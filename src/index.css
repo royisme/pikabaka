@@ -1,0 +1,453 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+@font-face {
+  font-family: 'CelebMF';
+  src: url('./font/Masterfont - Celeb MF Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'CelebMFLight';
+  src: url('./font/Masterfont - Celeb MF Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-system: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-display: "Space Grotesk", "Inter", -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  --surface: #0d0d1c;
+  --surface-container-low: #111127;
+  --surface-container-high: #1b1b40;
+  --surface-variant: rgba(32, 32, 77, 0.7);
+  --surface-tint: #a8c8ff;
+  --primary: #a8c8ff;
+  --primary-container: #6f8fcb;
+  --secondary: #72ac6f;
+  --secondary-container: rgba(114, 172, 111, 0.18);
+  --outline: rgba(67, 67, 114, 0.28);
+  --outline-variant: rgba(67, 67, 114, 0.15);
+
+  --bg-primary: var(--surface);
+  --bg-secondary: var(--surface-container-low);
+  --bg-elevated: var(--surface-container-high);
+  --bg-input: rgba(27, 27, 64, 0.88);
+  --bg-sidebar: var(--surface-container-low);
+  --bg-main: var(--surface);
+  --bg-card: var(--surface-container-high);
+  --bg-component: rgba(27, 27, 64, 0.72);
+  --bg-toggle-switch: rgba(67, 67, 114, 0.4);
+  --bg-item-surface: rgba(27, 27, 64, 0.72);
+  --bg-item-active: rgba(168, 200, 255, 0.16);
+
+  --text-primary: rgba(245, 247, 255, 0.96);
+  --text-secondary: rgba(201, 209, 235, 0.8);
+  --text-tertiary: rgba(145, 153, 188, 0.68);
+  --text-accent: var(--primary);
+
+  --border-subtle: transparent;
+  --border-muted: var(--outline-variant);
+
+  --accent-primary: var(--primary);
+  --accent-muted: rgba(168, 200, 255, 0.14);
+  --accent-live: var(--secondary);
+
+  --overlay-bg: var(--surface-variant);
+  --overlay-opacity: 0.7;
+  --overlay-border: var(--outline-variant);
+  --overlay-border-soft: rgba(67, 67, 114, 0.12);
+  --overlay-panel-bg: rgba(32, 32, 77, 0.7);
+  --overlay-pill-bg: rgba(27, 27, 64, 0.7);
+  --overlay-transcript-bg: rgba(13, 13, 28, 0.2);
+  --overlay-chip-bg: rgba(168, 200, 255, 0.06);
+  --overlay-chip-hover-bg: rgba(168, 200, 255, 0.12);
+  --overlay-input-bg: rgba(27, 27, 64, 0.72);
+  --overlay-input-hover-bg: rgba(33, 33, 82, 0.8);
+  --overlay-input-focus-bg: rgba(38, 53, 108, 0.86);
+  --overlay-control-bg: rgba(27, 27, 64, 0.7);
+  --overlay-control-hover-bg: rgba(168, 200, 255, 0.12);
+  --overlay-code-bg: rgba(13, 13, 28, 0.34);
+  --overlay-code-border: var(--outline-variant);
+  --overlay-code-header-bg: rgba(27, 27, 64, 0.82);
+  --overlay-inline-code-bg: rgba(168, 200, 255, 0.1);
+  --overlay-icon-bg: rgba(168, 200, 255, 0.06);
+  --overlay-icon-hover-bg: rgba(168, 200, 255, 0.14);
+  --overlay-panel-shadow: rgba(168, 200, 255, 0.08);
+  --overlay-pill-shadow: rgba(168, 200, 255, 0.06);
+  --overlay-text-primary: rgba(245, 247, 255, 0.96);
+  --overlay-text-secondary: rgba(201, 209, 235, 0.8);
+  --overlay-text-muted: rgba(145, 153, 188, 0.68);
+  --overlay-text-placeholder: rgba(145, 153, 188, 0.52);
+  --overlay-text-strong: #ffffff;
+  --overlay-shell-blur: 20px;
+  --overlay-pill-blur: 14px;
+  --overlay-transcript-blur: 8px;
+}
+
+[data-theme='light'] {
+  color-scheme: dark;
+}
+
+/* Light mode: liquid-glass — clean frosted white panel */
+[data-theme='light'] .liquid-glass {
+  background: rgba(255, 255, 255, 0.80);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.06),
+    0 1px 4px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 1.0);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+}
+
+/* ─── Light mode elevation system ────────────────────────────────────────
+   Top product designers (Linear, Vercel, Stripe) separate surfaces with
+   SHADOW — not borders. This creates depth without visual clutter.
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Level 1 — Cards sitting on the canvas */
+[data-theme='light'] .bg-bg-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* Level 2 — Modals, panels, settings wrapper */
+[data-theme='light'] #settings-panel-wrapper {
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.10),
+    0 6px 16px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+/* Level 3 — Dropdowns (override shadow-2xl in light mode) */
+[data-theme='light'] .shadow-2xl {
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.09),
+    0 2px 8px rgba(0, 0, 0, 0.05),
+    0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Sidebar border — very subtle rule separating white sidebar from gray canvas */
+[data-theme='light'] .border-r.border-border-subtle {
+  border-right-color: rgba(0, 0, 0, 0.07);
+}
+
+/* App sizing baseline (required for h-full / flex scroll areas) */
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--surface) !important;
+  color: var(--text-primary);
+  font-family: var(--font-system);
+  font-feature-settings: "tnum" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Allow selection in specific areas if needed */
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+label,
+[data-ui-label],
+.text-label {
+  font-family: var(--font-display);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+code,
+pre,
+kbd,
+samp,
+input,
+textarea,
+[data-mono],
+.timestamp,
+.time,
+.metric,
+.numeric {
+  font-family: var(--font-mono);
+}
+
+/* Scrollbar Styling - Minimal macOS Hidden style */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+/* Liquid Glass Effect Base - Professional Monospace Utility */
+.liquid-glass {
+  background: var(--surface-variant);
+  backdrop-filter: blur(20px) saturate(145%);
+  -webkit-backdrop-filter: blur(20px) saturate(145%);
+  border: 1px solid var(--outline-variant);
+  border-radius: 0.75rem;
+  box-shadow:
+    0 24px 40px rgba(168, 200, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  position: relative;
+  overflow: hidden;
+}
+
+.overlay-shell-surface {
+  background: var(--overlay-panel-bg);
+  border-color: var(--overlay-border);
+  box-shadow: 0 24px 40px var(--overlay-panel-shadow);
+  backdrop-filter: blur(var(--overlay-shell-blur)) saturate(145%);
+  -webkit-backdrop-filter: blur(var(--overlay-shell-blur)) saturate(145%);
+}
+
+[data-theme='light'] .overlay-shell-surface {
+  backdrop-filter: blur(var(--overlay-shell-blur)) saturate(145%);
+  -webkit-backdrop-filter: blur(var(--overlay-shell-blur)) saturate(145%);
+}
+
+.overlay-pill-surface {
+  background: var(--overlay-pill-bg);
+  border-color: var(--overlay-border);
+  box-shadow: 0 16px 28px var(--overlay-pill-shadow);
+  backdrop-filter: blur(var(--overlay-pill-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--overlay-pill-blur)) saturate(140%);
+}
+
+[data-theme='light'] .overlay-pill-surface {
+  backdrop-filter: blur(var(--overlay-pill-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--overlay-pill-blur)) saturate(140%);
+}
+
+.overlay-transcript-surface {
+  background: transparent;
+  border-bottom-color: transparent;
+}
+
+.overlay-subtle-surface {
+  background: var(--overlay-chip-bg);
+  border-color: var(--overlay-border-soft);
+}
+
+.overlay-code-block-surface {
+  background: var(--overlay-code-bg);
+  border-color: var(--overlay-code-border);
+}
+
+.overlay-code-header-surface {
+  background: var(--overlay-code-header-bg);
+  border-bottom-color: var(--overlay-code-border);
+}
+
+.overlay-chip-surface {
+  background: var(--overlay-chip-bg);
+  border-color: transparent;
+}
+
+.overlay-chip-surface:hover {
+  background: var(--overlay-chip-hover-bg);
+  border-color: var(--overlay-border-soft);
+}
+
+.overlay-input-surface {
+  background: var(--overlay-input-bg);
+  border-color: var(--overlay-border-soft);
+}
+
+.overlay-input-surface:hover {
+  background: var(--overlay-input-hover-bg);
+}
+
+.overlay-input-surface:focus {
+  background: var(--overlay-input-focus-bg);
+  border-color: var(--overlay-border);
+}
+
+.overlay-control-surface {
+  background: var(--overlay-control-bg);
+  border-color: var(--overlay-border);
+}
+
+.overlay-control-surface:hover {
+  background: var(--overlay-control-hover-bg);
+}
+
+.overlay-icon-surface {
+  background: var(--overlay-icon-bg);
+}
+
+.overlay-icon-surface-hover:hover {
+  background: var(--overlay-icon-hover-bg);
+}
+
+.overlay-inline-code-surface {
+  background: var(--overlay-inline-code-bg);
+}
+
+.overlay-text-primary {
+  color: var(--overlay-text-primary);
+}
+
+.overlay-text-secondary {
+  color: var(--overlay-text-secondary);
+}
+
+.overlay-text-muted {
+  color: var(--overlay-text-muted);
+}
+
+.overlay-text-strong {
+  color: var(--overlay-text-strong);
+}
+
+.overlay-text-interactive {
+  color: var(--overlay-text-primary);
+}
+
+.overlay-text-interactive:hover {
+  color: var(--overlay-text-primary);
+}
+
+.overlay-input-text {
+  color: var(--overlay-text-primary);
+}
+
+.overlay-input-text::placeholder {
+  color: var(--overlay-text-placeholder);
+}
+
+/* Interaction Utilities - Reusable */
+.interaction-base {
+  transition-property: transform, opacity, background-color, border-color, color;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+  backface-visibility: hidden;
+}
+
+.interaction-hover:hover {
+  transform: translateY(-0.5px);
+}
+
+.interaction-press:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+/* Electron Stability - Drag Regions */
+/* Title bar area usually */
+.titlebar-drag-region {
+  -webkit-app-region: drag;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38px;
+  /* Standard macOS titlebar height */
+  z-index: 9999;
+  cursor: default;
+}
+
+.draggable-area {
+  -webkit-app-region: drag;
+  position: relative;
+  z-index: 50;
+  cursor: default;
+}
+
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+/* Make sure buttons and interactive elements are not draggable */
+button,
+input,
+select,
+textarea,
+.interactive,
+.no-drag,
+[role="button"],
+a {
+  -webkit-app-region: no-drag;
+  cursor: default !important;
+}
+
+/* Explicit cursor class when pointer is explicitly needed */
+.cursor-pointer {
+  cursor: pointer;
+}
+
+/* Utilities for sidebar layout */
+.app-sidebar {
+  background: color-mix(in srgb, var(--surface-container-low) 88%, transparent);
+  backdrop-filter: blur(12px) saturate(130%);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  border-right: 1px solid var(--outline-variant);
+}
+
+[data-theme='light'] .app-sidebar {
+  background: color-mix(in srgb, var(--surface-container-low) 88%, transparent);
+  backdrop-filter: blur(12px) saturate(130%);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  border-right: 1px solid var(--outline-variant);
+}
+
+.app-content {
+  background: var(--surface);
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%) skewX(-12deg);
+  }
+
+  100% {
+    transform: translateX(200%) skewX(-12deg);
+  }
+}
+
+.animate-shine {
+  animation: shine 2s infinite;
+}
+
+/* Force instant transitions globally during previews */
+.disable-transitions, .disable-transitions * {
+  transition: none !important;
+}
+
+/* ── Windows / Linux window chrome – rounded corners ──────────────────────────
+   Using positive selectors (not :not()) avoids a brief border-radius flash on
+   macOS during cold-start, before the data-platform attribute is set.
+   ─────────────────────────────────────────────────────────────────────────── */
+html[data-platform="win32"] body,
+html[data-platform="linux"] body {
+  border-radius: 0.75rem !important;
+  overflow: hidden;
+}

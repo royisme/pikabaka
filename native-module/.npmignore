@@ -1,0 +1,12 @@
+src/
+target/
+.cargo/
+Cargo.toml
+Cargo.lock
+.gitignore
+.DS_Store
+node_modules/
+package-lock.json
+
+# We explicitly permit .node binaries to be packed
+!*.node

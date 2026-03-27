@@ -1,0 +1,12 @@
+allowBuilds:
+  better-sqlite3: true
+  core-js: true
+  electron: true
+  electron-winstaller: true
+  esbuild: true
+  keytar: true
+  lzma-native: true
+  protobufjs: true
+  sharp: true
+  sqlite3: true
+  tesseract.js: true

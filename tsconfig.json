@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"], // Browser APIs
+    "module": "ESNext", // For Vite/Modern browsers
+    "moduleResolution": "bundler", // For Vite
+    "jsx": "react-jsx", // React specific
+    "noEmit": true, // Vite handles the building
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+  },
+  "include": ["src", "premium/src"], // React source files and optional premium components
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
