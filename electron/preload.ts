@@ -127,6 +127,7 @@ interface ElectronAPI {
   onIntelligenceAssistUpdate: (callback: (data: { insight: string }) => void) => () => void
   onIntelligenceSuggestedAnswer: (callback: (data: { answer: string; question: string; confidence: number }) => void) => () => void
   onIntelligenceRefinedAnswer: (callback: (data: { answer: string; intent: string }) => void) => () => void
+  onKnowledgeContextUpdate: (callback: (data: { matchedJDSignals: any[]; resumeEvidence: any[]; mustHitKeywords: string[]; questionCategory: string }) => void) => () => void
   onIntelligenceRecap: (callback: (data: { summary: string }) => void) => () => void
   onIntelligenceClarify: (callback: (data: { clarification: string }) => void) => () => void
   onIntelligenceClarifyToken: (callback: (data: { token: string }) => void) => () => void
@@ -266,6 +267,14 @@ interface ElectronAPI {
   // JD & Research API
   profileUploadJD: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   profileDeleteJD: () => Promise<{ success: boolean; error?: string }>;
+
+  // Multi-JD Management
+  knowledgeGetAllJDs: () => Promise<any[]>;
+  knowledgeSetActiveJD: (docId: number) => Promise<{ success: boolean; error?: string }>;
+  knowledgeDeleteJD: (docId: number) => Promise<{ success: boolean; error?: string }>;
+  knowledgeUploadJD: (filePath: string) => Promise<{ success: boolean; error?: string }>;
+  knowledgeUpdateProfile: (updates: any) => Promise<{ success: boolean; error?: string }>;
+  knowledgeGeneratePrep: (jdId?: number) => Promise<{ success: boolean; data?: any; error?: string }>;
   profileResearchCompany: (companyName: string) => Promise<{ success: boolean; dossier?: any; error?: string }>;
   profileGenerateNegotiation: (force?: boolean) => Promise<{ success: boolean; script?: any; error?: string }>;
   profileGetNegotiationState: () => Promise<{ success: boolean; state?: any; isActive?: boolean; error?: string }>;
@@ -685,6 +694,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.removeListener("intelligence-refined-answer", subscription)
     }
   },
+  onKnowledgeContextUpdate: (callback: (data: { matchedJDSignals: any[]; resumeEvidence: any[]; mustHitKeywords: string[]; questionCategory: string }) => void) => {
+    const subscription = (_event: any, data: any) => callback(data)
+    ipcRenderer.on("knowledge:context-update", subscription)
+    return () => {
+      ipcRenderer.removeListener("knowledge:context-update", subscription)
+    }
+  },
   onIntelligenceRecapToken: (callback: (data: { token: string }) => void) => {
     const subscription = (_: any, data: any) => callback(data)
     ipcRenderer.on("intelligence-recap-token", subscription)
@@ -1040,6 +1056,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // JD & Research API
   profileUploadJD: (filePath: string) => ipcRenderer.invoke('profile:upload-jd', filePath),
   profileDeleteJD: () => ipcRenderer.invoke('profile:delete-jd'),
+
+  // Multi-JD Management
+  knowledgeGetAllJDs: () => ipcRenderer.invoke('knowledge:get-all-jds'),
+  knowledgeSetActiveJD: (docId: number) => ipcRenderer.invoke('knowledge:set-active-jd', docId),
+  knowledgeDeleteJD: (docId: number) => ipcRenderer.invoke('knowledge:delete-jd', docId),
+  knowledgeUploadJD: (filePath: string) => ipcRenderer.invoke('knowledge:upload-jd', filePath),
+  knowledgeUpdateProfile: (updates: any) => ipcRenderer.invoke('knowledge:update-profile', updates),
+  knowledgeGeneratePrep: (jdId?: number) => ipcRenderer.invoke('knowledge:generate-prep', jdId),
   profileResearchCompany: (companyName: string) => ipcRenderer.invoke('profile:research-company', companyName),
   profileGenerateNegotiation: (force?: boolean) => ipcRenderer.invoke('profile:generate-negotiation', force),
   profileGetNegotiationState: () => ipcRenderer.invoke('profile:get-negotiation-state'),

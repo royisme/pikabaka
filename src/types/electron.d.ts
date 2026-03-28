@@ -165,6 +165,7 @@ export interface ElectronAPI {
   onIntelligenceSuggestedAnswer: (callback: (data: { answer: string; question: string; confidence: number }) => void) => () => void
   onIntelligenceRefinedAnswerToken: (callback: (data: { token: string; intent: string }) => void) => () => void
   onIntelligenceRefinedAnswer: (callback: (data: { answer: string; intent: string }) => void) => () => void
+  onKnowledgeContextUpdate: (callback: (data: { matchedJDSignals: Array<{ requirement: string; relevance: number }>; resumeEvidence: Array<{ source: string; text: string }>; mustHitKeywords: string[]; questionCategory: string }) => void) => () => void
   onIntelligenceFollowUpQuestionsUpdate: (callback: (data: { questions: string }) => void) => () => void
   onIntelligenceFollowUpQuestionsToken: (callback: (data: { token: string }) => void) => () => void
   onIntelligenceRecap: (callback: (data: { summary: string }) => void) => () => void
@@ -301,6 +302,14 @@ export interface ElectronAPI {
   profileGenerateNegotiation: (force?: boolean) => Promise<{ success: boolean; script?: any; error?: string }>
   profileGetNegotiationState: () => Promise<{ success: boolean; state?: any; isActive?: boolean; error?: string }>
   profileResetNegotiation: () => Promise<{ success: boolean; error?: string }>
+
+  // Multi-JD Management
+  knowledgeGetAllJDs: () => Promise<any[]>
+  knowledgeSetActiveJD: (docId: number) => Promise<{ success: boolean; error?: string }>
+  knowledgeDeleteJD: (docId: number) => Promise<{ success: boolean; error?: string }>
+  knowledgeUploadJD: (filePath: string) => Promise<{ success: boolean; error?: string }>
+  knowledgeUpdateProfile: (updates: any) => Promise<{ success: boolean; error?: string }>
+  knowledgeGeneratePrep: (jdId?: number) => Promise<{ success: boolean; data?: any; error?: string }>
 
   // Tavily Search API
   setTavilyApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>

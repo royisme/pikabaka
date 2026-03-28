@@ -72,12 +72,21 @@ interface PikaInterfaceProps {
     overlayOpacity?: number;
 }
 
+interface KnowledgeContext {
+    matchedJDSignals: Array<{ requirement: string; relevance: number }>;
+    resumeEvidence: Array<{ source: string; text: string }>;
+    mustHitKeywords: string[];
+    questionCategory: string;
+}
+
 const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpacity = OVERLAY_OPACITY_DEFAULT }) => {
     const isLightTheme = useResolvedTheme() === 'light';
     const [isExpanded, setIsExpanded] = useState(true);
     const [inputValue, setInputValue] = useState('');
     const { shortcuts, isShortcutPressed } = useShortcuts();
     const [messages, setMessages] = useState<Message[]>([]);
+    const [knowledgeContext, setKnowledgeContext] = useState<KnowledgeContext | null>(null);
+    const knowledgeContextTimeoutRef = useRef<number | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const [nativeAudioHealth, setNativeAudioHealth] = useState<{
         connected: boolean;
@@ -731,6 +740,17 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
             });
         }));
 
+        cleanups.push(window.electronAPI.onKnowledgeContextUpdate((data) => {
+            setKnowledgeContext(data);
+            if (knowledgeContextTimeoutRef.current) {
+                window.clearTimeout(knowledgeContextTimeoutRef.current);
+            }
+            knowledgeContextTimeoutRef.current = window.setTimeout(() => {
+                setKnowledgeContext(null);
+                knowledgeContextTimeoutRef.current = null;
+            }, 30000);
+        }));
+
         // STREAMING: Recap
         cleanups.push(window.electronAPI.onIntelligenceRecapToken((data) => {
             setMessages(prev => {
@@ -857,7 +877,13 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         }
 
 
-        return () => cleanups.forEach(fn => fn());
+        return () => {
+            cleanups.forEach(fn => fn());
+            if (knowledgeContextTimeoutRef.current) {
+                window.clearTimeout(knowledgeContextTimeoutRef.current);
+                knowledgeContextTimeoutRef.current = null;
+            }
+        };
     }, [isExpanded]);
 
     // Stable mount-only effect for clarify streaming listeners.
@@ -2171,6 +2197,35 @@ Provide only the answer, nothing else.`;
                                                 <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                                                 <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {knowledgeContext && (knowledgeContext.mustHitKeywords.length > 0 || knowledgeContext.resumeEvidence.length > 0) && (
+                                        <div className="mx-3 mb-3 p-3 bg-accent-primary/5 border border-accent-primary/10 rounded-xl">
+                                            {knowledgeContext.mustHitKeywords.length > 0 && (
+                                                <div className="mb-2">
+                                                    <span className="text-[9px] font-bold text-accent-primary uppercase tracking-wide">Keywords to hit</span>
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {knowledgeContext.mustHitKeywords.slice(0, 8).map((kw, i) => (
+                                                            <span key={i} className="text-[10px] font-medium text-accent-primary px-1.5 py-0.5 rounded bg-accent-primary/10 border border-accent-primary/20">
+                                                                {kw}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {knowledgeContext.resumeEvidence.length > 0 && (
+                                                <div>
+                                                    <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wide">Evidence to cite</span>
+                                                    <div className="space-y-1 mt-1">
+                                                        {knowledgeContext.resumeEvidence.slice(0, 3).map((ev, i) => (
+                                                            <div key={i} className="text-[10px] text-text-secondary">
+                                                                <span className="font-medium text-emerald-400">{ev.source}:</span> {ev.text.slice(0, 100)}{ev.text.length > 100 ? '...' : ''}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                     <div ref={messagesEndRef} />

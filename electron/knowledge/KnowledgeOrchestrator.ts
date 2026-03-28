@@ -6,6 +6,7 @@ import { ProfileExtractor } from './ProfileExtractor';
 import { JDAnalyzer } from './JDAnalyzer';
 import { KnowledgeVectorStore } from './KnowledgeVectorStore';
 import { DepthScorer } from './DepthScorer';
+import { InterviewPrepService } from './InterviewPrepService';
 import {
   DocType,
   ProfileData,
@@ -18,6 +19,8 @@ import {
   CompanyDossier,
   NegotiationScript,
   NegotiationState,
+  JDListItem,
+  InterviewPrepData,
 } from './types';
 import { buildContextEnhancementPrompt, buildIntroResponsePrompt } from './prompts';
 
@@ -36,6 +39,7 @@ export class KnowledgeOrchestrator {
 
   private cachedProfileData: ProfileData | null = null;
   private cachedNegotiationScript: NegotiationScript | null = null;
+  private interviewPrepService: InterviewPrepService | null = null;
 
   private companyResearchEngine: {
     researchCompany: (company: string, jdCtx: any, useCache: boolean) => Promise<CompanyDossier>;
@@ -63,6 +67,7 @@ export class KnowledgeOrchestrator {
     this.generateContentFn = fn;
     this.profileExtractor = new ProfileExtractor(fn);
     this.jdAnalyzer = new JDAnalyzer(fn);
+    this.interviewPrepService = new InterviewPrepService(fn);
   }
 
   setEmbedFn(fn: EmbedFn): void {
@@ -92,10 +97,19 @@ export class KnowledgeOrchestrator {
         parsedData = await this.jdAnalyzer.analyze(text);
       }
 
-      this.vectorStore.clearEmbeddings(docType);
-
       const fileName = path.basename(filePath);
-      const docId = this.db.upsertDocument(docType, fileName, text, parsedData);
+      let docId: number;
+
+      if (docType === DocType.JD) {
+        const jdData = parsedData as JDData;
+        const label = jdData.company ? `${jdData.title} @ ${jdData.company}` : jdData.title;
+        docId = this.db.insertDocument(docType, fileName, text, parsedData, label);
+        this.db.setActiveDocument(docId);
+      } else {
+        this.vectorStore.clearEmbeddings(docType);
+        docId = this.db.upsertDocument(docType, fileName, text, parsedData);
+      }
+
       const chunks = this.chunkDocument(text, docType);
       const chunkIds = this.db.saveChunks(docId, chunks);
 
@@ -124,7 +138,7 @@ export class KnowledgeOrchestrator {
   getStatus(): KnowledgeStatus {
     const resumeDoc = this.db.getDocumentByType(DocType.RESUME);
     if (!resumeDoc) {
-      return { hasResume: false, activeMode: false };
+      return { hasResume: false, activeMode: false, jdCount: 0 };
     }
 
     let resumeSummary: KnowledgeStatus['resumeSummary'];
@@ -143,6 +157,7 @@ export class KnowledgeOrchestrator {
       hasResume: true,
       activeMode: this.knowledgeMode,
       resumeSummary,
+      jdCount: this.db.countDocumentsByType(DocType.JD),
     };
   }
 
@@ -190,7 +205,7 @@ export class KnowledgeOrchestrator {
       profile.nodeCount = profile.skills.length + profile.experience.length + profile.projects.length;
       profile.rawText = resumeDoc.raw_text;
 
-      const jdDoc = this.db.getDocumentByType(DocType.JD);
+      const jdDoc = this.db.getActiveDocument(DocType.JD);
       if (jdDoc) {
         profile.hasActiveJD = true;
         profile.activeJD = JSON.parse(jdDoc.parsed_data) as JDData;
@@ -262,7 +277,7 @@ export class KnowledgeOrchestrator {
       tracker.setScript(script);
     }
     const resumeDoc = this.db.getDocumentByType(DocType.RESUME);
-    const jdDoc = this.db.getDocumentByType(DocType.JD);
+    const jdDoc = this.db.getActiveDocument(DocType.JD);
     this.db.saveNegotiationState(resumeDoc?.id ?? null, jdDoc?.id ?? null, script, tracker?.getState?.() ?? null);
     this.cachedProfileData = null;
 
@@ -295,6 +310,103 @@ export class KnowledgeOrchestrator {
     this.db.clearNegotiationState();
   }
 
+  getAllJDs(): JDListItem[] {
+    const docs = this.db.getAllDocumentsByType(DocType.JD);
+    return docs.map(doc => {
+      let parsed: JDData = { company: '', title: '', requirements: [], technologies: [] };
+      try {
+        parsed = JSON.parse(doc.parsed_data) as JDData;
+      } catch { }
+
+      return {
+        id: doc.id,
+        company: parsed.company || 'Unknown',
+        title: parsed.title || 'Unknown Position',
+        label: doc.label || undefined,
+        isActive: doc.is_active === 1,
+        createdAt: doc.created_at,
+        technologies: parsed.technologies || [],
+      };
+    });
+  }
+
+  setActiveJD(docId: number): void {
+    this.db.setActiveDocument(docId);
+    this.cachedProfileData = null;
+    this.cachedNegotiationScript = null;
+    this.db.clearNegotiationState();
+  }
+
+  deleteJD(docId: number): void {
+    this.db.deleteDocumentById(docId);
+    this.cachedProfileData = null;
+    this.cachedNegotiationScript = null;
+  }
+
+  updateProfileData(updates: Partial<ProfileData>): { success: boolean; error?: string } {
+    try {
+      const resumeDoc = this.db.getDocumentByType(DocType.RESUME);
+      if (!resumeDoc) {
+        return { success: false, error: 'No resume found' };
+      }
+
+      let existing: any;
+      try {
+        existing = JSON.parse(resumeDoc.parsed_data);
+      } catch {
+        existing = {};
+      }
+
+      const merged = { ...existing };
+      if (updates.identity) merged.identity = { ...existing.identity, ...updates.identity };
+      if (updates.skills) merged.skills = updates.skills;
+      if (updates.experience) merged.experience = updates.experience;
+      if (updates.projects) merged.projects = updates.projects;
+      if (updates.education) merged.education = updates.education;
+      if (updates.totalExperienceYears !== undefined) merged.totalExperienceYears = updates.totalExperienceYears;
+
+      merged.experienceCount = (merged.experience || []).length;
+      merged.projectCount = (merged.projects || []).length;
+      merged.nodeCount = (merged.skills || []).length + (merged.experience || []).length + (merged.projects || []).length;
+
+      this.db.updateDocumentParsedData(resumeDoc.id, merged);
+      this.cachedProfileData = null;
+
+      console.log('[KnowledgeOrchestrator] Profile data updated by user edit');
+      return { success: true };
+    } catch (error: any) {
+      console.error('[KnowledgeOrchestrator] updateProfileData error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async generateInterviewPrep(jdId?: number): Promise<InterviewPrepData | null> {
+    if (!this.interviewPrepService) return null;
+
+    const profile = this.getProfileData();
+    if (!profile) return null;
+
+    let jdData: JDData | undefined;
+    if (jdId !== undefined) {
+      const docs = this.db.getAllDocumentsByType(DocType.JD);
+      const doc = docs.find(d => d.id === jdId);
+      if (doc) {
+        try { jdData = JSON.parse(doc.parsed_data) as JDData; } catch {}
+      }
+    } else {
+      jdData = profile.activeJD;
+    }
+
+    if (!jdData) return null;
+
+    try {
+      return await this.interviewPrepService.generatePrep(profile, jdData);
+    } catch (error: any) {
+      console.error('[KnowledgeOrchestrator] generateInterviewPrep error:', error);
+      return null;
+    }
+  }
+
   feedForDepthScoring(message: string): void {
     this.depthScorer.feed(message);
   }
@@ -304,7 +416,7 @@ export class KnowledgeOrchestrator {
       this.negotiationTracker.feedUtterance(text);
 
       const resumeDoc = this.db.getDocumentByType(DocType.RESUME);
-      const jdDoc = this.db.getDocumentByType(DocType.JD);
+      const jdDoc = this.db.getActiveDocument(DocType.JD);
       this.db.saveNegotiationState(
         resumeDoc?.id ?? null,
         jdDoc?.id ?? null,
@@ -348,16 +460,24 @@ export class KnowledgeOrchestrator {
           const identitySummary = `${identityName}, ${latestRole} with ${totalExperienceYears} years of experience`;
           const depthInstruction = this.depthScorer.getDepthInstruction();
           const contextChunks = results.map((result) => result.text);
+          const jdContext = profile?.activeJD ? {
+            requirements: profile.activeJD.requirements,
+            technologies: profile.activeJD.technologies,
+            keywords: profile.activeJD.keywords,
+          } : undefined;
           const systemPrompt = buildContextEnhancementPrompt(
             message,
             contextChunks,
             identitySummary,
             depthInstruction,
+            jdContext,
           );
+          const jdEnhancement = this.getJDEnhancement(message, profile);
 
           return {
             systemPromptInjection: systemPrompt,
             contextBlock: contextChunks.join('\n\n'),
+            ...jdEnhancement,
           };
         }
       }
@@ -365,9 +485,11 @@ export class KnowledgeOrchestrator {
       const profile = this.getProfileData();
       if (profile) {
         const identitySummary = `${profile.identity.name}, ${profile.experience?.[0]?.role || ''} with ${profile.totalExperienceYears} years of experience. Skills: ${profile.skills.slice(0, 10).join(', ')}`;
+        const jdEnhancement = this.getJDEnhancement(message, profile);
         return {
-          systemPromptInjection: `You are helping this candidate answer interview questions. Candidate: ${identitySummary}. Use their background to provide personalized, specific answers.`,
+          systemPromptInjection: `You are helping this candidate answer interview questions. Candidate: ${identitySummary}. Use their background to provide personalized, specific answers.${jdEnhancement.mustHitKeywords?.length ? ` Try to naturally incorporate these keywords: ${jdEnhancement.mustHitKeywords.join(', ')}.` : ''}`,
           contextBlock: profile.rawText.slice(0, 2000),
+          ...jdEnhancement,
         };
       }
 
@@ -392,6 +514,81 @@ export class KnowledgeOrchestrator {
     ];
 
     return patterns.some((pattern) => lower.includes(pattern));
+  }
+
+  private getJDEnhancement(question: string, profile: ProfileData | null): Partial<KnowledgeResult> {
+    if (!profile?.activeJD) return {};
+
+    const jd = profile.activeJD;
+    const questionLower = question.toLowerCase();
+
+    const questionCategory = this.classifyQuestion(questionLower);
+
+    const matchedJDSignals: Array<{ requirement: string; relevance: number }> = [];
+    for (const req of (jd.requirements || [])) {
+      const reqLower = req.toLowerCase();
+      const reqWords = reqLower.split(/[\s,/\\-]+/).filter(w => w.length > 2);
+      const relevance = reqWords.filter(w => questionLower.includes(w)).length / Math.max(reqWords.length, 1);
+      if (relevance > 0.2) {
+        matchedJDSignals.push({ requirement: req, relevance: Math.round(relevance * 100) / 100 });
+      }
+    }
+
+    for (const tech of (jd.technologies || [])) {
+      if (questionLower.includes(tech.toLowerCase())) {
+        matchedJDSignals.push({ requirement: tech, relevance: 1.0 });
+      }
+    }
+    matchedJDSignals.sort((a, b) => b.relevance - a.relevance);
+
+    const resumeEvidence: Array<{ source: string; text: string }> = [];
+    for (const exp of (profile.experience || [])) {
+      for (const highlight of (exp.highlights || [])) {
+        const highlightLower = highlight.toLowerCase();
+        const isRelevant = matchedJDSignals.some(s =>
+          highlightLower.includes(s.requirement.toLowerCase().split(' ')[0])
+        ) || questionLower.split(' ').filter(w => w.length > 3).some(w => highlightLower.includes(w));
+
+        if (isRelevant) {
+          resumeEvidence.push({ source: `${exp.role} @ ${exp.company}`, text: highlight });
+        }
+      }
+    }
+    for (const proj of (profile.projects || [])) {
+      const projText = `${proj.description} ${(proj.highlights || []).join(' ')}`.toLowerCase();
+      const isRelevant = matchedJDSignals.some(s =>
+        projText.includes(s.requirement.toLowerCase().split(' ')[0])
+      ) || (proj.technologies || []).some(t => questionLower.includes(t.toLowerCase()));
+
+      if (isRelevant) {
+        resumeEvidence.push({ source: `Project: ${proj.name}`, text: proj.description });
+      }
+    }
+
+    const mustHitKeywords = [
+      ...(jd.keywords || []),
+      ...(jd.technologies || []).filter(t => questionLower.includes(t.toLowerCase())),
+    ].slice(0, 10);
+
+    return {
+      matchedJDSignals: matchedJDSignals.slice(0, 5),
+      resumeEvidence: resumeEvidence.slice(0, 4),
+      mustHitKeywords: [...new Set(mustHitKeywords)],
+      questionCategory,
+    };
+  }
+
+  private classifyQuestion(questionLower: string): 'behavioral' | 'technical' | 'system_design' | 'intro' {
+    const introPatterns = ['tell me about yourself', 'introduce yourself', 'walk me through', 'describe yourself', 'who are you'];
+    if (introPatterns.some(p => questionLower.includes(p))) return 'intro';
+
+    const systemDesignPatterns = ['design a', 'design the', 'architect', 'how would you build', 'scale', 'system design', 'high level design'];
+    if (systemDesignPatterns.some(p => questionLower.includes(p))) return 'system_design';
+
+    const behavioralPatterns = ['tell me about a time', 'describe a situation', 'give me an example', 'how do you handle', 'what would you do if', 'biggest challenge', 'conflict', 'disagreed', 'failed', 'mistake', 'leadership'];
+    if (behavioralPatterns.some(p => questionLower.includes(p))) return 'behavioral';
+
+    return 'technical';
   }
 
   private chunkDocument(text: string, docType: DocType): Array<{ text: string; metadata?: any }> {

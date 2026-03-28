@@ -74,6 +74,44 @@ export interface JDData {
   min_years_experience?: number;
 }
 
+export interface JDListItem {
+  id: number;
+  company: string;
+  title: string;
+  label?: string;
+  isActive: boolean;
+  createdAt: string;
+  technologies: string[];
+}
+
+export interface InterviewPrepQuestion {
+  question: string;
+  category: 'behavioral' | 'technical' | 'system_design' | 'intro';
+  difficulty: number;  // 1-3
+  relatedJDRequirement?: string;
+  suggestedAnswer: {
+    opening: string;
+    keyPoints: string[];
+    evidence?: string;
+  };
+}
+
+export interface InterviewPrepData {
+  likelyQuestions: InterviewPrepQuestion[];
+  matchScore: number;  // 0-100
+  knowledgeGaps: Array<{ skill: string; importance: 'critical' | 'nice_to_have'; suggestion: string }>;
+  mustMentionKeywords: string[];
+  openingPitch: string;
+}
+
+export interface InterviewRecap {
+  strongAnswers: Array<{ question: string; score: number; feedback: string }>;
+  weakAnswers: Array<{ question: string; score: number; feedback: string; suggestion: string }>;
+  missedRequirements: string[];
+  improvementActions: string[];
+  jdCoverage: Array<{ requirement: string; covered: boolean; evidence?: string; confidence: number }>;
+}
+
 // ─── Company Research Types ──────────────────────────────────
 
 export interface CompanyDossier {
@@ -148,6 +186,7 @@ export interface NegotiationState {
 export interface KnowledgeStatus {
   hasResume: boolean;
   activeMode: boolean;
+  jdCount: number;
   resumeSummary?: {
     name: string;
     role: string;
@@ -161,6 +200,10 @@ export interface KnowledgeResult {
   liveNegotiationResponse?: any;
   systemPromptInjection?: string;
   contextBlock?: string;
+  matchedJDSignals?: Array<{ requirement: string; relevance: number }>;
+  resumeEvidence?: Array<{ source: string; text: string }>;
+  mustHitKeywords?: string[];
+  questionCategory?: 'behavioral' | 'technical' | 'system_design' | 'intro';
 }
 
 // ─── Function Types (injected from main.ts) ──────────────────
@@ -179,6 +222,8 @@ export interface DocumentRow {
   parsed_data: string; // JSON string
   created_at: string;
   updated_at: string;
+  is_active?: number;  // 0 or 1
+  label?: string;
 }
 
 export interface ChunkRow {

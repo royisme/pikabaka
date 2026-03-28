@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ToggleLeft, ToggleRight, Search, Zap, Calendar, ArrowRight, ArrowLeft, MoreHorizontal, Globe, Clock, ChevronRight, Settings, RefreshCw, Eye, EyeOff, Ghost, Plus, Mail, Link as LinkIcon, ChevronDown, Trash2, Bell, Check, Download, DownloadCloud, CheckCircle, AlertCircle } from 'lucide-react';
+import { ToggleLeft, ToggleRight, Search, Zap, Calendar, ArrowRight, ArrowLeft, MoreHorizontal, Globe, Clock, ChevronRight, Settings, RefreshCw, Eye, EyeOff, Ghost, Plus, Mail, Link as LinkIcon, ChevronDown, Trash2, Bell, Check, Download, DownloadCloud, CheckCircle, AlertCircle, Briefcase } from 'lucide-react';
 import { generateMeetingPDF } from '../utils/pdfGenerator';
 import icon from "../../assets/icon.png";
 import MeetingDetails from './MeetingDetails';
@@ -8,6 +8,7 @@ import GlobalChatOverlay from './GlobalChatOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
 import { analytics } from '../lib/analytics/analytics.service'; // Added analytics import
 import { useShortcuts } from '../hooks/useShortcuts';
+import { useProfileData } from '../hooks/useProfileData';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { isMac } from '../utils/platformUtils';
 import WindowControls from './WindowControls';
@@ -124,6 +125,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onP
 
     // Keybinds
     const { isShortcutPressed } = useShortcuts();
+    const { data: profileData } = useProfileData();
     const isLight = useResolvedTheme() === 'light';
 
     useEffect(() => {
@@ -722,6 +724,34 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onP
                                     )}
                                 </div>
                             </section>
+
+                            {/* Active JD Badge */}
+                            {profileData?.hasActiveJD && profileData.activeJD && (
+                                <div className="px-8 py-3 border-t border-border-subtle bg-bg-primary/50">
+                                    <div className="max-w-4xl mx-auto flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-7 h-7 rounded-lg bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center">
+                                                <Briefcase size={13} className="text-accent-primary" />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-semibold text-text-primary">{profileData.activeJD.title}</span>
+                                                    <span className="text-[9px] font-bold text-accent-primary px-1.5 py-0.5 bg-accent-primary/10 rounded uppercase tracking-wide border border-accent-primary/20">
+                                                        Active
+                                                    </span>
+                                                </div>
+                                                <span className="text-[11px] text-text-secondary">{profileData.activeJD.company}</span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => onOpenSettings?.('profile')}
+                                            className="text-[11px] font-medium text-text-tertiary hover:text-text-primary px-2.5 py-1 rounded-full hover:bg-bg-input transition-colors"
+                                        >
+                                            Change
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* BOTTOM SECTION: Black Background (Scrollable content) */}
                             <main className="flex-1 overflow-y-auto custom-scrollbar bg-bg-primary">

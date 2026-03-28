@@ -1,13 +1,14 @@
 import { useMutation, useQueryClient } from 'react-query';
+import type { ProfileData } from '../../electron/knowledge/types';
 
-export function useUploadJD() {
+export function useEditProfile() {
   const qc = useQueryClient();
 
   return useMutation(
-    async (filePath: string) => {
-      const result = await window.electronAPI.profileUploadJD(filePath);
+    async (updates: Partial<ProfileData>) => {
+      const result = await window.electronAPI.knowledgeUpdateProfile(updates);
       if (!result?.success) {
-        throw new Error(result?.error || 'JD upload failed');
+        throw new Error(result?.error || 'Failed to update profile');
       }
       return result;
     },
@@ -15,7 +16,6 @@ export function useUploadJD() {
       onSuccess: () => {
         qc.invalidateQueries(['profile', 'data']);
         qc.invalidateQueries(['profile', 'status']);
-        qc.invalidateQueries(['knowledge', 'jds']);
       },
     }
   );

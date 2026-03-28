@@ -231,4 +231,97 @@ export function registerKnowledgeHandlers(appState: AppState): void {
       return { success: false, error: error.message };
     }
   });
+
+  // ==========================================
+  // Multi-JD Management Handlers
+  // ==========================================
+
+  safeHandle("knowledge:get-all-jds", async () => {
+    try {
+      const orchestrator = appState.getKnowledgeOrchestrator();
+      if (!orchestrator) return [];
+      return orchestrator.getAllJDs();
+    } catch (error: any) {
+      console.error('[IPC] knowledge:get-all-jds error:', error);
+      return [];
+    }
+  });
+
+  safeHandle("knowledge:set-active-jd", async (_, docId: number) => {
+    try {
+      const orchestrator = appState.getKnowledgeOrchestrator();
+      if (!orchestrator) {
+        return { success: false, error: 'Knowledge engine not initialized' };
+      }
+      orchestrator.setActiveJD(docId);
+      return { success: true };
+    } catch (error: any) {
+      console.error('[IPC] knowledge:set-active-jd error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  safeHandle("knowledge:delete-jd", async (_, docId: number) => {
+    try {
+      const orchestrator = appState.getKnowledgeOrchestrator();
+      if (!orchestrator) {
+        return { success: false, error: 'Knowledge engine not initialized' };
+      }
+      orchestrator.deleteJD(docId);
+      return { success: true };
+    } catch (error: any) {
+      console.error('[IPC] knowledge:delete-jd error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  safeHandle("knowledge:upload-jd", async (_, filePath: string) => {
+    try {
+      console.log(`[IPC] knowledge:upload-jd called with: ${filePath}`);
+      const orchestrator = appState.getKnowledgeOrchestrator();
+      if (!orchestrator) {
+        return { success: false, error: 'Knowledge engine not initialized. Please ensure API keys are configured.' };
+      }
+      const result = await orchestrator.ingestDocument(filePath, DocType.JD);
+      return result;
+    } catch (error: any) {
+      console.error('[IPC] knowledge:upload-jd error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  safeHandle("knowledge:update-profile", async (_, updates: any) => {
+    try {
+      const orchestrator = appState.getKnowledgeOrchestrator();
+      if (!orchestrator) {
+        return { success: false, error: 'Knowledge engine not initialized' };
+      }
+      // Sanitize: only allow known profile fields
+      const allowedKeys = ['identity', 'skills', 'experience', 'projects', 'education', 'totalExperienceYears'];
+      const sanitized = Object.fromEntries(
+        Object.entries(updates || {}).filter(([k]) => allowedKeys.includes(k))
+      );
+      return orchestrator.updateProfileData(sanitized);
+    } catch (error: any) {
+      console.error('[IPC] knowledge:update-profile error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  safeHandle("knowledge:generate-prep", async (_, jdId?: number) => {
+    try {
+      const orchestrator = appState.getKnowledgeOrchestrator();
+      if (!orchestrator) {
+        return { success: false, error: 'Knowledge engine not initialized' };
+      }
+      const prepData = await orchestrator.generateInterviewPrep(jdId);
+      if (!prepData) {
+        return { success: false, error: 'Could not generate prep. Ensure resume and JD are uploaded.' };
+      }
+      return { success: true, data: prepData };
+    } catch (error: any) {
+      console.error('[IPC] knowledge:generate-prep error:', error);
+      return { success: false, error: error.message };
+    }
+  });
 }

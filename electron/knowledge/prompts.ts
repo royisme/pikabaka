@@ -192,13 +192,19 @@ export function buildContextEnhancementPrompt(
   question: string,
   relevantChunks: string[],
   identitySummary: string,
-  depthInstruction: string
+  depthInstruction: string,
+  jdContext?: { requirements?: string[]; technologies?: string[]; keywords?: string[] }
 ): string {
+  const jdSection = jdContext && (jdContext.requirements?.length || jdContext.technologies?.length)
+    ? `\nTarget position priorities:\n- Requirements: ${(jdContext.requirements || []).slice(0, 5).join(', ')}\n- Technologies: ${(jdContext.technologies || []).slice(0, 8).join(', ')}\n- Keywords to naturally include: ${(jdContext.keywords || []).slice(0, 8).join(', ')}`
+    : '';
+
   return `You are helping a job candidate answer an interview question. Use the candidate's background context to craft a personalized, specific answer.
 
 ${depthInstruction}
 
 Candidate identity: ${identitySummary}
+${jdSection}
 
 Relevant background:
 ${relevantChunks.map((c, i) => `[${i + 1}] ${c}`).join('\n')}
@@ -209,5 +215,5 @@ Instructions:
 - Answer in first person as the candidate
 - Reference specific experiences, projects, and skills from the background
 - Be specific with numbers, technologies, and outcomes where possible
-- Keep the answer focused and natural (not a lecture)`;
+- Keep the answer focused and natural (not a lecture)${jdContext ? '\n- Naturally incorporate keywords from the target position where relevant' : ''}`;
 }

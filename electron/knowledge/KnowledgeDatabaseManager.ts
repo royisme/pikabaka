@@ -57,6 +57,32 @@ export class KnowledgeDatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_knowledge_docs_type ON knowledge_documents(doc_type);
       CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_doc ON knowledge_chunks(doc_id);
     `);
+
+    // Migration: add multi-JD support columns
+    try {
+      this.db.exec(`ALTER TABLE knowledge_documents ADD COLUMN is_active INTEGER DEFAULT 0`);
+      // First migration only: activate existing JDs
+      this.db.prepare(`UPDATE knowledge_documents SET is_active = 1 WHERE doc_type = 'jd'`).run();
+    } catch { /* column already exists */ }
+
+    try {
+      this.db.exec(`ALTER TABLE knowledge_documents ADD COLUMN label TEXT`);
+    } catch { /* column already exists */ }
+
+    // Interview sessions table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS interview_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        jd_id INTEGER REFERENCES knowledge_documents(id),
+        transcript TEXT,
+        qa_pairs TEXT,
+        recap TEXT,
+        jd_coverage TEXT,
+        prep_notes TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        duration_seconds INTEGER
+      );
+    `);
   }
 
   // Documents
@@ -220,5 +246,100 @@ export class KnowledgeDatabaseManager {
 
   clearNegotiationState(): void {
     this.db.prepare('DELETE FROM knowledge_negotiation').run();
+  }
+
+  // ─── Multi-JD Support ─────────────────────────────────────────
+
+  insertDocument(docType: DocType, fileName: string, rawText: string, parsedData: any, label?: string): number {
+    const result = this.db.prepare(`
+      INSERT INTO knowledge_documents (doc_type, file_name, raw_text, parsed_data, label, is_active)
+      VALUES (?, ?, ?, ?, ?, 0)
+    `).run(docType, fileName, rawText, JSON.stringify(parsedData ?? null), label ?? null);
+
+    const docId = Number(result.lastInsertRowid);
+
+    // Auto-activate if it's the first JD
+    if (docType === DocType.JD) {
+      const count = this.db.prepare('SELECT COUNT(*) as cnt FROM knowledge_documents WHERE doc_type = ?').get(docType) as { cnt: number };
+      if (count.cnt === 1) {
+        this.db.prepare('UPDATE knowledge_documents SET is_active = 1 WHERE id = ?').run(docId);
+      }
+    }
+
+    return docId;
+  }
+
+  getAllDocumentsByType(docType: DocType): DocumentRow[] {
+    return this.db
+      .prepare('SELECT * FROM knowledge_documents WHERE doc_type = ? ORDER BY created_at DESC')
+      .all(docType) as DocumentRow[];
+  }
+
+  countDocumentsByType(docType: DocType): number {
+    const row = this.db.prepare('SELECT COUNT(*) as cnt FROM knowledge_documents WHERE doc_type = ?').get(docType) as { cnt: number };
+    return row.cnt;
+  }
+
+  getActiveDocument(docType: DocType): DocumentRow | null {
+    const row = this.db
+      .prepare('SELECT * FROM knowledge_documents WHERE doc_type = ? AND is_active = 1 LIMIT 1')
+      .get(docType) as DocumentRow | undefined;
+    return row ?? null;
+  }
+
+  setActiveDocument(docId: number): void {
+    const doc = this.db.prepare('SELECT doc_type FROM knowledge_documents WHERE id = ?').get(docId) as { doc_type: string } | undefined;
+    if (!doc) return;
+
+    const setActive = this.db.transaction(() => {
+      this.db.prepare('UPDATE knowledge_documents SET is_active = 0 WHERE doc_type = ?').run(doc.doc_type);
+      this.db.prepare('UPDATE knowledge_documents SET is_active = 1 WHERE id = ?').run(docId);
+    });
+    setActive();
+  }
+
+  deleteDocumentById(docId: number): void {
+    const del = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM knowledge_chunks WHERE doc_id = ?').run(docId);
+      this.db.prepare('DELETE FROM knowledge_documents WHERE id = ?').run(docId);
+    });
+    del();
+  }
+
+  updateDocumentParsedData(docId: number, parsedData: any): void {
+    this.db.prepare(`
+      UPDATE knowledge_documents
+      SET parsed_data = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(JSON.stringify(parsedData), docId);
+  }
+
+  // ─── Interview Sessions ───────────────────────────────────────
+
+  saveInterviewSession(jdId: number | null, transcript: string, qaPairs: any, recap: any, jdCoverage: any, prepNotes: string | null, durationSeconds: number | null): number {
+    const result = this.db.prepare(`
+      INSERT INTO interview_sessions (jd_id, transcript, qa_pairs, recap, jd_coverage, prep_notes, duration_seconds)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      jdId,
+      transcript,
+      JSON.stringify(qaPairs ?? null),
+      JSON.stringify(recap ?? null),
+      JSON.stringify(jdCoverage ?? null),
+      prepNotes,
+      durationSeconds
+    );
+    return Number(result.lastInsertRowid);
+  }
+
+  getInterviewSessions(jdId?: number): any[] {
+    if (jdId !== undefined) {
+      return this.db.prepare('SELECT * FROM interview_sessions WHERE jd_id = ? ORDER BY created_at DESC').all(jdId);
+    }
+    return this.db.prepare('SELECT * FROM interview_sessions ORDER BY created_at DESC').all();
+  }
+
+  getInterviewSession(sessionId: number): any | null {
+    return this.db.prepare('SELECT * FROM interview_sessions WHERE id = ?').get(sessionId) ?? null;
   }
 }

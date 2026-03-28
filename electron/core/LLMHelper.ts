@@ -944,6 +944,27 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     return `${header}${systemPrompt}${footer}`;
   }
 
+  private emitKnowledgeContextUpdate(knowledgeResult: any): void {
+    if (!knowledgeResult?.matchedJDSignals && !knowledgeResult?.resumeEvidence && !knowledgeResult?.mustHitKeywords) {
+      return;
+    }
+
+    try {
+      const { BrowserWindow } = require('electron');
+      const windows = BrowserWindow.getAllWindows();
+      for (const win of windows) {
+        win.webContents.send('knowledge:context-update', {
+          matchedJDSignals: knowledgeResult.matchedJDSignals || [],
+          resumeEvidence: knowledgeResult.resumeEvidence || [],
+          mustHitKeywords: knowledgeResult.mustHitKeywords || [],
+          questionCategory: knowledgeResult.questionCategory || 'technical',
+        });
+      }
+    } catch (e) {
+      console.warn('[LLMHelper] emitKnowledgeContextUpdate failed:', e);
+    }
+  }
+
   public async chatWithGemini(message: string, imagePaths?: string[], context?: string, skipSystemPrompt: boolean = false, alternateGroqMessage?: string): Promise<string> {
     try {
       console.log(`[LLMHelper] chatWithGemini called with message:`, message.substring(0, 50))
@@ -961,6 +982,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
           this.knowledgeOrchestrator.feedForDepthScoring(message);
 
           const knowledgeResult = await this.knowledgeOrchestrator.processQuestion(message);
+          this.emitKnowledgeContextUpdate(knowledgeResult);
           if (knowledgeResult) {
             // Fix 1: short-circuit for live negotiation coaching — bypass second LLM call
             if (knowledgeResult.liveNegotiationResponse) {
