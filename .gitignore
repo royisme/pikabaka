@@ -206,4 +206,4 @@ planning/live-negotiation/temp/
 .tap
 node-compile-cache/
 .serena
-tests/sample/*
+test/sample/*
