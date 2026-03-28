@@ -15,7 +15,7 @@ const isDev = isEnvDev && !isPackaged;
 
 const startUrl = isDev
   ? "http://localhost:5180"
-  : `file://${path.join(__dirname, "../../dist/index.html")}`
+  : `file://${path.join(app.getAppPath(), "dist/index.html")}`
 
 export class WindowHelper {
   private launcherWindow: BrowserWindow | null = null
@@ -137,7 +137,7 @@ export class WindowHelper {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        preload: path.join(__dirname, "preload.js"),
+        preload: path.join(__dirname, "../preload.js"),
         scrollBounce: true,
         webSecurity: !isDev, // DEBUG: Disable web security only in dev
       },
@@ -163,15 +163,15 @@ export class WindowHelper {
           if (isMac) {
             return app.isPackaged
               ? path.join(process.resourcesPath, "assets", "pika.icns")
-              : path.resolve(__dirname, "../../assets/pika.icns");
+              : path.resolve(app.getAppPath(), "assets/pika.icns");
           } else if (isWin) {
             return app.isPackaged
               ? path.join(process.resourcesPath, "assets/icons/win/icon.ico")
-              : path.resolve(__dirname, "../../assets/icons/win/icon.ico");
+              : path.resolve(app.getAppPath(), "assets/icons/win/icon.ico");
           } else {
             return app.isPackaged
               ? path.join(process.resourcesPath, "icon.png")
-              : path.resolve(__dirname, "../../assets/icon.png");
+              : path.resolve(app.getAppPath(), "assets/icon.png");
           }
         }
 
@@ -183,7 +183,7 @@ export class WindowHelper {
         const platformDir = isWin ? "win" : "mac";
         return app.isPackaged
           ? path.join(process.resourcesPath, `assets/fakeicon/${platformDir}/${iconName}`)
-          : path.resolve(__dirname, `../../assets/fakeicon/${platformDir}/${iconName}`);
+          : path.resolve(app.getAppPath(), `assets/fakeicon/${platformDir}/${iconName}`);
       })()
     }
 
@@ -221,7 +221,7 @@ export class WindowHelper {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        preload: path.join(__dirname, "preload.js"),
+        preload: path.join(__dirname, "../preload.js"),
         scrollBounce: true,
       },
       show: false,
