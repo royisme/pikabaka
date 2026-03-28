@@ -14,7 +14,7 @@
     "electron:build": "pnpm run build:electron && cross-env NODE_ENV=production electron .",
     "app:dev": "concurrently \"pnpm run dev -- --port 5180 --strictPort\" \"wait-on http://localhost:5180 && pnpm run electron:dev\"",
     "app:prod": "pnpm run build && pnpm run build:electron && pnpm run build:native && cross-env NODE_ENV=production electron .",
-    "app:build": "pnpm run build && pnpm run build:electron && cross-env PIKA_BUILD_ALL_MAC_ARCHES=1 pnpm run build:native && electron-builder --publish never",
+    "app:build": "pnpm run build && pnpm run build:electron && pnpm run build:native && electron-builder --publish never",
     "watch": "tsc -p electron/tsconfig.json --watch",
     "start": "pnpm run app:dev",
     "dist": "pnpm run app:build",
@@ -64,21 +64,21 @@
         {
           "target": "zip",
           "arch": [
-            "x64",
             "arm64"
           ]
         },
         {
           "target": "dmg",
           "arch": [
-            "x64",
             "arm64"
           ]
         }
       ],
       "icon": "assets/pika.icns",
-      "identity": null,
-      "hardenedRuntime": false
+      "identity": "shaoqing zhu (UL5T9WXYJT)",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "notarize": true
     },
     "win": {
       "target": [
@@ -225,7 +225,6 @@
     "ws": "^8.19.0"
   },
   "optionalDependencies": {
-    "sqlite-vec-darwin-arm64": "^0.1.7",
-    "sqlite-vec-darwin-x64": "^0.1.7"
+    "sqlite-vec-darwin-arm64": "^0.1.7"
   }
 }

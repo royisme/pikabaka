@@ -78,8 +78,9 @@ exports.default = async function (context) {
         // --force: replace existing signature
         // --deep: sign nested code
         // --entitlements: attach JIT/memory entitlements (critical for Apple Silicon)
-        // --sign -: ad-hoc signature
-        execSync(`codesign --force --deep --entitlements "${entitlementsPath}" --sign - "${appPath}"`, { stdio: 'inherit' });
+        // --sign: use Developer ID certificate (falls back to ad-hoc if not found)
+        const identity = process.env.CSC_NAME || 'Developer ID Application: shaoqing zhu (UL5T9WXYJT)';
+        execSync(`codesign --force --deep --entitlements "${entitlementsPath}" --sign "${identity}" "${appPath}"`, { stdio: 'inherit' });
         console.log('[Ad-Hoc Signing] Successfully signed the application with entitlements.');
     } catch (error) {
         console.error('[Ad-Hoc Signing] Failed to sign the application:', error);
