@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 
 interface AboutSectionProps { }
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.2';
 const BMC_URL = 'https://buymeacoffee.com/royisme';
 
 const stagger = {

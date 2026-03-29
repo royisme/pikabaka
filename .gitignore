@@ -206,4 +206,6 @@ planning/live-negotiation/temp/
 .tap
 node-compile-cache/
 .serena
+tsx-*/
+v8-compile-cache-*/
 test/sample/*

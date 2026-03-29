@@ -55,8 +55,8 @@ export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) =>
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h4 className="text-sm font-bold text-text-primary">Job Descriptions</h4>
-          <p className="text-xs text-text-secondary mt-0.5">Manage target positions for interview preparation</p>
+          <h4 className="text-sm font-bold text-text-primary">Roles You're Targeting</h4>
+          <p className="text-xs text-text-secondary mt-0.5">Keep the opportunities you're preparing for together in one place.</p>
         </div>
         <button
           onClick={handleUpload}
@@ -64,9 +64,9 @@ export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) =>
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-text-primary text-bg-main hover:opacity-90 transition-all shadow-sm disabled:opacity-50"
         >
           {isUploading ? (
-            <><RefreshCw size={12} className="animate-spin" /> Uploading...</>
+            <><RefreshCw size={12} className="animate-spin" /> Adding role...</>
           ) : (
-            <><Plus size={12} /> Add JD</>
+            <><Plus size={12} /> Add Role</>
           )}
         </button>
       </div>
@@ -74,8 +74,8 @@ export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) =>
       {jds.length === 0 ? (
         <div className="bg-bg-item-surface rounded-xl border border-border-subtle p-8 text-center">
           <Briefcase size={24} className="mx-auto text-text-tertiary mb-3" />
-          <p className="text-sm font-medium text-text-secondary">No job descriptions yet</p>
-          <p className="text-xs text-text-tertiary mt-1">Upload a JD to get tailored interview preparation</p>
+          <p className="text-sm font-medium text-text-secondary">No roles added yet</p>
+          <p className="text-xs text-text-tertiary mt-1">Add a job description to make prep more focused and tailored.</p>
           <button
             onClick={handleUpload}
             disabled={isUploading}
@@ -144,7 +144,7 @@ export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) =>
                       }}
                       className="text-[11px] font-medium text-accent-primary hover:bg-accent-primary/10 px-2 py-1 rounded-md transition-colors"
                     >
-                      Prepare
+                      View Prep
                     </button>
                   )}
                   {deleteConfirmId === jd.id ? (

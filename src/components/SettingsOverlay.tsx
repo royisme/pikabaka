@@ -1405,7 +1405,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                         }}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'profile' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <BookOpen size={16} /> My Knowledge
+                                        <BookOpen size={16} /> Your Background
                                     </button>
 
                                     <button
@@ -1887,23 +1887,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                             )}
                             {activeTab === 'profile' && (
                                 <div className="space-y-6 animated fadeIn">
-                                    {/* Introduction */}
-                                    <div className="mb-5">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <div className="flex items-center gap-2">
-                                                <h3 className="text-sm font-bold text-text-primary">Profile Intelligence</h3>
-                                                <span className="bg-yellow-500/10 text-yellow-500 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">BETA</span>
-                                            </div>
-                                            <div className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-border-subtle bg-bg-component text-text-primary">
-                                                Included in Pika
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-text-secondary mb-2">
-                                            This engine constructs an intelligent representation of your career history.
-                                        </p>
-                                    </div>
-
-                                    {/* Intelligence Graph Hero Card */}
+                                    {/* Profile Header */}
                                     <div className="bg-bg-item-surface rounded-xl border border-border-subtle flex flex-col justify-between overflow-hidden">
                                         <div className="flex flex-col justify-between min-h-[160px]">
 
@@ -1918,10 +1902,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         </div>
                                                         <div>
                                                             <h4 className="text-sm font-bold text-text-primary tracking-tight">
-                                                                {profileData?.identity?.name || 'Identity Node Inactive'}
+                                                                {profileData?.identity?.name || 'Your Background'}
                                                             </h4>
                                                             <p className="text-xs text-text-secondary mt-0.5 tracking-wide">
-                                                                {profileData?.identity?.email || 'Upload a resume to begin mapping.'}
+                                                                {profileData?.identity?.email || 'Add your resume to personalize interview support around your experience.'}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -1930,7 +1914,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         {profileStatus.hasProfile && (
                                                             <button
                                                                 onClick={async () => {
-                                                                    if (!confirm('Are you sure you want to delete your mapped persona? This will destroy all structured timeline data.')) return;
+                                                                    if (!confirm('Are you sure you want to delete your resume? This will clear your profile data.')) return;
                                                                     try {
                                                                         await window.electronAPI?.profileDelete?.();
                                                                         queryClient.invalidateQueries(['profile']);
@@ -1938,13 +1922,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                 }}
                                                                 className="text-[12px] font-medium text-text-tertiary hover:text-red-500 transition-colors px-3 py-1.5 rounded-full hover:bg-red-500/10"
                                                             >
-                                                                Disconnect
+                                                                Delete Profile
                                                             </button>
                                                         )}
 
                                                         {/* High-fidelity Toggle */}
                                                         <div className={`flex items-center gap-2 bg-bg-input px-3 py-1.5 rounded-full border border-border-subtle ${!profileStatus.hasProfile ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                                                            <span className="text-xs font-medium text-text-secondary">Persona Engine</span>
+                                                            <span className="text-xs font-medium text-text-secondary">Use your background in suggestions</span>
                                                             <div
                                                                 onClick={() => {
                                                                     if (!profileStatus.hasProfile) return;
@@ -1986,7 +1970,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         <span className="text-[20px] font-bold text-text-primary tracking-tight leading-none mb-1">{profileData?.nodeCount || 0}</span>
                                                         <div className="flex items-center gap-1.5">
                                                             <div className="w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.4)]" />
-                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Nodes</span>
+                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Profile Summary</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1994,7 +1978,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 {profileData?.skills && profileData.skills.length > 0 && (
                                                     <div className="mt-5">
                                                         <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">
-                                                            Top Skills
+Core Skills
                                                         </div>
                                                         <div className="flex flex-wrap gap-1.5">
                                                             {profileData.skills.slice(0, 15).map((skill: string, i: number) => (
@@ -2019,18 +2003,18 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     </div>
                                                     <div className="min-w-0">
                                                         <h4 className="text-sm font-bold text-text-primary mb-0.5 truncate pr-4">
-                                                            {profileStatus.hasProfile ? 'Overwrite Source Document' : 'Initialize Knowledge Base'}
+                                                            {profileStatus.hasProfile ? 'Refresh Resume' : 'Add Resume'}
                                                         </h4>
                                                         {profileUploading ? (
                                                             <div className="flex items-center gap-2">
                                                                 <div className="h-[4px] w-[100px] bg-bg-input rounded-full overflow-hidden">
                                                                     <div className="h-full bg-accent-primary rounded-full animate-pulse" style={{ width: '50%' }} />
                                                                 </div>
-                                                                <span className="text-[10px] text-text-secondary tracking-wide">Processing structural semantics...</span>
+                                                                <span className="text-[10px] text-text-secondary tracking-wide">Reviewing your resume...</span>
                                                             </div>
                                                         ) : (
                                                             <p className="text-xs text-text-secondary truncate pr-4">
-                                                                Provide a resume file to seed the intelligence engine.
+                                                                Add your resume to personalize prep, suggestions, and role alignment.
                                                             </p>
                                                         )}
                                                     </div>
@@ -2046,7 +2030,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     disabled={profileUploading}
                                                     className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap shrink-0 ${profileUploading ? 'bg-bg-input text-text-tertiary cursor-wait border border-border-subtle' : 'bg-text-primary text-bg-main hover:opacity-90 shadow-sm'}`}
                                                 >
-                                                    {profileUploading ? 'Ingesting...' : 'Select File'}
+                                                    {profileUploading ? 'Uploading...' : 'Choose File'}
                                                 </button>
                                             </div>
 
@@ -2074,29 +2058,31 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                             )}
                             {activeTab === 'keybinds' && (
                                 <div className="space-y-5 animated fadeIn select-text pb-4">
-                                    <div className="flex items-start justify-between">
-                                        <div>
-                                            <h3 className="text-lg font-bold text-text-primary mb-1">Keyboard shortcuts</h3>
-                                            <p className="text-xs text-text-secondary">Pika works with these easy to remember commands.</p>
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="max-w-2xl">
+                                            <h3 className="text-lg font-bold text-text-primary mb-1">Keyboard Shortcuts</h3>
+                                            <p className="text-xs text-text-secondary leading-relaxed">Customize the shortcuts you use most. Changes apply instantly and keep this page aligned with the premium settings design language.</p>
                                         </div>
                                         <button
                                             onClick={resetShortcuts}
-                                            className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-border-subtle bg-bg-subtle/30 hover:bg-bg-subtle hover:border-green-500/30 transition-all duration-200 text-xs font-medium text-text-secondary hover:text-green-500 active:scale-95 mt-1"
+                                            className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-border-subtle bg-bg-subtle/30 hover:bg-bg-subtle hover:border-green-500/30 transition-all duration-200 text-xs font-medium text-text-secondary hover:text-green-500 active:scale-95 mt-1 whitespace-nowrap"
                                         >
                                             <RotateCcw size={13} strokeWidth={2.5} />
-                                            Restore Default
+                                            Restore defaults
                                         </button>
                                     </div>
 
-                                    <div className="grid gap-6">
-                                        {/* General Category */}
-                                        <div>
-                                            <h4 className="text-sm font-bold text-text-primary mb-3">General</h4>
+                                    <div className="grid gap-4">
+                                        <div className="bg-bg-card border border-border-subtle rounded-2xl p-4 md:p-5">
+                                            <div className="mb-4">
+                                                <h4 className="text-sm font-semibold text-text-primary tracking-tight">General controls</h4>
+                                                <p className="text-xs text-text-tertiary mt-1">Core overlay actions, screenshot tools, and quick controls.</p>
+                                            </div>
                                             <div className="space-y-1">
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><Eye size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Toggle Visibility</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Show or hide Pika</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.toggleVisibility}
@@ -2106,7 +2092,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><PointerOff size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Toggle Mouse Passthrough</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Toggle mouse passthrough</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.toggleMousePassthrough}
@@ -2116,7 +2102,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><MessageSquare size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Process Screenshots</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Process current screenshots</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.processScreenshots}
@@ -2126,7 +2112,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><Sparkles size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Capture Screen & Ask AI</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Capture screen and ask AI</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.captureAndProcess}
@@ -2136,7 +2122,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><RotateCcw size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Reset / Cancel</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Reset or cancel current action</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.resetCancel}
@@ -2146,7 +2132,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><Camera size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Take Screenshot</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Take a full screenshot</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.takeScreenshot}
@@ -2156,7 +2142,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><Crop size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Selective Screenshot</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Capture a selected area</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.selectiveScreenshot}
@@ -2166,22 +2152,22 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             </div>
                                         </div>
 
-                                        {/* Chat Category */}
-                                        <div>
-                                            <div className="mb-3">
-                                                <h4 className="text-sm font-bold text-text-primary">Chat</h4>
+                                        <div className="bg-bg-card border border-border-subtle rounded-2xl p-4 md:p-5">
+                                            <div className="mb-4">
+                                                <h4 className="text-sm font-semibold text-text-primary tracking-tight">AI actions</h4>
+                                                <p className="text-xs text-text-tertiary mt-1">Shortcuts for answers, follow-ups, navigation, and response helpers.</p>
                                             </div>
                                             <div className="space-y-1">
                                                 {[
-                                                    { id: 'whatToAnswer', label: 'What to Answer', icon: <Sparkles size={14} /> },
-                                                    { id: 'clarify', label: 'Clarify', icon: <MessageSquare size={14} /> },
-                                                    { id: 'followUp', label: 'Follow Up', icon: <MessageSquare size={14} /> },
-                                                    { id: 'dynamicAction4', label: 'Recap / Brainstorm', icon: <RefreshCw size={14} /> },
-                                                    { id: 'answer', label: 'Answer / Record', icon: <Mic size={14} /> },
-                                                    { id: 'codeHint', label: 'Get Code Hint', icon: <Zap size={14} /> },
-                                                    { id: 'brainstorm', label: 'Brainstorm Approaches', icon: <Zap size={14} /> },
-                                                    { id: 'scrollUp', label: 'Scroll Up', icon: <ArrowUp size={14} /> },
-                                                    { id: 'scrollDown', label: 'Scroll Down', icon: <ArrowDown size={14} /> },
+                                                    { id: 'whatToAnswer', label: 'What should I answer?', icon: <Sparkles size={14} /> },
+                                                    { id: 'clarify', label: 'Clarify the question', icon: <MessageSquare size={14} /> },
+                                                    { id: 'followUp', label: 'Generate a follow-up', icon: <MessageSquare size={14} /> },
+                                                    { id: 'dynamicAction4', label: 'Recap or brainstorm', icon: <RefreshCw size={14} /> },
+                                                    { id: 'answer', label: 'Answer or record', icon: <Mic size={14} /> },
+                                                    { id: 'codeHint', label: 'Get a code hint', icon: <Zap size={14} /> },
+                                                    { id: 'brainstorm', label: 'Brainstorm approaches', icon: <Zap size={14} /> },
+                                                    { id: 'scrollUp', label: 'Scroll up', icon: <ArrowUp size={14} /> },
+                                                    { id: 'scrollDown', label: 'Scroll down', icon: <ArrowDown size={14} /> },
                                                 ].map((item, i) => (
                                                     <div key={i} className="flex items-center justify-between py-1.5 group">
                                                         <div className="flex items-center gap-3">
@@ -2197,15 +2183,17 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             </div>
                                         </div>
 
-                                        {/* Window Category */}
-                                        <div>
-                                            <h4 className="text-sm font-bold text-text-primary mb-3">Window</h4>
+                                        <div className="bg-bg-card border border-border-subtle rounded-2xl p-4 md:p-5">
+                                            <div className="mb-4">
+                                                <h4 className="text-sm font-semibold text-text-primary tracking-tight">Window movement</h4>
+                                                <p className="text-xs text-text-tertiary mt-1">Reposition the overlay without breaking your flow.</p>
+                                            </div>
                                             <div className="space-y-1">
                                                 {[
-                                                    { id: 'moveWindowUp', label: 'Move Window Up', icon: <ArrowUp size={14} /> },
-                                                    { id: 'moveWindowDown', label: 'Move Window Down', icon: <ArrowDown size={14} /> },
-                                                    { id: 'moveWindowLeft', label: 'Move Window Left', icon: <ArrowLeft size={14} /> },
-                                                    { id: 'moveWindowRight', label: 'Move Window Right', icon: <ArrowRight size={14} /> }
+                                                    { id: 'moveWindowUp', label: 'Move window up', icon: <ArrowUp size={14} /> },
+                                                    { id: 'moveWindowDown', label: 'Move window down', icon: <ArrowDown size={14} /> },
+                                                    { id: 'moveWindowLeft', label: 'Move window left', icon: <ArrowLeft size={14} /> },
+                                                    { id: 'moveWindowRight', label: 'Move window right', icon: <ArrowRight size={14} /> }
                                                 ].map((item, i) => (
                                                     <div key={i} className="flex items-center justify-between py-1.5 group">
                                                         <div className="flex items-center gap-3">

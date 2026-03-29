@@ -61,40 +61,71 @@
   --accent-muted: rgba(168, 200, 255, 0.14);
   --accent-live: var(--secondary);
 
-  --overlay-bg: var(--surface-variant);
-  --overlay-opacity: 0.7;
-  --overlay-border: var(--outline-variant);
-  --overlay-border-soft: rgba(67, 67, 114, 0.12);
-  --overlay-panel-bg: rgba(32, 32, 77, 0.7);
-  --overlay-pill-bg: rgba(27, 27, 64, 0.7);
-  --overlay-transcript-bg: rgba(13, 13, 28, 0.2);
-  --overlay-chip-bg: rgba(168, 200, 255, 0.06);
-  --overlay-chip-hover-bg: rgba(168, 200, 255, 0.12);
-  --overlay-input-bg: rgba(27, 27, 64, 0.72);
-  --overlay-input-hover-bg: rgba(33, 33, 82, 0.8);
-  --overlay-input-focus-bg: rgba(38, 53, 108, 0.86);
-  --overlay-control-bg: rgba(27, 27, 64, 0.7);
-  --overlay-control-hover-bg: rgba(168, 200, 255, 0.12);
-  --overlay-code-bg: rgba(13, 13, 28, 0.34);
-  --overlay-code-border: var(--outline-variant);
-  --overlay-code-header-bg: rgba(27, 27, 64, 0.82);
-  --overlay-inline-code-bg: rgba(168, 200, 255, 0.1);
-  --overlay-icon-bg: rgba(168, 200, 255, 0.06);
-  --overlay-icon-hover-bg: rgba(168, 200, 255, 0.14);
-  --overlay-panel-shadow: rgba(168, 200, 255, 0.08);
-  --overlay-pill-shadow: rgba(168, 200, 255, 0.06);
-  --overlay-text-primary: rgba(245, 247, 255, 0.96);
-  --overlay-text-secondary: rgba(201, 209, 235, 0.8);
-  --overlay-text-muted: rgba(145, 153, 188, 0.68);
-  --overlay-text-placeholder: rgba(145, 153, 188, 0.52);
+  --overlay-bg: rgba(24, 27, 34, 0.84);
+  --overlay-opacity: 0.78;
+  --overlay-border: rgba(255, 255, 255, 0.11);
+  --overlay-border-soft: rgba(255, 255, 255, 0.07);
+  --overlay-panel-bg: rgba(24, 27, 34, 0.84);
+  --overlay-pill-bg: rgba(27, 30, 37, 0.8);
+  --overlay-transcript-bg: rgba(15, 18, 26, 0.34);
+  --overlay-chip-bg: rgba(50, 56, 66, 0.76);
+  --overlay-chip-hover-bg: rgba(60, 66, 77, 0.84);
+  --overlay-input-bg: rgba(44, 49, 60, 0.86);
+  --overlay-input-hover-bg: rgba(49, 55, 66, 0.91);
+  --overlay-input-focus-bg: rgba(47, 57, 81, 0.94);
+  --overlay-control-bg: rgba(47, 52, 62, 0.82);
+  --overlay-control-hover-bg: rgba(57, 63, 74, 0.89);
+  --overlay-code-bg: rgba(32, 37, 46, 0.9);
+  --overlay-code-border: rgba(255, 255, 255, 0.09);
+  --overlay-code-header-bg: rgba(43, 48, 58, 0.9);
+  --overlay-inline-code-bg: rgba(168, 200, 255, 0.15);
+  --overlay-icon-bg: rgba(50, 56, 66, 0.78);
+  --overlay-icon-hover-bg: rgba(60, 66, 77, 0.86);
+  --overlay-panel-shadow: rgba(0, 0, 0, 0.2);
+  --overlay-pill-shadow: rgba(0, 0, 0, 0.15);
+  --overlay-text-primary: rgba(245, 247, 255, 0.98);
+  --overlay-text-secondary: rgba(221, 227, 243, 0.9);
+  --overlay-text-muted: rgba(186, 194, 217, 0.8);
+  --overlay-text-placeholder: rgba(186, 194, 217, 0.64);
   --overlay-text-strong: #ffffff;
-  --overlay-shell-blur: 20px;
-  --overlay-pill-blur: 14px;
+  --overlay-shell-blur: 17px;
+  --overlay-pill-blur: 11px;
   --overlay-transcript-blur: 8px;
 }
 
 [data-theme='light'] {
-  color-scheme: dark;
+  color-scheme: light;
+
+  --overlay-bg: rgba(247, 249, 253, 0.9);
+  --overlay-opacity: 0.8;
+  --overlay-border: rgba(59, 130, 246, 0.13);
+  --overlay-border-soft: rgba(59, 130, 246, 0.08);
+  --overlay-panel-bg: rgba(247, 249, 253, 0.9);
+  --overlay-pill-bg: rgba(255, 255, 255, 0.86);
+  --overlay-transcript-bg: rgba(255, 255, 255, 0.46);
+  --overlay-chip-bg: rgba(248, 250, 253, 0.86);
+  --overlay-chip-hover-bg: rgba(241, 246, 252, 0.94);
+  --overlay-input-bg: rgba(255, 255, 255, 0.92);
+  --overlay-input-hover-bg: rgba(252, 253, 255, 0.97);
+  --overlay-input-focus-bg: rgba(255, 255, 255, 0.99);
+  --overlay-control-bg: rgba(248, 250, 253, 0.88);
+  --overlay-control-hover-bg: rgba(241, 246, 252, 0.95);
+  --overlay-code-bg: rgba(242, 246, 252, 0.92);
+  --overlay-code-border: rgba(59, 130, 246, 0.11);
+  --overlay-code-header-bg: rgba(234, 240, 249, 0.95);
+  --overlay-inline-code-bg: rgba(59, 130, 246, 0.09);
+  --overlay-icon-bg: rgba(248, 250, 253, 0.84);
+  --overlay-icon-hover-bg: rgba(241, 246, 252, 0.93);
+  --overlay-panel-shadow: rgba(59, 130, 246, 0.065);
+  --overlay-pill-shadow: rgba(59, 130, 246, 0.05);
+  --overlay-text-primary: rgba(15, 23, 42, 0.97);
+  --overlay-text-secondary: rgba(30, 41, 59, 0.86);
+  --overlay-text-muted: rgba(51, 65, 85, 0.74);
+  --overlay-text-placeholder: rgba(71, 85, 105, 0.6);
+  --overlay-text-strong: #020617;
+  --overlay-shell-blur: 16px;
+  --overlay-pill-blur: 10px;
+  --overlay-transcript-blur: 6px;
 }
 
 /* Light mode: liquid-glass — clean frosted white panel */
@@ -225,8 +256,20 @@ textarea,
   background: var(--overlay-panel-bg);
   border-color: var(--overlay-border);
   box-shadow: 0 24px 40px var(--overlay-panel-shadow);
-  backdrop-filter: blur(var(--overlay-shell-blur)) saturate(145%);
-  -webkit-backdrop-filter: blur(var(--overlay-shell-blur)) saturate(145%);
+  backdrop-filter: blur(var(--overlay-shell-blur)) saturate(138%);
+  -webkit-backdrop-filter: blur(var(--overlay-shell-blur)) saturate(138%);
+}
+
+.overlay-shell-surface,
+.overlay-pill-surface,
+.overlay-subtle-surface,
+.overlay-chip-surface,
+.overlay-input-surface,
+.overlay-control-surface,
+.overlay-code-block-surface,
+.overlay-code-header-surface,
+.overlay-icon-surface {
+  color: var(--overlay-text-primary);
 }
 
 [data-theme='light'] .overlay-shell-surface {
@@ -238,8 +281,8 @@ textarea,
   background: var(--overlay-pill-bg);
   border-color: var(--overlay-border);
   box-shadow: 0 16px 28px var(--overlay-pill-shadow);
-  backdrop-filter: blur(var(--overlay-pill-blur)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--overlay-pill-blur)) saturate(140%);
+  backdrop-filter: blur(var(--overlay-pill-blur)) saturate(134%);
+  -webkit-backdrop-filter: blur(var(--overlay-pill-blur)) saturate(134%);
 }
 
 [data-theme='light'] .overlay-pill-surface {
@@ -248,7 +291,7 @@ textarea,
 }
 
 .overlay-transcript-surface {
-  background: transparent;
+  background: var(--overlay-transcript-bg);
   border-bottom-color: transparent;
 }
 
@@ -269,7 +312,7 @@ textarea,
 
 .overlay-chip-surface {
   background: var(--overlay-chip-bg);
-  border-color: transparent;
+  border-color: var(--overlay-border-soft);
 }
 
 .overlay-chip-surface:hover {

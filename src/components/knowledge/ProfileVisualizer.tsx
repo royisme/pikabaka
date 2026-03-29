@@ -241,7 +241,7 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ profileData }) => 
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-text-primary">Profile Overview</h2>
+        <h2 className="text-sm font-bold text-text-primary">Your Background</h2>
         <div className="flex items-center gap-3">
           {isEditing ? (
             <>
@@ -270,7 +270,7 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ profileData }) => 
 
       <div className={cardClass}>
         <div className="flex flex-col gap-3">
-          <div className={labelClass}>Identity</div>
+          <div className={labelClass}>Profile</div>
           {isEditing ? (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
@@ -352,7 +352,7 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ profileData }) => 
           </div>
           <div className="flex flex-col items-center">
             <span className="text-lg font-semibold text-text-primary">{nodeCount}</span>
-            <span className="text-xs text-text-secondary">Nodes</span>
+            <span className="text-xs text-text-secondary">Highlights</span>
           </div>
         </div>
       </div>

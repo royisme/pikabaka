@@ -91,12 +91,12 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
                 <div className="h-32 bg-bg-input rounded-xl mt-3" />
                 <div className="h-32 bg-bg-input rounded-xl mt-3" />
               </div>
-              <p className="text-xs text-text-secondary text-center">Generating interview preparation materials...</p>
+              <p className="text-xs text-text-secondary text-center">Preparing tailored guidance...</p>
             </div>
           ) : prepError ? (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-center">
               <AlertTriangle size={20} className="mx-auto text-red-400 mb-2" />
-              <p className="text-sm text-red-400 font-medium">Failed to generate prep</p>
+              <p className="text-sm text-red-400 font-medium">Couldn’t generate prep</p>
               <p className="text-xs text-text-secondary mt-1">{(prepErrorObj as Error | undefined)?.message}</p>
               <button
                 onClick={() => generatePrepAsync(jdId).then((d) => setPrepData(d)).catch(() => {})}
@@ -130,9 +130,9 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-1">Match Score</div>
                     <p className="text-xs text-text-secondary">
-                      {prepData.matchScore >= 70 ? 'Strong match — focus on showcasing depth' :
-                       prepData.matchScore >= 40 ? 'Moderate match — emphasize transferable skills' :
-                       'Gap-heavy — prepare to address missing skills proactively'}
+                      {prepData.matchScore >= 70 ? 'Strong alignment — focus on depth, outcomes, and credibility.' :
+                       prepData.matchScore >= 40 ? 'Good baseline — highlight transferable experience and relevant wins.' :
+                       'Use this prep to address likely gaps clearly and confidently.'}
                     </p>
                   </div>
                 </div>
@@ -154,7 +154,7 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
                 <div className="bg-bg-item-surface rounded-xl border border-border-subtle p-4">
                   <div className="flex items-center gap-1.5 mb-2">
                     <Zap size={12} className="text-yellow-400" />
-                    <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide">Keywords to Mention</div>
+                    <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide">Key Terms to Weave In</div>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {prepData.mustMentionKeywords.map((kw, i) => (
@@ -170,7 +170,7 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
                 <div className="bg-bg-item-surface rounded-xl border border-border-subtle p-4">
                   <div className="flex items-center gap-1.5 mb-3">
                     <AlertTriangle size={12} className="text-red-400" />
-                    <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide">Skill Gaps</div>
+                    <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide">What to Strengthen</div>
                     <span className="text-[9px] text-text-tertiary ml-1">({prepData.knowledgeGaps.length})</span>
                   </div>
                   <div className="space-y-2">
@@ -181,7 +181,7 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
                             ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                             : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
                         }`}>
-                          {gap.importance === 'critical' ? 'CRITICAL' : 'NICE TO HAVE'}
+                          {gap.importance === 'critical' ? 'KEY FOCUS' : 'SUPPORTING'}
                         </span>
                         <div>
                           <span className="text-xs font-medium text-text-primary">{gap.skill}</span>
@@ -198,7 +198,7 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
                   <div className="flex items-center gap-1.5">
                     <BookOpen size={12} className="text-accent-primary" />
                     <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide">
-                      Likely Questions ({filteredQuestions.length})
+                      Questions to Practice ({filteredQuestions.length})
                     </div>
                   </div>
 
@@ -244,7 +244,7 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-text-primary font-medium">{q.question}</p>
                             {q.relatedJDRequirement && (
-                              <p className="text-[10px] text-text-tertiary mt-1">Tests: {q.relatedJDRequirement}</p>
+                              <p className="text-[10px] text-text-tertiary mt-1">Focus: {q.relatedJDRequirement}</p>
                             )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
@@ -278,7 +278,7 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
                               )}
                               {q.suggestedAnswer.evidence && (
                                 <div>
-                                  <div className="text-[9px] font-bold text-text-secondary uppercase tracking-wide mb-1">Evidence from Resume</div>
+                                  <div className="text-[9px] font-bold text-text-secondary uppercase tracking-wide mb-1">Relevant Background</div>
                                   <p className="text-[11px] text-accent-primary bg-accent-primary/5 rounded-lg px-3 py-2 border border-accent-primary/10">
                                     {q.suggestedAnswer.evidence}
                                   </p>
