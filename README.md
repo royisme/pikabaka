@@ -36,6 +36,14 @@ npm run app:dev         # start dev server + Electron
 npm run dist
 ```
 
+## Installation Notes
+
+**macOS: Unsigned app warning** — If macOS reports the app as unsigned or unverified after installation, you can remove the quarantine attribute with:
+
+```bash
+xattr -cr "/Applications/Pika.app"
+```
+
 ## AI Providers
 
 | Provider | Notes |
