@@ -2,6 +2,14 @@
 
 AI-powered interview copilot & meeting assistant. Real-time transcription, AI answer suggestions, and screenshot analysis — running locally on your machine.
 
+## Demo
+
+![Pika Demo](demo/out/pika-preview.gif)
+
+Full demo video available at `demo/out/pika-demo.mp4`
+
+Built with [Remotion](https://www.remotion.dev/) — see `demo/` directory for source.
+
 ## Features
 
 - **Real-time transcription** — sub-500ms latency via Rust native audio capture
