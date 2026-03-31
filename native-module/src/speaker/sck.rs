@@ -188,7 +188,7 @@ impl SpeakerInput {
         self.cfg.sample_rate() as f64
     }
 
-    pub fn stream(self) -> SpeakerStream {
+    pub fn stream(self) -> Result<SpeakerStream> {
         let buffer_size = 1024 * 128;
         let rb = HeapRb::<f32>::new(buffer_size);
         let (producer, consumer) = rb.split();
@@ -245,18 +245,22 @@ impl SpeakerInput {
 
         let status = start_error.load(Ordering::SeqCst);
         if status == 0 {
-            println!("[SpeakerInput] WARNING: Start callback not received after 2s");
+            return Err(anyhow::anyhow!(
+                "SCK stream start timed out — check Screen Recording permission in System Settings"
+            ));
         } else if status == 2 {
-            println!("[SpeakerInput] WARNING: Stream started with error - audio may not work");
+            return Err(anyhow::anyhow!(
+                "SCK stream failed to start — check Screen Recording permission in System Settings"
+            ));
         }
 
-        SpeakerStream {
+        Ok(SpeakerStream {
             consumer: Some(consumer),
             stream,
             _handler: handler,
             _filter: self.filter,
             _cfg: self.cfg,
-        }
+        })
     }
 }
 

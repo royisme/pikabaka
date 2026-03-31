@@ -107,7 +107,25 @@ impl SystemAudioCapture {
                 }
             };
 
-            let mut stream = input.stream();
+            let mut stream = match input.stream() {
+                Ok(s) => s,
+                Err(e) => {
+                    println!("[SystemAudioCapture] Stream init failed: {}. Falling back to CoreAudio...", e);
+                    match speaker::SpeakerInput::new(None) {
+                        Ok(fallback) => match fallback.stream() {
+                            Ok(s) => s,
+                            Err(e2) => {
+                                eprintln!("[SystemAudioCapture] FATAL: CoreAudio fallback also failed: {}", e2);
+                                return;
+                            }
+                        },
+                        Err(e2) => {
+                            eprintln!("[SystemAudioCapture] FATAL: CoreAudio fallback init failed: {}", e2);
+                            return;
+                        }
+                    }
+                }
+            };
             let mut consumer = match stream.take_consumer() {
                 Some(c) => c,
                 None => {
