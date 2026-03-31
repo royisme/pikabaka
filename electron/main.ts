@@ -754,12 +754,12 @@ export class AppState {
   }
 
 
-  public async startAudioTest(deviceId?: string): Promise<void> {
-    await startAudioTestFn(this, deviceId)
+  public async startAudioTest(deviceId?: string): Promise<{ fallbackUsed: boolean }> {
+    return startAudioTestFn(this, deviceId)
   }
 
-  public async _startAudioTestImpl(deviceId?: string): Promise<void> {
-    await startAudioTestImplFn(this, deviceId)
+  public async _startAudioTestImpl(deviceId?: string): Promise<{ fallbackUsed: boolean }> {
+    return startAudioTestImplFn(this, deviceId)
   }
 
   public stopAudioTest(): void {

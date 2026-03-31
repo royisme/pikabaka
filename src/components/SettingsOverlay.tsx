@@ -779,6 +779,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [selectedInput, setSelectedInput] = useState('');
     const [selectedOutput, setSelectedOutput] = useState('');
     const [micLevel, setMicLevel] = useState(0);
+    const [inputDeviceNotFound, setInputDeviceNotFound] = useState(false);
     const [useExperimentalSck, setUseExperimentalSck] = useState(false);
 
     // STT Provider settings
@@ -1315,7 +1316,15 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 setMicLevel(Math.max(0, Math.min(100, level * 100)));
             });
 
-            window.electronAPI?.startAudioTest(selectedInput || undefined).catch((error) => {
+            window.electronAPI?.startAudioTest(selectedInput || undefined).then((result) => {
+                if (result?.warning) {
+                    setInputDeviceNotFound(true);
+                    setSelectedInput('');
+                    localStorage.removeItem('preferredInputDeviceId');
+                } else {
+                    setInputDeviceNotFound(false);
+                }
+            }).catch((error) => {
                 console.error("Error starting native microphone test:", error);
                 setMicLevel(0);
             });
@@ -2718,10 +2727,16 @@ Core Skills
                                                 options={inputDevices}
                                                 onChange={(id) => {
                                                     setSelectedInput(id);
+                                                    setInputDeviceNotFound(false);
                                                     localStorage.setItem('preferredInputDeviceId', id);
                                                 }}
                                                 placeholder="Default Microphone"
                                             />
+                                            {inputDeviceNotFound && (
+                                                <p className="text-xs text-yellow-400 mt-1 px-1">
+                                                    Previously selected device not found. Using default microphone.
+                                                </p>
+                                            )}
 
                                             <div>
                                                 <div className="flex justify-between text-xs text-text-secondary mb-2 px-1">

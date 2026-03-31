@@ -224,12 +224,12 @@ export function setupSystemAudioPipeline(appState: AppState): void {
   }
 }
 
-export async function startAudioTest(appState: AppState, deviceId?: string): Promise<void> {
+export async function startAudioTest(appState: AppState, deviceId?: string): Promise<{ fallbackUsed: boolean }> {
   const state = appState as any;
-  if (state._audioTestStarting) return;
+  if (state._audioTestStarting) return { fallbackUsed: false };
   state._audioTestStarting = true;
   try {
-    await _startAudioTestImpl(appState, deviceId);
+    return await _startAudioTestImpl(appState, deviceId);
   } finally {
     state._audioTestStarting = false;
   }
@@ -269,7 +269,7 @@ export function attachAudioTestListeners(appState: AppState, capture: Microphone
   });
 }
 
-export async function _startAudioTestImpl(appState: AppState, deviceId?: string): Promise<void> {
+export async function _startAudioTestImpl(appState: AppState, deviceId?: string): Promise<{ fallbackUsed: boolean }> {
   const state = appState as any;
   console.log(`[Main] Starting Audio Test on device: ${deviceId || 'default'}`);
   stopAudioTest(appState);
@@ -282,6 +282,7 @@ export async function _startAudioTestImpl(appState: AppState, deviceId?: string)
     state.audioTestCapture = new MicrophoneCapture(deviceId || undefined);
     attachAudioTestListeners(appState, state.audioTestCapture);
     state.audioTestCapture.start();
+    return { fallbackUsed: false };
   } catch (err) {
     console.warn('[Main] Failed to start audio test on preferred device. Falling back to default.', err);
     try { state.audioTestCapture?.stop(); } catch { }
@@ -290,6 +291,7 @@ export async function _startAudioTestImpl(appState: AppState, deviceId?: string)
       state.audioTestCapture = new MicrophoneCapture();
       attachAudioTestListeners(appState, state.audioTestCapture);
       state.audioTestCapture.start();
+      return { fallbackUsed: true };
     } catch (fallbackErr) {
       console.error('[Main] Failed to start audio test:', fallbackErr);
       throw fallbackErr;

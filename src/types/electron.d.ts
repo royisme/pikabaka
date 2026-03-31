@@ -218,7 +218,7 @@ export interface ElectronAPI {
   openMailto: (params: { to: string; subject: string; body: string }) => Promise<{ success: boolean; error?: string }>;
 
   // Audio Test
-  startAudioTest: (deviceId?: string) => Promise<{ success: boolean }>;
+  startAudioTest: (deviceId?: string) => Promise<{ success: boolean; warning?: string }>;
   stopAudioTest: () => Promise<{ success: boolean }>;
   onAudioTestLevel: (callback: (level: number) => void) => () => void;
 

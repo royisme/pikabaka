@@ -535,7 +535,10 @@ export function registerSttHandlers(appState: AppState): void {
   });
 
   safeHandle("start-audio-test", async (event, deviceId?: string) => {
-    await appState.startAudioTest(deviceId);
+    const result = await appState.startAudioTest(deviceId);
+    if (result.fallbackUsed && deviceId) {
+      return { success: true, warning: `Device '${deviceId}' not found, using default microphone.` };
+    }
     return { success: true };
   });
 
