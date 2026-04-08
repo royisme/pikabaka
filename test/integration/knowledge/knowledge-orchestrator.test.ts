@@ -566,7 +566,10 @@ t.test('generateInterviewPrep() propagates error gracefully', async (t) => {
   );
   orch.setGenerateContentFn((async () => { throw new Error('LLM exploded'); }) as any);
 
+  const originalError = console.error;
+  console.error = () => {};
   const result = await orch.generateInterviewPrep();
+  console.error = originalError;
 
   t.equal(result, null, 'returns null on error (error is caught)');
   t.end();
