@@ -1,49 +1,14 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, useMemo, useCallback } from 'react';
-import {
-    Sparkles,
-    Pencil,
-    MessageSquare,
-    RefreshCw,
-    Settings,
-    ArrowUp,
-    ArrowRight,
-    HelpCircle,
-    ChevronUp,
-    ChevronDown,
-    Lightbulb,
-    CornerDownLeft,
-    Mic,
-    MicOff,
-    Image,
-    Camera,
-    X,
-    LogOut,
-    Zap,
-    Edit3,
-    SlidersHorizontal,
-    Ghost,
-    Link,
-    Code,
-    Copy,
-    Check,
-    PointerOff
-} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneLight, vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 // import { ModelSelector } from './ui/ModelSelector'; // REMOVED
 import TopPill from './ui/TopPill';
-import RollingTranscript from './ui/RollingTranscript';
-import { NegotiationCoachingCard } from '../premium';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
-import 'katex/dist/katex.min.css';
-import { analytics, detectProviderType } from '../lib/analytics/analytics.service';
-import { useShortcuts } from '../hooks/useShortcuts';
+import TranscriptPanel from './meeting/TranscriptPanel';
+import ChatPanel from './meeting/ChatPanel';
+import ResizableSplitter from './ui/ResizableSplitter';
+import { analytics } from '../lib/analytics/analytics.service';
+import { useShortcuts, type ShortcutConfig } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
-import { getOverlayAppearance, OVERLAY_OPACITY_DEFAULT } from '../lib/overlayAppearance';
+import { getOverlayAppearance, getDefaultOverlayOpacity } from '../lib/overlayAppearance';
 import { upsertTranscriptSegment, type TranscriptDisplayMode, type TranscriptSegment } from '../lib/transcriptSegments';
 
 interface Message {
@@ -79,7 +44,7 @@ interface KnowledgeContext {
     questionCategory: string;
 }
 
-const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpacity = OVERLAY_OPACITY_DEFAULT }) => {
+const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpacity = getDefaultOverlayOpacity() }) => {
     const isLightTheme = useResolvedTheme() === 'light';
     const [isExpanded, setIsExpanded] = useState(true);
     const [inputValue, setInputValue] = useState('');
@@ -117,6 +82,11 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         const stored = localStorage.getItem('pika_interviewer_transcript');
         return stored !== 'false';
     });
+    const [splitterPosition, setSplitterPosition] = useState(() => {
+        const stored = localStorage.getItem('pika_splitter_position');
+        const parsed = stored ? Number(stored) : 40;
+        return Number.isFinite(parsed) ? Math.min(80, Math.max(20, parsed)) : 40;
+    });
 
     // Analytics State
     const requestStartTimeRef = useRef<number | null>(null);
@@ -130,6 +100,10 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         window.addEventListener('storage', handleStorage);
         return () => window.removeEventListener('storage', handleStorage);
     }, []);
+
+    useEffect(() => {
+        localStorage.setItem('pika_splitter_position', String(splitterPosition));
+    }, [splitterPosition]);
 
     const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
     const [transcriptDisplayMode, setTranscriptDisplayMode] = useState<TranscriptDisplayMode>('original');
@@ -149,10 +123,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
 
     // Settings State with Persistence
     const [isUndetectable, setIsUndetectable] = useState(false);
-    const [hideChatHidesWidget, setHideChatHidesWidget] = useState(() => {
-        const stored = localStorage.getItem('pika_hideChatHidesWidget');
-        return stored ? stored === 'true' : true;
-    });
 
     // Model Selection State
     const [currentModel, setCurrentModel] = useState<string>('gemini-3-flash-preview');
@@ -173,8 +143,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         return () => { unsubscribe?.(); };
     }, []);
 
-    const codeTheme = isLightTheme ? oneLight : vscDarkPlus;
-    const codeLineNumberColor = isLightTheme ? 'rgba(15,23,42,0.35)' : 'rgba(255,255,255,0.2)';
     const appearance = useMemo(
         () => getOverlayAppearance(overlayOpacity, isLightTheme ? 'light' : 'dark'),
         [overlayOpacity, isLightTheme]
@@ -204,13 +172,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     }, [isConnected, nativeAudioHealth, noSystemAudioSince]);
     const showSttErrorDetail = !!nativeAudioHealth.lastError && !isSttActivelyReceiving;
     const overlayPanelClass = 'overlay-text-primary';
-    const subtleSurfaceClass = 'overlay-subtle-surface';
-    const codeBlockClass = 'overlay-code-block-surface';
-    const codeHeaderClass = 'overlay-code-header-surface';
-    const codeHeaderTextClass = 'overlay-text-muted';
-    const quickActionClass = 'overlay-chip-surface overlay-text-interactive hover:overlay-text-primary';
-    const inputClass = `${isLightTheme ? 'focus:ring-black/10' : 'focus:ring-white/10'} overlay-input-surface overlay-input-text`;
-    const controlSurfaceClass = 'overlay-control-surface overlay-text-interactive';
 
     useEffect(() => {
         const shouldTrackMissingSystemAudio =
@@ -296,13 +257,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         }
     }, []);
 
-    const handleModelSelect = (modelId: string) => {
-        setCurrentModel(modelId);
-        // Session-only: update runtime but don't persist as default
-        window.electronAPI.setModel(modelId)
-            .catch((err: any) => console.error("Failed to set model:", err));
-    };
-
     // Listen for default model changes from Settings
     useEffect(() => {
         if (!window.electronAPI?.onModelChanged) return;
@@ -330,8 +284,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     // Persist Settings
     useEffect(() => {
         localStorage.setItem('pika_undetectable', String(isUndetectable));
-        localStorage.setItem('pika_hideChatHidesWidget', String(hideChatHidesWidget));
-    }, [isUndetectable, hideChatHidesWidget]);
+    }, [isUndetectable]);
 
     // Mouse Passthrough State
     const [isMousePassthrough, setIsMousePassthrough] = useState(false);
@@ -399,15 +352,63 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         }
     }, [messages, isExpanded, isProcessing]);
 
-    // Build conversation context from messages
+    // Build bounded conversation context from chat + transcript state
     useEffect(() => {
-        const context = messages
-            .filter(m => m.role !== 'user' || !m.hasScreenshot)
-            .map(m => `${m.role === 'interviewer' ? 'Interviewer' : m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
-            .slice(-20)
-            .join('\n');
-        setConversationContext(context);
-    }, [messages]);
+        const maxContextChars = 8000;
+        const transcriptBudget = Math.floor(maxContextChars * 0.45);
+        const chatBudget = maxContextChars - transcriptBudget;
+
+        const transcriptLines: string[] = [];
+        let transcriptChars = 0;
+
+        if (currentInterviewerPartial.trim()) {
+            const partialLine = `Interviewer (partial): ${currentInterviewerPartial.trim()}`;
+            transcriptLines.unshift(partialLine);
+            transcriptChars += partialLine.length;
+        }
+
+        for (let i = transcriptSegments.length - 1; i >= 0; i -= 1) {
+            const segment = transcriptSegments[i];
+            const text = (segment.translatedText || segment.sourceText || '').trim();
+            if (!text) continue;
+
+            const speaker = segment.speakerLabel || 'Interviewer';
+            const line = `${speaker}: ${text}`;
+            const nextChars = transcriptChars + line.length + (transcriptLines.length > 0 ? 1 : 0);
+            if (nextChars > transcriptBudget) break;
+
+            transcriptLines.unshift(line);
+            transcriptChars = nextChars;
+        }
+
+        const chatLines: string[] = [];
+        let chatChars = 0;
+
+        for (let i = messages.length - 1; i >= 0; i -= 1) {
+            const message = messages[i];
+            if ((message.role === 'user' && message.hasScreenshot) || !message.text.trim()) continue;
+
+            const roleLabel = message.role === 'interviewer'
+                ? 'Interviewer'
+                : message.role === 'user'
+                    ? 'User'
+                    : 'Assistant';
+            const line = `${roleLabel}: ${message.text.trim()}`;
+            const nextChars = chatChars + line.length + (chatLines.length > 0 ? 1 : 0);
+            if (nextChars > chatBudget) break;
+
+            chatLines.unshift(line);
+            chatChars = nextChars;
+        }
+
+        const sections = [
+            transcriptLines.length > 0 ? `Recent transcript:\n${transcriptLines.join('\n')}` : '',
+            chatLines.length > 0 ? `Recent chat:\n${chatLines.join('\n')}` : ''
+        ].filter(Boolean);
+
+        const context = sections.join('\n\n');
+        setConversationContext(context.length > maxContextChars ? context.slice(-maxContextChars) : context);
+    }, [currentInterviewerPartial, messages, transcriptSegments]);
 
     // Listen for settings window visibility changes
     useEffect(() => {
@@ -937,43 +938,96 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
 
     // Quick Actions - Updated to use new Intelligence APIs
 
-    const handleCopy = (text: string) => {
-        navigator.clipboard.writeText(text);
-        analytics.trackCopyAnswer();
-        // Optional: Trigger a small toast or state change for visual feedback
-    };
+    const submitPrompt = useCallback(async ({
+        userText,
+        attachments = attachedContext,
+        clearAttachments = true,
+        addUserMessage = true,
+        placeholderIntent,
+        skipRag = false,
+        streamOptions
+    }: {
+        userText: string;
+        attachments?: Array<{ path: string, preview: string }>;
+        clearAttachments?: boolean;
+        addUserMessage?: boolean;
+        placeholderIntent?: string;
+        skipRag?: boolean;
+        streamOptions?: { skipSystemPrompt?: boolean };
+    }) => {
+        const trimmedText = userText.trim();
+        const currentAttachments = attachments;
+        const promptText = trimmedText || (currentAttachments.length > 0 ? 'Analyze this screenshot' : '');
 
-    const handleWhatToSay = async () => {
-        setIsExpanded(true);
-        setIsProcessing(true);
-        analytics.trackCommandExecuted('what_to_say');
+        if (!promptText && currentAttachments.length === 0) return;
 
-        // Capture and clear attached image context
-        const currentAttachments = attachedContext;
-        if (currentAttachments.length > 0) {
+        if (clearAttachments) {
             setAttachedContext([]);
-            // Show the attached image in chat
+        }
+
+        if (addUserMessage) {
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'user',
-                text: 'What should I say about this?',
-                hasScreenshot: true,
-                screenshotPreview: currentAttachments[0].preview
+                text: promptText,
+                hasScreenshot: currentAttachments.length > 0,
+                screenshotPreview: currentAttachments[0]?.preview
             }]);
         }
 
+        setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            role: 'system',
+            text: '',
+            isStreaming: true,
+            ...(placeholderIntent ? { intent: placeholderIntent } : {})
+        }]);
+
+        setIsExpanded(true);
+        setIsProcessing(true);
+
         try {
-            // Pass imagePath if attached
-            await window.electronAPI.generateWhatToSay(undefined, currentAttachments.length > 0 ? currentAttachments.map(s => s.path) : undefined);
+            if (!skipRag && currentAttachments.length === 0) {
+                const ragResult = await window.electronAPI.ragQueryLive?.(promptText);
+                if (ragResult?.success) {
+                    return;
+                }
+            }
+
+            requestStartTimeRef.current = Date.now();
+            await window.electronAPI.streamGeminiChat(
+                promptText,
+                currentAttachments.length > 0 ? currentAttachments.map(s => s.path) : undefined,
+                conversationContext,
+                streamOptions
+            );
         } catch (err) {
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'system',
-                text: `Error: ${err}`
-            }]);
-        } finally {
             setIsProcessing(false);
+            setMessages(prev => {
+                const last = prev[prev.length - 1];
+                if (last && last.isStreaming && last.text === '') {
+                    return prev.slice(0, -1).concat({
+                        id: Date.now().toString(),
+                        role: 'system',
+                        text: `❌ Error starting stream: ${err}`,
+                        ...(last.intent ? { intent: last.intent } : {})
+                    });
+                }
+                return [...prev, {
+                    id: Date.now().toString(),
+                    role: 'system',
+                    text: `❌ Error: ${err}`
+                }];
+            });
         }
+    }, [attachedContext, conversationContext]);
+
+    const handleWhatToSay = async () => {
+        analytics.trackCommandExecuted('what_to_say');
+        await submitPrompt({
+            userText: attachedContext.length > 0 ? 'What should I say about this?' : 'What should I say in response to the latest interviewer context?',
+            placeholderIntent: 'what_to_answer'
+        });
     };
 
     const handleFollowUp = async (intent: string = 'rephrase') => {
@@ -995,57 +1049,27 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     };
 
     const handleRecap = async () => {
-        setIsExpanded(true);
-        setIsProcessing(true);
         analytics.trackCommandExecuted('recap');
-
-        try {
-            await window.electronAPI.generateRecap();
-        } catch (err) {
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'system',
-                text: `Error: ${err}`
-            }]);
-        } finally {
-            setIsProcessing(false);
-        }
+        await submitPrompt({
+            userText: 'Give me a concise recap of the latest interview discussion.',
+            placeholderIntent: 'recap'
+        });
     };
 
     const handleFollowUpQuestions = async () => {
-        setIsExpanded(true);
-        setIsProcessing(true);
         analytics.trackCommandExecuted('suggest_questions');
-
-        try {
-            await window.electronAPI.generateFollowUpQuestions();
-        } catch (err) {
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'system',
-                text: `Error: ${err}`
-            }]);
-        } finally {
-            setIsProcessing(false);
-        }
+        await submitPrompt({
+            userText: 'Suggest smart follow-up questions I can ask next.',
+            placeholderIntent: 'follow_up_questions'
+        });
     };
 
     const handleClarify = async () => {
-        setIsExpanded(true);
-        setIsProcessing(true);
         analytics.trackCommandExecuted('clarify');
-
-        try {
-            await window.electronAPI.generateClarify();
-        } catch (err) {
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'system',
-                text: `Error: ${err}`
-            }]);
-        } finally {
-            setIsProcessing(false);
-        }
+        await submitPrompt({
+            userText: 'Clarify what the interviewer is asking and what they likely want to hear.',
+            placeholderIntent: 'clarify'
+        });
     };
 
     const handleCodeHint = async () => {
@@ -1056,7 +1080,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         const currentAttachments = attachedContext;
         if (currentAttachments.length > 0) {
             setAttachedContext([]);
-            // Show the attached image in chat
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'user',
@@ -1080,262 +1103,23 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     };
 
     const handleBrainstorm = async () => {
-        setIsExpanded(true);
-        setIsProcessing(true);
         analytics.trackCommandExecuted('brainstorm');
-
-        const currentAttachments = attachedContext;
-        if (currentAttachments.length > 0) {
-            setAttachedContext([]);
-            // Show the attached image in chat
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'user',
-                text: 'Brainstorm with this context',
-                hasScreenshot: true,
-                screenshotPreview: currentAttachments[0].preview
-            }]);
-        }
-
-        try {
-            await window.electronAPI.generateBrainstorm(currentAttachments.length > 0 ? currentAttachments.map(s => s.path) : undefined);
-        } catch (err) {
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                role: 'system',
-                text: `Error: ${err}`
-            }]);
-        } finally {
-            setIsProcessing(false);
-        }
+        await submitPrompt({
+            userText: attachedContext.length > 0 ? 'Brainstorm with this context.' : 'Brainstorm the best angles and talking points for the current discussion.',
+            placeholderIntent: 'brainstorm'
+        });
     };
-
-
-    // Setup Streaming Listeners
-    useEffect(() => {
-        const cleanups: (() => void)[] = [];
-
-        // Stream Token
-        cleanups.push(window.electronAPI.onGeminiStreamToken((token) => {
-            // Guard: if this token is the negotiation coaching JSON sentinel, accumulate it
-            // silently. The JSON is always emitted as a single complete `yield JSON.stringify(...)`
-            // call, so one parse attempt is sufficient. The onGeminiStreamDone handler will
-            // detect the accumulated JSON and render the proper card UI — we just prevent the
-            // raw JSON characters from ever appearing in the chat bubble.
-            try {
-                const parsed = JSON.parse(token);
-                if (parsed?.__negotiationCoaching) {
-                    // Store the raw JSON text (Done handler needs it) but don't show it.
-                    setMessages(prev => {
-                        const lastMsg = prev[prev.length - 1];
-                        if (lastMsg && lastMsg.isStreaming && lastMsg.role === 'system') {
-                            const updated = [...prev];
-                            updated[prev.length - 1] = { ...lastMsg, text: token };
-                            return updated;
-                        }
-                        return prev;
-                    });
-                    return; // Skip the normal append below
-                }
-            } catch {
-                // Not JSON — normal text token, fall through to the standard append.
-            }
-
-            setMessages(prev => {
-                const lastMsg = prev[prev.length - 1];
-                if (lastMsg && lastMsg.isStreaming && lastMsg.role === 'system') {
-                    const updated = [...prev];
-                    updated[prev.length - 1] = {
-                        ...lastMsg,
-                        text: lastMsg.text + token,
-                        // re-check code status on every token? Expensive but needed for progressive highlighting
-                        isCode: (lastMsg.text + token).includes('```') || (lastMsg.text + token).includes('def ') || (lastMsg.text + token).includes('function ')
-                    };
-                    return updated;
-                }
-                return prev;
-            });
-        }));
-
-        // Stream Done
-        cleanups.push(window.electronAPI.onGeminiStreamDone(() => {
-            setIsProcessing(false);
-
-            // Calculate latency if we have a start time
-            let latency = 0;
-            if (requestStartTimeRef.current) {
-                latency = Date.now() - requestStartTimeRef.current;
-                requestStartTimeRef.current = null;
-            }
-
-            // Track Usage
-            analytics.trackModelUsed({
-                model_name: currentModel,
-                provider_type: detectProviderType(currentModel),
-                latency_ms: latency
-            });
-
-            setMessages(prev => {
-                const lastMsg = prev[prev.length - 1];
-                if (lastMsg && lastMsg.isStreaming && lastMsg.role === 'system') {
-                    // Detect negotiation coaching response
-                    try {
-                        const parsed = JSON.parse(lastMsg.text);
-                        if (parsed?.__negotiationCoaching) {
-                            const coaching = parsed.__negotiationCoaching;
-                            return [...prev.slice(0, -1), {
-                                ...lastMsg,
-                                isStreaming: false,
-                                isNegotiationCoaching: true,
-                                negotiationCoachingData: coaching,
-                                text: '',
-                            }];
-                        }
-                    } catch {}
-                    // Normal completion
-                    return [...prev.slice(0, -1), { ...lastMsg, isStreaming: false }];
-                }
-                return prev;
-            });
-        }));
-
-        // Stream Error
-        cleanups.push(window.electronAPI.onGeminiStreamError((error) => {
-            setIsProcessing(false);
-            requestStartTimeRef.current = null; // Clear timer on error
-            setMessages(prev => {
-                // Append error to the current message or add new one?
-                // Let's add a new error block if the previous one confusing,
-                // or just update status.
-                // Ideally we want to show the partial response AND the error.
-                const lastMsg = prev[prev.length - 1];
-                if (lastMsg && lastMsg.isStreaming) {
-                    const updated = [...prev];
-                    updated[prev.length - 1] = {
-                        ...lastMsg,
-                        isStreaming: false,
-                        text: lastMsg.text + `\n\n[Error: ${error}]`
-                    };
-                    return updated;
-                }
-                return [...prev, {
-                    id: Date.now().toString(),
-                    role: 'system',
-                    text: `❌ Error: ${error}`
-                }];
-            });
-        }));
-
-        // JIT RAG Stream listeners (for live meeting RAG responses)
-        if (window.electronAPI.onRAGStreamChunk) {
-            cleanups.push(window.electronAPI.onRAGStreamChunk((data: { chunk: string }) => {
-                // Same guard as onGeminiStreamToken: suppress raw JSON if this chunk is
-                // the negotiation coaching sentinel. The onRAGStreamComplete handler will
-                // convert it to the proper card UI.
-                try {
-                    const parsed = JSON.parse(data.chunk);
-                    if (parsed?.__negotiationCoaching) {
-                        setMessages(prev => {
-                            const lastMsg = prev[prev.length - 1];
-                            if (lastMsg && lastMsg.isStreaming && lastMsg.role === 'system') {
-                                const updated = [...prev];
-                                updated[prev.length - 1] = { ...lastMsg, text: data.chunk };
-                                return updated;
-                            }
-                            return prev;
-                        });
-                        return; // Skip normal append
-                    }
-                } catch {
-                    // Normal text chunk — fall through.
-                }
-
-                setMessages(prev => {
-                    const lastMsg = prev[prev.length - 1];
-                    if (lastMsg && lastMsg.isStreaming && lastMsg.role === 'system') {
-                        const updated = [...prev];
-                        updated[prev.length - 1] = {
-                            ...lastMsg,
-                            text: lastMsg.text + data.chunk,
-                            isCode: (lastMsg.text + data.chunk).includes('```')
-                        };
-                        return updated;
-                    }
-                    return prev;
-                });
-            }));
-        }
-
-        if (window.electronAPI.onRAGStreamComplete) {
-            cleanups.push(window.electronAPI.onRAGStreamComplete(() => {
-                setIsProcessing(false);
-                requestStartTimeRef.current = null;
-                setMessages(prev => {
-                    const lastMsg = prev[prev.length - 1];
-                    if (lastMsg && lastMsg.isStreaming && lastMsg.role === 'system') {
-                        // Detect negotiation coaching response
-                        try {
-                            const parsed = JSON.parse(lastMsg.text);
-                            if (parsed?.__negotiationCoaching) {
-                                const coaching = parsed.__negotiationCoaching;
-                                return [...prev.slice(0, -1), {
-                                    ...lastMsg,
-                                    isStreaming: false,
-                                    isNegotiationCoaching: true,
-                                    negotiationCoachingData: coaching,
-                                    text: '',
-                                }];
-                            }
-                        } catch {}
-                        // Normal completion
-                        return [...prev.slice(0, -1), { ...lastMsg, isStreaming: false }];
-                    }
-                    if (lastMsg && lastMsg.isStreaming) {
-                        const updated = [...prev];
-                        updated[prev.length - 1] = { ...lastMsg, isStreaming: false };
-                        return updated;
-                    }
-                    return prev;
-                });
-            }));
-        }
-
-        if (window.electronAPI.onRAGStreamError) {
-            cleanups.push(window.electronAPI.onRAGStreamError((data: { error: string }) => {
-                setIsProcessing(false);
-                requestStartTimeRef.current = null;
-                setMessages(prev => {
-                    const lastMsg = prev[prev.length - 1];
-                    if (lastMsg && lastMsg.isStreaming) {
-                        const updated = [...prev];
-                        updated[prev.length - 1] = {
-                            ...lastMsg,
-                            isStreaming: false,
-                            text: lastMsg.text + `\n\n[RAG Error: ${data.error}]`
-                        };
-                        return updated;
-                    }
-                    return prev;
-                });
-            }));
-        }
-
-        return () => cleanups.forEach(fn => fn());
-    }, [currentModel]); // Ensure tracking captures correct model
-
 
     const handleAnswerNow = async () => {
         if (isManualRecording) {
-            // Stop recording - send accumulated voice input to Gemini
-            isRecordingRef.current = false;  // Update ref immediately
+            isRecordingRef.current = false;
             setIsManualRecording(false);
-            setManualTranscript('');  // Clear live preview
+            setManualTranscript('');
 
-            // Send manual finalization signal to STT Providers
             window.electronAPI.finalizeMicSTT().catch(err => console.error('[PikaInterface] Failed to send finalizeMicSTT:', err));
 
             const currentAttachments = attachedContext;
-            setAttachedContext([]); // Clear context immediately on send
+            setAttachedContext([]);
 
             const question = (voiceInputRef.current + (manualTranscriptRef.current ? ' ' + manualTranscriptRef.current : '')).trim();
             setVoiceInput('');
@@ -1344,7 +1128,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
             manualTranscriptRef.current = '';
 
             if (!question && currentAttachments.length === 0) {
-                // No voice input and no image
                 setMessages(prev => [...prev, {
                     id: Date.now().toString(),
                     role: 'system',
@@ -1353,7 +1136,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
                 return;
             }
 
-            // Show user's spoken question
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'user',
@@ -1362,7 +1144,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
                 screenshotPreview: currentAttachments[0]?.preview
             }]);
 
-            // Add placeholder for streaming response
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'system',
@@ -1376,7 +1157,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
                 let prompt = '';
 
                 if (currentAttachments.length > 0) {
-                    // Image + Voice Context
                     prompt = `You are a helper. The user has provided a screenshot and a spoken question/command.
 User said: "${question}"
 
@@ -1385,14 +1165,11 @@ Instructions:
 2. Provide a direct, helpful answer.
 3. Be concise.`;
                 } else {
-                    // JIT RAG pre-flight: try to use indexed meeting context first
                     const ragResult = await window.electronAPI.ragQueryLive?.(question);
                     if (ragResult?.success) {
-                        // JIT RAG handled it — response streamed via rag:stream-chunk events
                         return;
                     }
 
-                    // Voice Only (Smart Extract) — fallback
                     prompt = `You are a real-time interview assistant. The user just repeated or paraphrased a question from their interviewer.
 Instructions:
 1. Extract the core question being asked
@@ -1404,16 +1181,13 @@ Instructions:
 Provide only the answer, nothing else.`;
                 }
 
-                // Call Streaming API: message = question, context = instructions
                 requestStartTimeRef.current = Date.now();
                 await window.electronAPI.streamGeminiChat(question, currentAttachments.length > 0 ? currentAttachments.map(s => s.path) : undefined, prompt, { skipSystemPrompt: true });
 
             } catch (err) {
-                // Initial invocation failing (e.g. IPC error before stream starts)
                 setIsProcessing(false);
                 setMessages(prev => {
                     const last = prev[prev.length - 1];
-                    // If we just added the empty streaming placeholder, remove it or fill it with error
                     if (last && last.isStreaming && last.text === '') {
                         return prev.slice(0, -1).concat({
                             id: Date.now().toString(),
@@ -1429,20 +1203,14 @@ Provide only the answer, nothing else.`;
                 });
             }
         } else {
-            // Start recording - reset voice input state
             setVoiceInput('');
             voiceInputRef.current = '';
             setManualTranscript('');
-            isRecordingRef.current = true;  // Update ref immediately
+            isRecordingRef.current = true;
             setIsManualRecording(true);
 
-
-            // Ensure native audio is connected
             try {
-                // Native audio is now managed by main process
-                // await window.electronAPI.invoke('native-audio-connect');
             } catch (err) {
-                // Already connected, that's fine
             }
         }
     };
@@ -1453,346 +1221,13 @@ Provide only the answer, nothing else.`;
         const userText = inputValue;
         const currentAttachments = attachedContext;
 
-        // Clear inputs immediately
         setInputValue('');
-        setAttachedContext([]);
 
-        setMessages(prev => [...prev, {
-            id: Date.now().toString(),
-            role: 'user',
-            text: userText || (currentAttachments.length > 0 ? 'Analyze this screenshot' : ''),
-            hasScreenshot: currentAttachments.length > 0,
-            screenshotPreview: currentAttachments[0]?.preview
-        }]);
-
-        // Add placeholder for streaming response
-        setMessages(prev => [...prev, {
-            id: Date.now().toString(),
-            role: 'system',
-            text: '',
-            isStreaming: true
-        }]);
-
-        setIsExpanded(true);
-        setIsProcessing(true);
-
-        try {
-            // JIT RAG pre-flight: try to use indexed meeting context first
-            if (currentAttachments.length === 0) {
-                const ragResult = await window.electronAPI.ragQueryLive?.(userText || '');
-                if (ragResult?.success) {
-                    // JIT RAG handled it — response streamed via rag:stream-chunk events
-                    return;
-                }
-            }
-
-            // Pass imagePath if attached, AND conversation context
-            requestStartTimeRef.current = Date.now();
-            await window.electronAPI.streamGeminiChat(
-                userText || 'Analyze this screenshot',
-                currentAttachments.length > 0 ? currentAttachments.map(s => s.path) : undefined,
-                conversationContext // Pass context so "answer this" works
-            );
-        } catch (err) {
-            setIsProcessing(false);
-            setMessages(prev => {
-                const last = prev[prev.length - 1];
-                if (last && last.isStreaming && last.text === '') {
-                    // remove the empty placeholder
-                    return prev.slice(0, -1).concat({
-                        id: Date.now().toString(),
-                        role: 'system',
-                        text: `❌ Error starting stream: ${err}`
-                    });
-                }
-                return [...prev, {
-                    id: Date.now().toString(),
-                    role: 'system',
-                    text: `❌ Error: ${err}`
-                }];
-            });
-        }
+        await submitPrompt({
+            userText,
+            attachments: currentAttachments
+        });
     };
-
-    const clearChat = () => {
-        setMessages([]);
-    };
-
-
-
-
-    const renderMessageText = (msg: Message) => {
-        // Negotiation coaching card takes priority
-        if (msg.isNegotiationCoaching && msg.negotiationCoachingData) {
-            return (
-                <NegotiationCoachingCard
-                    {...msg.negotiationCoachingData}
-                    phase={msg.negotiationCoachingData.phase as any}
-                    onSilenceTimerEnd={() => {
-                        setMessages(prev => prev.map(m =>
-                            m.id === msg.id
-                                ? { ...m, negotiationCoachingData: m.negotiationCoachingData ? { ...m.negotiationCoachingData, showSilenceTimer: false } : undefined }
-                                : m
-                        ));
-                    }}
-                />
-            );
-        }
-
-        // Code-containing messages get special styling
-        // We split by code blocks to keep the "Code Solution" UI intact for the code parts
-        // But use ReactMarkdown for the text parts around it
-        if (msg.isCode || (msg.role === 'system' && msg.text.includes('```'))) {
-            const parts = msg.text.split(/(```[\s\S]*?```)/g);
-            return (
-                <div className={`rounded-lg p-3 my-1 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
-                    <div className={`flex items-center gap-2 mb-2 font-medium text-[11px] tracking-[0.02em] ${isLightTheme ? 'text-violet-600' : 'text-purple-300'}`}>
-                        <Code className="w-3.5 h-3.5" />
-                        <span>Code Solution</span>
-                    </div>
-                    <div className={`space-y-2 text-[13px] leading-relaxed ${isLightTheme ? 'text-slate-800' : 'text-slate-200'}`}>
-                        {parts.map((part, i) => {
-                            if (part.startsWith('```')) {
-                                const match = part.match(/```(\w+)?\n?([\s\S]*?)```/);
-                                if (match) {
-                                    const lang = match[1] || 'python';
-                                    const code = match[2].trim();
-                                    return (
-                                        <div key={i} className={`my-3 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
-                                            {/* Minimalist Apple Header */}
-                                            <div className={`px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
-                                                <span className={`text-[10px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
-                                                    {lang || 'CODE'}
-                                                </span>
-                                            </div>
-                                            <div className="bg-transparent">
-                                                <SyntaxHighlighter
-                                                    language={lang}
-                                                    style={codeTheme}
-                                                    customStyle={{
-                                                        margin: 0,
-                                                        borderRadius: 0,
-                                                        fontSize: '13px',
-                                                        lineHeight: '1.6',
-                                                        background: 'transparent',
-                                                        padding: '16px',
-                                                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
-                                                    }}
-                                                    wrapLongLines={true}
-                                                    showLineNumbers={true}
-                                                    lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1.2em', color: codeLineNumberColor, textAlign: 'right', fontSize: '11px' }}
-                                                >
-                                                    {code}
-                                                </SyntaxHighlighter>
-                                            </div>
-                                        </div>
-                                    );
-                                }
-                            }
-                            // Regular text - Render with Markdown
-                            return (
-                                <div key={i} className="markdown-content">
-                                    <ReactMarkdown
-                                        remarkPlugins={[remarkGfm, remarkMath]}
-                                        rehypePlugins={[rehypeKatex]}
-                                        components={{
-                                            p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
-                                            strong: ({ node, ...props }: any) => <strong className="font-bold overlay-text-strong" {...props} />,
-                                            em: ({ node, ...props }: any) => <em className="italic overlay-text-secondary" {...props} />,
-                                            ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
-                                            ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
-                                            li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
-                                            h1: ({ node, ...props }: any) => <h1 className="text-lg font-bold mb-2 mt-3 overlay-text-strong" {...props} />,
-                                            h2: ({ node, ...props }: any) => <h2 className="text-base font-bold mb-2 mt-3 overlay-text-strong" {...props} />,
-                                            h3: ({ node, ...props }: any) => <h3 className="text-sm font-bold mb-1 mt-2 overlay-text-primary" {...props} />,
-                                            code: ({ node, ...props }: any) => <code className={`overlay-inline-code-surface rounded px-1 py-0.5 text-xs font-mono whitespace-pre-wrap ${isLightTheme ? 'text-violet-700' : 'text-purple-200'}`} {...props} />,
-                                            blockquote: ({ node, ...props }: any) => <blockquote className={`border-l-2 pl-3 italic my-2 ${isLightTheme ? 'border-violet-500/30 text-slate-600' : 'border-purple-500/50 text-slate-400'}`} {...props} />,
-                                            a: ({ node, ...props }: any) => <a className={`hover:underline ${isLightTheme ? 'text-blue-600 hover:text-blue-700' : 'text-blue-400 hover:text-blue-300'}`} target="_blank" rel="noopener noreferrer" {...props} />,
-                                        }}
-                                    >
-                                        {part}
-                                    </ReactMarkdown>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            );
-        }
-
-        // Custom Styled Labels (Shorten, Recap, Follow-up) - also use Markdown for content
-        if (msg.intent === 'shorten') {
-            return (
-                <div className={`rounded-lg p-3 my-1 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
-                    <div className={`flex items-center gap-2 mb-2 font-medium text-[11px] tracking-[0.02em] ${isLightTheme ? 'text-cyan-700' : 'text-cyan-300'}`}>
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>Shortened</span>
-                    </div>
-                    <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-slate-200'}`}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
-                            p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
-                            strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-cyan-800' : 'text-cyan-100'}`} {...props} />,
-                            ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2" {...props} />,
-                            li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
-                        }}>
-                            {msg.text}
-                        </ReactMarkdown>
-                    </div>
-                </div>
-            );
-        }
-
-        if (msg.intent === 'recap') {
-            return (
-                <div className={`rounded-lg p-3 my-1 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
-                    <div className={`flex items-center gap-2 mb-2 font-medium text-[11px] tracking-[0.02em] ${isLightTheme ? 'text-indigo-700' : 'text-indigo-300'}`}>
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Recap</span>
-                    </div>
-                    <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-slate-200'}`}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
-                            p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
-                            strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-indigo-800' : 'text-indigo-100'}`} {...props} />,
-                            ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2" {...props} />,
-                            li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
-                        }}>
-                            {msg.text}
-                        </ReactMarkdown>
-                    </div>
-                </div>
-            );
-        }
-
-        if (msg.intent === 'follow_up_questions') {
-            return (
-                <div className={`rounded-lg p-3 my-1 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
-                    <div className={`flex items-center gap-2 mb-2 font-medium text-[11px] tracking-[0.02em] ${isLightTheme ? 'text-amber-700' : 'text-[#FFD60A]'}`}>
-                        <HelpCircle className="w-3.5 h-3.5" />
-                        <span>Follow-Up Questions</span>
-                    </div>
-                    <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-slate-200'}`}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
-                            p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
-                            strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-amber-800' : 'text-[#FFF9C4]'}`} {...props} />,
-                            ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2" {...props} />,
-                            li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
-                        }}>
-                            {msg.text}
-                        </ReactMarkdown>
-                    </div>
-                </div>
-            );
-        }
-
-        if (msg.intent === 'what_to_answer') {
-            // Split text by code blocks (Handle unclosed blocks at EOF)
-            const parts = msg.text.split(/(```[\s\S]*?(?:```|$))/g);
-
-            return (
-                <div className={`rounded-lg p-3 my-1 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
-                    <div className="flex items-center gap-2 mb-2 text-emerald-400 font-medium text-[11px] tracking-[0.02em]">
-                        <span>Say this</span>
-                    </div>
-                    <div className="text-[14px] leading-relaxed overlay-text-primary">
-                        {parts.map((part, i) => {
-                            if (part.startsWith('```')) {
-                                // Robust matching: handles unclosed blocks for streaming (```...$)
-                                const match = part.match(/```(\w*)\s+([\s\S]*?)(?:```|$)/);
-
-                                // Fallback logic: if it starts with ticks, treat as code (even if unclosed)
-                                if (match || part.startsWith('```')) {
-                                    const lang = (match && match[1]) ? match[1] : 'python';
-                                    let code = '';
-
-                                    if (match && match[2]) {
-                                        code = match[2].trim();
-                                    } else {
-                                        // Manual strip if regex failed
-                                        code = part.replace(/^```\w*\s*/, '').replace(/```$/, '').trim();
-                                    }
-
-                                    return (
-                                        <div key={i} className={`my-3 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
-                                            {/* Minimalist Apple Header */}
-                                            <div className={`px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
-                                                <span className={`text-[10px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
-                                                    {lang || 'CODE'}
-                                                </span>
-                                            </div>
-
-                                            <div className="bg-transparent">
-                                                <SyntaxHighlighter
-                                                    language={lang}
-                                                    style={codeTheme}
-                                                    customStyle={{
-                                                        margin: 0,
-                                                        borderRadius: 0,
-                                                        fontSize: '13px',
-                                                        lineHeight: '1.6',
-                                                        background: 'transparent',
-                                                        padding: '16px',
-                                                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
-                                                    }}
-                                                    wrapLongLines={true}
-                                                    showLineNumbers={true}
-                                                    lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1.2em', color: codeLineNumberColor, textAlign: 'right', fontSize: '11px' }}
-                                                >
-                                                    {code}
-                                                </SyntaxHighlighter>
-                                            </div>
-                                        </div>
-                                    );
-                                }
-                            }
-                            // Regular text - Render Markdown
-                            return (
-                                <div key={i} className="markdown-content">
-                                    <ReactMarkdown
-                                        remarkPlugins={[remarkGfm, remarkMath]}
-                                        rehypePlugins={[rehypeKatex]}
-                                        components={{
-                                            p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
-                                            strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-emerald-700' : 'text-emerald-100'}`} {...props} />,
-                                            em: ({ node, ...props }: any) => <em className={`italic ${isLightTheme ? 'text-emerald-700/80' : 'text-emerald-200/80'}`} {...props} />,
-                                            ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
-                                            ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
-                                            li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
-                                        }}
-                                    >
-                                        {part}
-                                    </ReactMarkdown>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            );
-        }
-
-        // Standard Text Messages (e.g. from User or Interviewer)
-        // We still want basic markdown support here too
-        return (
-            <div className="markdown-content">
-                <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkMath]}
-                    rehypePlugins={[rehypeKatex]}
-                    components={{
-                        p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
-                        strong: ({ node, ...props }: any) => <strong className="font-bold opacity-100 overlay-text-strong" {...props} />,
-                        em: ({ node, ...props }: any) => <em className="italic opacity-90 overlay-text-secondary" {...props} />,
-                        ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
-                        ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
-                        li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
-                        code: ({ node, ...props }: any) => <code className={`overlay-inline-code-surface rounded px-1 py-0.5 text-xs font-mono ${isLightTheme ? 'text-slate-800' : ''}`} {...props} />,
-                        a: ({ node, ...props }: any) => <a className="underline hover:opacity-80" target="_blank" rel="noopener noreferrer" {...props} />,
-                    }}
-                >
-                    {msg.text}
-                </ReactMarkdown>
-            </div>
-        );
-    };
-
 
     // We use a ref to hold the latest handlers to avoid re-binding the event listener on every render
     const handlersRef = useRef({
@@ -1820,7 +1255,7 @@ Provide only the answer, nothing else.`;
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            const { handleWhatToSay, handleFollowUp, handleFollowUpQuestions, handleRecap, handleAnswerNow, handleClarify, handleCodeHint, handleBrainstorm } = handlersRef.current;
+            const { handleWhatToSay, handleFollowUpQuestions, handleRecap, handleAnswerNow, handleClarify, handleCodeHint, handleBrainstorm } = handlersRef.current;
 
             // Chat Shortcuts (Scope: Local to Chat/Overlay usually, but we allow them here if focused)
             if (isShortcutPressed(e, 'whatToAnswer')) {
@@ -2066,423 +1501,60 @@ Provide only the answer, nothing else.`;
                             onLogoClick={() => window.electronAPI?.setWindowMode?.('launcher')}
                         />
                         <div
-                            className={`relative w-[600px] max-w-full border rounded-[24px] overflow-hidden flex flex-col draggable-area overlay-shell-surface ${overlayPanelClass}`}
+                            className={`relative w-[1000px] max-w-[90vw] border rounded-[24px] overflow-hidden flex flex-col draggable-area overlay-shell-surface ${overlayPanelClass}`}
                             style={appearance.shellStyle}
                         >
-
-
-
-
-                            {/* Transcript notes panel */}
-                            {showTranscript && (transcriptSegments.length > 0 || isInterviewerSpeaking) && (
-                                <RollingTranscript
-                                    segments={transcriptSegments}
-                                    partialText={isInterviewerSpeaking ? currentInterviewerPartial : undefined}
-                                    displayMode={transcriptDisplayMode}
-                                    isActive={isInterviewerSpeaking}
-                                    surfaceStyle={appearance.transcriptStyle}
-                                    onTranslateSegment={handleTranslateTranscriptSegment}
-                                />
-                            )}
-
-                            <div className="px-4 pt-2 pb-1 no-drag" aria-live="polite" aria-atomic="true">
-                                <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium border border-border-subtle/70 ${subtleSurfaceClass} ${sttStatus.toneClass}`} style={appearance.subtleStyle}>
-                                    <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${sttStatus.dotClass}`} />
-                                    <span>{sttStatus.label}</span>
-                                    {showSttErrorDetail && (
-                                        <span className="opacity-80">- {nativeAudioHealth.lastError}</span>
-                                    )}
-                                </div>
-                            </div>
-                            {sttNeedsTroubleshooting && (
-                                <div className="mx-4 mb-2 p-2 rounded-lg border border-amber-500/30 bg-amber-500/10 no-drag">
-                                    <p className="text-[10px] text-amber-200">
-                                        STT has no usable system audio input. Check output device routing and permissions.
-                                    </p>
-                                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                if (!contentRef.current) return;
-                                                const contentRect = contentRef.current.getBoundingClientRect();
-                                                const buttonRect = e.currentTarget.getBoundingClientRect();
-                                                const POPUP_WIDTH = 270;
-                                                const GAP = 8;
-                                                const x = Math.round(window.screenX + buttonRect.left + buttonRect.width / 2 - POPUP_WIDTH / 2);
-                                                const y = Math.round(window.screenY + contentRect.bottom + GAP);
-                                                window.electronAPI.toggleSettingsWindow({ x, y });
-                                            }}
-                                            className="px-2.5 py-1 rounded-md text-[10px] font-medium border border-border-subtle bg-bg-input hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary text-text-primary transition-colors"
-                                        >
-                                            Open audio settings
-                                        </button>
-                                        <span className="text-[10px] text-amber-200/80">Tips: play audio on selected output device, then restart meeting if needed.</span>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Chat History - Only show if there are messages OR active states */}
-                            {(messages.length > 0 || isManualRecording || isProcessing) && (
-                                <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-3.5 space-y-2.5 max-h-[clamp(300px,35vh,450px)] no-drag" style={{ scrollbarWidth: 'none' }}>
-                                    {messages.map((msg) => (
-                                        <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
-                                            <div className={`
-                      ${msg.role === 'user' ? 'max-w-[72.25%] px-[13.6px] py-[10.2px]' : 'max-w-[85%] px-4 py-2.5'} text-[14px] leading-6 relative group whitespace-pre-wrap
-                      ${msg.role === 'user'
-                                                    ? (isLightTheme
-                                                        ? 'bg-blue-500/12 border border-blue-500/25 text-blue-950 rounded-[20px] rounded-tr-[4px] shadow-sm font-medium'
-                                                        : 'bg-blue-500/18 border border-blue-400/30 text-blue-50 rounded-[20px] rounded-tr-[4px] shadow-sm font-medium')
-                                                    : ''
-                                                }
-                      ${msg.role === 'system'
-                                                    ? 'overlay-text-primary font-normal'
-                                                    : ''
-                                                }
-                      ${msg.role === 'interviewer'
-                                                    ? 'overlay-text-muted italic pl-0 text-[13px]'
-                                                    : ''
-                                                }
-                    `}>
-                                                {msg.role === 'interviewer' && (
-                                                    <div className="flex items-center gap-1.5 mb-1 text-[10px] font-medium tracking-[0.08em] overlay-text-muted/90">
-                                                        Interviewer
-                                                        {msg.isStreaming && <span className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />}
-                                                    </div>
-                                                )}
-                                                {msg.role === 'user' && msg.hasScreenshot && (
-                                                    <div className={`flex items-center gap-1 text-[10px] opacity-70 mb-1 border-b pb-1 ${isLightTheme ? 'border-black/10' : 'border-white/10'}`}>
-                                                        <Image className="w-2.5 h-2.5" />
-                                                        <span>Screenshot attached</span>
-                                                    </div>
-                                                )}
-                                                {msg.role === 'system' && !msg.isStreaming && (
-                                                    <button
-                                                        onClick={() => handleCopy(msg.text)}
-                                                        className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive"
-                                                        title="Copy to clipboard"
-                                                        style={appearance.iconStyle}
-                                                    >
-                                                        <Copy className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                                {renderMessageText(msg)}
-                                            </div>
-                                        </div>
-                                    ))}
-
-                                    {/* Active Recording State with Live Transcription */}
-                                    {isManualRecording && (
-                                        <div className="flex flex-col items-end gap-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                            {/* Live transcription preview */}
-                                            {(manualTranscript || voiceInput) && (
-                                                <div className="max-w-[85%] px-3.5 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-[18px] rounded-tr-[4px]">
-                                                    <span className="text-[13px] text-emerald-300">
-                                                        {voiceInput}{voiceInput && manualTranscript ? ' ' : ''}{manualTranscript}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            <div className="px-3 py-2 flex gap-1.5 items-center">
-                                                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                                <span className="text-[10px] text-emerald-400/70 ml-1">Listening...</span>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {isProcessing && (
-                                        <div className="flex justify-start">
-                                            <div className="px-3 py-2 flex gap-1.5">
-                                                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                                <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {knowledgeContext && knowledgeContext.matchedJDSignals.length > 0 && (
-                                        <div className="mx-3 mb-2 p-3.5 rounded-2xl border border-white/12 bg-[rgba(10,14,28,0.82)] shadow-[0_10px_28px_rgba(0,0,0,0.18)]">
-                                            <div className="flex items-center gap-1.5 mb-2">
-                                                <span className="text-[10px] font-semibold text-blue-100/90 tracking-[0.08em]">Role focus</span>
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                {knowledgeContext.matchedJDSignals.slice(0, 5).map((sig, i) => (
-                                                    <div key={i} className="flex items-center gap-2.5">
-                                                        <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-300" />
-                                                        <span className="text-[11.5px] text-white/88 leading-relaxed">{sig.requirement}</span>
-                                                        <div className="ml-auto w-8 h-1.5 rounded-full bg-white/10 overflow-hidden shrink-0">
-                                                            <div className="h-full rounded-full bg-blue-300" style={{ width: `${Math.round(sig.relevance * 100)}%` }} />
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {knowledgeContext && (knowledgeContext.mustHitKeywords.length > 0 || knowledgeContext.resumeEvidence.length > 0) && (
-                                        <div className="mx-3 mb-3 p-3.5 rounded-2xl border border-white/12 bg-[rgba(10,14,28,0.88)] shadow-[0_10px_28px_rgba(0,0,0,0.2)]">
-                                            {knowledgeContext.mustHitKeywords.length > 0 && (
-                                                <div className="mb-3">
-                                                    <span className="text-[10px] font-semibold text-blue-100/90 tracking-[0.08em]">Language to weave in</span>
-                                                    <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                                        {knowledgeContext.mustHitKeywords.slice(0, 8).map((kw, i) => (
-                                                            <span key={i} className="text-[10.5px] font-medium text-blue-50 px-2 py-1 rounded-md bg-blue-400/16 border border-blue-300/20">
-                                                                {kw}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {knowledgeContext.resumeEvidence.length > 0 && (
-                                                <div>
-                                                    <span className="text-[10px] font-semibold text-emerald-100/90 tracking-[0.08em]">Good examples to mention</span>
-                                                    <div className="space-y-1.5 mt-1.5">
-                                                        {knowledgeContext.resumeEvidence.slice(0, 3).map((ev, i) => (
-                                                            <div key={i} className="text-[11px] leading-relaxed text-white/80">
-                                                                <span className="font-semibold text-emerald-200">{ev.source}:</span> {ev.text.slice(0, 100)}{ev.text.length > 100 ? '...' : ''}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                    <div ref={messagesEndRef} />
-                                </div>
-                            )}
-
-                            {/* Quick Actions */}
-                            <div className={`flex flex-nowrap justify-center items-center gap-1.5 px-4 pb-3 overflow-x-auto no-scrollbar ${(transcriptSegments.length > 0 || isInterviewerSpeaking) && showTranscript ? 'pt-1.5' : 'pt-3.5'}`}>
-                                <button onClick={handleWhatToSay} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-                                    <Pencil className="w-3 h-3 opacity-65" /> Guide me
-                                </button>
-                                <button onClick={handleClarify} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-                                    <MessageSquare className="w-3 h-3 opacity-65" /> Clarify
-                                </button>
-                                <button onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-                                    {actionButtonMode === 'brainstorm'
-                                        ? <><Lightbulb className="w-3 h-3 opacity-65" /> Ideas</>
-                                        : <><RefreshCw className="w-3 h-3 opacity-65" /> Recap</>
-                                    }
-                                </button>
-                                <button onClick={handleFollowUpQuestions} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-                                    <HelpCircle className="w-3 h-3 opacity-65" /> Follow-up
-                                </button>
-                                <button
-                                    onClick={handleAnswerNow}
-                                    className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press min-w-[84px] whitespace-nowrap shrink-0 ${isManualRecording
-                                        ? 'bg-red-500/10 text-red-300 ring-1 ring-red-400/20'
-                                        : 'bg-[#007AFF] text-white shadow-[0_4px_14px_rgba(0,122,255,0.18)] hover:bg-[#0071E3]'
-                                        }`}
-                                >
-                                    {isManualRecording ? (
-                                        <>
-                                            <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                                            Stop
-                                        </>
-                                    ) : (
-                                        <><Zap className="w-3 h-3 opacity-75" /> Answer</>
-                                    )}
-                                </button>
-                            </div>
-
-                            {/* Input Area */}
-                            <div className="p-3 pt-0">
-                                {/* Latent Context Preview (Attached Screenshot) */}
-                                {attachedContext.length > 0 && (
-                                    <div className={`mb-2 rounded-lg p-2 transition-all duration-200 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <span className="text-[11px] font-medium overlay-text-primary">
-                                                {attachedContext.length} screenshot{attachedContext.length > 1 ? 's' : ''} attached
-                                            </span>
-                                            <button
-                                                onClick={() => setAttachedContext([])}
-                                                className="p-1 rounded-full transition-colors overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive"
-                                                title="Remove all"
-                                                style={appearance.iconStyle}
-                                            >
-                                                <X className="w-3.5 h-3.5" />
-                                            </button>
-                                        </div>
-                                        <div className="flex gap-1.5 overflow-x-auto max-w-full pb-1">
-                                            {attachedContext.map((ctx, idx) => (
-                                                <div key={ctx.path} className="relative group/thumb flex-shrink-0">
-                                                    <img
-                                                        src={ctx.preview}
-                                                        alt={`Screenshot ${idx + 1}`}
-                                                        className={`h-10 w-auto rounded border ${isLightTheme ? 'border-black/15' : 'border-white/20'}`}
-                                                    />
-                                                    <button
-                                                        onClick={() => setAttachedContext(prev => prev.filter((_, i) => i !== idx))}
-                                                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500/80 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-                                                        title="Remove"
-                                                    >
-                                                        <X className="w-2.5 h-2.5 text-white" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <span className="text-[10px] overlay-text-muted">Ask a question or click Answer</span>
-                                    </div>
-                                )}
-
-                                <div className="relative group">
-                                    <input
-                                        ref={textInputRef}
-                                        type="text"
-                                        value={inputValue}
-                                        onChange={(e) => setInputValue(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
-
-                                        className={`w-full border focus:ring-1 rounded-xl pl-3 pr-10 py-2.5 focus:outline-none transition-all duration-200 ease-sculpted text-[13px] leading-relaxed ${inputClass}`}
-                                        style={appearance.inputStyle}
+                            <div className="flex-1 min-h-0 flex">
+                                <div className="min-w-0 min-h-0" style={{ width: `${splitterPosition}%` }}>
+                                    <TranscriptPanel
+                                        transcriptSegments={transcriptSegments}
+                                        isInterviewerSpeaking={isInterviewerSpeaking}
+                                        currentInterviewerPartial={currentInterviewerPartial}
+                                        transcriptDisplayMode={transcriptDisplayMode}
+                                        showTranscript={showTranscript}
+                                        handleTranslateTranscriptSegment={handleTranslateTranscriptSegment}
+                                        sttStatus={sttStatus}
+                                        sttNeedsTroubleshooting={sttNeedsTroubleshooting}
+                                        showSttErrorDetail={showSttErrorDetail}
+                                        nativeAudioHealth={nativeAudioHealth}
+                                        appearance={appearance}
+                                        isLightTheme={isLightTheme}
                                     />
-
-                                    {/* Custom Rich Placeholder */}
-                                    {!inputValue && (
-                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none text-[12px] overlay-text-muted/90 max-w-[calc(100%-56px)] overflow-hidden whitespace-nowrap text-ellipsis">
-                                            <span>Ask anything on screen or conversation, or</span>
-                                            <div className="flex items-center gap-1 opacity-80">
-                                                {(shortcuts.selectiveScreenshot || ['⌘', 'Shift', 'H']).map((key, i) => (
-                                                    <React.Fragment key={i}>
-                                                        {i > 0 && <span className="text-[10px]">+</span>}
-                                                        <kbd className="px-1.5 py-0.5 rounded border text-[10px] font-sans min-w-[20px] text-center overlay-control-surface overlay-text-secondary" style={appearance.controlStyle}>{key}</kbd>
-                                                    </React.Fragment>
-                                                ))}
-                                            </div>
-                                            <span>for selective screenshot</span>
-                                        </div>
-                                    )}
-
-                                    {!inputValue && (
-                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-20">
-                                            <span className="text-[10px]">↵</span>
-                                        </div>
-                                    )}
                                 </div>
-
-                                {/* Bottom Row */}
-                                <div className="flex items-center justify-between mt-3 px-0.5">
-                                    <div className="flex items-center gap-1.5">
-                                        <button
-                                            onClick={(e) => {
-                                                // Calculate position for detached window
-                                                if (!contentRef.current) return;
-                                                const contentRect = contentRef.current.getBoundingClientRect();
-                                                const buttonRect = e.currentTarget.getBoundingClientRect();
-                                                const GAP = 8;
-
-                                                const x = window.screenX + buttonRect.left;
-                                                const y = window.screenY + contentRect.bottom + GAP;
-
-                                                window.electronAPI.toggleModelSelector({ x, y });
-                                            }}
-                                            className={`
-                                                flex items-center gap-2 px-3 py-1.5
-                                                border border-border-subtle/60 rounded-lg transition-colors
-                                                text-xs font-medium w-[140px]
-                                                interaction-base interaction-press
-                                                ${controlSurfaceClass}
-                                            `}
-                                            style={appearance.controlStyle}
-                                        >
-                                            <span className="truncate min-w-0 flex-1">
-                                                {(() => {
-                                                    const m = currentModel;
-                                                    if (m.startsWith('ollama-')) return m.replace('ollama-', '');
-                                                    if (m === 'gemini-3.1-flash-lite-preview') return 'Gemini 3.1 Flash';
-                                                    if (m === 'gemini-3.1-pro-preview') return 'Gemini 3.1 Pro';
-                                                    if (m === 'llama-3.3-70b-versatile') return 'Groq Llama 3.3';
-                                                    if (m === 'gpt-5.4') return 'GPT 5.4';
-                                                    if (m === 'claude-sonnet-4-6') return 'Sonnet 4.6';
-                                                    return m;
-                                                })()}
-                                            </span>
-                                            <ChevronDown size={14} className="shrink-0 transition-transform" />
-                                        </button>
-
-                                        <div className="w-px h-3 mx-1" style={appearance.dividerStyle} />
-
-                                        <div className="relative">
-                                            <button
-                                                onClick={(e) => {
-                                                    if (isSettingsOpen) {
-                                                        // If open, just close it (toggle will handle logic but we can be explicit or just toggle)
-                                                        // Actually toggle-settings-window handles hiding if visible, so logic is same.
-                                                        window.electronAPI.toggleSettingsWindow();
-                                                        return;
-                                                    }
-
-                                                    if (!contentRef.current) return;
-
-                                                    const contentRect = contentRef.current.getBoundingClientRect();
-                                                    const buttonRect = e.currentTarget.getBoundingClientRect();
-                                                    const POPUP_WIDTH = 270; // Matches SettingsWindowHelper actual width
-                                                    const GAP = 8; // Same gap as between TopPill and main body (gap-2 = 8px)
-
-                                                    // X: Left-aligned relative to the Settings Button
-                                                    const x = window.screenX + buttonRect.left;
-
-                                                    // Y: Below the main content + gap
-                                                    const y = window.screenY + contentRect.bottom + GAP;
-
-                                                    window.electronAPI.toggleSettingsWindow({ x, y });
-                                                }}
-                                                className={`
-                                            w-7 h-7 flex items-center justify-center rounded-lg
-                                            interaction-base interaction-press
-                                            ${isSettingsOpen
-                                                    ? 'overlay-icon-surface overlay-icon-surface-hover overlay-text-primary'
-                                                    : 'overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive'}
-                                        `}
-
-                                                style={appearance.iconStyle}
-                                            >
-                                                <SlidersHorizontal className="w-3.5 h-3.5" />
-                                            </button>
-                                        </div>
-
-                                        <div className="w-px h-3 mx-1" style={appearance.dividerStyle} />
-
-                                        {/* Mouse Passthrough Toggle */}
-                                        <div className="relative">
-                                            <button
-                                                onClick={() => {
-                                                    const newState = !isMousePassthrough;
-                                                    setIsMousePassthrough(newState);
-                                                    window.electronAPI?.setOverlayMousePassthrough?.(newState);
-                                                }}
-                                                className={`
-                                                    w-7 h-7 flex items-center justify-center rounded-lg
-                                                    interaction-base interaction-press
-                                                    ${isMousePassthrough
-                                                        ? 'overlay-icon-surface overlay-icon-surface-hover text-sky-400 opacity-100'
-                                                        : 'overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive'}
-                                                `}
-
-                                                style={appearance.iconStyle}
-                                            >
-                                                <PointerOff className="w-3.5 h-3.5" />
-                                            </button>
-                                        </div>
-
-                                    </div>
-
-                                    <button
-                                        onClick={handleManualSubmit}
-                                        disabled={!inputValue.trim()}
-                                    className={`
-                                    w-7 h-7 rounded-full flex items-center justify-center
-                                    interaction-base interaction-press
-                                    ${inputValue.trim()
-                                                ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20 hover:bg-[#0071E3]'
-                                                : 'overlay-icon-surface overlay-text-muted cursor-not-allowed'
-                                            }
-                                `}
-                                    style={inputValue.trim() ? undefined : appearance.iconStyle}
-                                    >
-                                        <ArrowRight className="w-3.5 h-3.5" />
-                                    </button>
+                                <ResizableSplitter position={splitterPosition} onPositionChange={setSplitterPosition} />
+                                <div className="min-w-0 min-h-0 flex-1">
+                                    <ChatPanel
+                                        messages={messages}
+                                        knowledgeContext={knowledgeContext}
+                                        attachedContext={attachedContext}
+                                        setAttachedContext={setAttachedContext}
+                                        actionButtonMode={actionButtonMode}
+                                        inputValue={inputValue}
+                                        setInputValue={setInputValue}
+                                        isProcessing={isProcessing}
+                                        handleWhatToSay={handleWhatToSay}
+                                        handleClarify={handleClarify}
+                                        handleFollowUpQuestions={handleFollowUpQuestions}
+                                        handleRecap={handleRecap}
+                                        handleBrainstorm={handleBrainstorm}
+                                        handleAnswerNow={handleAnswerNow}
+                                        handleManualSubmit={handleManualSubmit}
+                                        isManualRecording={isManualRecording}
+                                        manualTranscript={manualTranscript}
+                                        voiceInput={voiceInput}
+                                        appearance={appearance}
+                                        isLightTheme={isLightTheme}
+                                        currentModel={currentModel}
+                                        isSettingsOpen={isSettingsOpen}
+                                        isMousePassthrough={isMousePassthrough}
+                                        setIsMousePassthrough={setIsMousePassthrough}
+                                        shortcuts={shortcuts as ShortcutConfig}
+                                        scrollContainerRef={scrollContainerRef}
+                                        messagesEndRef={messagesEndRef}
+                                        textInputRef={textInputRef}
+                                        contentRef={contentRef}
+                                        setMessages={setMessages}
+                                    />
                                 </div>
                             </div>
                         </div>

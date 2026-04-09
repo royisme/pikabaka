@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useStreamBuffer } from '../hooks/useStreamBuffer';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 import { X, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import pikaIcon from '../../assets/icon.png';
+import { electronChatFetch } from '../lib/electronChatFetch';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -12,19 +14,8 @@ import 'katex/dist/katex.min.css';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
-// ============================================
-// Types 
-// ============================================
-
-interface Message {
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    isStreaming?: boolean;
-}
-
 interface MeetingContext {
-    id?: string;  // Required for RAG queries
+    id?: string;
     title: string;
     summary?: string;
     keyPoints?: string[];
@@ -37,14 +28,15 @@ interface MeetingChatOverlayProps {
     onClose: () => void;
     meetingContext: MeetingContext;
     initialQuery?: string;
-    onNewQuery: (query: string) => void;
+    initialQueryKey?: number;
 }
 
-type ChatState = 'idle' | 'opening' | 'waiting_for_llm' | 'streaming_response' | 'error' | 'closing';
-
-// ============================================
-// Typing Indicator Component
-// ============================================
+const getMessageText = (message: { parts?: Array<{ type: string; text?: string }> }) => {
+    return message.parts
+        ?.filter((part) => part.type === 'text')
+        .map((part) => part.text ?? '')
+        .join('') ?? '';
+};
 
 const TypingIndicator: React.FC = () => (
     <div className="flex items-center gap-1 py-4">
@@ -58,17 +50,13 @@ const TypingIndicator: React.FC = () => (
                         duration: 0.6,
                         repeat: Infinity,
                         delay: i * 0.15,
-                        ease: "easeInOut"
+                        ease: 'easeInOut'
                     }}
                 />
             ))}
         </div>
     </div>
 );
-
-// ============================================
-// Message Components
-// ============================================
 
 const UserMessage: React.FC<{ content: string }> = ({ content }) => (
     <motion.div
@@ -178,58 +166,65 @@ const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = (
     );
 };
 
-// ============================================
-// Main Component
-// ============================================
-
 const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
     isOpen,
     onClose,
     meetingContext,
     initialQuery = '',
-    // onNewQuery
+    initialQueryKey = 0,
 }) => {
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [chatState, setChatState] = useState<ChatState>('idle');
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatWindowRef = useRef<HTMLDivElement>(null);
-    const streamBuffer = useStreamBuffer();
+    const lastQueryRef = useRef<string>('');
 
-    // Auto-scroll to bottom on new messages
+    const {
+        messages,
+        sendMessage,
+        regenerate,
+        status,
+        error,
+        setMessages,
+        stop,
+    } = useChat({
+        transport: new DefaultChatTransport({
+            api: '/api/chat',
+            fetch: electronChatFetch as typeof globalThis.fetch,
+            body: { meetingId: meetingContext.id },
+        }),
+    });
+    const [input, setInput] = useState('');
+    const isLoading = status === 'submitted' || status === 'streaming';
+
+    const handleFormSubmit = useCallback((e: React.FormEvent) => {
+        e.preventDefault();
+        if (!input.trim() || isLoading) return;
+        const text = input.trim();
+        setInput('');
+        void sendMessage({ text });
+    }, [input, isLoading, sendMessage]);
+
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+    }, [messages, isLoading]);
 
-    // Submit initial query when overlay opens
     useEffect(() => {
-        if (isOpen && initialQuery && messages.length === 0) {
-            setChatState('opening');
-            setTimeout(() => {
-                submitQuestion(initialQuery);
-            }, 100);
+        if (isOpen && initialQuery) {
+            const queryToken = `${initialQueryKey}:${initialQuery}`;
+            if (queryToken !== lastQueryRef.current) {
+                lastQueryRef.current = queryToken;
+                void sendMessage({ text: initialQuery });
+            }
         }
-    }, [isOpen, initialQuery]);
+    }, [isOpen, initialQuery, initialQueryKey, sendMessage]);
 
-    // Listen for new queries from parent
-    useEffect(() => {
-        if (isOpen && initialQuery && messages.length > 0) {
-            // This is a follow-up query
-            submitQuestion(initialQuery);
-        }
-    }, [initialQuery]);
-
-    // Reset state when overlay closes
     useEffect(() => {
         if (!isOpen) {
-            setChatState('idle');
+            stop();
             setMessages([]);
-            setErrorMessage(null);
+            lastQueryRef.current = '';
         }
-    }, [isOpen]);
+    }, [isOpen, setMessages, stop]);
 
-    // ESC key handler
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape' && isOpen) {
@@ -240,7 +235,6 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isOpen]);
 
-    // Click outside handler
     const handleBackdropClick = useCallback((e: React.MouseEvent) => {
         if (e.target === e.currentTarget) {
             handleClose();
@@ -248,228 +242,9 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
     }, []);
 
     const handleClose = useCallback(() => {
+        stop();
         onClose();
-    }, [onClose]);
-
-    // Build context string for LLM
-    const buildContextString = useCallback((): string => {
-        const parts: string[] = [];
-
-        parts.push(`MEETING: ${meetingContext.title}`);
-
-        if (meetingContext.summary) {
-            parts.push(`\nSUMMARY:\n${meetingContext.summary}`);
-        }
-
-        if (meetingContext.keyPoints?.length) {
-            parts.push(`\nKEY POINTS:\n${meetingContext.keyPoints.map(p => `- ${p}`).join('\n')}`);
-        }
-
-        if (meetingContext.actionItems?.length) {
-            parts.push(`\nACTION ITEMS:\n${meetingContext.actionItems.map(a => `- ${a}`).join('\n')}`);
-        }
-
-        if (meetingContext.transcript?.length) {
-            const recentTranscript = meetingContext.transcript.slice(-20);
-            const transcriptText = recentTranscript
-                .map(t => `[${t.speaker === 'user' ? 'Me' : 'Them'}]: ${t.text}`)
-                .join('\n');
-            parts.push(`\nRECENT TRANSCRIPT:\n${transcriptText}`);
-        }
-
-        return parts.join('\n');
-    }, [meetingContext]);
-
-    // Submit question using RAG streaming
-    const submitQuestion = useCallback(async (question: string) => {
-        if (!question.trim() || chatState === 'waiting_for_llm' || chatState === 'streaming_response') return;
-
-        const userMessage: Message = {
-            id: `user-${Date.now()}`,
-            role: 'user',
-            content: question
-        };
-        setMessages(prev => [...prev, userMessage]);
-        setChatState('waiting_for_llm');
-        setErrorMessage(null);
-
-        const assistantMessageId = `assistant-${Date.now()}`;
-
-        try {
-            // Add typing indicator delay (200ms) - makes the AI feel "thoughtful"
-            await new Promise(resolve => setTimeout(resolve, 200));
-
-            // Create assistant message placeholder
-            setMessages(prev => [...prev, {
-                id: assistantMessageId,
-                role: 'assistant',
-                content: '',
-                isStreaming: true
-            }]);
-
-            // Set up RAG streaming listeners (RAF-batched to avoid per-token re-renders)
-            streamBuffer.reset();
-            const tokenCleanup = window.electronAPI?.onRAGStreamChunk((data: { chunk: string }) => {
-                setChatState('streaming_response');
-                streamBuffer.appendToken(data.chunk, (content) => {
-                    setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                            ? { ...msg, content }
-                            : msg
-                    ));
-                });
-            });
-
-            const doneCleanup = window.electronAPI?.onRAGStreamComplete(() => {
-                // Final commit — flush any remaining buffered content
-                const finalContent = streamBuffer.getBufferedContent();
-                setMessages(prev => prev.map(msg =>
-                    msg.id === assistantMessageId
-                        ? { ...msg, content: finalContent, isStreaming: false }
-                        : msg
-                ));
-                setChatState('idle');
-                streamBuffer.reset();
-                tokenCleanup?.();
-                doneCleanup?.();
-                errorCleanup?.();
-            });
-
-            const errorCleanup = window.electronAPI?.onRAGStreamError((data: { error: string }) => {
-                console.error('[MeetingChat] RAG stream error:', data.error);
-                setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-                setErrorMessage("Couldn't get a response. Please try again.");
-                setChatState('error');
-                streamBuffer.reset();
-                tokenCleanup?.();
-                doneCleanup?.();
-                errorCleanup?.();
-            });
-
-            // Get meeting ID from context for RAG queries
-            const meetingId = meetingContext.id;
-
-            if (meetingId) {
-                // Use RAG-powered meeting query
-                const result = await window.electronAPI?.ragQueryMeeting(meetingId, question);
-
-                // If RAG not available (or failed), fall back to context-window chat
-                if (result?.fallback) {
-                    console.log("[MeetingChat] RAG unavailable, using context window fallback");
-                    // Cleanup RAG listeners since we won't use them
-                    tokenCleanup?.();
-                    doneCleanup?.();
-                    errorCleanup?.();
-
-                    // FALLBACK LOGIC
-                    const contextString = buildContextString();
-                    const systemPrompt = `You are recalling a specific meeting. Answer questions ONLY about this meeting. Be concise (2-4 sentences). Sound natural, like a human recalling. If information is not present, say so briefly. Never guess.
-
-${contextString}`;
-
-                    streamBuffer.reset();
-                    const oldTokenCleanup = window.electronAPI?.onGeminiStreamToken((token: string) => {
-                        setChatState('streaming_response');
-                        streamBuffer.appendToken(token, (content) => {
-                            setMessages(prev => prev.map(msg =>
-                                msg.id === assistantMessageId
-                                    ? { ...msg, content }
-                                    : msg
-                            ));
-                        });
-                    });
-
-                    const oldDoneCleanup = window.electronAPI?.onGeminiStreamDone(() => {
-                        const finalContent = streamBuffer.getBufferedContent();
-                        setMessages(prev => prev.map(msg =>
-                            msg.id === assistantMessageId
-                                ? { ...msg, content: finalContent, isStreaming: false }
-                                : msg
-                        ));
-                        streamBuffer.reset();
-                        oldTokenCleanup?.();
-                        oldDoneCleanup?.();
-                        oldErrorCleanup?.();
-                    });
-
-                    const oldErrorCleanup = window.electronAPI?.onGeminiStreamError((error: string) => {
-                        console.error('[MeetingChat] Gemini stream error (fallback):', error);
-                        setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-                        setErrorMessage("Couldn't get a response. Please check your settings.");
-                        setChatState('error');
-                        streamBuffer.reset();
-                        oldTokenCleanup?.();
-                        oldDoneCleanup?.();
-                        oldErrorCleanup?.();
-                    });
-
-                    await window.electronAPI?.streamGeminiChat(
-                        question,
-                        undefined,
-                        systemPrompt,
-                        { skipSystemPrompt: true }
-                    );
-                }
-            } else {
-                // No meeting ID, standard fallback
-                const contextString = buildContextString();
-                const systemPrompt = `You are recalling a specific meeting. Answer questions ONLY about this meeting. Be concise (2-4 sentences). Sound natural, like a human recalling. If information is not present, say so briefly. Never guess.
-
-${contextString}`;
-
-                // Switch to Gemini streaming (RAF-batched)
-                streamBuffer.reset();
-                const oldTokenCleanup = window.electronAPI?.onGeminiStreamToken((token: string) => {
-                    setChatState('streaming_response');
-                    streamBuffer.appendToken(token, (content) => {
-                        setMessages(prev => prev.map(msg =>
-                            msg.id === assistantMessageId
-                                ? { ...msg, content }
-                                : msg
-                        ));
-                    });
-                });
-
-                const oldDoneCleanup = window.electronAPI?.onGeminiStreamDone(() => {
-                    const finalContent = streamBuffer.getBufferedContent();
-                    setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                            ? { ...msg, content: finalContent, isStreaming: false }
-                            : msg
-                    ));
-                    setChatState('idle');
-                    streamBuffer.reset();
-                    oldTokenCleanup?.();
-                    oldDoneCleanup?.();
-                    oldErrorCleanup?.();
-                });
-
-                const oldErrorCleanup = window.electronAPI?.onGeminiStreamError((error: string) => {
-                    console.error('[MeetingChat] Gemini stream error:', error);
-                    setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-                    setErrorMessage("Couldn't get a response. Please check your settings.");
-                    setChatState('error');
-                    streamBuffer.reset();
-                    oldTokenCleanup?.();
-                    oldDoneCleanup?.();
-                    oldErrorCleanup?.();
-                });
-
-                await window.electronAPI?.streamGeminiChat(
-                    question,
-                    undefined,
-                    systemPrompt,
-                    { skipSystemPrompt: true }
-                );
-            }
-
-        } catch (error) {
-            console.error('[MeetingChat] Error:', error);
-            setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-            setErrorMessage("Something went wrong. Please try again.");
-            setChatState('error');
-        }
-    }, [chatState, buildContextString, meetingContext]);
+    }, [onClose, stop]);
 
     return (
         <AnimatePresence>
@@ -482,7 +257,6 @@ ${contextString}`;
                     className="absolute inset-0 z-40 flex flex-col justify-end"
                     onClick={handleBackdropClick}
                 >
-                    {/* Backdrop with blur */}
                     <motion.div
                         initial={{ backdropFilter: 'blur(0px)' }}
                         animate={{ backdropFilter: 'blur(8px)' }}
@@ -491,20 +265,18 @@ ${contextString}`;
                         className="absolute inset-0 bg-black/40"
                     />
 
-                    {/* Chat Window - extends to bottom, leaves room for input */}
                     <motion.div
                         ref={chatWindowRef}
                         initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "85vh", opacity: 1 }}
+                        animate={{ height: '85vh', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{
-                            height: { type: "spring", stiffness: 300, damping: 30, mass: 0.8 },
+                            height: { type: 'spring', stiffness: 300, damping: 30, mass: 0.8 },
                             opacity: { duration: 0.2 }
                         }}
                         className="relative mx-auto w-full max-w-[680px] mb-0 bg-bg-secondary rounded-t-[24px] border-t border-x border-border-subtle shadow-2xl overflow-hidden flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* Header with close button */}
                         <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle shrink-0">
                             <div className="flex items-center gap-2 text-text-tertiary">
                                 <img src={pikaIcon} className="w-3.5 h-3.5 opacity-50 object-contain drop-shadow-sm" alt="logo" />
@@ -518,27 +290,44 @@ ${contextString}`;
                             </button>
                         </div>
 
-                        {/* Messages area - scrollable */}
                         <div className="flex-1 overflow-y-auto px-6 py-4 pb-32 custom-scrollbar">
-                            {messages.map((msg) => (
-                                msg.role === 'user'
-                                    ? <UserMessage key={msg.id} content={msg.content} />
-                                    : <AssistantMessage key={msg.id} content={msg.content} isStreaming={msg.isStreaming} />
-                            ))}
+                            {messages.map((msg) => {
+                                const content = getMessageText(msg);
+                                return msg.role === 'user'
+                                    ? <UserMessage key={msg.id} content={content} />
+                                    : <AssistantMessage key={msg.id} content={content} isStreaming={isLoading && msg.id === messages[messages.length - 1]?.id} />;
+                            })}
 
-                            {chatState === 'waiting_for_llm' && <TypingIndicator />}
+                            {isLoading && messages[messages.length - 1]?.role !== 'assistant' && <TypingIndicator />}
 
-                            {errorMessage && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 4 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="text-[#FF6B6B] text-[13px] py-2"
-                                >
-                                    {errorMessage}
-                                </motion.div>
+                            {error && (
+                                <div className="text-[#FF6B6B] text-[13px] py-2 flex items-center gap-2">
+                                    <span>Couldn't get a response.</span>
+                                    <button onClick={() => void regenerate()} className="underline hover:text-red-400">Retry</button>
+                                </div>
                             )}
 
                             <div ref={messagesEndRef} />
+                        </div>
+
+                        <div className="absolute bottom-0 left-0 right-0 px-4 py-3 border-t border-border-subtle bg-bg-secondary">
+                            <form onSubmit={handleFormSubmit} className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    placeholder="Ask a follow-up question..."
+                                    className="flex-1 bg-bg-input border border-border-subtle rounded-xl px-3 py-2 text-[14px] text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                                    autoFocus
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={!input.trim() || isLoading}
+                                    className="px-3 py-2 rounded-xl bg-accent-primary text-white text-[13px] font-medium disabled:opacity-50"
+                                >
+                                    Send
+                                </button>
+                            </form>
                         </div>
                     </motion.div>
                 </motion.div>

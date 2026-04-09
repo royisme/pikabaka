@@ -242,6 +242,13 @@ interface ElectronAPI {
   onRAGStreamComplete: (callback: (data: { meetingId?: string; global?: boolean }) => void) => () => void
   onRAGStreamError: (callback: (data: { meetingId?: string; global?: boolean; error: string }) => void) => () => void
 
+  // Chat Streaming API
+  chatStreamMeeting: (params: { requestId: string; meetingId: string; messages: Array<{ role: string; content: string }>; context?: string }) => Promise<{ success?: boolean; error?: string }>
+  chatCancelStream: (requestId: string) => Promise<{ success: boolean }>
+  onChatStreamChunk: (callback: (data: { requestId: string; chunk: string }) => void) => () => void
+  onChatStreamComplete: (callback: (data: { requestId: string }) => void) => () => void
+  onChatStreamError: (callback: (data: { requestId: string; error: string }) => void) => () => void
+
   // Keybind Management
   getKeybinds: () => Promise<Array<{ id: string; label: string; accelerator: string; isGlobal: boolean; defaultAccelerator: string }>>
   setKeybind: (id: string, accelerator: string) => Promise<boolean>
@@ -1017,6 +1024,27 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => {
       ipcRenderer.removeListener('rag:stream-error', subscription)
     }
+  },
+
+  // Chat Streaming API
+  chatStreamMeeting: (params: { requestId: string; meetingId: string; messages: Array<{ role: string; content: string }>; context?: string }) =>
+    ipcRenderer.invoke('chat:stream-meeting', params),
+  chatCancelStream: (requestId: string) =>
+    ipcRenderer.invoke('chat:cancel-stream', { requestId }),
+  onChatStreamChunk: (callback: (data: { requestId: string; chunk: string }) => void) => {
+    const handler = (_: any, data: any) => callback(data)
+    ipcRenderer.on('chat:stream-chunk', handler)
+    return () => ipcRenderer.removeListener('chat:stream-chunk', handler)
+  },
+  onChatStreamComplete: (callback: (data: { requestId: string }) => void) => {
+    const handler = (_: any, data: any) => callback(data)
+    ipcRenderer.on('chat:stream-complete', handler)
+    return () => ipcRenderer.removeListener('chat:stream-complete', handler)
+  },
+  onChatStreamError: (callback: (data: { requestId: string; error: string }) => void) => {
+    const handler = (_: any, data: any) => callback(data)
+    ipcRenderer.on('chat:stream-error', handler)
+    return () => ipcRenderer.removeListener('chat:stream-error', handler)
   },
 
   // Keybind Management

@@ -68,7 +68,8 @@ const MeetingDetails: React.FC<MeetingDetailsProps> = ({ meeting: initialMeeting
     const [query, setQuery] = useState('');
     const [isCopied, setIsCopied] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
-    const [submittedQuery, setSubmittedQuery] = useState('');
+    const [chatQueryCounter, setChatQueryCounter] = useState(0);
+    const [initialChatQuery, setInitialChatQuery] = useState('');
     const [translations, setTranslations] = useState<Record<number, { text: string; state: 'pending' | 'complete' | 'error' }>>({});
     const [isTranslatingAll, setIsTranslatingAll] = useState(false);
     const translateAbortRef = useRef(false);
@@ -128,10 +129,9 @@ const MeetingDetails: React.FC<MeetingDetailsProps> = ({ meeting: initialMeeting
 
     const handleSubmitQuestion = () => {
         if (query.trim()) {
-            setSubmittedQuery(query);
-            if (!isChatOpen) {
-                setIsChatOpen(true);
-            }
+            setInitialChatQuery(query.trim());
+            setChatQueryCounter(c => c + 1);
+            setIsChatOpen(true);
             setQuery('');
         }
     };
@@ -606,7 +606,6 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                 onClose={() => {
                     setIsChatOpen(false);
                     setQuery('');
-                    setSubmittedQuery('');
                 }}
                 meetingContext={{
                     id: meeting.id,  // Required for RAG queries
@@ -616,10 +615,8 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                     actionItems: meeting.detailedSummary?.actionItems,
                     transcript: meeting.transcript
                 }}
-                initialQuery={submittedQuery}
-                onNewQuery={(newQuery) => {
-                    setSubmittedQuery(newQuery);
-                }}
+                initialQuery={initialChatQuery}
+                initialQueryKey={chatQueryCounter}
             />
         </div>
     );

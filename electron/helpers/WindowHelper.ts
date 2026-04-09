@@ -21,9 +21,6 @@ export class WindowHelper {
   private launcherWindow: BrowserWindow | null = null
   private overlayWindow: BrowserWindow | null = null
   private isWindowVisible: boolean = false
-  // Position/Size tracking for Launcher
-  private launcherPosition: { x: number; y: number } | null = null
-  private launcherSize: { width: number; height: number } | null = null
   // Track current window mode (persists even when overlay is hidden via Cmd+B)
   private currentWindowMode: 'launcher' | 'overlay' = 'launcher'
 
@@ -31,14 +28,8 @@ export class WindowHelper {
   private contentProtection: boolean = false
   private opacityTimeout: NodeJS.Timeout | null = null
 
-  // Initialize with explicit number type and 0 value
-  private screenWidth: number = 0
-  private screenHeight: number = 0
-
   // Movement variables (apply to active window)
   private step: number = 20
-  private currentX: number = 0
-  private currentY: number = 0
 
   constructor(appState: AppState) {
     this.appState = appState
@@ -78,11 +69,6 @@ export class WindowHelper {
       height: newHeight
     })
 
-    // Update internal tracking if it's launcher
-    if (activeWindow === this.launcherWindow) {
-      this.launcherSize = { width: newWidth, height: newHeight }
-      this.launcherPosition = { x: newX, y: currentY }
-    }
   }
 
   // Dedicated method for overlay window resizing - decoupled from launcher
@@ -111,9 +97,6 @@ export class WindowHelper {
 
     const primaryDisplay = screen.getPrimaryDisplay()
     const workArea = primaryDisplay.workArea
-    this.screenWidth = workArea.width
-    this.screenHeight = workArea.height
-
     // Fixed dimensions per user request
     const width = 1200;
     const height = 800;
@@ -204,7 +187,7 @@ export class WindowHelper {
       .then(() => console.log('[WindowHelper] loadURL success'))
       .catch((e) => { console.error("[WindowHelper] Failed to load URL:", e) })
 
-    this.launcherWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    this.launcherWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
       console.error(`[WindowHelper] did-fail-load: ${errorCode} ${errorDescription}`);
     });
 
@@ -213,10 +196,12 @@ export class WindowHelper {
     // }
 
     // --- 2. Create Overlay Window (Hidden initially) ---
+    const overlayDefaultWidth = Math.min(1000, Math.floor(primaryDisplay.workAreaSize.width * 0.9))
+
     const overlaySettings: Electron.BrowserWindowConstructorOptions = {
-      width: 600,
+      width: overlayDefaultWidth,
       height: 1,
-      minWidth: 300,
+      minWidth: 600,
       minHeight: 1,
       webPreferences: {
         nodeIntegration: false,
@@ -272,7 +257,6 @@ export class WindowHelper {
     this.launcherWindow.on("move", () => {
       if (this.launcherWindow) {
         const bounds = this.launcherWindow.getBounds()
-        this.launcherPosition = { x: bounds.x, y: bounds.y }
         this.appState.settingsWindowHelper.reposition(bounds)
       }
     })
@@ -280,7 +264,6 @@ export class WindowHelper {
     this.launcherWindow.on("resize", () => {
       if (this.launcherWindow) {
         const bounds = this.launcherWindow.getBounds()
-        this.launcherSize = { width: bounds.width, height: bounds.height }
         this.appState.settingsWindowHelper.reposition(bounds)
       }
     })
@@ -473,10 +456,10 @@ export class WindowHelper {
       const workArea = primaryDisplay.workArea;
       const currentBounds = this.overlayWindow.getBounds();
       const targetHeight = Math.max(currentBounds.height, 216);
-      const x = Math.floor(workArea.x + (workArea.width - 600) / 2)
-      const y = Math.floor(workArea.y + (workArea.height - 600) / 2)
-
-      this.overlayWindow.setBounds({ x, y, width: 600, height: targetHeight });
+      const overlayWidth = Math.min(1000, Math.floor(screen.getPrimaryDisplay().workAreaSize.width * 0.9));
+      const overlayX = Math.floor(workArea.x + (workArea.width - overlayWidth) / 2)
+      const overlayY = Math.floor(workArea.y + (workArea.height - targetHeight) / 2)
+      this.overlayWindow.setBounds({ x: overlayX, y: overlayY, width: overlayWidth, height: targetHeight });
 
       if (process.platform === 'win32' && this.contentProtection) {
         // Opacity Shield: Show at 0 opacity first to prevent frame leak
@@ -562,8 +545,6 @@ export class WindowHelper {
     const [x, y] = win.getPosition();
     win.setPosition(x + dx, y + dy);
 
-    this.currentX = x + dx;
-    this.currentY = y + dy;
   }
 
   public moveWindowRight(): void { this.moveActiveWindow(this.step, 0) }

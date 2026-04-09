@@ -176,6 +176,11 @@
     "wait-on": "^8.0.1"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.68",
+    "@ai-sdk/google": "^3.0.60",
+    "@ai-sdk/groq": "^3.0.35",
+    "@ai-sdk/openai": "^3.0.52",
+    "@ai-sdk/react": "^3.0.155",
     "@anthropic-ai/sdk": "^0.74.0",
     "@bany/curl-to-json": "^1.2.10",
     "@elevenlabs/client": "^0.15.1",
@@ -190,6 +195,7 @@
     "@types/keytar": "^4.4.0",
     "@types/three": "^0.182.0",
     "@xenova/transformers": "^2.17.2",
+    "ai": "^6.0.153",
     "axios": "^1.7.7",
     "better-sqlite3": "12.6.2",
     "class-variance-authority": "^0.7.0",

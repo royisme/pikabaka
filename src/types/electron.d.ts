@@ -335,6 +335,13 @@ export interface ElectronAPI {
   // Arch
   getArch: () => Promise<string>;
 
+  // Chat Streaming API (useChat / Vercel AI SDK bridge)
+  chatStreamMeeting: (params: { requestId: string; meetingId: string; messages: Array<{ role: string; content: string }>; context?: string }) => Promise<{ success?: boolean; error?: string }>;
+  chatCancelStream: (requestId: string) => Promise<{ success: boolean }>;
+  onChatStreamChunk: (callback: (data: { requestId: string; chunk: string }) => void) => () => void;
+  onChatStreamComplete: (callback: (data: { requestId: string }) => void) => () => void;
+  onChatStreamError: (callback: (data: { requestId: string; error: string }) => void) => () => void;
+
   // Cropper API
   cropperConfirmed: (bounds: { x: number; y: number; width: number; height: number }) => void;
   cropperCancelled: () => void;
