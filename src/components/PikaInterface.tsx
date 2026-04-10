@@ -32,9 +32,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const [isUndetectable, setIsUndetectable] = useState(false);
     const [currentModel, setCurrentModel] = useState<string>('gemini-3-flash-preview');
 
-    // Analytics
-    const requestStartTimeRef = useRef<number | null>(null);
-
     // Refs for DOM / layout
     const isStealthRef = useRef<boolean>(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -81,12 +78,14 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         setInputValue,
         isProcessing,
         setIsProcessing,
+        handleWhatToSay,
+        handleFollowUp,
+        handleCodeHint,
         handleClarify,
         handleFollowUpQuestions,
         handleRecap,
         handleBrainstorm,
         handleManualSubmit,
-        conversationContext,
     } = useMeetingChat();
 
     // --- Persist splitter position ---
@@ -257,149 +256,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     );
     const overlayPanelClass = 'overlay-text-primary';
 
-    // --- Action handlers that still live here (use streamGeminiChat + conversationContext) ---
-
-    const submitPrompt = useCallback(async ({
-        userText,
-        attachments = attachedContext,
-        clearAttachments = true,
-        addUserMessage = true,
-        placeholderIntent,
-        skipRag = false,
-        streamOptions,
-    }: {
-        userText: string;
-        attachments?: Array<{ path: string; preview: string }>;
-        clearAttachments?: boolean;
-        addUserMessage?: boolean;
-        placeholderIntent?: string;
-        skipRag?: boolean;
-        streamOptions?: { skipSystemPrompt?: boolean };
-    }) => {
-        const trimmedText = userText.trim();
-        const currentAttachments = attachments;
-        const promptText = trimmedText || (currentAttachments.length > 0 ? 'Analyze this screenshot' : '');
-
-        if (!promptText && currentAttachments.length === 0) return;
-        if (clearAttachments) setAttachedContext([]);
-
-        if (addUserMessage) {
-            setSystemMessages((prev) => [
-                ...prev,
-                {
-                    id: Date.now().toString(),
-                    role: 'user',
-                    text: promptText,
-                    hasScreenshot: currentAttachments.length > 0,
-                    screenshotPreview: currentAttachments[0]?.preview,
-                },
-            ]);
-        }
-
-        setSystemMessages((prev) => [
-            ...prev,
-            {
-                id: Date.now().toString(),
-                role: 'system',
-                text: '',
-                isStreaming: true,
-                ...(placeholderIntent ? { intent: placeholderIntent } : {}),
-            },
-        ]);
-
-        setIsExpanded(true);
-        setIsProcessing(true);
-
-        try {
-            if (!skipRag && currentAttachments.length === 0) {
-                const ragResult = await window.electronAPI.ragQueryLive?.(promptText);
-                if (ragResult?.success) return;
-            }
-
-            requestStartTimeRef.current = Date.now();
-            await window.electronAPI.streamGeminiChat(
-                promptText,
-                currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined,
-                conversationContext,
-                streamOptions
-            );
-        } catch (err) {
-            setIsProcessing(false);
-            setSystemMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last && last.isStreaming && last.text === '') {
-                    return prev.slice(0, -1).concat({
-                        id: Date.now().toString(),
-                        role: 'system',
-                        text: `\u274C Error starting stream: ${err}`,
-                        ...(last.intent ? { intent: last.intent } : {}),
-                    });
-                }
-                return [...prev, { id: Date.now().toString(), role: 'system', text: `\u274C Error: ${err}` }];
-            });
-        }
-    }, [attachedContext, conversationContext, setAttachedContext, setIsProcessing, setSystemMessages]);
-
-    const handleWhatToSay = useCallback(async () => {
-        analytics.trackCommandExecuted('what_to_say');
-        await submitPrompt({
-            userText: attachedContext.length > 0
-                ? 'What should I say about this?'
-                : 'What should I say in response to the latest interviewer context?',
-            placeholderIntent: 'what_to_answer',
-        });
-    }, [submitPrompt, attachedContext.length]);
-
-    const handleFollowUp = useCallback(async (intent: string = 'rephrase') => {
-        setIsExpanded(true);
-        setIsProcessing(true);
-        analytics.trackCommandExecuted('follow_up_' + intent);
-        try {
-            await window.electronAPI.generateFollowUp(intent);
-        } catch (err) {
-            setSystemMessages((prev) => [
-                ...prev,
-                { id: Date.now().toString(), role: 'system', text: `Error: ${err}` },
-            ]);
-        } finally {
-            setIsProcessing(false);
-        }
-    }, [setIsProcessing, setSystemMessages]);
-
-    const handleCodeHint = useCallback(async () => {
-        setIsExpanded(true);
-        setIsProcessing(true);
-        analytics.trackCommandExecuted('code_hint');
-
-        const currentAttachments = attachedContext;
-        if (currentAttachments.length > 0) {
-            setAttachedContext([]);
-            setSystemMessages((prev) => [
-                ...prev,
-                {
-                    id: Date.now().toString(),
-                    role: 'user',
-                    text: 'Give me a code hint for this',
-                    hasScreenshot: true,
-                    screenshotPreview: currentAttachments[0].preview,
-                },
-            ]);
-        }
-
-        try {
-            await window.electronAPI.generateCodeHint(
-                currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined
-            );
-        } catch (err) {
-            setSystemMessages((prev) => [
-                ...prev,
-                { id: Date.now().toString(), role: 'system', text: `Error: ${err}` },
-            ]);
-        } finally {
-            setIsProcessing(false);
-        }
-    }, [attachedContext, setAttachedContext, setIsProcessing, setSystemMessages]);
-
     const handleAnswerNow = useCallback(async () => {
         if (isManualRecording) {
             isRecordingRef.current = false;
@@ -472,7 +328,6 @@ Instructions:
 Provide only the answer, nothing else.`;
                 }
 
-                requestStartTimeRef.current = Date.now();
                 await window.electronAPI.streamGeminiChat(
                     question,
                     currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined,
@@ -515,16 +370,16 @@ Provide only the answer, nothing else.`;
     ]);
 
     // Handlers ref pattern — avoids re-binding event listener on every render
-    const handlersRef = useRef({
-        handleWhatToSay,
-        handleFollowUp,
-        handleFollowUpQuestions,
-        handleRecap,
-        handleAnswerNow,
-        handleClarify,
-        handleCodeHint,
-        handleBrainstorm,
-    });
+    const handlersRef = useRef<{
+        handleWhatToSay: () => void;
+        handleFollowUp: (intent?: string) => void;
+        handleFollowUpQuestions: () => void;
+        handleRecap: () => void;
+        handleAnswerNow: () => void;
+        handleClarify: () => void;
+        handleCodeHint: () => void;
+        handleBrainstorm: () => void;
+    }>(null!);
     handlersRef.current = {
         handleWhatToSay,
         handleFollowUp,
@@ -586,43 +441,14 @@ Provide only the answer, nothing else.`;
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isShortcutPressed, actionButtonMode]);
 
-    const generalHandlersRef = useRef({
-        toggleVisibility: () => window.electronAPI.toggleWindow(),
-        processScreenshots: handleWhatToSay,
-        resetCancel: async () => {
-            if (isProcessing) {
-                setIsProcessing(false);
-            } else {
-                await window.electronAPI.resetIntelligence();
-                setSystemMessages([]);
-                setAttachedContext([]);
-                setInputValue('');
-            }
-        },
-        toggleMousePassthrough: () => {
-            const newState = !isMousePassthrough;
-            setIsMousePassthrough(newState);
-            window.electronAPI?.setOverlayMousePassthrough?.(newState);
-        },
-        takeScreenshot: async () => {
-            try {
-                const data = await window.electronAPI.takeScreenshot();
-                if (data?.path) handleScreenshotAttach(data as { path: string; preview: string });
-            } catch (err) {
-                console.error('Error triggering screenshot:', err);
-            }
-        },
-        selectiveScreenshot: async () => {
-            try {
-                const data = await window.electronAPI.takeSelectiveScreenshot();
-                if (data && !data.cancelled && data.path) {
-                    handleScreenshotAttach(data as { path: string; preview: string });
-                }
-            } catch (err) {
-                console.error('Error triggering selective screenshot:', err);
-            }
-        },
-    });
+    const generalHandlersRef = useRef<{
+        toggleVisibility: () => void;
+        processScreenshots: () => void;
+        resetCancel: () => Promise<void>;
+        toggleMousePassthrough: () => void;
+        takeScreenshot: () => Promise<void>;
+        selectiveScreenshot: () => Promise<void>;
+    }>(null!);
     generalHandlersRef.current = {
         toggleVisibility: () => window.electronAPI.toggleWindow(),
         processScreenshots: handleWhatToSay,

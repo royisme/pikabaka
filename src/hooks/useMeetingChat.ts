@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { electronChatFetch } from '../lib/electronChatFetch';
+import { analytics } from '../lib/analytics/analytics.service';
 
 export type Message = {
   id: string;
@@ -359,10 +360,115 @@ export function useMeetingChat() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally empty — these listeners must survive isExpanded changes
 
-  const handleWhatToSay = useCallback(async () => {
-    setIsProcessing(true);
-    const currentAttachments = attachedContext;
+  const submitPrompt = useCallback(async ({
+    userText,
+    attachments,
+    clearAttachments = true,
+    addUserMessage = true,
+    placeholderIntent,
+    skipRag = false,
+    streamOptions,
+  }: {
+    userText: string;
+    attachments?: Array<{ path: string; preview: string }>;
+    clearAttachments?: boolean;
+    addUserMessage?: boolean;
+    placeholderIntent?: string;
+    skipRag?: boolean;
+    streamOptions?: { skipSystemPrompt?: boolean };
+  }) => {
+    const currentAttachments = attachments ?? attachedContext;
+    const trimmedText = userText.trim();
+    const promptText = trimmedText || (currentAttachments.length > 0 ? 'Analyze this screenshot' : '');
 
+    if (!promptText && currentAttachments.length === 0) return;
+    if (clearAttachments) setAttachedContext([]);
+
+    if (addUserMessage) {
+      setSystemMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: 'user',
+          text: promptText,
+          hasScreenshot: currentAttachments.length > 0,
+          screenshotPreview: currentAttachments[0]?.preview,
+        },
+      ]);
+    }
+
+    setSystemMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        role: 'system',
+        text: '',
+        isStreaming: true,
+        ...(placeholderIntent ? { intent: placeholderIntent } : {}),
+      },
+    ]);
+
+    setIsProcessing(true);
+
+    try {
+      if (!skipRag && currentAttachments.length === 0) {
+        const ragResult = await window.electronAPI.ragQueryLive?.(promptText);
+        if (ragResult?.success) return;
+      }
+
+      await window.electronAPI.streamGeminiChat(
+        promptText,
+        currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined,
+        conversationContextRef.current,
+        streamOptions
+      );
+    } catch (err) {
+      setIsProcessing(false);
+      setSystemMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last && last.isStreaming && last.text === '') {
+          return prev.slice(0, -1).concat({
+            id: Date.now().toString(),
+            role: 'system',
+            text: `\u274C Error starting stream: ${err}`,
+            ...(last.intent ? { intent: last.intent } : {}),
+          });
+        }
+        return [...prev, { id: Date.now().toString(), role: 'system', text: `\u274C Error: ${err}` }];
+      });
+    }
+  }, [attachedContext, conversationContextRef, setAttachedContext, setIsProcessing, setSystemMessages]);
+
+  const handleWhatToSay = useCallback(async () => {
+    analytics.trackCommandExecuted('what_to_say');
+    await submitPrompt({
+      userText: attachedContext.length > 0
+        ? 'What should I say about this?'
+        : 'What should I say in response to the latest interviewer context?',
+      placeholderIntent: 'what_to_answer',
+    });
+  }, [submitPrompt, attachedContext.length]);
+
+  const handleFollowUp = useCallback(async (intent: string = 'rephrase') => {
+    setIsProcessing(true);
+    analytics.trackCommandExecuted('follow_up_' + intent);
+    try {
+      await window.electronAPI.generateFollowUp(intent);
+    } catch (err) {
+      setSystemMessages((prev) => [
+        ...prev,
+        { id: Date.now().toString(), role: 'system', text: `Error: ${err}` },
+      ]);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [setIsProcessing, setSystemMessages]);
+
+  const handleCodeHint = useCallback(async () => {
+    setIsProcessing(true);
+    analytics.trackCommandExecuted('code_hint');
+
+    const currentAttachments = attachedContext;
     if (currentAttachments.length > 0) {
       setAttachedContext([]);
       setSystemMessages((prev) => [
@@ -370,7 +476,7 @@ export function useMeetingChat() {
         {
           id: Date.now().toString(),
           role: 'user',
-          text: 'What should I say about this?',
+          text: 'Give me a code hint for this',
           hasScreenshot: true,
           screenshotPreview: currentAttachments[0].preview,
         },
@@ -378,13 +484,18 @@ export function useMeetingChat() {
     }
 
     try {
-      await window.electronAPI.generateWhatToSay(undefined, currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined);
+      await window.electronAPI.generateCodeHint(
+        currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined
+      );
     } catch (err) {
-      pushSystemError(err);
+      setSystemMessages((prev) => [
+        ...prev,
+        { id: Date.now().toString(), role: 'system', text: `Error: ${err}` },
+      ]);
     } finally {
       setIsProcessing(false);
     }
-  }, [attachedContext, pushSystemError]);
+  }, [attachedContext, setAttachedContext, setIsProcessing, setSystemMessages]);
 
   const handleClarify = useCallback(async () => {
     setIsProcessing(true);
@@ -517,7 +628,10 @@ export function useMeetingChat() {
     messages,
     setSystemMessages,
     stop,
+    submitPrompt,
     handleWhatToSay,
+    handleFollowUp,
+    handleCodeHint,
     handleClarify,
     handleFollowUpQuestions,
     handleRecap,
