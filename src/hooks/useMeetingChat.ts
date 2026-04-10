@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { electronChatFetch } from '../lib/electronChatFetch';
+import { analytics } from '../lib/analytics/analytics.service';
 
-type Message = {
+export type Message = {
   id: string;
   role: 'user' | 'system' | 'interviewer';
   text: string;
@@ -147,10 +148,327 @@ export function useMeetingChat() {
     ]);
   }, []);
 
-  const handleWhatToSay = useCallback(async () => {
-    setIsProcessing(true);
-    const currentAttachments = attachedContext;
+  // IPC response listeners — update systemMessages with streaming AI responses
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    const cleanups: Array<() => void> = [];
 
+    // ---- Assist (generic insight from streaming) ----
+    if (window.electronAPI.onIntelligenceAssistUpdate) {
+      cleanups.push(window.electronAPI.onIntelligenceAssistUpdate((data) => {
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          const text = (data as { insight?: string; token?: string }).insight ?? (data as { token?: string }).token ?? '';
+          if (last && last.isStreaming && last.intent === 'assist') {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...last, text: last.text + text };
+            return updated;
+          }
+          return [...prev, { id: Date.now().toString(), role: 'system', text, intent: 'assist', isStreaming: true }];
+        });
+      }));
+    }
+
+    // ---- Streaming: Gemini Chat (streamGeminiChat / suggested answer) ----
+    if (window.electronAPI.onIntelligenceSuggestedAnswerToken) {
+      cleanups.push(window.electronAPI.onIntelligenceSuggestedAnswerToken((data) => {
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.isStreaming && last.intent === 'what_to_answer') {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...last, text: last.text + data.token };
+            return updated;
+          }
+          return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: 'what_to_answer', isStreaming: true }];
+        });
+      }));
+    }
+    if (window.electronAPI.onIntelligenceSuggestedAnswer) {
+      cleanups.push(window.electronAPI.onIntelligenceSuggestedAnswer((data) => {
+        setIsProcessing(false);
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.isStreaming && last.intent === 'what_to_answer') {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...last, text: data.answer, isStreaming: false };
+            return updated;
+          }
+          return [...prev, { id: Date.now().toString(), role: 'system', text: data.answer, intent: 'what_to_answer' }];
+        });
+      }));
+    }
+
+    // ---- Streaming: Refinement ----
+    if (window.electronAPI.onIntelligenceRefinedAnswerToken) {
+      cleanups.push(window.electronAPI.onIntelligenceRefinedAnswerToken((data) => {
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.isStreaming && last.intent === data.intent) {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...last, text: last.text + data.token };
+            return updated;
+          }
+          return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: data.intent, isStreaming: true }];
+        });
+      }));
+    }
+    if (window.electronAPI.onIntelligenceRefinedAnswer) {
+      cleanups.push(window.electronAPI.onIntelligenceRefinedAnswer((data) => {
+        setIsProcessing(false);
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.isStreaming && last.intent === data.intent) {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...last, text: data.answer, isStreaming: false };
+            return updated;
+          }
+          return [...prev, { id: Date.now().toString(), role: 'system', text: data.answer, intent: data.intent }];
+        });
+      }));
+    }
+
+    // ---- Streaming: Recap ----
+    if (window.electronAPI.onIntelligenceRecapToken) {
+      cleanups.push(window.electronAPI.onIntelligenceRecapToken((data) => {
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.isStreaming && last.intent === 'recap') {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...last, text: last.text + data.token };
+            return updated;
+          }
+          return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: 'recap', isStreaming: true }];
+        });
+      }));
+    }
+    if (window.electronAPI.onIntelligenceRecap) {
+      cleanups.push(window.electronAPI.onIntelligenceRecap((data) => {
+        setIsProcessing(false);
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.isStreaming && last.intent === 'recap') {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...last, text: data.summary, isStreaming: false };
+            return updated;
+          }
+          return [...prev, { id: Date.now().toString(), role: 'system', text: data.summary, intent: 'recap' }];
+        });
+      }));
+    }
+
+    // ---- Streaming: Follow-Up Questions ----
+    if (window.electronAPI.onIntelligenceFollowUpQuestionsToken) {
+      cleanups.push(window.electronAPI.onIntelligenceFollowUpQuestionsToken((data) => {
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.isStreaming && last.intent === 'follow_up_questions') {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...last, text: last.text + data.token };
+            return updated;
+          }
+          return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: 'follow_up_questions', isStreaming: true }];
+        });
+      }));
+    }
+    if (window.electronAPI.onIntelligenceFollowUpQuestionsUpdate) {
+      cleanups.push(window.electronAPI.onIntelligenceFollowUpQuestionsUpdate((data) => {
+        setIsProcessing(false);
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.isStreaming && last.intent === 'follow_up_questions') {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...last, text: data.questions, isStreaming: false };
+            return updated;
+          }
+          return [...prev, { id: Date.now().toString(), role: 'system', text: data.questions, intent: 'follow_up_questions' }];
+        });
+      }));
+    }
+
+    // ---- Manual result / generic error ----
+    if (window.electronAPI.onIntelligenceManualResult) {
+      cleanups.push(window.electronAPI.onIntelligenceManualResult((data) => {
+        setIsProcessing(false);
+        setSystemMessages((prev) => [
+          ...prev,
+          { id: Date.now().toString(), role: 'system', text: `\uD83C\uDFAF **Answer:**\n\n${data.answer}` },
+        ]);
+      }));
+    }
+    if (window.electronAPI.onIntelligenceError) {
+      cleanups.push(window.electronAPI.onIntelligenceError((data) => {
+        setIsProcessing(false);
+        setSystemMessages((prev) => [
+          ...prev,
+          { id: Date.now().toString(), role: 'system', text: `\u274C Error (${data.mode}): ${data.error}` },
+        ]);
+      }));
+    }
+    if (window.electronAPI.onSuggestionGenerated) {
+      cleanups.push(window.electronAPI.onSuggestionGenerated((data) => {
+        setIsProcessing(false);
+        setSystemMessages((prev) => [
+          ...prev,
+          { id: Date.now().toString(), role: 'system', text: data.suggestion },
+        ]);
+      }));
+    }
+    if (window.electronAPI.onSuggestionError) {
+      cleanups.push(window.electronAPI.onSuggestionError((data) => {
+        setIsProcessing(false);
+        setSystemMessages((prev) => [
+          ...prev,
+          { id: Date.now().toString(), role: 'system', text: `Error: ${data.error}` },
+        ]);
+      }));
+    }
+
+    return () => cleanups.forEach((fn) => fn());
+  }, []);
+
+  // Clarify streaming listeners — intentionally empty dep array so they survive
+  // expand/collapse cycles without orphaning an in-flight stream.
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    const cleanupToken = window.electronAPI.onIntelligenceClarifyToken((data: { token: string }) => {
+      setSystemMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last && last.isStreaming && last.intent === 'clarify') {
+          const updated = [...prev];
+          updated[updated.length - 1] = { ...last, text: last.text + data.token };
+          return updated;
+        }
+        return [...prev, { id: Date.now().toString(), role: 'system' as const, text: data.token, intent: 'clarify', isStreaming: true }];
+      });
+    });
+    const cleanupFinal = window.electronAPI.onIntelligenceClarify((data: { clarification: string }) => {
+      setIsProcessing(false);
+      setSystemMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last && last.isStreaming && last.intent === 'clarify') {
+          const updated = [...prev];
+          updated[updated.length - 1] = { ...last, text: data.clarification, isStreaming: false };
+          return updated;
+        }
+        return [...prev, { id: Date.now().toString(), role: 'system' as const, text: data.clarification, intent: 'clarify' }];
+      });
+    });
+    return () => {
+      cleanupToken();
+      cleanupFinal();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — these listeners must survive isExpanded changes
+
+  const submitPrompt = useCallback(async ({
+    userText,
+    attachments,
+    clearAttachments = true,
+    addUserMessage = true,
+    placeholderIntent,
+    skipRag = false,
+    streamOptions,
+  }: {
+    userText: string;
+    attachments?: Array<{ path: string; preview: string }>;
+    clearAttachments?: boolean;
+    addUserMessage?: boolean;
+    placeholderIntent?: string;
+    skipRag?: boolean;
+    streamOptions?: { skipSystemPrompt?: boolean };
+  }) => {
+    const currentAttachments = attachments ?? attachedContext;
+    const trimmedText = userText.trim();
+    const promptText = trimmedText || (currentAttachments.length > 0 ? 'Analyze this screenshot' : '');
+
+    if (!promptText && currentAttachments.length === 0) return;
+    if (clearAttachments) setAttachedContext([]);
+
+    if (addUserMessage) {
+      setSystemMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: 'user',
+          text: promptText,
+          hasScreenshot: currentAttachments.length > 0,
+          screenshotPreview: currentAttachments[0]?.preview,
+        },
+      ]);
+    }
+
+    setSystemMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        role: 'system',
+        text: '',
+        isStreaming: true,
+        ...(placeholderIntent ? { intent: placeholderIntent } : {}),
+      },
+    ]);
+
+    setIsProcessing(true);
+
+    try {
+      if (!skipRag && currentAttachments.length === 0) {
+        const ragResult = await window.electronAPI.ragQueryLive?.(promptText);
+        if (ragResult?.success) return;
+      }
+
+      await window.electronAPI.streamGeminiChat(
+        promptText,
+        currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined,
+        conversationContextRef.current,
+        streamOptions
+      );
+    } catch (err) {
+      setIsProcessing(false);
+      setSystemMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last && last.isStreaming && last.text === '') {
+          return prev.slice(0, -1).concat({
+            id: Date.now().toString(),
+            role: 'system',
+            text: `\u274C Error starting stream: ${err}`,
+            ...(last.intent ? { intent: last.intent } : {}),
+          });
+        }
+        return [...prev, { id: Date.now().toString(), role: 'system', text: `\u274C Error: ${err}` }];
+      });
+    }
+  }, [attachedContext, conversationContextRef, setAttachedContext, setIsProcessing, setSystemMessages]);
+
+  const handleWhatToSay = useCallback(async () => {
+    analytics.trackCommandExecuted('what_to_say');
+    await submitPrompt({
+      userText: attachedContext.length > 0
+        ? 'What should I say about this?'
+        : 'What should I say in response to the latest interviewer context?',
+      placeholderIntent: 'what_to_answer',
+    });
+  }, [submitPrompt, attachedContext.length]);
+
+  const handleFollowUp = useCallback(async (intent: string = 'rephrase') => {
+    setIsProcessing(true);
+    analytics.trackCommandExecuted('follow_up_' + intent);
+    try {
+      await window.electronAPI.generateFollowUp(intent);
+    } catch (err) {
+      setSystemMessages((prev) => [
+        ...prev,
+        { id: Date.now().toString(), role: 'system', text: `Error: ${err}` },
+      ]);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [setIsProcessing, setSystemMessages]);
+
+  const handleCodeHint = useCallback(async () => {
+    setIsProcessing(true);
+    analytics.trackCommandExecuted('code_hint');
+
+    const currentAttachments = attachedContext;
     if (currentAttachments.length > 0) {
       setAttachedContext([]);
       setSystemMessages((prev) => [
@@ -158,7 +476,7 @@ export function useMeetingChat() {
         {
           id: Date.now().toString(),
           role: 'user',
-          text: 'What should I say about this?',
+          text: 'Give me a code hint for this',
           hasScreenshot: true,
           screenshotPreview: currentAttachments[0].preview,
         },
@@ -166,13 +484,18 @@ export function useMeetingChat() {
     }
 
     try {
-      await window.electronAPI.generateWhatToSay(undefined, currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined);
+      await window.electronAPI.generateCodeHint(
+        currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined
+      );
     } catch (err) {
-      pushSystemError(err);
+      setSystemMessages((prev) => [
+        ...prev,
+        { id: Date.now().toString(), role: 'system', text: `Error: ${err}` },
+      ]);
     } finally {
       setIsProcessing(false);
     }
-  }, [attachedContext, pushSystemError]);
+  }, [attachedContext, setAttachedContext, setIsProcessing, setSystemMessages]);
 
   const handleClarify = useCallback(async () => {
     setIsProcessing(true);
@@ -301,9 +624,14 @@ export function useMeetingChat() {
     inputValue,
     setInputValue,
     isProcessing: isProcessing || isChatLoading,
+    setIsProcessing,
     messages,
+    setSystemMessages,
     stop,
+    submitPrompt,
     handleWhatToSay,
+    handleFollowUp,
+    handleCodeHint,
     handleClarify,
     handleFollowUpQuestions,
     handleRecap,
