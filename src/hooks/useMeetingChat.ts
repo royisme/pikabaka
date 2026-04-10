@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
+import { electronChatFetch } from '../lib/electronChatFetch';
 
 type Message = {
   id: string;
@@ -37,8 +40,25 @@ export function useMeetingChat() {
   const [conversationContext, setConversationContext] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // systemMessages holds quick-action responses (WhatToSay, Clarify, Recap, etc.)
+  const [systemMessages, setSystemMessages] = useState<Message[]>([]);
   const knowledgeContextTimeoutRef = useRef<number | null>(null);
+  const conversationContextRef = useRef(conversationContext);
+
+  // Keep ref in sync so DefaultChatTransport body getter always reads latest value
+  useEffect(() => {
+    conversationContextRef.current = conversationContext;
+  }, [conversationContext]);
+
+  const { messages: chatMessages, sendMessage, status, stop } = useChat({
+    transport: new DefaultChatTransport({
+      api: '/api/chat',
+      fetch: electronChatFetch as typeof globalThis.fetch,
+      body: () => ({ context: conversationContextRef.current.slice(-8000) }),
+    }),
+  });
+
+  const isChatLoading = status === 'submitted' || status === 'streaming';
 
   useEffect(() => {
     window.electronAPI?.getActionButtonMode?.()
@@ -77,18 +97,47 @@ export function useMeetingChat() {
     };
   }, []);
 
+  // Build conversationContext from all messages (chat + system) for IPC quick actions
+  const allMessagesForContext = useMemo(() => {
+    const fromChat: Message[] = chatMessages.map((m) => ({
+      id: m.id,
+      role: m.role === 'assistant' ? ('interviewer' as const) : ('user' as const),
+      text: m.parts
+        .filter((p) => p.type === 'text')
+        .map((p) => (p as { type: 'text'; text: string }).text)
+        .join(''),
+    }));
+    return [...fromChat, ...systemMessages];
+  }, [chatMessages, systemMessages]);
+
   useEffect(() => {
-    const context = messages
+    const context = allMessagesForContext
       .filter((m) => m.role !== 'user' || !m.hasScreenshot)
       .map((m) => `${m.role === 'interviewer' ? 'Interviewer' : m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
       .slice(-20)
       .join('\n');
 
     setConversationContext(context);
-  }, [messages]);
+  }, [allMessagesForContext]);
+
+  // Merged messages for UI rendering (chat + system quick-action responses)
+  const messages = useMemo<Message[]>(() => {
+    const lastChatId = chatMessages[chatMessages.length - 1]?.id;
+    const fromChat: Message[] = chatMessages.map((m) => ({
+      id: m.id,
+      role: m.role === 'assistant' ? ('interviewer' as const) : ('user' as const),
+      text: m.parts
+        .filter((p) => p.type === 'text')
+        .map((p) => (p as { type: 'text'; text: string }).text)
+        .join(''),
+      isStreaming: isChatLoading && m.id === lastChatId && m.role === 'assistant',
+    }));
+    // Sort by id (timestamp-based ids sort chronologically)
+    return [...fromChat, ...systemMessages].sort((a, b) => a.id.localeCompare(b.id));
+  }, [chatMessages, systemMessages, isChatLoading]);
 
   const pushSystemError = useCallback((error: unknown) => {
-    setMessages((prev) => [
+    setSystemMessages((prev) => [
       ...prev,
       {
         id: Date.now().toString(),
@@ -104,7 +153,7 @@ export function useMeetingChat() {
 
     if (currentAttachments.length > 0) {
       setAttachedContext([]);
-      setMessages((prev) => [
+      setSystemMessages((prev) => [
         ...prev,
         {
           id: Date.now().toString(),
@@ -162,7 +211,7 @@ export function useMeetingChat() {
 
     if (currentAttachments.length > 0) {
       setAttachedContext([]);
-      setMessages((prev) => [
+      setSystemMessages((prev) => [
         ...prev,
         {
           id: Date.now().toString(),
@@ -184,57 +233,64 @@ export function useMeetingChat() {
   }, [attachedContext, pushSystemError]);
 
   const handleAnswerNow = useCallback(async () => {
-    setIsProcessing(true);
+    if (!inputValue) return;
+
+    // Try RAG first; fall back to useChat/sendMessage
     try {
       const ragResult = await window.electronAPI.ragQueryLive?.(inputValue || '');
       if (ragResult?.success) return;
-
-      await window.electronAPI.streamGeminiChat(inputValue || '', undefined, conversationContext);
-    } catch (err) {
-      pushSystemError(err);
-    } finally {
-      setIsProcessing(false);
+    } catch {
+      // RAG unavailable — continue to useChat
     }
-  }, [conversationContext, inputValue, pushSystemError]);
+
+    sendMessage({ text: inputValue });
+  }, [inputValue, sendMessage]);
 
   const handleManualSubmit = useCallback(async () => {
     if (!inputValue.trim() && attachedContext.length === 0) return;
 
-    const userText = inputValue;
+    const userText = inputValue.trim();
     const currentAttachments = attachedContext;
 
     setInputValue('');
-    setAttachedContext([]);
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        role: 'user',
-        text: userText || (currentAttachments.length > 0 ? 'Analyze this screenshot' : ''),
-        hasScreenshot: currentAttachments.length > 0,
-        screenshotPreview: currentAttachments[0]?.preview,
-      },
-    ]);
+    if (currentAttachments.length > 0) setAttachedContext([]);
 
-    setIsProcessing(true);
-
-    try {
-      if (currentAttachments.length === 0) {
+    if (currentAttachments.length > 0) {
+      // Screenshots: use legacy streamGeminiChat (supports image paths)
+      setSystemMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: 'user',
+          text: userText || 'Analyze this screenshot',
+          hasScreenshot: true,
+          screenshotPreview: currentAttachments[0].preview,
+        },
+      ]);
+      setIsProcessing(true);
+      try {
+        await window.electronAPI.streamGeminiChat(
+          userText || 'Analyze this screenshot',
+          currentAttachments.map((s) => s.path),
+          conversationContextRef.current.slice(-8000)
+        );
+      } catch (err) {
+        pushSystemError(err);
+      } finally {
+        setIsProcessing(false);
+      }
+    } else {
+      // Text-only: try RAG first, then use useChat/sendMessage
+      try {
         const ragResult = await window.electronAPI.ragQueryLive?.(userText || '');
         if (ragResult?.success) return;
+      } catch {
+        // RAG unavailable — continue to useChat
       }
 
-      await window.electronAPI.streamGeminiChat(
-        userText || 'Analyze this screenshot',
-        currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined,
-        conversationContext
-      );
-    } catch (err) {
-      pushSystemError(err);
-    } finally {
-      setIsProcessing(false);
+      sendMessage({ text: userText });
     }
-  }, [attachedContext, conversationContext, inputValue, pushSystemError]);
+  }, [inputValue, attachedContext, sendMessage, pushSystemError]);
 
   return {
     knowledgeContext,
@@ -244,8 +300,9 @@ export function useMeetingChat() {
     conversationContext,
     inputValue,
     setInputValue,
-    isProcessing,
+    isProcessing: isProcessing || isChatLoading,
     messages,
+    stop,
     handleWhatToSay,
     handleClarify,
     handleFollowUpQuestions,
