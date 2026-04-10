@@ -8,30 +8,9 @@ import { analytics } from '../lib/analytics/analytics.service';
 import { useShortcuts, type ShortcutConfig } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { getOverlayAppearance, getDefaultOverlayOpacity } from '../lib/overlayAppearance';
-import { useMeetingChat } from '../hooks/useMeetingChat';
+import { useMeetingChat, type Message } from '../hooks/useMeetingChat';
 import { useMeetingTranscript } from '../hooks/useMeetingTranscript';
 import { useMeetingAudio } from '../hooks/useMeetingAudio';
-
-interface Message {
-    id: string;
-    role: 'user' | 'system' | 'interviewer';
-    text: string;
-    isStreaming?: boolean;
-    hasScreenshot?: boolean;
-    screenshotPreview?: string;
-    isCode?: boolean;
-    intent?: string;
-    isNegotiationCoaching?: boolean;
-    negotiationCoachingData?: {
-        tacticalNote: string;
-        exactScript: string;
-        showSilenceTimer: boolean;
-        phase: string;
-        theirOffer: number | null;
-        yourTarget: number | null;
-        currency: string;
-    };
-}
 
 interface PikaInterfaceProps {
     onEndMeeting?: () => void;
@@ -71,9 +50,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         isInterviewerSpeaking,
         currentInterviewerPartial,
         transcriptDisplayMode,
-        setTranscriptDisplayMode,
         showTranscript,
-        setShowTranscript,
         handleTranslateTranscriptSegment,
     } = useMeetingTranscript();
 
@@ -88,7 +65,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         setVoiceInput,
         voiceInputRef,
         nativeAudioHealth,
-        isConnected,
         sttStatus,
         sttNeedsTroubleshooting,
         showSttErrorDetail,
@@ -105,12 +81,11 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         setInputValue,
         isProcessing,
         setIsProcessing,
-        stop,
         handleClarify,
         handleFollowUpQuestions,
-        handleRecap: hookHandleRecap,
-        handleBrainstorm: hookHandleBrainstorm,
-        handleManualSubmit: hookHandleManualSubmit,
+        handleRecap,
+        handleBrainstorm,
+        handleManualSubmit,
         conversationContext,
     } = useMeetingChat();
 
@@ -375,24 +350,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         });
     }, [submitPrompt, attachedContext.length]);
 
-    const handleRecap = useCallback(async () => {
-        analytics.trackCommandExecuted('recap');
-        await submitPrompt({
-            userText: 'Give me a concise recap of the latest interview discussion.',
-            placeholderIntent: 'recap',
-        });
-    }, [submitPrompt]);
-
-    const handleBrainstorm = useCallback(async () => {
-        analytics.trackCommandExecuted('brainstorm');
-        await submitPrompt({
-            userText: attachedContext.length > 0
-                ? 'Brainstorm with this context.'
-                : 'Brainstorm the best angles and talking points for the current discussion.',
-            placeholderIntent: 'brainstorm',
-        });
-    }, [submitPrompt, attachedContext.length]);
-
     const handleFollowUp = useCallback(async (intent: string = 'rephrase') => {
         setIsExpanded(true);
         setIsProcessing(true);
@@ -556,14 +513,6 @@ Provide only the answer, nothing else.`;
         setIsProcessing,
         setSystemMessages,
     ]);
-
-    const handleManualSubmit = useCallback(async () => {
-        if (!inputValue.trim() && attachedContext.length === 0) return;
-        const userText = inputValue;
-        const currentAttachments = attachedContext;
-        setInputValue('');
-        await submitPrompt({ userText, attachments: currentAttachments });
-    }, [inputValue, attachedContext, setInputValue, submitPrompt]);
 
     // Handlers ref pattern — avoids re-binding event listener on every render
     const handlersRef = useRef({
