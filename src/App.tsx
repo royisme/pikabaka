@@ -37,12 +37,18 @@ const App: React.FC = () => {
 
   // Initialize Analytics
   useEffect(() => {
-    // Only init if we are in a main window context to avoid duplicate events from helper windows
-    // Actually, we probably want to track app open from the main entry point.
-    // Let's protect initialization to ensure single run per window.
-    // The service handles single-init, but let's be thoughtful about WHICH window tracks "App Open".
-    // Launcher is the main entry. Overlay is the "Assistant".
+    // Overlay window: html/body/#root all have `background: var(--surface) !important`
+    // in index.css. Must use setProperty with 'important' priority to override so the
+    // Electron transparent window shows through in areas outside the card.
+    if (isOverlayWindow) {
+      document.documentElement.style.setProperty('background', 'transparent', 'important');
+      document.body.style.setProperty('background', 'transparent', 'important');
+      const rootEl = document.getElementById('root');
+      if (rootEl) rootEl.style.setProperty('background', 'transparent', 'important');
+    }
+  }, [isOverlayWindow]);
 
+  useEffect(() => {
     analytics.initAnalytics();
 
     if (isLauncherWindow || isDefault) {

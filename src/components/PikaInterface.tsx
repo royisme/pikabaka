@@ -604,7 +604,7 @@ Provide only the answer, nothing else.`;
     return (
         <div
             ref={contentRef}
-            className="flex flex-col items-center w-fit mx-auto h-fit min-h-0 bg-transparent p-0 rounded-[24px] font-sans gap-2 overlay-text-primary"
+            className="flex flex-col items-center w-full mx-auto h-fit min-h-0 bg-transparent p-0 rounded-[24px] font-sans gap-2 overlay-text-primary"
         >
             <AnimatePresence>
                 {isExpanded && (
@@ -623,7 +623,7 @@ Provide only the answer, nothing else.`;
                             onLogoClick={() => window.electronAPI?.setWindowMode?.('launcher')}
                         />
                         <div
-                            className={`relative w-[1000px] max-w-[90vw] border rounded-[24px] overflow-hidden flex flex-col draggable-area overlay-shell-surface ${overlayPanelClass}`}
+                            className={`relative w-full border rounded-[24px] overflow-hidden flex flex-col draggable-area overlay-shell-surface ${overlayPanelClass}`}
                             style={appearance.shellStyle}
                         >
                             <div className="flex-1 min-h-0 flex">

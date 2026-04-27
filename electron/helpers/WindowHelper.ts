@@ -215,7 +215,7 @@ export class WindowHelper {
       backgroundColor: "#00000000",
       alwaysOnTop: true,
       focusable: true,
-      resizable: false, // Enforce automatic resizing only
+      resizable: true,
       movable: true,
       skipTaskbar: true, // Don't show separately in dock/taskbar
       hasShadow: false, // Prevent shadow from adding perceived size/artifacts

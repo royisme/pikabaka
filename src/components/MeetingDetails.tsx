@@ -271,20 +271,20 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                     {/* Tabs */}
                     {/* Designing Tabs to match reference 1:1 (Dark Pill Container) */}
                     <div className="flex items-center justify-between mb-8">
-                        <div className={`p-1 rounded-xl inline-flex items-center gap-0.5 ${isLight ? 'bg-[#E5E5EA] border border-black/[0.04]' : 'bg-[#121214] border border-white/[0.08]'}`}>
+                        <div className={`p-1 rounded-xl inline-flex items-center gap-0.5 ${isLight ? 'bg-[#E5E5EA] border border-black/[0.06]' : 'bg-surface border border-white/[0.08]'}`}>
                             {['summary', 'transcript', 'usage'].map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab as any)}
                                     className={`
                                         relative px-3 py-1 text-[13px] font-medium rounded-lg transition-all duration-200 z-10
-                                        ${activeTab === tab ? (isLight ? 'text-black' : 'text-[#E9E9E9]') : `${isLight ? 'text-text-secondary' : 'text-text-tertiary'} hover:text-text-primary`}
+                                        ${activeTab === tab ? (isLight ? 'text-gray-900' : 'text-text-primary') : `${isLight ? 'text-gray-500' : 'text-text-secondary'} hover:text-text-primary`}
                                     `}
                                 >
                                     {activeTab === tab && (
                                         <motion.div
                                             layoutId="activeTabBackground"
-                                            className={`absolute inset-0 rounded-lg -z-10 shadow-sm ${isLight ? 'bg-white' : 'bg-[#3A3A3C]'}`}
+                                            className={`absolute inset-0 rounded-lg -z-10 shadow-sm ${isLight ? 'bg-white' : 'bg-bg-elevated'}`}
                                             initial={false}
                                             transition={{ type: "spring", stiffness: 400, damping: 30 }}
                                         />
@@ -447,10 +447,10 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                                 <div key={i} className="group">
                                                     <div className="flex items-center justify-between mb-1">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-xs font-semibold text-text-secondary">
+                                                            <span className="text-xs font-semibold text-text-primary">
                                                                 {entry.speaker === 'user' ? 'Me' : 'Them'}
                                                             </span>
-                                                            <span className="text-xs text-text-tertiary font-mono">{entry.timestamp ? formatTime(entry.timestamp) : '0:00'}</span>
+                                                            <span className="text-xs text-text-secondary font-mono">{entry.timestamp ? formatTime(entry.timestamp) : '0:00'}</span>
                                                         </div>
                                                         <button
                                                             onClick={() => handleTranslateEntry(i, entry)}
@@ -461,7 +461,7 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                                             {hasTranslation ? 'Retranslate' : 'Translate'}
                                                         </button>
                                                     </div>
-                                                    <p className="text-text-secondary text-[15px] leading-relaxed select-text cursor-text">{entry.text}</p>
+                                                    <p className="text-text-primary text-[15px] leading-relaxed select-text cursor-text">{entry.text}</p>
                                                     {isPending && (
                                                         <div className="flex items-center gap-1.5 mt-1.5 text-text-tertiary">
                                                             <Loader2 size={12} className="animate-spin" />

@@ -176,6 +176,10 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatWindowRef = useRef<HTMLDivElement>(null);
     const lastQueryRef = useRef<string>('');
+    const [panelHeight, setPanelHeight] = useState(0.85); // fraction of viewport height
+    const isDraggingRef = useRef(false);
+    const dragStartYRef = useRef(0);
+    const dragStartHeightRef = useRef(0);
 
     const {
         messages,
@@ -246,6 +250,30 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
         onClose();
     }, [onClose, stop]);
 
+    const handleDragStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        isDraggingRef.current = true;
+        dragStartYRef.current = e.clientY;
+        dragStartHeightRef.current = panelHeight;
+
+        const onMouseMove = (moveEvent: MouseEvent) => {
+            if (!isDraggingRef.current) return;
+            const delta = dragStartYRef.current - moveEvent.clientY;
+            const deltaFraction = delta / window.innerHeight;
+            const newHeight = Math.min(0.95, Math.max(0.3, dragStartHeightRef.current + deltaFraction));
+            setPanelHeight(newHeight);
+        };
+
+        const onMouseUp = () => {
+            isDraggingRef.current = false;
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+    }, [panelHeight]);
+
     return (
         <AnimatePresence>
             {isOpen && (
@@ -268,19 +296,27 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
                     <motion.div
                         ref={chatWindowRef}
                         initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: '85vh', opacity: 1 }}
+                        animate={{ height: `${panelHeight * 100}vh`, opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{
-                            height: { type: 'spring', stiffness: 300, damping: 30, mass: 0.8 },
+                            height: isDraggingRef.current ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 30, mass: 0.8 },
                             opacity: { duration: 0.2 }
                         }}
                         className="relative mx-auto w-full max-w-[680px] mb-0 bg-bg-secondary rounded-t-[24px] border-t border-x border-border-subtle shadow-2xl overflow-hidden flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle shrink-0">
-                            <div className="flex items-center gap-2 text-text-tertiary">
-                                <img src={pikaIcon} className="w-3.5 h-3.5 opacity-50 object-contain drop-shadow-sm" alt="logo" />
-                                <span className="text-[13px] font-medium">Search this meeting</span>
+                        {/* Drag handle */}
+                        <div
+                            onMouseDown={handleDragStart}
+                            className="absolute top-0 left-0 right-0 h-5 flex items-center justify-center cursor-ns-resize z-10 group"
+                        >
+                            <div className="w-10 h-1 rounded-full bg-border-subtle group-hover:bg-text-tertiary transition-colors" />
+                        </div>
+
+                        <div className="flex items-center justify-between px-4 py-3 pt-5 border-b border-border-subtle shrink-0">
+                            <div className="flex items-center gap-2">
+                                <img src={pikaIcon} className="w-3.5 h-3.5 opacity-60 object-contain drop-shadow-sm" alt="logo" />
+                                <span className="text-[13px] font-medium text-text-secondary">Search this meeting</span>
                             </div>
                             <button
                                 onClick={handleClose}
