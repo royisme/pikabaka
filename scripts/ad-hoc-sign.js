@@ -3,7 +3,14 @@ const fs = require('fs');
 const path = require('path');
 
 // ─── Helper Disguise Configuration ───
-// Display name used for helper processes in Activity Monitor
+// Display name used for helper processes in Activity Monitor.
+//
+// IMPORTANT: This script runs as electron-builder's `afterPack` hook, which
+// fires AFTER the app is unpacked into the staging directory but BEFORE
+// codesigning. We only mutate Info.plist values here so that electron-builder's
+// own signing step (with hardenedRuntime + Developer ID + notarize) seals a
+// consistent, valid signature. We must NOT run `codesign` here ourselves —
+// doing so corrupts the chain that electron-builder is about to build.
 const DISGUISE_BASE = 'CoreServices';
 
 const HELPER_SUFFIXES = ['', ' (GPU)', ' (Renderer)', ' (Plugin)'];
@@ -39,51 +46,27 @@ function disguiseHelperPlists(appOutDir, appName) {
         console.log(`[Helper Disguise] ${helperName} → display as "${disguisedName}"`);
 
         try {
-            // Update CFBundleDisplayName (Activity Monitor display)
             execSync(`/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName '${disguisedName}'" "${plistPath}"`, { stdio: 'pipe' });
-            // Update CFBundleName (Dock / menu bar fallback)
             execSync(`/usr/libexec/PlistBuddy -c "Set :CFBundleName '${disguisedName}'" "${plistPath}"`, { stdio: 'pipe' });
         } catch (err) {
             console.warn(`[Helper Disguise] PlistBuddy warning for ${helperName}:`, err.message);
         }
     }
 
-    console.log('[Helper Disguise] All helper plists updated successfully.');
+    console.log('[Helper Disguise] All helper plists updated. electron-builder will now sign with Developer ID.');
 }
 
 exports.default = async function (context) {
-    // Only process on macOS
     if (process.platform !== 'darwin') {
         return;
     }
 
     const appOutDir = context.appOutDir;
     const appName = context.packager.appInfo.productFilename;
-    const appPath = path.join(appOutDir, `${appName}.app`);
 
-    // ── Step 1: Disguise helper display names (before signing) ──
     try {
         disguiseHelperPlists(appOutDir, appName);
     } catch (error) {
         console.error('[Helper Disguise] Failed to update helper plists:', error);
-        // Non-fatal: continue to signing
-    }
-
-    // ── Step 2: Ad-hoc sign the application ──
-    // Resolve the path to the entitlements file so V8 gets JIT memory permissions
-    const entitlementsPath = path.join(context.packager.info.projectDir, 'assets', 'entitlements.mac.plist');
-    console.log(`[Ad-Hoc Signing] Signing ${appPath} with entitlements from ${entitlementsPath}...`);
-
-    try {
-        // --force: replace existing signature
-        // --deep: sign nested code
-        // --entitlements: attach JIT/memory entitlements (critical for Apple Silicon)
-        // --sign: use Developer ID certificate (falls back to ad-hoc if not found)
-        const identity = process.env.CSC_NAME || 'Developer ID Application: shaoqing zhu (UL5T9WXYJT)';
-        execSync(`codesign --force --deep --entitlements "${entitlementsPath}" --sign "${identity}" "${appPath}"`, { stdio: 'inherit' });
-        console.log('[Ad-Hoc Signing] Successfully signed the application with entitlements.');
-    } catch (error) {
-        console.error('[Ad-Hoc Signing] Failed to sign the application:', error);
-        throw error;
     }
 };

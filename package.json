@@ -21,7 +21,8 @@
     "electron:build": "pnpm run verify && pnpm run build:electron:raw && cross-env NODE_ENV=production electron .",
     "app:dev": "concurrently \"pnpm run dev -- --port 5180 --strictPort\" \"wait-on http://localhost:5180 && pnpm run build:electron:raw && cross-env NODE_ENV=development electron .\"",
     "app:prod": "pnpm run verify && pnpm run build:web:raw && pnpm run build:electron:raw && pnpm run build:native:raw && cross-env NODE_ENV=production electron .",
-    "app:build": "pnpm run verify && pnpm run build:web:raw && pnpm run build:electron:raw && pnpm run build:native:raw && electron-builder --publish never",
+    "app:build": "pnpm run verify && pnpm run build:web:raw && pnpm run build:electron:raw && pnpm run build:native:raw && node scripts/build-app.js",
+    "app:notarize": "node scripts/notarize-only.js",
     "watch": "tsc -p electron/tsconfig.json --watch",
     "start": "pnpm run app:dev",
     "dist": "pnpm run app:build",
@@ -83,6 +84,8 @@
       "identity": "shaoqing zhu (UL5T9WXYJT)",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist",
       "notarize": true
     },
     "win": {
