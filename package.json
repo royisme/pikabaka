@@ -23,6 +23,7 @@
     "app:prod": "pnpm run verify && pnpm run build:web:raw && pnpm run build:electron:raw && pnpm run build:native:raw && cross-env NODE_ENV=production electron .",
     "app:build": "pnpm run verify && pnpm run build:web:raw && pnpm run build:electron:raw && pnpm run build:native:raw && node scripts/build-app.js",
     "app:notarize": "node scripts/notarize-only.js",
+    "release": "node scripts/release.js",
     "watch": "tsc -p electron/tsconfig.json --watch",
     "start": "pnpm run app:dev",
     "dist": "pnpm run app:build",
