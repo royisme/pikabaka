@@ -1,6 +1,6 @@
 {
   "name": "pika",
-  "version": "1.0.2",
+  "version": "2.1.0",
   "main": "dist-electron/electron/main.js",
   "description": "AI-powered interview copilot and meeting assistant.",
   "scripts": {
