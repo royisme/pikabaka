@@ -151,7 +151,7 @@ export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) =>
                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleDelete(jd.id)}
-                        className="text-[11px] font-medium text-red-500 hover:bg-red-500/10 px-2 py-1 rounded-md transition-colors"
+                        className="text-[11px] font-medium text-state-danger hover:bg-state-danger-soft px-2 py-1 rounded-md transition-colors"
                       >
                         Confirm
                       </button>
@@ -168,7 +168,7 @@ export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) =>
                         e.stopPropagation();
                         setDeleteConfirmId(jd.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-red-500 p-1.5 rounded-md hover:bg-red-500/10 transition-all"
+                      className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-state-danger p-1.5 rounded-md hover:bg-state-danger-soft transition-all"
                     >
                       <Trash2 size={14} />
                     </button>

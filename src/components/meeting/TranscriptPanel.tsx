@@ -72,7 +72,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
             </div>
 
             {sttNeedsTroubleshooting && (
-                <div className="mx-4 mb-2 p-2 rounded-lg border border-amber-500/30 bg-amber-500/10 no-drag">
+                <div className="mx-4 mb-2 p-2 rounded-lg border border-state-warning-border bg-state-warning-soft no-drag">
                     <p className={`text-[10px] ${isLightTheme ? 'text-amber-800' : 'text-amber-200'}`}>
                         STT has no usable system audio input. Check output device routing and permissions.
                     </p>

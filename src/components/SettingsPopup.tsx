@@ -175,12 +175,12 @@ const SettingsPopup = () => {
         ? 'bg-[#F3F4F6]/92 border-black/10 shadow-black/10'
         : 'bg-[#1E1E1E]/80 border-white/10 shadow-black/40';
     const itemHoverClass = isLightTheme ? 'hover:bg-black/[0.04]' : 'hover:bg-white/5';
-    const labelInactiveClass = isLightTheme ? 'text-slate-700 group-hover:text-slate-900' : 'text-slate-400 group-hover:text-slate-200';
-    const iconInactiveClass = isLightTheme ? 'text-slate-500 group-hover:text-slate-700' : 'text-slate-500 group-hover:text-slate-300';
+    const labelInactiveClass = isLightTheme ? 'text-text-tertiary group-hover:text-slate-900' : 'text-text-secondary group-hover:text-text-primary';
+    const iconInactiveClass = isLightTheme ? 'text-text-secondary group-hover:text-text-tertiary' : 'text-text-secondary group-hover:text-slate-300';
     const dividerClass = isLightTheme ? 'bg-black/[0.06]' : 'bg-white/[0.04]';
     const shortcutKeyClass = isLightTheme
-        ? 'border-black/10 bg-black/[0.04] text-slate-600'
-        : 'border-white/10 bg-white/5 text-slate-500';
+        ? 'border-black/10 bg-black/[0.04] text-text-tertiary'
+        : 'border-white/10 bg-white/5 text-text-secondary';
     const defaultToggleTrackClass = isLightTheme ? 'bg-black/[0.22]' : 'bg-white/10';
     const toggleKnobClass = isLightTheme ? 'bg-white shadow-[0_1px_4px_rgba(0,0,0,0.18)]' : 'bg-black shadow-sm';
 
@@ -241,7 +241,7 @@ const SettingsPopup = () => {
                 <div className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors duration-200 group cursor-default ${itemHoverClass}`}>
                     <div className="flex items-center gap-3">
                         <MessageSquare
-                            className={`w-3.5 h-3.5 transition-colors ${showTranscript ? 'text-emerald-400' : iconInactiveClass}`}
+                            className={`w-3.5 h-3.5 transition-colors ${showTranscript ? 'text-state-success' : iconInactiveClass}`}
                             fill={showTranscript ? "currentColor" : "none"}
                         />
                         <span className={`text-[12px] font-medium transition-colors ${showTranscript ? (isLightTheme ? 'text-slate-950' : 'text-white') : labelInactiveClass}`}>Live transcript</span>
@@ -254,7 +254,7 @@ const SettingsPopup = () => {
                             // Dispatch event for same-window listeners
                             window.dispatchEvent(new Event('storage'));
                         }}
-                        className={`w-[30px] h-[18px] rounded-full p-[1.5px] transition-all duration-300 ease-spring active:scale-[0.92] ${showTranscript ? 'bg-emerald-500 shadow-[0_2px_10px_rgba(16,185,129,0.3)]' : defaultToggleTrackClass}`}
+                        className={`w-[30px] h-[18px] rounded-full p-[1.5px] transition-all duration-300 ease-spring active:scale-[0.92] ${showTranscript ? 'bg-state-success shadow-[0_2px_10px_rgba(16,185,129,0.3)]' : defaultToggleTrackClass}`}
                     >
                         <div className={`w-[15px] h-[15px] rounded-full transition-transform duration-300 ease-spring ${toggleKnobClass} ${showTranscript ? 'translate-x-[12px]' : 'translate-x-0'}`} />
                     </button>
@@ -365,10 +365,10 @@ const SettingsPopup = () => {
                 >
                     <div className="flex items-center gap-3">
                         <Heart className="w-3.5 h-3.5 text-pink-400 group-hover:fill-pink-400 transition-all duration-300" />
-                        <span className={`text-[12px] transition-colors ${isLightTheme ? 'text-slate-700 group-hover:text-pink-700' : 'text-slate-400 group-hover:text-pink-100'}`}>Donate</span>
+                        <span className={`text-[12px] transition-colors ${isLightTheme ? 'text-text-tertiary group-hover:text-pink-700' : 'text-text-secondary group-hover:text-pink-100'}`}>Donate</span>
                     </div>
                     <div className="opacity-60 group-hover:opacity-100 transition-opacity">
-                        <Link className={`w-3 h-3 group-hover:text-pink-400 ${isLightTheme ? 'text-slate-600' : 'text-slate-500'}`} />
+                        <Link className={`w-3 h-3 group-hover:text-pink-400 ${isLightTheme ? 'text-text-tertiary' : 'text-text-secondary'}`} />
                     </div>
                 </div>
 

@@ -95,7 +95,7 @@ export const SuggestionOverlay: React.FC<SuggestionOverlayProps> = ({ className 
         <div className={`suggestion-overlay ${className || ''}`}>
             {/* Connection indicator */}
             <div className="flex items-center gap-2 mb-2">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-state-success' : 'bg-state-danger'}`} />
                 <span className="text-xs text-gray-400">
                     {isConnected ? 'Live' : 'Disconnected'}
                 </span>
@@ -105,7 +105,7 @@ export const SuggestionOverlay: React.FC<SuggestionOverlayProps> = ({ className 
             {currentTranscript && (
                 <div className="transcript-bubble mb-3 p-3 rounded-lg bg-gray-800/80 backdrop-blur-sm border border-gray-700">
                     <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium text-blue-400">
+                        <span className="text-xs font-medium text-state-info">
                             {currentTranscript.speaker === 'interviewer' ? '🎤 Interviewer' : '👤 You'}
                         </span>
                         {!currentTranscript.final && (
@@ -128,7 +128,7 @@ export const SuggestionOverlay: React.FC<SuggestionOverlayProps> = ({ className 
             {suggestion && !isProcessing && (
                 <div className="suggestion-card p-4 rounded-lg bg-gradient-to-br from-indigo-900/80 to-purple-900/80 backdrop-blur-sm border border-indigo-500/50 shadow-lg shadow-indigo-500/20">
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium text-indigo-300">💡 Suggested Response</span>
+                        <span className="text-xs font-medium text-state-info">💡 Suggested Response</span>
                         <span className="text-xs text-gray-400">
                             {Math.round(suggestion.confidence * 100)}% confidence
                         </span>
@@ -145,7 +145,7 @@ export const SuggestionOverlay: React.FC<SuggestionOverlayProps> = ({ className 
             {/* Error state */}
             {error && (
                 <div className="error-card p-3 rounded-lg bg-red-900/30 border border-red-700">
-                    <span className="text-sm text-red-300">⚠️ {error}</span>
+                    <span className="text-sm text-state-danger">⚠️ {error}</span>
                 </div>
             )}
 

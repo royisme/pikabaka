@@ -44,7 +44,7 @@ const CopyBlock = ({ command }: { command: string }) => {
                 title="Copy to clipboard"
             >
                 {copied ? (
-                    <span className="text-[10px] font-semibold text-green-400">Copied</span>
+                    <span className="text-[10px] font-semibold text-state-success">Copied</span>
                 ) : (
                     <span className="text-[10px] font-medium text-white/50 group-hover:text-white/80">Copy</span>
                 )}
@@ -132,7 +132,7 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
     return (
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center font-sans antialiased">
+                <div className="fixed inset-0 z-titlebar flex items-center justify-center font-sans antialiased">
                     {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -163,7 +163,7 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                         Update Failed
                                     </h2>
                                     {errorMessage && (
-                                        <p className="text-[13px] text-red-400 font-medium">
+                                        <p className="text-[13px] text-state-danger font-medium">
                                             {errorMessage}
                                         </p>
                                     )}
@@ -229,8 +229,8 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                     className="w-full max-w-[360px] bg-white/[0.03] rounded-xl border border-white/[0.06] p-3.5 flex flex-col gap-2.5 text-left mb-8 outline-none focus:outline-none focus:ring-0"
                                 >
                                     <div className="flex items-start gap-2.5">
-                                        <div className="w-5 h-5 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <span className="text-[10px] text-amber-500">!</span>
+                                        <div className="w-5 h-5 rounded-full bg-state-warning-soft flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <span className="text-[10px] text-state-warning">!</span>
                                         </div>
                                         <div className="space-y-0.5">
                                             <p className="text-[12px] font-medium text-white/80 leading-tight">
@@ -253,7 +253,7 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                             title="Copy to clipboard"
                                         >
                                             {copied ? (
-                                                <span className="text-[10px] font-semibold text-green-400">Copied</span>
+                                                <span className="text-[10px] font-semibold text-state-success">Copied</span>
                                             ) : (
                                                 <span className="text-[10px] font-medium text-white/50 group-hover:text-white/80">Copy</span>
                                             )}

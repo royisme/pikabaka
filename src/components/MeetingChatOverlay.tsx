@@ -98,7 +98,7 @@ const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = (
                         rehypePlugins={[rehypeKatex]}
                         components={{
                             p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
-                            a: ({ node, ...props }: any) => <a className="text-blue-500 hover:underline" {...props} />,
+                            a: ({ node, ...props }: any) => <a className="text-state-info hover:underline" {...props} />,
                             pre: ({ children }: any) => <div className="not-prose mb-4">{children}</div>,
                             code: ({ node, inline, className, children, ...props }: any) => {
                                 const match = /language-(\w+)/.exec(className || '');
@@ -158,7 +158,7 @@ const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = (
                     onClick={handleCopy}
                     className="flex items-center gap-2 mt-3 text-[13px] text-text-tertiary hover:text-text-secondary transition-colors"
                 >
-                    {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                    {copied ? <Check size={14} className="text-state-success" /> : <Copy size={14} />}
                     {copied ? 'Copied' : 'Copy message'}
                 </button>
             )}
@@ -305,12 +305,14 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
                         className="relative mx-auto w-full max-w-[680px] mb-0 bg-bg-secondary rounded-t-[24px] border-t border-x border-border-subtle shadow-2xl overflow-hidden flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* Drag handle */}
                         <div
+                            className="absolute top-0 left-0 right-0 z-10 flex justify-center pt-1.5 pb-1 cursor-ns-resize group"
                             onMouseDown={handleDragStart}
-                            className="absolute top-0 left-0 right-0 h-5 flex items-center justify-center cursor-ns-resize z-10 group"
+                            role="separator"
+                            aria-orientation="horizontal"
+                            aria-label="Resize chat panel"
                         >
-                            <div className="w-10 h-1 rounded-full bg-border-subtle group-hover:bg-text-tertiary transition-colors" />
+                            <div className="h-1 w-10 rounded-full bg-[var(--overlay-text-muted)] opacity-50 group-hover:opacity-80 transition-opacity duration-base" />
                         </div>
 
                         <div className="flex items-center justify-between px-4 py-3 pt-5 border-b border-border-subtle shrink-0">
@@ -322,7 +324,7 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
                                 onClick={handleClose}
                                 className="p-2 transition-colors group"
                             >
-                                <X size={16} className="text-text-tertiary group-hover:text-red-500 group-hover:drop-shadow-[0_0_8px_rgba(239,68,68,0.5)] transition-all duration-300" />
+                                <X size={16} className="text-text-tertiary group-hover:text-state-danger group-hover:drop-shadow-[0_0_8px_var(--state-danger)] transition-all duration-300" />
                             </button>
                         </div>
 
@@ -337,9 +339,9 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
                             {isLoading && messages[messages.length - 1]?.role !== 'assistant' && <TypingIndicator />}
 
                             {error && (
-                                <div className="text-[#FF6B6B] text-[13px] py-2 flex items-center gap-2">
+                                <div className="text-state-danger text-[13px] py-2 flex items-center gap-2">
                                     <span>Couldn't get a response.</span>
-                                    <button onClick={() => void regenerate()} className="underline hover:text-red-400">Retry</button>
+                                    <button onClick={() => void regenerate()} className="underline hover:text-state-danger-strong">Retry</button>
                                 </div>
                             )}
 

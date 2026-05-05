@@ -91,10 +91,63 @@
   --overlay-shell-blur: 17px;
   --overlay-pill-blur: 11px;
   --overlay-transcript-blur: 8px;
+
+  /* ─── Semantic state tokens ─────────────────────────────────────────────
+     Use these instead of raw red/emerald/amber/blue Tailwind colors.
+     Each state has a solid foreground, a subtle background, and a border tint.
+     ──────────────────────────────────────────────────────────────────────── */
+  --state-success: #22c55e;
+  --state-success-strong: #16a34a;
+  --state-success-bg: rgba(34, 197, 94, 0.14);
+  --state-success-border: rgba(34, 197, 94, 0.32);
+
+  --state-warning: #f59e0b;
+  --state-warning-strong: #d97706;
+  --state-warning-bg: rgba(245, 158, 11, 0.14);
+  --state-warning-border: rgba(245, 158, 11, 0.32);
+
+  --state-danger: #ef4444;
+  --state-danger-strong: #dc2626;
+  --state-danger-bg: rgba(239, 68, 68, 0.14);
+  --state-danger-border: rgba(239, 68, 68, 0.32);
+
+  --state-info: var(--primary);
+  --state-info-bg: var(--accent-muted);
+  --state-info-border: rgba(168, 200, 255, 0.32);
+
+  /* ─── Layered z-index scale (replaces magic numbers like z-[49] / z-[2000]) */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 200;
+  --z-dropdown: 1000;
+  --z-overlay: 1500;
+  --z-modal: 2000;
+  --z-toast: 3000;
+  --z-tooltip: 4000;
+  --z-titlebar: 9999;
+
+  /* ─── Motion duration scale */
+  --motion-instant: 80ms;
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --motion-pageshift: 480ms;
+
+  /* ─── Border radius scale (semantic, not size-named) */
+  --radius-input: 0.5rem;
+  --radius-card: 0.75rem;
+  --radius-modal: 1rem;
+  --radius-pill: 9999px;
 }
 
 [data-theme='light'] {
   color-scheme: light;
+
+  /* Soften hot semantic states slightly on light backgrounds */
+  --state-success-bg: rgba(34, 197, 94, 0.10);
+  --state-warning-bg: rgba(245, 158, 11, 0.10);
+  --state-danger-bg: rgba(239, 68, 68, 0.10);
+  --state-info-bg: rgba(59, 130, 246, 0.10);
 
   --overlay-bg: rgba(247, 249, 253, 0.9);
   --overlay-opacity: 0.8;
@@ -116,8 +169,8 @@
   --overlay-inline-code-bg: rgba(59, 130, 246, 0.09);
   --overlay-icon-bg: rgba(248, 250, 253, 0.84);
   --overlay-icon-hover-bg: rgba(241, 246, 252, 0.93);
-  --overlay-panel-shadow: rgba(59, 130, 246, 0.065);
-  --overlay-pill-shadow: rgba(59, 130, 246, 0.05);
+  --overlay-panel-shadow: rgba(15, 23, 42, 0.10);
+  --overlay-pill-shadow: rgba(15, 23, 42, 0.07);
   --overlay-text-primary: rgba(15, 23, 42, 0.97);
   --overlay-text-secondary: rgba(30, 41, 59, 0.86);
   --overlay-text-muted: rgba(51, 65, 85, 0.74);
@@ -232,10 +285,70 @@ textarea,
   font-family: var(--font-mono);
 }
 
-/* Scrollbar Styling - Minimal macOS Hidden style */
+/* Scrollbar Styling — Hidden by default, reveal on hover/focus (macOS-native feel) */
 ::-webkit-scrollbar {
-  width: 0px;
+  width: 8px;
+  height: 8px;
   background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color var(--motion-base) ease;
+}
+
+*:hover > ::-webkit-scrollbar-thumb,
+*:focus-within > ::-webkit-scrollbar-thumb,
+:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(145, 153, 188, 0.35);
+  background-clip: padding-box;
+}
+
+[data-theme='light'] :hover::-webkit-scrollbar-thumb {
+  background-color: rgba(15, 23, 42, 0.22);
+  background-clip: padding-box;
+}
+
+/* Hide scrollbars entirely for explicit opt-outs (e.g. transcript stealth) */
+.scrollbar-none::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Explicit scroll container — guarantees the hover-revealed thumb regardless of
+   parent hover state. Used by long lists, transcripts, chat panels. */
+.custom-scrollbar {
+  scrollbar-gutter: stable;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(145, 153, 188, 0.0);
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: padding-box;
+  transition: background-color var(--motion-base) ease;
+}
+
+.custom-scrollbar:hover::-webkit-scrollbar-thumb,
+.custom-scrollbar:focus-within::-webkit-scrollbar-thumb,
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(145, 153, 188, 0.45);
+  background-clip: padding-box;
+}
+
+[data-theme='light'] .custom-scrollbar:hover::-webkit-scrollbar-thumb,
+[data-theme='light'] .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(15, 23, 42, 0.28);
+  background-clip: padding-box;
 }
 
 /* Liquid Glass Effect Base - Professional Monospace Utility */
@@ -494,3 +607,70 @@ html[data-platform="linux"] body {
   border-radius: 0.75rem !important;
   overflow: hidden;
 }
+
+/* ─── Accessibility: visible keyboard focus ──────────────────────────────
+   Components widely use `focus:outline-none` for visual cleanliness.
+   This rule re-asserts a focus indicator for keyboard users only via
+   :focus-visible, which mouse clicks don't trigger.
+   ─────────────────────────────────────────────────────────────────────── */
+:where(button, a, [role="button"], [role="tab"], [role="menuitem"],
+       [role="option"], input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* Within liquid-glass / overlay surfaces, use a softer ring that reads on blur */
+.overlay-shell-surface :where(button, a, [role="button"], [role="tab"],
+       input, [tabindex]):focus-visible,
+.overlay-pill-surface :where(button, a, [role="button"], [role="tab"],
+       input, [tabindex]):focus-visible {
+  outline-color: var(--overlay-text-strong);
+  outline-offset: 2px;
+}
+
+/* ─── Reduced motion ──────────────────────────────────────────────────────
+   Respect users with vestibular disorders or who disable system animations.
+   Keeps essential opacity transitions but kills movement.
+   ─────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Keep focus indicator transitions instant rather than removed entirely */
+  *:focus-visible {
+    transition: outline-color 0.001ms !important;
+  }
+}
+
+/* ─── Semantic state utility classes ──────────────────────────────────────
+   Allow `bg-state-danger` / `text-state-success` etc. to flow from CSS vars
+   so theme-switching just works.
+   ─────────────────────────────────────────────────────────────────────── */
+.bg-state-success { background-color: var(--state-success); }
+.bg-state-success-soft { background-color: var(--state-success-bg); }
+.bg-state-warning { background-color: var(--state-warning); }
+.bg-state-warning-soft { background-color: var(--state-warning-bg); }
+.bg-state-danger { background-color: var(--state-danger); }
+.bg-state-danger-soft { background-color: var(--state-danger-bg); }
+.bg-state-info { background-color: var(--state-info); }
+.bg-state-info-soft { background-color: var(--state-info-bg); }
+
+.text-state-success { color: var(--state-success); }
+.text-state-success-strong { color: var(--state-success-strong); }
+.text-state-warning { color: var(--state-warning); }
+.text-state-warning-strong { color: var(--state-warning-strong); }
+.text-state-danger { color: var(--state-danger); }
+.text-state-danger-strong { color: var(--state-danger-strong); }
+.text-state-info { color: var(--state-info); }
+
+.border-state-success { border-color: var(--state-success-border); }
+.border-state-warning { border-color: var(--state-warning-border); }
+.border-state-danger { border-color: var(--state-danger-border); }
+.border-state-info { border-color: var(--state-info-border); }

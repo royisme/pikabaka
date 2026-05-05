@@ -144,7 +144,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
             <div className="mb-2 flex items-center justify-between">
                 <label className="flex items-center text-xs font-medium text-text-primary uppercase tracking-wide">
                     {providerName} API Key
-                    {hasStoredKey && <span className="ml-2 text-green-500 normal-case">✓ Saved</span>}
+                    {hasStoredKey && <span className="ml-2 text-state-success normal-case">✓ Saved</span>}
                 </label>
                 <button
                     onClick={() => {
@@ -170,7 +170,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                     onClick={onSaveKey}
                     disabled={savingStatus || !apiKey.trim()}
                     className={`px-5 py-2.5 rounded-lg text-xs font-medium transition-colors ${savedStatus
-                        ? 'bg-green-500/20 text-green-400'
+                        ? 'bg-state-success-soft text-state-success'
                         : 'bg-bg-input hover:bg-bg-secondary border border-border-subtle text-text-primary disabled:opacity-50'
                         }`}
                 >
@@ -179,7 +179,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                 {hasStoredKey && (
                     <button
                         onClick={onRemoveKey}
-                        className="px-2.5 py-2.5 rounded-lg text-xs font-medium text-text-tertiary hover:text-red-500 hover:bg-red-500/10 transition-all"
+                        className="px-2.5 py-2.5 rounded-lg text-xs font-medium text-text-tertiary hover:text-state-danger hover:bg-state-danger-soft transition-all"
                         title="Remove API Key"
                     >
                         <Trash2 size={16} strokeWidth={1.5} />
@@ -192,8 +192,8 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                 <button
                     onClick={onTestConnection}
                     disabled={(!apiKey.trim() && !hasStoredKey) || testStatus === 'testing'}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors border border-border-subtle flex items-center gap-2 shrink-0 ${testStatus === 'success' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
-                        testStatus === 'error' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors border border-border-subtle flex items-center gap-2 shrink-0 ${testStatus === 'success' ? 'bg-state-success-soft text-state-success border-state-success-border' :
+                        testStatus === 'error' ? 'bg-state-danger-soft text-state-danger border-state-danger-border' :
                             'bg-bg-input hover:bg-bg-elevated text-text-primary'
                         }`}
                     title={testError || "Test Connection"}
@@ -260,8 +260,8 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
             </div>
 
             {/* Error from test or fetch */}
-            {testError && <p className="text-[10px] text-red-400 mt-1.5 mb-2">{testError}</p>}
-            {fetchError && <p className="text-[10px] text-red-400 mt-1.5 mb-2">Model fetch error: {fetchError}</p>}
+            {testError && <p className="text-[10px] text-state-danger mt-1.5 mb-2">{testError}</p>}
+            {fetchError && <p className="text-[10px] text-state-danger mt-1.5 mb-2">Model fetch error: {fetchError}</p>}
 
 
         </div>

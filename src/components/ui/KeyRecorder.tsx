@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Check } from 'lucide-react';
 
 interface KeyRecorderProps {
     currentKeys: string[];

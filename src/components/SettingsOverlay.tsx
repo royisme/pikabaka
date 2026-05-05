@@ -2,12 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from 'react-query';
 import packageJson from '../../package.json';
 import {
-    X, Mic, Speaker, Monitor, Keyboard, User, BookOpen, LifeBuoy, LogOut, Upload,
+    X, Mic, Speaker, Monitor, Keyboard, BookOpen, LogOut, Upload,
     ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
     Camera, RotateCcw, Eye, Layout, MessageSquare, Crop,
-    ChevronDown, ChevronUp, Check, BadgeCheck, Power, Palette, Calendar, Ghost, Sun, Moon, RefreshCw, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink, Trash2,
-    Sparkles, Pencil, Briefcase, Building2, Search, MapPin, HelpCircle, Zap, SlidersHorizontal, PointerOff,
-    Star, AlertCircle, Gift, Loader2, Shield
+    ChevronDown, ChevronUp, Check, BadgeCheck, Power, Palette, Ghost, Sun, Moon, RefreshCw, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink, Trash2,
+    Sparkles, Pencil, MapPin, HelpCircle, Zap, SlidersHorizontal, PointerOff,
+    AlertCircle, Loader2, Shield
 } from 'lucide-react';
 import { analytics } from '../lib/analytics/analytics.service';
 import { AboutSection } from './AboutSection';
@@ -18,7 +18,6 @@ import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import {
     clampOverlayOpacity,
     getOverlayAppearance,
-    OVERLAY_OPACITY_DEFAULT,
     OVERLAY_OPACITY_MIN,
     getDefaultOverlayOpacity,
 } from '../lib/overlayAppearance';
@@ -30,33 +29,9 @@ import { useProfileStatus } from '../hooks/useProfileStatus';
 import { useProfileData } from '../hooks/useProfileData';
 import { useUploadResume } from '../hooks/useUploadResume';
 import { useKnowledgeMode } from '../hooks/useKnowledgeMode';
-import { useNegotiationScript } from '../hooks/useNegotiationScript';
 
 const DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT =
     'You are a realtime subtitle translator. Preserve meaning, tone, technical terms, product names, numbers, and code tokens exactly when appropriate. Do not summarize, do not add explanations, and do not omit information. Return only the translated sentence(s), with no prefix/suffix and no markdown.';
-
-// ---------------------------------------------------------------------------
-// StarRating — renders filled/empty stars for culture ratings
-// ---------------------------------------------------------------------------
-const StarRating = ({ value, size = 11 }: { value: number; size?: number }) => {
-    const clamped = Math.min(5, Math.max(0, value ?? 0));
-    // Round to nearest 0.5 so 3.7→3.5 stars, 3.8→4 stars, 4.75→5 stars
-    const rounded = Math.round(clamped * 2) / 2;
-    const full = Math.floor(rounded);
-    const half = rounded - full === 0.5;
-    const empty = 5 - full - (half ? 1 : 0);
-    return (
-        <span className="flex items-center gap-0.5">
-            {Array.from({ length: full }).map((_, i) => (
-                <Star key={`f${i}`} size={size} className="text-yellow-400 fill-yellow-400" />
-            ))}
-            {half && <Star size={size} className="text-yellow-400 fill-yellow-400/40" />}
-            {Array.from({ length: empty }).map((_, i) => (
-                <Star key={`e${i}`} size={size} className="text-text-tertiary/25 fill-transparent" />
-            ))}
-        </span>
-    );
-};
 
 // ---------------------------------------------------------------------------
 // MockupPikaInterface — fake in-meeting widget for the opacity preview
@@ -91,7 +66,7 @@ const MockupPikaInterface = ({ opacity }: { opacity: number }) => {
                                 <span className="opacity-80 tracking-wide">Hide</span>
                             </div>
                             <div className="w-8 h-8 rounded-full flex items-center justify-center overlay-icon-surface overlay-text-primary" style={appearance.iconStyle}>
-                                <div className="w-3.5 h-3.5 rounded-[3px] bg-red-400 opacity-80" />
+                                <div className="w-3.5 h-3.5 rounded-[3px] bg-state-danger opacity-80" />
                             </div>
                         </div>
                     </div>
@@ -102,7 +77,7 @@ const MockupPikaInterface = ({ opacity }: { opacity: number }) => {
                         {/* Rolling Transcript Bar */}
                         <div className="w-full flex justify-center py-2 px-4 border-b mb-1 overlay-transcript-surface" style={appearance.transcriptStyle}>
                             <p className="text-[13px] truncate max-w-[90%] font-medium overlay-text-primary">
-                                <span className={`${resolvedTheme === 'light' ? 'text-blue-700' : 'text-blue-400'} mr-2 font-semibold`}>Interviewer</span>
+                                <span className={`${resolvedTheme === 'light' ? 'text-blue-700' : 'text-state-info'} mr-2 font-semibold`}>Interviewer</span>
                                 <span className="opacity-95">So how would you optimize the current algorithm?</span>
                             </p>
                         </div>
@@ -111,7 +86,7 @@ const MockupPikaInterface = ({ opacity }: { opacity: number }) => {
                         <div className="flex-1 overflow-y-auto px-4 py-2 space-y-3">
                             <div className="flex justify-start">
                                 <div className="max-w-[85%] px-4 py-3 text-[14px] leading-relaxed font-normal overlay-text-primary">
-                                    <span className="font-semibold text-emerald-500 block mb-1">Suggestion</span>
+                                    <span className="font-semibold text-state-success block mb-1">Suggestion</span>
                                     A good approach would be to use a hash map to cache the intermediate results, which brings the time complexity down from O(n²) to O(n).
                                 </div>
                             </div>
@@ -269,13 +244,13 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
 
     const getBadgeStyle = (color?: string) => {
         switch (color) {
-            case 'blue': return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+            case 'blue': return 'bg-state-info-soft text-state-info border-state-info-border';
             case 'orange': return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
             case 'purple': return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
             case 'teal': return 'bg-teal-500/10 text-teal-500 border-teal-500/20';
-            case 'cyan': return 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20';
+            case 'cyan': return 'bg-state-info-soft text-state-info border-cyan-500/20';
             case 'indigo': return 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20';
-            case 'green': return 'bg-green-500/10 text-green-500 border-green-500/20';
+            case 'green': return 'bg-state-success-soft text-state-success border-state-success-border';
             default: return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
         }
     };
@@ -284,13 +259,13 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
         if (isSelectedItem) return 'bg-accent-primary text-white shadow-sm';
         // For unselected items in list or trigger
         switch (color) {
-            case 'blue': return 'bg-blue-500/10 text-blue-600';
+            case 'blue': return 'bg-state-info-soft text-blue-600';
             case 'orange': return 'bg-orange-500/10 text-orange-600';
             case 'purple': return 'bg-purple-500/10 text-purple-600';
             case 'teal': return 'bg-teal-500/10 text-teal-600';
-            case 'cyan': return 'bg-cyan-500/10 text-cyan-600';
+            case 'cyan': return 'bg-state-info-soft text-cyan-600';
             case 'indigo': return 'bg-indigo-500/10 text-indigo-600';
-            case 'green': return 'bg-green-500/10 text-green-600';
+            case 'green': return 'bg-state-success-soft text-green-600';
             default: return 'bg-gray-500/10 text-gray-600';
         }
     };
@@ -404,10 +379,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const { isEnabled: knowledgeMode, toggle: toggleKnowledge } = useKnowledgeMode();
     const profileUploading = uploadResume.isLoading;
     const profileError = uploadResume.error instanceof Error ? uploadResume.error.message : '';
-    const { script: negotiationScript, isGenerating: negotiationGenerating, error: negotiationErrorObject, generate: generateNegotiation } = useNegotiationScript();
-    const negotiationError = negotiationErrorObject?.message ?? '';
-    const [, setTavilyApiKey] = useState('');
-    const [hasStoredTavilyKey, setHasStoredTavilyKey] = useState(false);
     const [verboseLogging, setVerboseLogging] = useState(false);
     const [permissionStatus, setPermissionStatus] = useState<{ microphone: string; screen: string } | null>(null);
 
@@ -489,7 +460,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         const stored = localStorage.getItem('pika_overlay_opacity');
         const parsed = stored ? parseFloat(stored) : NaN;
         // Treat missing value or the old default (0.65) as "not user-set"
-        const isUserSet = Number.isFinite(parsed) && parsed !== OVERLAY_OPACITY_DEFAULT;
+        const isUserSet = Number.isFinite(parsed) && parsed !== getDefaultOverlayOpacity();
         return isUserSet ? clampOverlayOpacity(parsed) : getDefaultOverlayOpacity();
     });
 
@@ -498,7 +469,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     useEffect(() => {
         const stored = localStorage.getItem('pika_overlay_opacity');
         const parsed = stored ? parseFloat(stored) : NaN;
-        const isUserSet = Number.isFinite(parsed) && parsed !== OVERLAY_OPACITY_DEFAULT;
+        const isUserSet = Number.isFinite(parsed) && parsed !== getDefaultOverlayOpacity();
         if (!isUserSet) {
             setOverlayOpacity(getDefaultOverlayOpacity());
         }
@@ -1194,10 +1165,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     };
 
 
-    const [calendarStatus, setCalendarStatus] = useState<{ connected: boolean; email?: string }>({ connected: false });
-    const [isCalendarsLoading, setIsCalendarsLoading] = useState(false);
-
-
     // Load stored credentials on mount
 
 
@@ -1302,10 +1269,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             const savedSck = localStorage.getItem('useExperimentalSckBackend') === 'true';
             setUseExperimentalSck(savedSck);
 
-            // Load Calendar Status
-            if (window.electronAPI?.getCalendarStatus) {
-                window.electronAPI.getCalendarStatus().then(setCalendarStatus);
-            }
         }
     }, [isOpen, selectedInput, selectedOutput]); // Re-run if isOpen changes, or if selected devices are cleared
 
@@ -1391,12 +1354,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                         <FlaskConical size={16} /> AI Providers
                                     </button>
                                     <button
-                                        onClick={() => setActiveTab('calendar')}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'calendar' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
-                                    >
-                                        <Calendar size={16} /> Calendar
-                                    </button>
-                                    <button
                                         onClick={() => setActiveTab('audio')}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'audio' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
@@ -1429,12 +1386,12 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                             <div className="mt-auto p-6 border-t border-border-subtle">
                                 <button
                                     onClick={() => window.electronAPI.quitApp()}
-                                    className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-3"
+                                    className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-state-danger hover:bg-state-danger-soft transition-colors flex items-center gap-3"
                                 >
                                     <LogOut size={16} /> Quit Pika
                                 </button>
                                 <button onClick={onClose} className="group mt-2 w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50 transition-colors flex items-center gap-3">
-                                    <X size={18} className="group-hover:text-red-500 transition-colors" /> Close
+                                    <X size={18} className="group-hover:text-state-danger transition-colors" /> Close
                                 </button>
                             </div>
                         </div>
@@ -1470,7 +1427,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     <h3 className="text-lg font-bold text-text-primary">{isUndetectable ? 'Undetectable' : 'Detectable'}</h3>
                                                 </div>
                                                 <p className="text-xs text-text-secondary">
-                                                    Pika is currently {isUndetectable ? 'undetectable' : 'detectable'} by screen-sharing. <button className="text-blue-400 hover:underline">Supported apps here</button>
+                                                    Pika is currently {isUndetectable ? 'undetectable' : 'detectable'} by screen-sharing. <button className="text-state-info hover:underline">Supported apps here</button>
                                                 </p>
                                             </div>
                                             <div
@@ -1491,7 +1448,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                         <div className={`${isLight ? 'bg-bg-card' : 'bg-bg-item-surface'} rounded-xl p-5 border border-border-subtle flex items-center justify-between transition-all ${isMousePassthrough ? 'shadow-lg shadow-sky-500/10' : ''}`}>
                                             <div className="flex flex-col gap-1">
                                                 <div className="flex items-center gap-2">
-                                                    <PointerOff size={18} className={isMousePassthrough ? 'text-sky-400' : 'text-text-primary'} />
+                                                    <PointerOff size={18} className={isMousePassthrough ? 'text-state-info' : 'text-text-primary'} />
                                                     <h3 className="text-lg font-bold text-text-primary">Mouse Passthrough</h3>
                                                 </div>
                                                 <p className="text-xs text-text-secondary">
@@ -1504,7 +1461,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     setIsMousePassthrough(newState);
                                                     window.electronAPI?.setOverlayMousePassthrough(newState);
                                                 }}
-                                                className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer ${isMousePassthrough ? 'bg-sky-500' : 'bg-bg-toggle-switch border border-border-muted'}`}
+                                                className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer ${isMousePassthrough ? 'bg-state-info' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                             >
                                                 <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${isMousePassthrough ? 'translate-x-5' : 'translate-x-0'}`} />
                                             </div>
@@ -1535,13 +1492,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                     </div>
                                                                     {granted ? (
                                                                         <div className="flex items-center gap-1.5">
-                                                                            <Check size={13} className="text-emerald-400" />
-                                                                            <span className="text-xs text-emerald-400">Granted</span>
+                                                                            <Check size={13} className="text-state-success" />
+                                                                            <span className="text-xs text-state-success">Granted</span>
                                                                         </div>
                                                                     ) : (
                                                                         <button
                                                                             onClick={() => window.electronAPI?.openPrivacySettings(key)}
-                                                                            className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                                                                            className="flex items-center gap-1.5 text-xs text-state-warning hover:text-amber-300 transition-colors"
                                                                         >
                                                                             <AlertCircle size={13} />
                                                                             <span>Not granted</span>
@@ -1583,7 +1540,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 {/* Debug Logging */}
                                                 <div className="flex items-center justify-between px-4 py-3">
                                                     <div className="flex items-center gap-4">
-                                                        <div className={`w-10 h-10 bg-bg-item-surface rounded-lg border flex items-center justify-center transition-colors ${verboseLogging ? 'border-amber-500/40 text-amber-400' : 'border-border-subtle text-text-tertiary'}`}>
+                                                        <div className={`w-10 h-10 bg-bg-item-surface rounded-lg border flex items-center justify-center transition-colors ${verboseLogging ? 'border-state-warning-border text-state-warning' : 'border-border-subtle text-text-tertiary'}`}>
                                                             <Terminal size={20} />
                                                         </div>
                                                         <div>
@@ -1597,7 +1554,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             setVerboseLogging(newState);
                                                             window.electronAPI?.setVerboseLogging?.(newState);
                                                         }}
-                                                        className={`w-11 h-6 rounded-full relative transition-colors ${verboseLogging ? 'bg-amber-500' : 'bg-bg-toggle-switch border border-border-muted'}`}
+                                                        className={`w-11 h-6 rounded-full relative transition-colors ${verboseLogging ? 'bg-state-warning' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                                     >
                                                         <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${verboseLogging ? 'translate-x-5' : 'translate-x-0'}`} />
                                                     </div>
@@ -1754,8 +1711,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         disabled={updateStatus === 'checking'}
                                                         className={`px-5 py-2 rounded-lg text-[13px] font-bold transition-all flex items-center gap-2 shrink-0 ${updateStatus === 'checking' ? 'bg-bg-input text-text-tertiary cursor-wait' :
                                                             updateStatus === 'available' ? 'bg-accent-primary text-white hover:bg-accent-secondary shadow-lg shadow-blue-500/20' :
-                                                                updateStatus === 'uptodate' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
-                                                                    updateStatus === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                                                                updateStatus === 'uptodate' ? 'bg-state-success-soft text-state-success border border-state-success-border' :
+                                                                    updateStatus === 'error' ? 'bg-state-danger-soft text-state-danger border border-state-danger-border' :
                                                                         'bg-bg-component hover:bg-bg-input text-text-primary'
                                                             }`}
                                                     >
@@ -1855,7 +1812,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
                                         <div className={`grid grid-cols-2 gap-3 ${isUndetectable ? 'opacity-50 pointer-events-none' : ''}`}>
                                             {isUndetectable && (
-                                                <p className="col-span-2 text-xs text-yellow-500/80 -mt-1 mb-1">
+                                                <p className="col-span-2 text-xs text-state-warning -mt-1 mb-1">
                                                     ⚠️ Disable Undetectable mode first to change disguise.
                                                 </p>
                                             )}
@@ -1929,7 +1886,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                         queryClient.invalidateQueries(['profile']);
                                                                     } catch (e) { console.error('Failed to delete profile:', e); }
                                                                 }}
-                                                                className="text-[12px] font-medium text-text-tertiary hover:text-red-500 transition-colors px-3 py-1.5 rounded-full hover:bg-red-500/10"
+                                                                className="text-[12px] font-medium text-text-tertiary hover:text-state-danger transition-colors px-3 py-1.5 rounded-full hover:bg-state-danger-soft"
                                                             >
                                                                 Delete Profile
                                                             </button>
@@ -1958,7 +1915,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     <div className="flex flex-col items-center justify-center flex-1">
                                                         <span className="text-[20px] font-bold text-text-primary tracking-tight leading-none mb-1">{profileData?.experienceCount || 0}</span>
                                                         <div className="flex items-center gap-1.5">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-state-success shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
                                                             <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Experience</span>
                                                         </div>
                                                     </div>
@@ -1968,7 +1925,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     <div className="flex flex-col items-center justify-center flex-1">
                                                         <span className="text-[20px] font-bold text-text-primary tracking-tight leading-none mb-1">{profileData?.projectCount || 0}</span>
                                                         <div className="flex items-center gap-1.5">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]" />
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-state-info shadow-[0_0_8px_rgba(59,130,246,0.4)]" />
                                                             <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Projects</span>
                                                         </div>
                                                     </div>
@@ -2045,7 +2002,7 @@ Core Skills
 
                                             {profileError && (
                                                 <div className="px-5 pb-4">
-                                                    <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-[11px] text-red-500 font-medium">
+                                                    <div className="px-3 py-2 bg-state-danger-soft border border-state-danger-border rounded-lg flex items-center gap-2 text-[11px] text-state-danger font-medium">
                                                         <X size={12} /> {profileError}
                                                     </div>
                                                 </div>
@@ -2074,7 +2031,7 @@ Core Skills
                                         </div>
                                         <button
                                             onClick={resetShortcuts}
-                                            className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-border-subtle bg-bg-subtle/30 hover:bg-bg-subtle hover:border-green-500/30 transition-all duration-200 text-xs font-medium text-text-secondary hover:text-green-500 active:scale-95 mt-1 whitespace-nowrap"
+                                            className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-border-subtle bg-bg-subtle/30 hover:bg-bg-subtle hover:border-state-success-border transition-all duration-200 text-xs font-medium text-text-secondary hover:text-state-success active:scale-95 mt-1 whitespace-nowrap"
                                         >
                                             <RotateCcw size={13} strokeWidth={2.5} />
                                             Restore defaults
@@ -2378,7 +2335,7 @@ Core Skills
                                                                 return (keyMap[sttProvider] || '').trim();
                                                             })()}
                                                             className={`px-5 py-2.5 rounded-lg text-xs font-medium transition-colors ${sttSaved
-                                                                ? 'bg-green-500/20 text-green-400'
+                                                                ? 'bg-state-success-soft text-state-success'
                                                                 : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-50'
                                                                 }`}
                                                         >
@@ -2397,7 +2354,7 @@ Core Skills
                                                             return hasKeyMap[sttProvider] ? (
                                                                 <button
                                                                     onClick={() => handleRemoveSttKey(sttProvider as any)}
-                                                                    className="px-2.5 py-2.5 rounded-lg text-xs font-medium text-text-tertiary hover:text-red-500 hover:bg-red-500/10 transition-all"
+                                                                    className="px-2.5 py-2.5 rounded-lg text-xs font-medium text-text-tertiary hover:text-state-danger hover:bg-state-danger-soft transition-all"
                                                                     title="Remove API Key"
                                                                 >
                                                                     <Trash2 size={16} strokeWidth={1.5} />
@@ -2445,7 +2402,7 @@ Core Skills
                                                             {sttTestStatus === 'testing' ? (
                                                                 <><RefreshCw size={12} className="animate-spin" /> Testing...</>
                                                             ) : sttTestStatus === 'success' ? (
-                                                                <><Check size={12} className="text-green-500" /> Connected</>
+                                                                <><Check size={12} className="text-state-success" /> Connected</>
                                                             ) : (
                                                                 <>Test Connection</>
                                                             )}
@@ -2471,7 +2428,7 @@ Core Skills
                                                             <ExternalLink size={12} />
                                                         </button>
                                                         {sttTestStatus === 'error' && (
-                                                            <span className="text-xs text-red-400">{sttTestError}</span>
+                                                            <span className="text-xs text-state-danger">{sttTestError}</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -2528,7 +2485,7 @@ Core Skills
                                                 </div>
                                                 <button
                                                     onClick={() => setTranscriptTranslationEnabled((v) => !v)}
-                                                    className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${transcriptTranslationEnabled ? 'bg-blue-500' : 'bg-bg-toggle-switch border border-border-muted'}`}
+                                                    className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${transcriptTranslationEnabled ? 'bg-state-info' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                                 >
                                                     <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${transcriptTranslationEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
                                                 </button>
@@ -2631,7 +2588,7 @@ Core Skills
                                                     </button>
                                                 </div>
                                                 {translationModelsFetchError && (
-                                                    <p className="text-[11px] text-red-400">{translationModelsFetchError}</p>
+                                                    <p className="text-[11px] text-state-danger">{translationModelsFetchError}</p>
                                                 )}
                                                 {translationModelOptions.length > 0 && (
                                                     <select
@@ -2703,7 +2660,7 @@ Core Skills
                                             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                                                 <button
                                                     onClick={handleSaveTranscriptTranslationSettings}
-                                                    className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${translationSettingsSaved ? 'bg-green-500/20 text-green-400' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
+                                                    className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${translationSettingsSaved ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
                                                 >
                                                     {translationSettingsSaved ? 'Saved!' : 'Save Translation Settings'}
                                                 </button>
@@ -2733,7 +2690,7 @@ Core Skills
                                                 placeholder="Default Microphone"
                                             />
                                             {inputDeviceNotFound && (
-                                                <p className="text-xs text-yellow-400 mt-1 px-1">
+                                                <p className="text-xs text-state-warning mt-1 px-1">
                                                     Previously selected device not found. Using default microphone.
                                                 </p>
                                             )}
@@ -2744,7 +2701,7 @@ Core Skills
                                                 </div>
                                                 <div className="h-1.5 bg-bg-input rounded-full overflow-hidden">
                                                     <div
-                                                        className="h-full bg-green-500 transition-all duration-100 ease-out"
+                                                        className="h-full bg-state-success transition-all duration-100 ease-out"
                                                         style={{ width: `${micLevel}%` }}
                                                     />
                                                 </div>
@@ -2814,16 +2771,16 @@ Core Skills
                                             <div className="h-px bg-border-subtle my-2" />
 
                                             {/* SCK Backend Toggle */}
-                                            <div className="bg-amber-500/5 rounded-xl border border-amber-500/20 p-4">
+                                            <div className="bg-state-warning-soft rounded-xl border border-state-warning-border p-4">
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-start gap-3">
-                                                        <div className="mt-0.5 p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
+                                                        <div className="mt-0.5 p-1.5 rounded-lg bg-state-warning-soft text-state-warning">
                                                             <FlaskConical size={18} />
                                                         </div>
                                                         <div>
                                                             <div className="flex items-center gap-2 mb-0.5">
                                                                 <h3 className="text-sm font-bold text-text-primary">SCK Backend</h3>
-                                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-400 uppercase tracking-wide">Alternative</span>
+                                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-state-info-soft text-state-info uppercase tracking-wide">Alternative</span>
                                                             </div>
                                                             <p className="text-xs text-text-secondary leading-relaxed max-w-[300px]">
                                                                 Use the ScreenCaptureKit backend. An optimized alternative to CoreAudio if you experience any capture issues.
@@ -2836,7 +2793,7 @@ Core Skills
                                                             setUseExperimentalSck(newState);
                                                             window.localStorage.setItem('useExperimentalSckBackend', newState ? 'true' : 'false');
                                                         }}
-                                                        className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${useExperimentalSck ? 'bg-amber-500' : 'bg-bg-toggle-switch border border-border-muted'}`}
+                                                        className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${useExperimentalSck ? 'bg-state-warning' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                                     >
                                                         <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${useExperimentalSck ? 'translate-x-5' : 'translate-x-0'}`} />
                                                     </div>
@@ -2847,87 +2804,6 @@ Core Skills
                                 </div>
                             )}
 
-
-                            {activeTab === 'calendar' && (
-                                <div className="space-y-6 animated fadeIn h-full">
-                                    <div>
-                                        <h3 className="text-lg font-bold text-text-primary mb-2">Visible Calendars</h3>
-                                        <p className="text-xs text-text-secondary mb-4">Upcoming meetings are synchronized from these calendars</p>
-                                    </div>
-
-                                    <div className="bg-bg-card rounded-xl p-6 border border-border-subtle flex flex-col items-start gap-4">
-                                        {calendarStatus.connected ? (
-                                            <div className="w-full flex items-center justify-between">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
-                                                        <Calendar size={20} />
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="text-sm font-medium text-text-primary">Google Calendar</h4>
-                                                        <p className="text-xs text-text-secondary">Connected as {calendarStatus.email || 'User'}</p>
-                                                    </div>
-                                                </div>
-
-                                                <button
-                                                    onClick={async () => {
-                                                        setIsCalendarsLoading(true);
-                                                        try {
-                                                            await window.electronAPI.calendarDisconnect();
-                                                            const status = await window.electronAPI.getCalendarStatus();
-                                                            setCalendarStatus(status);
-                                                        } catch (e) {
-                                                            console.error(e);
-                                                        } finally {
-                                                            setIsCalendarsLoading(false);
-                                                        }
-                                                    }}
-                                                    disabled={isCalendarsLoading}
-                                                    className="px-3 py-1.5 bg-bg-input hover:bg-bg-elevated border border-border-subtle text-text-primary rounded-md text-xs font-medium transition-colors"
-                                                >
-                                                    {isCalendarsLoading ? 'Disconnecting...' : 'Disconnect'}
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div className="w-full py-4">
-                                                <div className="mb-4">
-                                                    <Calendar size={24} className="text-text-tertiary mb-3" />
-                                                    <h4 className="text-sm font-bold text-text-primary mb-1">No calendars</h4>
-                                                    <p className="text-xs text-text-secondary">Get started by connecting a Google account.</p>
-                                                </div>
-
-                                                <button
-                                                    onClick={async () => {
-                                                        setIsCalendarsLoading(true);
-                                                        try {
-                                                            const res = await window.electronAPI.calendarConnect();
-                                                            if (res.success) {
-                                                                const status = await window.electronAPI.getCalendarStatus();
-                                                                setCalendarStatus(status);
-                                                            }
-                                                        } catch (e) {
-                                                            console.error(e);
-                                                        } finally {
-                                                            setIsCalendarsLoading(false);
-                                                        }
-                                                    }}
-                                                    disabled={isCalendarsLoading}
-                                                    className={`px-4 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-2.5 ${isLight ? 'bg-bg-component hover:bg-bg-item-surface text-text-primary border border-border-subtle' : 'bg-[#303033] hover:bg-[#3A3A3D] text-white'}`}
-                                                >
-                                                    <svg viewBox="0 0 24 24" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
-                                                        <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
-                                                            <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z" />
-                                                            <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z" />
-                                                            <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.734 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z" />
-                                                            <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z" />
-                                                        </g>
-                                                    </svg>
-                                                    {isCalendarsLoading ? 'Connecting...' : 'Connect Google'}
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
 
                             {activeTab === 'about' && (
                                 <AboutSection />
@@ -2947,6 +2823,7 @@ Core Skills
             {/* ------------------------------------------------------------------ */}
             <div
                 id="settings-mockup-wrapper"
+                /* z-[49] is intentional: must sit just below the z-50 settings modal it previews */
                 className="fixed inset-0 z-[49] pointer-events-none transition-opacity duration-150"
                 style={{ opacity: isPreviewingOpacity ? 1 : 0 }}
             >

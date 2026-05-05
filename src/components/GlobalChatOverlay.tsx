@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useStreamBuffer } from '../hooks/useStreamBuffer';
-import { X, Copy, Check, Globe, ArrowUp } from 'lucide-react';
+import { X, Copy, Check, ArrowUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import pikaIcon from '../../assets/icon.png';
 
@@ -97,7 +97,7 @@ const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = (
                     onClick={handleCopy}
                     className="flex items-center gap-2 mt-3 text-[13px] text-text-tertiary hover:text-text-secondary transition-colors"
                 >
-                    {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                    {copied ? <Check size={14} className="text-state-success" /> : <Copy size={14} />}
                     {copied ? 'Copied' : 'Copy message'}
                 </button>
             )}
@@ -346,7 +346,7 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                                 onClick={onClose}
                                 className="p-2 transition-colors group"
                             >
-                                <X size={16} className="text-text-tertiary group-hover:text-red-500 group-hover:drop-shadow-[0_0_8px_rgba(239,68,68,0.5)] transition-all duration-300" />
+                                <X size={16} className="text-text-tertiary group-hover:text-state-danger group-hover:drop-shadow-[0_0_8px_rgba(239,68,68,0.5)] transition-all duration-300" />
                             </button>
                         </div>
 

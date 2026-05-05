@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, AlertCircle, CheckCircle, Save, ChevronDown, Check, RefreshCw, ExternalLink, Loader2 } from 'lucide-react';
+import * as Select from '@radix-ui/react-select';
+import { Plus, Trash2, Edit2, AlertCircle, CheckCircle, Save, ChevronDown, Check, RefreshCw, Loader2 } from 'lucide-react';
 import { STANDARD_CLOUD_MODELS, prettifyModelId } from '../../utils/modelUtils';
 import { validateCurl } from '../../lib/curl-validator';
 import { ProviderCard } from './ProviderCard';
@@ -32,56 +33,46 @@ interface ModelSelectProps {
 }
 
 const ModelSelect: React.FC<ModelSelectProps> = ({ value, options, onChange, placeholder = "Select model" }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const containerRef = React.useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
     const selectedOption = options.find(o => o.id === value);
 
     return (
-        <div className="relative" ref={containerRef}>
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-40 bg-bg-input border border-border-subtle rounded-lg px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent-primary flex items-center justify-between hover:bg-bg-elevated transition-colors"
-                type="button"
-            >
-                <span className="truncate pr-2">{selectedOption ? selectedOption.name : placeholder}</span>
-                <ChevronDown size={14} className={`text-text-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
+        <Select.Root value={value} onValueChange={onChange}>
+            <Select.Trigger className="w-40 bg-bg-input border border-border-subtle rounded-lg px-3 py-1.5 text-xs text-text-primary flex items-center justify-between hover:bg-bg-elevated transition-colors">
+                <Select.Value placeholder={selectedOption ? selectedOption.name : placeholder} />
+                <Select.Icon asChild>
+                    <ChevronDown size={14} className="text-text-secondary transition-transform" />
+                </Select.Icon>
+            </Select.Trigger>
 
-            {isOpen && (
-                <div className="absolute top-full right-0 mt-1 w-full bg-bg-elevated border border-border-subtle rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto animated fadeIn">
-                    <div className="p-1 space-y-0.5">
+            <Select.Portal>
+                <Select.Content
+                    className="bg-bg-elevated border border-border-subtle rounded-lg shadow-xl z-50 max-h-60 overflow-hidden animated fadeIn"
+                    position="popper"
+                    sideOffset={4}
+                    align="end"
+                >
+                    <Select.Viewport className="p-1 space-y-0.5 w-40 max-h-60 overflow-y-auto">
                         {options.map((option) => (
-                            <button
+                            <Select.Item
                                 key={option.id}
-                                onClick={() => {
-                                    onChange(option.id);
-                                    setIsOpen(false);
-                                }}
-                                className={`w-full text-left px-3 py-2 text-xs rounded-md flex items-center justify-between group transition-colors ${value === option.id ? 'bg-bg-input hover:bg-bg-elevated text-text-primary' : 'text-text-secondary hover:bg-bg-input hover:text-text-primary'}`}
-                                type="button"
+                                value={option.id}
+                                className={`px-3 py-2 text-xs rounded-md flex items-center justify-between group transition-colors cursor-default outline-none data-[highlighted]:bg-bg-input data-[highlighted]:text-text-primary ${value === option.id ? 'bg-bg-input text-text-primary' : 'text-text-secondary'}`}
                             >
-                                <span className="truncate">{option.name}</span>
-                                {value === option.id && <Check size={14} className="text-accent-primary shrink-0 ml-2" />}
-                            </button>
+                                <Select.ItemText>
+                                    <span className="truncate">{option.name}</span>
+                                </Select.ItemText>
+                                <Select.ItemIndicator>
+                                    <Check size={14} className="text-accent-primary shrink-0 ml-2" />
+                                </Select.ItemIndicator>
+                            </Select.Item>
                         ))}
                         {options.length === 0 && (
-                            <div className="px-3 py-2 text-xs text-gray-500 italic">No models available</div>
+                            <div className="px-3 py-2 text-xs text-text-tertiary italic">No models available</div>
                         )}
-                    </div>
-                </div>
-            )}
-        </div>
+                    </Select.Viewport>
+                </Select.Content>
+            </Select.Portal>
+        </Select.Root>
     );
 };
 
@@ -122,7 +113,6 @@ export const AIProvidersSettings: React.FC = () => {
     // --- Local (Ollama) ---
     const [ollamaModels, setOllamaModels] = useState<string[]>([]);
     const [ollamaStatus, setOllamaStatus] = useState<'checking' | 'detected' | 'not-found' | 'fixing'>('checking');
-    const [ollamaRestarted, setOllamaRestarted] = useState(false);
     const [isRefreshingOllama, setIsRefreshingOllama] = useState(false);
 
     // --- Default Model ---
@@ -266,7 +256,6 @@ export const AIProvidersSettings: React.FC = () => {
             // @ts-ignore
             const result = await window.electronAPI?.invoke?.('force-restart-ollama');
             if (result && result.success) {
-                setOllamaRestarted(true);
                 // Wait for server to be ready
                 setTimeout(() => checkOllama(false), 2000);
             } else {
@@ -350,18 +339,6 @@ export const AIProvidersSettings: React.FC = () => {
             setTestError(prev => ({ ...prev, [provider]: e.message || 'Connection failed' }));
         }
     };
-
-    const openKeyUrl = (provider: string) => {
-        const urls: Record<string, string> = {
-            gemini: 'https://aistudio.google.com/app/apikey',
-            groq: 'https://console.groq.com/keys',
-            openai: 'https://platform.openai.com/api-keys',
-            claude: 'https://console.anthropic.com/settings/keys'
-        };
-        // @ts-ignore
-        window.electronAPI?.openExternal(urls[provider]);
-    };
-
 
     // --- Custom Provider Handlers ---
 
@@ -573,11 +550,11 @@ export const AIProvidersSettings: React.FC = () => {
                     <div>
                         <div className="flex items-center gap-2">
                             <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-0">Fast Response Mode</label>
-                            <span className="bg-orange-500/10 text-orange-500 text-[9px] font-bold px-1.5 py-0.5 rounded border border-orange-500/20">NEW</span>
+                            <span className="bg-state-warning-soft text-state-warning text-[9px] font-bold px-1.5 py-0.5 rounded border border-state-warning">NEW</span>
                         </div>
                         <p className="text-[10px] text-text-secondary mt-0.5">Super fast responses using Groq Llama 3 for text. Multimodal requests still use your Default Model.</p>
                         {!hasStoredKey.groq && (
-                            <p className="text-[10px] text-orange-500 mt-0.5 font-medium">Requires a Groq API Key to be configured below.</p>
+                            <p className="text-[10px] text-state-warning mt-0.5 font-medium">Requires a Groq API Key to be configured below.</p>
                         )}
                     </div>
                     <div
@@ -592,7 +569,7 @@ export const AIProvidersSettings: React.FC = () => {
                             // @ts-ignore
                             await window.electronAPI?.setGroqFastTextMode(newState);
                         }}
-                        className={`w-11 h-6 rounded-full relative transition-colors ${!hasStoredKey.groq ? 'cursor-not-allowed bg-bg-toggle-switch' : fastResponseMode ? 'bg-orange-500' : 'bg-bg-toggle-switch border border-border-muted'}`}
+                        className={`w-11 h-6 rounded-full relative transition-colors ${!hasStoredKey.groq ? 'cursor-not-allowed bg-bg-toggle-switch' : fastResponseMode ? 'bg-state-warning' : 'bg-bg-toggle-switch border border-border-muted'}`}
                     >
                         <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${fastResponseMode ? 'translate-x-5' : 'translate-x-0'}`} />
                     </div>
@@ -728,7 +705,7 @@ export const AIProvidersSettings: React.FC = () => {
 
                     {ollamaStatus === 'not-found' && (
                         <div className="flex flex-col gap-2">
-                            <div className="flex items-center gap-2 text-xs text-red-400">
+                            <div className="flex items-center gap-2 text-xs text-state-danger">
                                 <AlertCircle size={14} />
                                 <span>Ollama not detected</span>
                             </div>
@@ -748,7 +725,7 @@ export const AIProvidersSettings: React.FC = () => {
 
                     {ollamaStatus === 'detected' && ollamaModels.length > 0 && (
                         <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-xs text-green-400 mb-3">
+                            <div className="flex items-center gap-2 text-xs text-state-success mb-3">
                                 <CheckCircle size={14} />
                                 <span>Ollama connected</span>
                             </div>
@@ -862,7 +839,7 @@ export const AIProvidersSettings: React.FC = () => {
                                 </button>
                             </div>
                             {oaiError && (
-                                <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-xs">
+                                <div className="flex items-start gap-2 p-3 bg-state-danger-soft border border-state-danger rounded-lg text-state-danger text-xs">
                                     <AlertCircle size={14} className="shrink-0 mt-0.5" />
                                     <span>{oaiError}</span>
                                 </div>
@@ -921,7 +898,7 @@ export const AIProvidersSettings: React.FC = () => {
                                         <button
                                             type="button"
                                             onClick={() => handleDeleteOai(p.id)}
-                                            className="p-1.5 rounded-lg text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                            className="p-1.5 rounded-lg text-text-secondary hover:text-state-danger hover:bg-state-danger-soft transition-colors"
                                             title="Delete"
                                         >
                                             <Trash2 size={14} />
@@ -940,7 +917,7 @@ export const AIProvidersSettings: React.FC = () => {
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <h3 className="text-sm font-bold text-text-primary">Custom Providers (cURL)</h3>
-                            <span className="px-1.5 py-0 rounded-full text-[7px] font-bold bg-yellow-500/10 text-yellow-500 uppercase tracking-widest border border-yellow-500/20 leading-loose mt-0.5">Experimental</span>
+                            <span className="px-1.5 py-0 rounded-full text-[7px] font-bold bg-state-warning-soft text-state-warning uppercase tracking-widest border border-state-warning leading-loose mt-0.5">Experimental</span>
                         </div>
                         <p className="text-xs text-text-secondary">Advanced: custom request templates via cURL.</p>
                     </div>
@@ -1058,7 +1035,7 @@ export const AIProvidersSettings: React.FC = () => {
                             </div>
 
                             {curlError && (
-                                <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-xs">
+                                <div className="flex items-start gap-2 p-3 bg-state-danger-soft border border-state-danger rounded-lg text-state-danger text-xs">
                                     <AlertCircle size={14} className="shrink-0 mt-0.5" />
                                     <span>{curlError}</span>
                                 </div>
@@ -1115,7 +1092,7 @@ export const AIProvidersSettings: React.FC = () => {
                                         </button>
                                         <button
                                             onClick={() => handleDeleteCustom(provider.id)}
-                                            className="p-1.5 rounded-lg text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                            className="p-1.5 rounded-lg text-text-secondary hover:text-state-danger hover:bg-state-danger-soft transition-colors"
                                             title="Delete"
                                         >
                                             <Trash2 size={14} />

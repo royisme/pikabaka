@@ -12,10 +12,10 @@ interface InterviewPrepPanelProps {
 }
 
 const categoryColors: Record<string, { bg: string; text: string; border: string }> = {
-  behavioral: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
-  technical: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
-  system_design: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20' },
-  intro: { bg: 'bg-yellow-500/10', text: 'text-yellow-400', border: 'border-yellow-500/20' },
+  behavioral: { bg: 'bg-state-info-soft', text: 'text-state-info', border: 'border-state-info-border' },
+  technical: { bg: 'bg-state-success-soft', text: 'text-state-success', border: 'border-state-success-border' },
+  system_design: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-state-info-border' },
+  intro: { bg: 'bg-state-warning-soft', text: 'text-state-warning', border: 'border-state-warning-border' },
 };
 
 const difficultyLabels = ['Easy', 'Medium', 'Hard'];
@@ -94,13 +94,13 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
               <p className="text-xs text-text-secondary text-center">Preparing tailored guidance...</p>
             </div>
           ) : prepError ? (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-center">
-              <AlertTriangle size={20} className="mx-auto text-red-400 mb-2" />
-              <p className="text-sm text-red-400 font-medium">Couldn’t generate prep</p>
+            <div className="bg-state-danger-soft border border-state-danger-border rounded-xl p-4 text-center">
+              <AlertTriangle size={20} className="mx-auto text-state-danger mb-2" />
+              <p className="text-sm text-state-danger font-medium">Couldn’t generate prep</p>
               <p className="text-xs text-text-secondary mt-1">{(prepErrorObj as Error | undefined)?.message}</p>
               <button
                 onClick={() => generatePrepAsync(jdId).then((d) => setPrepData(d)).catch(() => {})}
-                className="mt-3 px-4 py-1.5 rounded-full text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                className="mt-3 px-4 py-1.5 rounded-full text-xs font-medium bg-state-danger-soft text-state-danger hover:bg-state-danger-soft transition-colors"
               >
                 Retry
               </button>
@@ -153,12 +153,12 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
               {prepData.mustMentionKeywords?.length > 0 && (
                 <div className="bg-bg-item-surface rounded-xl border border-border-subtle p-4">
                   <div className="flex items-center gap-1.5 mb-2">
-                    <Zap size={12} className="text-yellow-400" />
+                    <Zap size={12} className="text-state-warning" />
                     <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide">Key Terms to Weave In</div>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {prepData.mustMentionKeywords.map((kw, i) => (
-                      <span key={i} className="text-[10px] font-medium text-yellow-400 px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/20">
+                      <span key={i} className="text-[10px] font-medium text-state-warning px-2 py-0.5 rounded-full bg-state-warning-soft border border-state-warning-border">
                         {kw}
                       </span>
                     ))}
@@ -169,7 +169,7 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
               {prepData.knowledgeGaps?.length > 0 && (
                 <div className="bg-bg-item-surface rounded-xl border border-border-subtle p-4">
                   <div className="flex items-center gap-1.5 mb-3">
-                    <AlertTriangle size={12} className="text-red-400" />
+                    <AlertTriangle size={12} className="text-state-danger" />
                     <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide">What to Strengthen</div>
                     <span className="text-[9px] text-text-tertiary ml-1">({prepData.knowledgeGaps.length})</span>
                   </div>
@@ -178,8 +178,8 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
                       <div key={i} className="flex items-start gap-2">
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${
                           gap.importance === 'critical'
-                            ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                            : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                            ? 'bg-state-danger-soft text-state-danger border border-state-danger-border'
+                            : 'bg-state-warning-soft text-state-warning border border-state-warning-border'
                         }`}>
                           {gap.importance === 'critical' ? 'KEY FOCUS' : 'SUPPORTING'}
                         </span>

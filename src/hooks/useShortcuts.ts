@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { acceleratorToKeys, keysToAccelerator } from '../utils/keyboardUtils';
-import { getPlatformShortcut, isMac } from '../utils/platformUtils';
+import { isMac } from '../utils/platformUtils';
 
 // Define the shape of our shortcuts configuration
 export interface ShortcutConfig {

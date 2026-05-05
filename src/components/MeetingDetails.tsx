@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
-import { ArrowLeft, Search, Mail, Link, ChevronDown, Play, ArrowUp, Copy, Check, MoreHorizontal, Settings, ArrowRight, Languages, Loader2, Globe } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowUp, Copy, Check, Languages, Loader2, Globe } from 'lucide-react';
+import { motion } from 'framer-motion';
 import MeetingChatOverlay from './MeetingChatOverlay';
 import EditableTextBlock from './EditableTextBlock';
 import pikaLogo from '../../assets/icon.png';
@@ -13,12 +13,6 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 const formatTime = (ms: number) => {
     const date = new Date(ms);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).toLowerCase();
-};
-
-const formatDuration = (ms: number) => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = ((ms % 60000) / 1000).toFixed(0);
-    return `${minutes}:${Number(seconds) < 10 ? '0' : ''}${seconds}`;
 };
 
 const cleanMarkdown = (content: string) => {
@@ -185,19 +179,6 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
         }
     };
 
-    const handleOverviewSave = async (newOverview: string) => {
-        setMeeting(prev => ({
-            ...prev,
-            detailedSummary: {
-                ...prev.detailedSummary!,
-                overview: newOverview
-            }
-        }));
-        if (window.electronAPI?.updateMeetingSummary) {
-            await window.electronAPI.updateMeetingSummary(meeting.id, { overview: newOverview });
-        }
-    };
-
     const handleActionItemSave = async (index: number, newVal: string) => {
         const newItems = [...(meeting.detailedSummary?.actionItems || [])];
         if (!newVal.trim()) {
@@ -310,7 +291,7 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                 onClick={handleCopy}
                                 className="flex items-center gap-2 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors"
                             >
-                                {isCopied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                                {isCopied ? <Check size={14} className="text-state-success" /> : <Copy size={14} />}
                                 {isCopied ? 'Copied' : activeTab === 'summary' ? 'Copy full summary' : activeTab === 'transcript' ? 'Copy full transcript' : 'Copy usage'}
                             </button>
                         </div>
@@ -469,7 +450,7 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                                         </div>
                                                     )}
                                                     {translation?.state === 'error' && (
-                                                        <div className="flex items-center gap-1.5 mt-1.5 text-red-400">
+                                                        <div className="flex items-center gap-1.5 mt-1.5 text-state-danger">
                                                             <span className="text-xs">Translation failed</span>
                                                         </div>
                                                     )}

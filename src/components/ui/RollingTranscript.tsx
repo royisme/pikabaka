@@ -163,7 +163,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                                 <div className="my-2.5 h-px bg-border-subtle/60" />
                                                 <div className="flex gap-2">
                                                     <Globe
-                                                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-400/90"
+                                                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-state-info"
                                                         strokeWidth={2}
                                                         aria-hidden="true"
                                                     />

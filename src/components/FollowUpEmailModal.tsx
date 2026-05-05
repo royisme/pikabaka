@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Mail, RotateCcw, ExternalLink, Loader2, Paperclip } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Meeting {
@@ -37,7 +37,6 @@ const FollowUpEmailModal: React.FC<FollowUpEmailModalProps> = ({ isOpen, onClose
 
     // State
     const [isGenerating, setIsGenerating] = useState(false);
-    const [hasGeneratedOnce, setHasGeneratedOnce] = useState(false);
 
     // Mount effect - Initialize and Generate
     useEffect(() => {
@@ -129,17 +128,6 @@ const FollowUpEmailModal: React.FC<FollowUpEmailModalProps> = ({ isOpen, onClose
         onClose();
     };
 
-    const handleSendDefault = async () => {
-        // @ts-ignore
-        await window.electronAPI?.invoke('open-mailto', {
-            to: recipientEmail,
-            subject: subject,
-            body: emailBody
-        });
-        onClose();
-    };
-
-
     if (!isOpen) return null;
 
     return (
@@ -183,7 +171,7 @@ const FollowUpEmailModal: React.FC<FollowUpEmailModalProps> = ({ isOpen, onClose
                                     <div className="flex-1 min-h-[32px] flex items-center border-b border-white/[0.06] group-focus-within:border-white/20 transition-colors pb-1">
                                         {recipientEmail ? (
                                             <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#27272A] border border-white/10 rounded-full text-[#E9E9E9] text-[13px] shadow-sm animate-in fade-in zoom-in duration-200">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-state-success shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
                                                 {recipientEmail}
                                                 <button
                                                     onClick={() => setRecipientEmail('')}
@@ -226,7 +214,7 @@ const FollowUpEmailModal: React.FC<FollowUpEmailModalProps> = ({ isOpen, onClose
                                     <div className="absolute inset-0 flex items-center justify-center z-10 bg-[#121212]/50 backdrop-blur-[2px]">
                                         <div className="flex flex-col items-center gap-4">
                                             <div className="relative">
-                                                <div className="w-10 h-10 border-2 border-[#27272A] border-t-blue-500 rounded-full animate-spin"></div>
+                                                <div className="w-10 h-10 border-2 border-[#27272A] border-t-state-info rounded-full animate-spin"></div>
                                                 <div className="absolute inset-0 flex items-center justify-center">
                                                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                                                 </div>

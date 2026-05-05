@@ -10,7 +10,7 @@ import StartupSequence from "./components/StartupSequence"
 import { AnimatePresence, motion } from "framer-motion"
 import UpdateBanner from "./components/UpdateBanner"
 import { AlertCircle } from "lucide-react"
-import { clampOverlayOpacity, OVERLAY_OPACITY_DEFAULT, getDefaultOverlayOpacity } from "./lib/overlayAppearance"
+import { clampOverlayOpacity, getDefaultOverlayOpacity } from "./lib/overlayAppearance"
 import { analytics } from "./lib/analytics/analytics.service"
 import { ErrorBoundary } from "./components/ErrorBoundary"
 
@@ -86,11 +86,9 @@ const App: React.FC = () => {
     const stored = localStorage.getItem('pika_overlay_opacity');
     const parsed = stored ? parseFloat(stored) : NaN;
     // Treat missing value or the old default (0.65) as "not user-set"
-    const isUserSet = Number.isFinite(parsed) && parsed !== OVERLAY_OPACITY_DEFAULT;
+    const isUserSet = Number.isFinite(parsed) && parsed !== getDefaultOverlayOpacity();
     return isUserSet ? clampOverlayOpacity(parsed) : getDefaultOverlayOpacity();
   });
-  
-  const [isLauncherMainView, setIsLauncherMainView] = useState(true);
 
   // Ollama Auto-Pull State
   const [ollamaPullStatus, setOllamaPullStatus] = useState<'idle' | 'downloading' | 'complete' | 'failed'>('idle');
@@ -320,7 +318,6 @@ const App: React.FC = () => {
                       setSettingsInitialTab(tab);
                       setIsSettingsOpen(true);
                     }}
-                    onPageChange={setIsLauncherMainView}
                     ollamaPullStatus={ollamaPullStatus}
                     ollamaPullPercent={ollamaPullPercent}
                     ollamaPullMessage={ollamaPullMessage}

@@ -15,7 +15,7 @@ const StartupSequence: React.FC<StartupSequenceProps> = ({ onComplete }) => {
     }, [onComplete]);
 
     return (
-        <div className="fixed inset-0 z-[100] bg-[#000000] flex items-center justify-center overflow-hidden">
+        <div className="fixed inset-0 z-overlay bg-[#000000] flex flex-col items-center justify-center overflow-hidden">
             {/* Volumetric Backlight - Adds depth/atmosphere */}
             <motion.div
                 className="absolute w-96 h-96 bg-white/10 rounded-full blur-[120px]"
@@ -48,6 +48,16 @@ const StartupSequence: React.FC<StartupSequenceProps> = ({ onComplete }) => {
                     filter: { times: [0, 0.25, 1], duration: 1.8, ease: "easeInOut" }
                 }}
             />
+
+            <p
+                className="relative z-10 mt-6 font-sans text-base md:text-lg italic tracking-label text-text-secondary opacity-0 animate-fade-in-up"
+                style={{
+                    animationDelay: 'var(--motion-slow)',
+                    animationDuration: 'calc(var(--motion-slow) + var(--motion-base))',
+                }}
+            >
+                Hear. Think. Speak — with an AI in the loop.
+            </p>
         </div>
     );
 };

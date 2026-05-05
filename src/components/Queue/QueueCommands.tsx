@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react"
 import { IoLogOutOutline } from "react-icons/io5"
-import { Dialog, DialogContent, DialogClose } from "../ui/dialog"
 
 interface QueueCommandsProps {
   onTooltipVisibilityChange: (visible: boolean, height: number) => void
@@ -9,12 +8,6 @@ interface QueueCommandsProps {
   onSettingsToggle: () => void
   onCodeHint?: () => void
   onBrainstorm?: () => void
-}
-
-interface Transcript {
-  speaker: string
-  text: string
-  final: boolean
 }
 
 const QueueCommands: React.FC<QueueCommandsProps> = ({
@@ -27,71 +20,8 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
 }) => {
   const [isTooltipVisible, setIsTooltipVisible] = useState(false)
   const tooltipRef = useRef<HTMLDivElement>(null)
-  const [isRecording, setIsRecording] = useState(false)
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
-  const [audioResult, setAudioResult] = useState<string | null>(null)
-  const chunks = useRef<Blob[]>([])
 
-  // Native audio service state
-  const [isNativeAudioConnected, setIsNativeAudioConnected] = useState(false)
-  const [transcripts, setTranscripts] = useState<Transcript[]>([])
-  const [latestSuggestion, setLatestSuggestion] = useState<string | null>(null)
-  const [isSuggestionLoading, setIsSuggestionLoading] = useState(false)
-
-  // Subscribe to native audio events
-  useEffect(() => {
-    const cleanupFns: (() => void)[] = []
-
-    // Check initial status
-    window.electronAPI.getNativeAudioStatus().then((status) => {
-      console.log('[QueueCommands] Initial audio status:', status)
-      setIsNativeAudioConnected(status.connected)
-      if (status.connected) {
-        setAudioResult('🎤 Connected to native audio service')
-      }
-    }).catch(err => console.error('Failed to get audio status:', err))
-
-    // Connection status
-    cleanupFns.push(window.electronAPI.onNativeAudioConnected(() => {
-      console.log('[QueueCommands] Native audio connected')
-      setIsNativeAudioConnected(true)
-      setAudioResult('🎤 Connected to native audio service')
-    }))
-
-    cleanupFns.push(window.electronAPI.onNativeAudioDisconnected(() => {
-      console.log('[QueueCommands] Native audio disconnected')
-      setIsNativeAudioConnected(false)
-      setAudioResult('⚠️ Disconnected from native audio service')
-    }))
-
-    // Transcript updates
-    cleanupFns.push(window.electronAPI.onNativeAudioTranscript((transcript) => {
-      console.log('[QueueCommands] Transcript:', transcript)
-      setTranscripts(prev => [...prev.slice(-10), transcript]) // Keep last 10
-      setAudioResult(`[${transcript.speaker}] ${transcript.text}`)
-    }))
-
-    // Suggestion events
-    cleanupFns.push(window.electronAPI.onSuggestionProcessingStart(() => {
-      console.log('[QueueCommands] Generating suggestion...')
-      setIsSuggestionLoading(true)
-    }))
-
-    cleanupFns.push(window.electronAPI.onSuggestionGenerated((data) => {
-      console.log('[QueueCommands] Suggestion received:', data)
-      setIsSuggestionLoading(false)
-      setLatestSuggestion(data.suggestion)
-    }))
-
-    cleanupFns.push(window.electronAPI.onSuggestionError((error) => {
-      console.error('[QueueCommands] Suggestion error:', error)
-      setIsSuggestionLoading(false)
-      setLatestSuggestion(`Error: ${error.error}`)
-    }))
-
-    return () => cleanupFns.forEach(fn => fn())
-  }, [])
-
+  
   useEffect(() => {
     let tooltipHeight = 0
     if (tooltipRef.current && isTooltipVisible) {
@@ -110,18 +40,7 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
 
   // Status button shows native audio connection state
   const handleRecordClick = async () => {
-    // Toggle visibility of transcript display
-    if (audioResult) {
-      setAudioResult(null)
-      setLatestSuggestion(null)
-    } else {
-      setAudioResult(isNativeAudioConnected
-        ? '🎤 Listening... speak into your microphone'
-        : '⚠️ Native audio service not connected')
-    }
   }
-
-  // Remove handleChatSend function
 
   return (
     <div className="w-fit">
@@ -202,15 +121,10 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
         {/* Voice Recording Button */}
         <div className="flex items-center gap-2">
           <button
-            className={`bg-white/10 hover:bg-white/20 transition-colors rounded-md px-2 py-1 text-[11px] leading-none text-white/70 flex items-center gap-1 ${isRecording ? 'bg-red-500/70 hover:bg-red-500/90' : ''}`}
+            className={`bg-white/10 hover:bg-white/20 transition-colors rounded-md px-2 py-1 text-[11px] leading-none text-white/70 flex items-center gap-1`}
             onClick={handleRecordClick}
-            type="button"
           >
-            {isRecording ? (
-              <span className="animate-pulse">● Stop Recording</span>
-            ) : (
-              <span>🎤 Record Voice</span>
-            )}
+            <span>🎤 Record Voice</span>
           </button>
         </div>
 
@@ -325,22 +239,14 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
 
         {/* Sign Out Button - Moved to end */}
         <button
-          className="text-red-500/70 hover:text-red-500/90 transition-colors"
+          className="text-state-danger hover:text-state-danger transition-colors"
           title="Sign Out"
           onClick={() => window.electronAPI.quitApp()}
         >
           <IoLogOutOutline className="w-4 h-4" />
         </button>
       </div>
-      {/* Audio Result Display */}
-      {audioResult && (
-        <div className="mt-2 p-2 bg-white/10 rounded text-white text-xs max-w-md">
-          <span className="font-semibold">Audio Result:</span> {audioResult}
-        </div>
-      )}
-      {/* Chat Dialog Overlay */}
-      {/* Remove the Dialog component */}
-    </div>
+          </div>
   )
 }
 

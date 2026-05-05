@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, X, ExternalLink } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface SupportToasterProps {
@@ -10,7 +10,7 @@ interface SupportToasterProps {
 
 export const SupportToaster: React.FC<SupportToasterProps> = ({ className }) => {
     const [isVisible, setIsVisible] = useState(false);
-    const [hasDonated, setHasDonated] = useState(false);
+    const [, setHasDonated] = useState(false);
     const [isButtonHovered, setIsButtonHovered] = useState(false);
 
     useEffect(() => {
@@ -92,7 +92,7 @@ export const SupportToaster: React.FC<SupportToasterProps> = ({ className }) => 
     return (
         <AnimatePresence>
             {isVisible && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
+                <div className="fixed inset-0 z-titlebar flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.98, y: 4 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}

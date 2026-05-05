@@ -1,4 +1,4 @@
-import { ChevronUp, ChevronDown, PointerOff } from "lucide-react";
+import { ChevronUp, ChevronDown } from "lucide-react";
 import icon from "../../../assets/icon.png";
 import type { OverlayAppearance } from "../../lib/overlayAppearance";
 
@@ -34,6 +34,7 @@ export default function TopPill({
                 {/* LOGO BUTTON */}
                 <button
                     onClick={onLogoClick}
+                    aria-label="Open dashboard"
                     className={`
             w-8 h-8
             rounded-full
@@ -85,6 +86,7 @@ export default function TopPill({
                 {/* STOP / QUIT BUTTON */}
                 <button
                     onClick={onQuit}
+                    aria-label="Stop and quit"
                     className={`
             w-8 h-8
             rounded-full
@@ -92,7 +94,7 @@ export default function TopPill({
             overlay-text-primary
             flex items-center justify-center
             interaction-base interaction-press
-            hover:bg-red-500/10 hover:text-red-400
+            hover:bg-state-danger-soft hover:text-state-danger
           `}
                     style={appearance.iconStyle}
                 >

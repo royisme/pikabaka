@@ -157,7 +157,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <Code className="w-3.5 h-3.5" />
             <span>Code Solution</span>
           </div>
-          <div className={`space-y-2 text-[13px] leading-relaxed ${isLightTheme ? 'text-slate-800' : 'text-slate-200'}`}>
+          <div className={`space-y-2 text-[13px] leading-relaxed ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             {parts.map((part, i) => {
               if (part.startsWith('```')) {
                 const match = part.match(/```(\w+)?\n?([\s\S]*?)```/);
@@ -211,7 +211,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                       h2: ({ node, ...props }: any) => <h2 className="text-base font-bold mb-2 mt-3 overlay-text-strong" {...props} />,
                       h3: ({ node, ...props }: any) => <h3 className="text-sm font-bold mb-1 mt-2 overlay-text-primary" {...props} />,
                       code: ({ node, ...props }: any) => <code className={`overlay-inline-code-surface rounded px-1 py-0.5 text-xs font-mono whitespace-pre-wrap ${isLightTheme ? 'text-violet-700' : 'text-purple-200'}`} {...props} />,
-                      blockquote: ({ node, ...props }: any) => <blockquote className={`border-l-2 pl-3 italic my-2 ${isLightTheme ? 'border-violet-500/30 text-slate-600' : 'border-purple-500/50 text-slate-400'}`} {...props} />,
+                      blockquote: ({ node, ...props }: any) => <blockquote className={`border-l-2 pl-3 italic my-2 ${isLightTheme ? 'border-violet-500/30 text-text-tertiary' : 'border-purple-500/50 text-text-secondary'}`} {...props} />,
                       a: ({ node, ...props }: any) => <a className={`hover:underline ${isLightTheme ? 'text-blue-600 hover:text-blue-700' : 'text-blue-400 hover:text-blue-300'}`} target="_blank" rel="noopener noreferrer" {...props} />,
                     }}
                   >
@@ -232,7 +232,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <MessageSquare className="w-3.5 h-3.5" />
             <span>Shortened</span>
           </div>
-          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-slate-200'}`}>
+          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
               p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-cyan-800' : 'text-cyan-100'}`} {...props} />,
@@ -249,11 +249,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     if (msg.intent === 'recap') {
       return (
         <div className={`rounded-lg p-3 my-1 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
-          <div className={`flex items-center gap-2 mb-2 font-medium text-[11px] tracking-[0.02em] ${isLightTheme ? 'text-indigo-700' : 'text-indigo-300'}`}>
+          <div className={`flex items-center gap-2 mb-2 font-medium text-[11px] tracking-[0.02em] ${isLightTheme ? 'text-indigo-700' : 'text-state-info'}`}>
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Recap</span>
           </div>
-          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-slate-200'}`}>
+          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
               p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-indigo-800' : 'text-indigo-100'}`} {...props} />,
@@ -274,7 +274,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <HelpCircle className="w-3.5 h-3.5" />
             <span>Follow-Up Questions</span>
           </div>
-          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-slate-200'}`}>
+          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
               p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-amber-800' : 'text-[#FFF9C4]'}`} {...props} />,
@@ -293,7 +293,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
       return (
         <div className={`rounded-lg p-3 my-1 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
-          <div className="flex items-center gap-2 mb-2 text-emerald-400 font-medium text-[11px] tracking-[0.02em]">
+          <div className="flex items-center gap-2 mb-2 text-state-success font-medium text-[11px] tracking-[0.02em]">
             <span>Say this</span>
           </div>
           <div className="text-[14px] leading-relaxed overlay-text-primary">
@@ -350,7 +350,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     rehypePlugins={[rehypeKatex]}
                     components={{
                       p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
-                      strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-emerald-700' : 'text-emerald-100'}`} {...props} />,
+                      strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-emerald-700' : 'text-state-success'}`} {...props} />,
                       em: ({ node, ...props }: any) => <em className={`italic ${isLightTheme ? 'text-emerald-700/80' : 'text-emerald-200/80'}`} {...props} />,
                       ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
                       ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
@@ -412,7 +412,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               {msg.role === 'interviewer' && (
                 <div className="flex items-center gap-1.5 mb-1 text-[10px] font-medium tracking-[0.08em] overlay-text-muted/90">
                   Interviewer
-                  {msg.isStreaming && <span className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />}
+                  {msg.isStreaming && <span className="w-1 h-1 bg-state-success rounded-full animate-pulse" />}
                 </div>
               )}
               {msg.role === 'user' && msg.hasScreenshot && (
@@ -439,17 +439,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         {isManualRecording && (
           <div className="flex flex-col items-end gap-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
             {(manualTranscript || voiceInput) && (
-              <div className="max-w-[85%] px-3.5 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-[18px] rounded-tr-[4px]">
-                <span className="text-[13px] text-emerald-300">
+              <div className="max-w-[85%] px-3.5 py-2.5 bg-state-success-soft border border-state-success-border rounded-[18px] rounded-tr-[4px]">
+                <span className="text-[13px] text-state-success">
                   {voiceInput}{voiceInput && manualTranscript ? ' ' : ''}{manualTranscript}
                 </span>
               </div>
             )}
             <div className="px-3 py-2 flex gap-1.5 items-center">
-              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              <span className="text-[10px] text-emerald-400/70 ml-1">Listening...</span>
+              <div className="w-2 h-2 bg-state-success rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-state-success rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-state-success rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              <span className="text-[10px] text-state-success ml-1">Listening...</span>
             </div>
           </div>
         )}
@@ -499,7 +499,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
             {knowledgeContext.resumeEvidence.length > 0 && (
               <div>
-                <span className="text-[10px] font-semibold text-emerald-100/90 tracking-[0.08em]">Good examples to mention</span>
+                <span className="text-[10px] font-semibold text-state-success tracking-[0.08em]">Good examples to mention</span>
                 <div className="space-y-1.5 mt-1.5">
                   {knowledgeContext.resumeEvidence.slice(0, 3).map((ev, i) => (
                     <div key={i} className="text-[11px] leading-relaxed text-white/80">
@@ -533,13 +533,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         <button
           onClick={handleAnswerNow}
           className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press min-w-[84px] whitespace-nowrap shrink-0 ${isManualRecording
-            ? 'bg-red-500/10 text-red-300 ring-1 ring-red-400/20'
+            ? 'bg-state-danger-soft text-state-danger ring-1 ring-state-danger-border'
             : 'bg-[#007AFF] text-white shadow-[0_4px_14px_rgba(0,122,255,0.18)] hover:bg-[#0071E3]'
           }`}
         >
           {isManualRecording ? (
             <>
-              <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+              <div className="w-1.5 h-1.5 rounded-full bg-state-danger animate-pulse" />
               Stop
             </>
           ) : (
@@ -574,7 +574,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   />
                   <button
                     onClick={() => setAttachedContext(prev => prev.filter((_, i) => i !== idx))}
-                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500/80 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-state-danger hover:bg-state-danger rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
                     title="Remove"
                   >
                     <X className="w-2.5 h-2.5 text-white" />
@@ -704,7 +704,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   w-7 h-7 flex items-center justify-center rounded-lg
                   interaction-base interaction-press
                   ${isMousePassthrough
-                    ? 'overlay-icon-surface overlay-icon-surface-hover text-sky-400 opacity-100'
+                    ? 'overlay-icon-surface overlay-icon-surface-hover text-state-info opacity-100'
                     : 'overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive'}
                 `}
                 style={appearance.iconStyle}

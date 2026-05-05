@@ -44,6 +44,7 @@ const WindowControls: React.FC = () => {
         onClick={handleMinimize}
         className="flex items-center justify-center w-[46px] h-full border-0 bg-transparent text-text-secondary hover:text-text-primary hover:bg-white/10 transition-colors duration-100"
         title="Minimize"
+        aria-label="Minimize window"
       >
         <Minus size={16} strokeWidth={1.5} />
       </button>
@@ -51,6 +52,7 @@ const WindowControls: React.FC = () => {
         onClick={handleMaximize}
         className="flex items-center justify-center w-[46px] h-full border-0 bg-transparent text-text-secondary hover:text-text-primary hover:bg-white/10 transition-colors duration-100"
         title={isMaximized ? 'Restore' : 'Maximize'}
+        aria-label={isMaximized ? 'Restore window' : 'Maximize window'}
       >
         {isMaximized ? (
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -65,8 +67,9 @@ const WindowControls: React.FC = () => {
       </button>
       <button
         onClick={handleClose}
-        className="flex items-center justify-center w-[46px] h-full border-0 bg-transparent text-text-secondary hover:text-white hover:bg-red-500 transition-colors duration-100"
+        className="flex items-center justify-center w-[46px] h-full border-0 bg-transparent text-text-secondary hover:text-white hover:bg-state-danger transition-colors duration-100"
         title="Close"
+        aria-label="Close window"
       >
         <X size={16} strokeWidth={1.5} />
       </button>

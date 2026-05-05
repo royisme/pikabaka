@@ -1,5 +1,4 @@
 import React from 'react';
-import { isMac } from '../../utils/platformUtils';
 
 interface KeyBadgeProps {
     keys: string[];
