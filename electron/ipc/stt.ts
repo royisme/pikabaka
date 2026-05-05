@@ -1,6 +1,8 @@
 import { BrowserWindow } from "electron"
 import { AppState } from "../main"
 import { AudioDevices } from "../audio/AudioDevices"
+import { DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE, isTranscriptAssemblerProfile } from "../lib/transcript-assembler"
+import { SettingsManager } from "../services/SettingsManager"
 import { safeHandle } from "./safeHandle"
 
 export function registerSttHandlers(appState: AppState): void {
@@ -30,6 +32,21 @@ export function registerSttHandlers(appState: AppState): void {
     } catch (error: any) {
       return 'google';
     }
+  });
+
+  safeHandle("get-transcript-assembler-profile", async () => {
+    const profile = SettingsManager.getInstance().get('transcriptAssemblerProfile');
+    return isTranscriptAssemblerProfile(profile) ? profile : DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE;
+  });
+
+  safeHandle("set-transcript-assembler-profile", async (_, profile: unknown) => {
+    if (!isTranscriptAssemblerProfile(profile)) {
+      return { success: false, error: 'Invalid transcript assembler profile' };
+    }
+
+    SettingsManager.getInstance().set('transcriptAssemblerProfile', profile);
+    appState.transcriptAssemblerProfile = profile;
+    return { success: true };
   });
 
   safeHandle("set-groq-stt-api-key", async (_, apiKey: string) => {

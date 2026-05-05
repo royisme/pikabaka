@@ -4,6 +4,8 @@ export function audioSttChannels() {
   return {
     setSttProvider: (provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => ipcRenderer.invoke("set-stt-provider", provider),
     getSttProvider: () => ipcRenderer.invoke("get-stt-provider"),
+    getTranscriptAssemblerProfile: () => ipcRenderer.invoke("get-transcript-assembler-profile"),
+    setTranscriptAssemblerProfile: (profile: 'sentence_bias' | 'low_latency' | 'coherent') => ipcRenderer.invoke("set-transcript-assembler-profile", profile),
     setGroqSttApiKey: (apiKey: string) => ipcRenderer.invoke("set-groq-stt-api-key", apiKey),
     setOpenAiSttApiKey: (apiKey: string) => ipcRenderer.invoke("set-openai-stt-api-key", apiKey),
     setDeepgramApiKey: (apiKey: string) => ipcRenderer.invoke("set-deepgram-api-key", apiKey),

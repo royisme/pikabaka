@@ -13,7 +13,7 @@ export interface BufferedTranscriptTurn {
   flushTimer: NodeJS.Timeout | null;
 }
 
-export type TranscriptAssemblerProfile = 'sentence_bias' | 'low_latency';
+export type TranscriptAssemblerProfile = 'sentence_bias' | 'low_latency' | 'coherent';
 
 export interface TranscriptAssemblerThresholds {
   maxSilenceBeforeNewTurnMs: number;
@@ -24,9 +24,10 @@ export interface TranscriptAssemblerThresholds {
   /** Minimum word count before a sentence-ending can trigger the shorter flush delay.
    *  Segments with fewer words use fragmentFlushDelayMs even if they end with punctuation. */
   minWordsBeforeSentenceFlush: number;
+  maxTurnDurationMs: number;
 }
 
-const TRANSCRIPT_ASSEMBLER_PROFILE: TranscriptAssemblerProfile = 'sentence_bias';
+export const DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE: TranscriptAssemblerProfile = 'sentence_bias';
 
 const TRANSCRIPT_ASSEMBLER_THRESHOLDS: Record<TranscriptAssemblerProfile, TranscriptAssemblerThresholds> = {
   sentence_bias: {
@@ -36,6 +37,7 @@ const TRANSCRIPT_ASSEMBLER_THRESHOLDS: Record<TranscriptAssemblerProfile, Transc
     speechEndedSentenceFlushMs: 260,
     speechEndedFragmentFlushMs: 1100,
     minWordsBeforeSentenceFlush: 18,
+    maxTurnDurationMs: 0,
   },
   low_latency: {
     maxSilenceBeforeNewTurnMs: 2200,
@@ -44,12 +46,28 @@ const TRANSCRIPT_ASSEMBLER_THRESHOLDS: Record<TranscriptAssemblerProfile, Transc
     speechEndedSentenceFlushMs: 120,
     speechEndedFragmentFlushMs: 500,
     minWordsBeforeSentenceFlush: 8,
+    maxTurnDurationMs: 0,
+  },
+  coherent: {
+    maxSilenceBeforeNewTurnMs: 6000,
+    sentenceFlushDelayMs: 2500,
+    fragmentFlushDelayMs: 5000,
+    speechEndedSentenceFlushMs: 400,
+    speechEndedFragmentFlushMs: 1500,
+    minWordsBeforeSentenceFlush: 10,
+    maxTurnDurationMs: 30000,
   },
 };
 
+export function isTranscriptAssemblerProfile(value: unknown): value is TranscriptAssemblerProfile {
+  return value === 'sentence_bias' || value === 'low_latency' || value === 'coherent';
+}
+
 export function getTranscriptAssemblerThresholds(appState: AppState): TranscriptAssemblerThresholds {
-  void appState;
-  return TRANSCRIPT_ASSEMBLER_THRESHOLDS[TRANSCRIPT_ASSEMBLER_PROFILE];
+  const profile = isTranscriptAssemblerProfile(appState.transcriptAssemblerProfile)
+    ? appState.transcriptAssemblerProfile
+    : DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE;
+  return TRANSCRIPT_ASSEMBLER_THRESHOLDS[profile];
 }
 
 export function emitNativeAudioTranscript(appState: AppState, payload: any): void {
@@ -126,6 +144,11 @@ export function bufferFinalTranscriptChunk(
 
   let buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   if (buffer && timestamp - buffer.lastUpdatedAt > thresholds.maxSilenceBeforeNewTurnMs) {
+    void flushBufferedTranscriptTurn(appState, speaker);
+    buffer = null;
+  }
+
+  if (buffer && thresholds.maxTurnDurationMs > 0 && timestamp - buffer.startedAt > thresholds.maxTurnDurationMs) {
     void flushBufferedTranscriptTurn(appState, speaker);
     buffer = null;
   }

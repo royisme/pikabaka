@@ -47,8 +47,11 @@ import {
 } from "./lib/auto-updater"
 import {
   type BufferedTranscriptTurn,
+  DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE,
+  type TranscriptAssemblerProfile,
   type TranscriptAssemblerThresholds,
   type TranscriptSpeaker,
+  isTranscriptAssemblerProfile,
   getTranscriptAssemblerThresholds as getTranscriptAssemblerThresholdsFn,
   emitNativeAudioTranscript as emitNativeAudioTranscriptFn,
   createTranscriptSegmentId as createTranscriptSegmentIdFn,
@@ -185,6 +188,10 @@ export class AppState {
     const settingsManager = SettingsManager.getInstance();
     this.isUndetectable = settingsManager.get('isUndetectable') ?? false;
     this.disguiseMode = settingsManager.get('disguiseMode') ?? 'none';
+    const transcriptAssemblerProfile = settingsManager.get('transcriptAssemblerProfile');
+    this.transcriptAssemblerProfile = isTranscriptAssemblerProfile(transcriptAssemblerProfile)
+      ? transcriptAssemblerProfile
+      : DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE;
     this._verboseLogging = settingsManager.get('verboseLogging') ?? false;
     setVerboseLoggingFlag(this._verboseLogging);
     console.log(`[AppState] Initialized with isUndetectable=${this.isUndetectable}, disguiseMode=${this.disguiseMode}, verboseLogging=${this._verboseLogging}`);
@@ -533,6 +540,7 @@ export class AppState {
   public lastSystemAudioChunkAt: number | null = null;
   public lastInterviewerTranscriptAt: number | null = null;
   public lastAudioPipelineError: string | null = null;
+  public transcriptAssemblerProfile: TranscriptAssemblerProfile = 'sentence_bias';
   public transcriptTurnBuffers: Record<TranscriptSpeaker, BufferedTranscriptTurn | null> = {
     interviewer: null,
     user: null,

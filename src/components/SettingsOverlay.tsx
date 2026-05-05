@@ -33,6 +33,14 @@ import { useKnowledgeMode } from '../hooks/useKnowledgeMode';
 const DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT =
     'You are a realtime subtitle translator. Preserve meaning, tone, technical terms, product names, numbers, and code tokens exactly when appropriate. Do not summarize, do not add explanations, and do not omit information. Return only the translated sentence(s), with no prefix/suffix and no markdown.';
 
+type TranscriptAssemblerProfile = 'sentence_bias' | 'low_latency' | 'coherent';
+
+const TRANSCRIPT_ASSEMBLER_PROFILE_OPTIONS: Array<{ value: TranscriptAssemblerProfile; label: string; desc: string }> = [
+    { value: 'sentence_bias', label: 'Sentence-biased', desc: 'Balanced sentence completeness with moderate delay.' },
+    { value: 'low_latency', label: 'Low-latency', desc: 'Fastest transcript updates, but long sentences may split earlier.' },
+    { value: 'coherent', label: 'Coherent', desc: 'Most complete segments for translation; final subtitles may arrive 5-30s later.' },
+];
+
 // ---------------------------------------------------------------------------
 // MockupPikaInterface — fake in-meeting widget for the opacity preview
 // ---------------------------------------------------------------------------
@@ -755,6 +763,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
     // STT Provider settings
     const [sttProvider, setSttProvider] = useState<'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'>('google');
+    const [transcriptAssemblerProfile, setTranscriptAssemblerProfile] = useState<TranscriptAssemblerProfile>('sentence_bias');
     const [groqSttModel, setGroqSttModel] = useState('whisper-large-v3-turbo');
     const [sttGroqKey, setSttGroqKey] = useState('');
     const [sttOpenaiKey, setSttOpenaiKey] = useState('');
@@ -860,6 +869,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 if (oaiList) {
                     setTranslationOpenAICompatFromSettings(oaiList);
                 }
+                const assemblerProfile = await window.electronAPI?.getTranscriptAssemblerProfile?.();
+                if (assemblerProfile) {
+                    setTranscriptAssemblerProfile(assemblerProfile);
+                }
             } catch (e) {
                 console.error('Failed to load STT settings:', e);
             }
@@ -922,6 +935,20 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             await window.electronAPI?.setSttProvider?.(provider);
         } catch (e) {
             console.error('Failed to set STT provider:', e);
+        }
+    };
+
+    const handleTranscriptAssemblerProfileChange = async (profile: TranscriptAssemblerProfile) => {
+        const previousProfile = transcriptAssemblerProfile;
+        setTranscriptAssemblerProfile(profile);
+        try {
+            const result = await window.electronAPI?.setTranscriptAssemblerProfile?.(profile);
+            if (result && !result.success) {
+                setTranscriptAssemblerProfile(previousProfile);
+            }
+        } catch (e) {
+            console.error('Failed to set transcript segmentation profile:', e);
+            setTranscriptAssemblerProfile(previousProfile);
         }
     };
 
@@ -2470,6 +2497,34 @@ Core Skills
                                                     Select the primary language being spoken in the meeting.
                                                 </p>
                                             </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h3 className="text-lg font-bold text-text-primary mb-1">Transcript Segmentation</h3>
+                                        <p className="text-xs text-text-secondary mb-5">Choose how patiently Pika buffers final speech segments before translation.</p>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                            {TRANSCRIPT_ASSEMBLER_PROFILE_OPTIONS.map((option) => {
+                                                const selected = transcriptAssemblerProfile === option.value;
+                                                return (
+                                                    <button
+                                                        key={option.value}
+                                                        type="button"
+                                                        onClick={() => handleTranscriptAssemblerProfileChange(option.value)}
+                                                        className={`rounded-xl border p-4 text-left transition-all duration-base ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary ${selected
+                                                            ? 'bg-accent-primary/10 border-accent-primary text-text-primary shadow-sm'
+                                                            : 'bg-bg-card border-border-subtle text-text-secondary hover:bg-bg-elevated hover:text-text-primary'
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-center justify-between gap-3 mb-2">
+                                                            <span className="text-sm font-semibold">{option.label}</span>
+                                                            {selected && <Check size={15} className="text-accent-primary" />}
+                                                        </div>
+                                                        <p className="text-xs leading-relaxed text-text-tertiary">{option.desc}</p>
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     </div>
 
