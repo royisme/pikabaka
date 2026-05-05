@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Heart, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
+import packageJson from '../../package.json';
 
 interface AboutSectionProps { }
 
-const APP_VERSION = '1.0.2';
 const BMC_URL = 'https://buymeacoffee.com/royisme';
 
 const stagger = {
@@ -68,7 +68,7 @@ export const AboutSection: React.FC<AboutSectionProps> = () => {
                         Pika
                     </h3>
                     <span className="text-[11px] font-mono text-text-tertiary/70 tabular-nums">
-                        v{APP_VERSION}
+                        v{packageJson.version}
                     </span>
                 </div>
                 <p className="text-sm text-text-secondary leading-relaxed mt-3 max-w-[52ch]">
