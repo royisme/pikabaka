@@ -19,6 +19,7 @@
 import { EventEmitter } from 'events';
 import WebSocket from 'ws';
 import { RECOGNITION_LANGUAGES } from '../config/languages';
+import { normalizeLanguageToIso639 } from '../transcript/translationExecutor';
 
 const SONIOX_WEBSOCKET_URL = 'wss://stt-rt.soniox.com/transcribe-websocket';
 const RECONNECT_BASE_DELAY_MS = 1000;
@@ -236,6 +237,8 @@ export class SonioxStreamingSTT extends EventEmitter {
 
                 let currentFinalText = '';
                 let nonFinalText = '';
+                const finalLangCounts = new Map<string, number>();
+                const nonFinalLangCounts = new Map<string, number>();
 
                 for (const token of tokens) {
                     if (!token.text) continue;
@@ -250,28 +253,42 @@ export class SonioxStreamingSTT extends EventEmitter {
                         continue;
                     }
 
+                    const tokenLang = typeof token.language === 'string' && token.language.trim()
+                        ? token.language.trim()
+                        : undefined;
+
                     if (token.is_final) {
                         currentFinalText += token.text;
+                        if (tokenLang) {
+                            finalLangCounts.set(tokenLang, (finalLangCounts.get(tokenLang) || 0) + 1);
+                        }
                     } else {
                         nonFinalText += token.text;
+                        if (tokenLang) {
+                            nonFinalLangCounts.set(tokenLang, (nonFinalLangCounts.get(tokenLang) || 0) + 1);
+                        }
                     }
                 }
 
                 // 1. Emit final tokens immediately
                 if (currentFinalText) {
+                    const detectedLanguage = pickDominantLanguage(finalLangCounts);
                     this.emit('transcript', {
                         text: currentFinalText,
                         isFinal: true,
                         confidence: 1.0,
+                        ...(detectedLanguage ? { detectedLanguage } : {}),
                     });
                 }
 
                 // 2. Emit non-final tokens as interim (live preview)
                 if (nonFinalText) {
+                    const detectedLanguage = pickDominantLanguage(nonFinalLangCounts);
                     this.emit('transcript', {
                         text: nonFinalText,
                         isFinal: false,
                         confidence: 1.0,
+                        ...(detectedLanguage ? { detectedLanguage } : {}),
                     });
                 }
 
@@ -367,4 +384,21 @@ export class SonioxStreamingSTT extends EventEmitter {
             this.reconnectTimer = null;
         }
     }
+}
+
+/**
+ * Pick the language with the highest token count from a tally map and
+ * normalize it to a base ISO 639-1 code (e.g. 'en-US' -> 'en').
+ */
+function pickDominantLanguage(counts: Map<string, number>): string | undefined {
+    if (counts.size === 0) return undefined;
+    let bestLang: string | undefined;
+    let bestCount = -1;
+    for (const [lang, count] of counts) {
+        if (count > bestCount) {
+            bestCount = count;
+            bestLang = lang;
+        }
+    }
+    return normalizeLanguageToIso639(bestLang);
 }
