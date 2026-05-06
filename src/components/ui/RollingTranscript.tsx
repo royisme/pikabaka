@@ -128,6 +128,14 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                             <span className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
                                                 {seg.speakerLabel}
                                             </span>
+                                            {seg.detectedLanguage && (
+                                                <span
+                                                    className="rounded-sm border border-border-subtle px-1 py-0 text-[9px] font-mono uppercase tracking-wider text-text-tertiary"
+                                                    title={`Detected language: ${seg.detectedLanguage}`}
+                                                >
+                                                    {seg.detectedLanguage}
+                                                </span>
+                                            )}
                                             <time
                                                 className="text-[9px] tabular-nums text-text-tertiary"
                                                 dateTime={new Date(seg.timestamp).toISOString()}
