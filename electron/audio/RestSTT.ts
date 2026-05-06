@@ -15,6 +15,7 @@ import { EventEmitter } from 'events';
 import axios from 'axios';
 import FormData from 'form-data';
 import { RECOGNITION_LANGUAGES } from '../config/languages';
+import { normalizeLanguageToIso639 } from '../transcript/translationExecutor';
 
 export type RestSttProvider = 'groq' | 'openai' | 'elevenlabs' | 'azure' | 'ibmwatson';
 
@@ -26,13 +27,18 @@ interface RestSttProviderConfig {
     extraFormFields?: Record<string, string>;
     /** Extract transcript text from the API response */
     extractTranscript: (data: any) => string;
+    /** Extract detected language (ISO 639) from the API response, if available */
+    extractDetectedLanguage?: (data: any) => string | undefined;
 }
 
 type ProviderConfigFactory = (apiKey: string, region?: string, languageKey?: string) => RestSttProviderConfig;
 
 const PROVIDER_CONFIGS: Record<RestSttProvider, ProviderConfigFactory> = {
     groq: (apiKey, region, languageKey) => {
-        const lang = languageKey ? RECOGNITION_LANGUAGES[languageKey]?.iso639 : undefined;
+        // Auto-detect mode: drop the language hint so Whisper detects natively.
+        const lang = languageKey && languageKey !== 'auto'
+            ? RECOGNITION_LANGUAGES[languageKey]?.iso639
+            : undefined;
         return {
             endpoint: 'https://api.groq.com/openai/v1/audio/transcriptions',
             model: 'whisper-large-v3-turbo',
@@ -40,33 +46,50 @@ const PROVIDER_CONFIGS: Record<RestSttProvider, ProviderConfigFactory> = {
             uploadType: 'multipart',
             extraFormFields: {
                 temperature: '0',
-                response_format: 'json',
+                // verbose_json surfaces the detected `language` field on the response.
+                response_format: 'verbose_json',
                 ...(lang ? { language: lang } : {})
             },
             extractTranscript: (data: any) => {
                 if (typeof data === 'string') return data;
                 return data?.text ?? '';
             },
+            extractDetectedLanguage: (data: any) => {
+                if (typeof data !== 'object' || !data) return undefined;
+                return normalizeLanguageToIso639(data.language);
+            },
         };
     },
     openai: (apiKey, region, languageKey) => {
-        const lang = languageKey ? RECOGNITION_LANGUAGES[languageKey]?.iso639 : undefined;
+        const lang = languageKey && languageKey !== 'auto'
+            ? RECOGNITION_LANGUAGES[languageKey]?.iso639
+            : undefined;
         return {
             endpoint: 'https://api.openai.com/v1/audio/transcriptions',
             model: 'whisper-1',
             authHeader: { Authorization: `Bearer ${apiKey}` },
             uploadType: 'multipart',
             extraFormFields: {
+                // verbose_json surfaces the detected `language` field on the response.
+                response_format: 'verbose_json',
                 ...(lang ? { language: lang } : {})
             },
             extractTranscript: (data: any) => {
                 if (typeof data === 'string') return data;
                 return data?.text ?? '';
             },
+            extractDetectedLanguage: (data: any) => {
+                if (typeof data !== 'object' || !data) return undefined;
+                return normalizeLanguageToIso639(data.language);
+            },
         };
     },
     elevenlabs: (apiKey, region, languageKey) => {
-        const lang = languageKey ? RECOGNITION_LANGUAGES[languageKey]?.iso639 : undefined;
+        // ElevenLabs Scribe auto-detects when language_code is omitted and returns
+        // a `language_code` field on the response.
+        const lang = languageKey && languageKey !== 'auto'
+            ? RECOGNITION_LANGUAGES[languageKey]?.iso639
+            : undefined;
         return {
             endpoint: 'https://api.elevenlabs.io/v1/speech-to-text',
             model: 'scribe_v2',
@@ -78,6 +101,10 @@ const PROVIDER_CONFIGS: Record<RestSttProvider, ProviderConfigFactory> = {
             extractTranscript: (data: any) => {
                 if (typeof data === 'string') return data;
                 return data?.text ?? '';
+            },
+            extractDetectedLanguage: (data: any) => {
+                if (typeof data !== 'object' || !data) return undefined;
+                return normalizeLanguageToIso639(data.language_code ?? data.language);
             },
         };
     },
@@ -300,14 +327,15 @@ export class RestSTT extends EventEmitter {
         this.isUploading = true;
 
         try {
-            const transcript = await this.uploadAudio(wavBuffer);
+            const { transcript, detectedLanguage } = await this.uploadAudio(wavBuffer);
 
             if (transcript && transcript.trim().length > 0) {
-                console.log(`[RestSTT] Transcript: "${transcript.substring(0, 60)}..."`);
+                console.log(`[RestSTT] Transcript: "${transcript.substring(0, 60)}..."${detectedLanguage ? ` [lang=${detectedLanguage}]` : ''}`);
                 this.emit('transcript', {
                     text: transcript.trim(),
                     isFinal: true,
                     confidence: 1.0,
+                    detectedLanguage,
                 });
             }
         } catch (err) {
@@ -327,7 +355,7 @@ export class RestSTT extends EventEmitter {
     /**
      * Upload WAV audio to the REST endpoint
      */
-    private async uploadAudio(wavBuffer: Buffer): Promise<string> {
+    private async uploadAudio(wavBuffer: Buffer): Promise<{ transcript: string; detectedLanguage?: string }> {
         if (this.config.uploadType === 'binary') {
             return this.uploadBinary(wavBuffer);
         }
@@ -337,7 +365,7 @@ export class RestSTT extends EventEmitter {
     /**
      * Upload via multipart FormData (Groq, OpenAI, ElevenLabs)
      */
-    private async uploadMultipart(wavBuffer: Buffer): Promise<string> {
+    private async uploadMultipart(wavBuffer: Buffer): Promise<{ transcript: string; detectedLanguage?: string }> {
         const form = new FormData();
 
         form.append('file', wavBuffer, {
@@ -366,13 +394,16 @@ export class RestSTT extends EventEmitter {
             timeout: 30000,
         });
 
-        return this.config.extractTranscript(response.data);
+        return {
+            transcript: this.config.extractTranscript(response.data),
+            detectedLanguage: this.config.extractDetectedLanguage?.(response.data),
+        };
     }
 
     /**
      * Upload via raw binary body (Azure, IBM Watson)
      */
-    private async uploadBinary(wavBuffer: Buffer): Promise<string> {
+    private async uploadBinary(wavBuffer: Buffer): Promise<{ transcript: string; detectedLanguage?: string }> {
         const response = await axios.post(this.config.endpoint, wavBuffer, {
             headers: {
                 ...this.config.authHeader,
@@ -381,7 +412,10 @@ export class RestSTT extends EventEmitter {
             timeout: 30000,
         });
 
-        return this.config.extractTranscript(response.data);
+        return {
+            transcript: this.config.extractTranscript(response.data),
+            detectedLanguage: this.config.extractDetectedLanguage?.(response.data),
+        };
     }
 
     /**
