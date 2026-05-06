@@ -2,6 +2,11 @@ import { SpeechClient } from '@google-cloud/speech';
 import { EventEmitter } from 'events';
 import * as path from 'path';
 import { RECOGNITION_LANGUAGES, EnglishVariant } from '../config/languages';
+import { normalizeLanguageToIso639 } from '../transcript/translationExecutor';
+
+// Google Cloud Speech allows up to 3 alternative language codes.
+const AUTO_PRIMARY_LANGUAGE = 'en-US';
+const AUTO_ALTERNATIVE_LANGUAGES = ['zh-CN', 'ja-JP', 'es-ES'];
 
 /**
  * GoogleSTT
@@ -91,6 +96,30 @@ export class GoogleSTT extends EventEmitter {
         }
 
         this.pendingLanguageChange = setTimeout(() => {
+            // Auto mode: keep a sensible primary and use alternateLanguageCodes (max 3)
+            // so Google performs language identification across them.
+            if (key === 'auto') {
+                console.log('[GoogleSTT] Updating recognition language to: auto');
+                // Preserve previously configured primary if non-default; else fall back.
+                if (!this.languageCode) {
+                    this.languageCode = AUTO_PRIMARY_LANGUAGE;
+                }
+                // Cap at 3 per Google API limit.
+                this.alternativeLanguageCodes = AUTO_ALTERNATIVE_LANGUAGES.slice(0, 3);
+
+                console.log('[GoogleSTT] Primary:', this.languageCode);
+                console.log('[GoogleSTT] Alternates:', this.alternativeLanguageCodes.join(', '));
+
+                if (this.isStreaming || this.isActive) {
+                    console.log('[GoogleSTT] Language changed while active. Restarting stream...');
+                    this.stop();
+                    this.start();
+                }
+
+                this.pendingLanguageChange = undefined;
+                return;
+            }
+
             const config = RECOGNITION_LANGUAGES[key];
             if (!config) {
                 console.warn(`[GoogleSTT] Unknown language key: ${key}`);
@@ -101,7 +130,7 @@ export class GoogleSTT extends EventEmitter {
 
             // Update state
             this.languageCode = config.bcp47;
-            
+
             // Handle variants (English specifically)
             if ('alternates' in config) {
                 this.alternativeLanguageCodes = (config as EnglishVariant).alternates;
@@ -262,12 +291,14 @@ export class GoogleSTT extends EventEmitter {
                     const alt = result.alternatives[0];
                     const transcript = alt.transcript;
                     const isFinal = result.isFinal;
+                    const detectedLanguage = normalizeLanguageToIso639(result.languageCode);
 
                     if (transcript) {
                         this.emit('transcript', {
                             text: transcript,
                             isFinal,
-                            confidence: alt.confidence
+                            confidence: alt.confidence,
+                            detectedLanguage,
                         });
                     }
                 }
