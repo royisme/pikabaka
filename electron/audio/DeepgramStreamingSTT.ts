@@ -25,7 +25,7 @@ export class DeepgramStreamingSTT extends EventEmitter {
 
     private sampleRate = 16000;
     private numChannels = 1;
-    private languageCode = 'en'; // Default to English
+    private languageCode: string | undefined = 'en'; // Default to English; undefined ⇒ multi/auto-detect
 
     private reconnectAttempts = 0;
     private reconnectTimer: NodeJS.Timeout | null = null;
@@ -55,21 +55,29 @@ export class DeepgramStreamingSTT extends EventEmitter {
     /** Set recognition language using ISO-639-1 code */
     public setRecognitionLanguage(key: string): void {
         const config = RECOGNITION_LANGUAGES[key];
+        let nextCode: string | undefined;
         if (config) {
-            this.languageCode = config.iso639;
-            console.log(`[DeepgramStreaming] Language set to ${this.languageCode}`);
+            nextCode = config.iso639;
+            console.log(`[DeepgramStreaming] Language set to ${nextCode}`);
+        } else if (key === 'auto') {
+            nextCode = undefined;
+            console.log('[DeepgramStreaming] Language set to multi (auto-detect)');
+        } else {
+            return;
+        }
 
-            if (this.isActive) {
-                console.log('[DeepgramStreaming] Language changed while active. Restarting...');
-                // EC-02 fix: save the buffer so in-flight chunks are not discarded
-                // when stop() clears this.buffer.
-                const savedBuffer = [...this.buffer];
-                this.stop();
-                this.start();
-                // Restore saved chunks so they are sent once reconnected
-                if (savedBuffer.length > 0) {
-                    this.buffer = [...savedBuffer, ...this.buffer];
-                }
+        this.languageCode = nextCode;
+
+        if (this.isActive) {
+            console.log('[DeepgramStreaming] Language changed while active. Restarting...');
+            // EC-02 fix: save the buffer so in-flight chunks are not discarded
+            // when stop() clears this.buffer.
+            const savedBuffer = [...this.buffer];
+            this.stop();
+            this.start();
+            // Restore saved chunks so they are sent once reconnected
+            if (savedBuffer.length > 0) {
+                this.buffer = [...savedBuffer, ...this.buffer];
             }
         }
     }
@@ -143,13 +151,17 @@ export class DeepgramStreamingSTT extends EventEmitter {
         if (this.isConnecting) return;
         this.isConnecting = true;
 
+        const languageParam = this.languageCode
+            ? `&language=${this.languageCode}`
+            : `&language=multi&detect_language=true`;
+
         const url =
             `wss://api.deepgram.com/v1/listen` +
             `?model=nova-3` +
             `&encoding=linear16` +
             `&sample_rate=${this.sampleRate}` +
             `&channels=${this.numChannels}` +
-            `&language=${this.languageCode}` +
+            languageParam +
             `&smart_format=true` +
             `&interim_results=true` +
             `&keepalive=true`;
@@ -188,13 +200,34 @@ export class DeepgramStreamingSTT extends EventEmitter {
                 // { type: "Results", channel: { alternatives: [{ transcript, confidence }] }, is_final }
                 if (msg.type !== 'Results') return;
 
-                const transcript = msg.channel?.alternatives?.[0]?.transcript;
+                const alt = msg.channel?.alternatives?.[0];
+                const transcript = alt?.transcript;
                 if (!transcript) return;
+
+                // Extract detected language. Deepgram surfaces it in different
+                // shapes depending on model/feature flags:
+                //   - alt.languages: string[] (preferred — per-segment dominant)
+                //   - alt.language: string
+                //   - msg.channel.detected_language / msg.detected_language
+                //   - msg.language
+                const rawLang: unknown =
+                    (Array.isArray(alt?.languages) ? alt.languages[0] : undefined) ??
+                    alt?.language ??
+                    msg.channel?.detected_language ??
+                    msg.detected_language ??
+                    msg.language;
+
+                let detectedLanguage: string | undefined;
+                if (typeof rawLang === 'string' && rawLang.length > 0) {
+                    // Normalize to base ISO 639 code, lowercase (e.g. 'en-US' → 'en').
+                    detectedLanguage = rawLang.toLowerCase().split(/[-_]/)[0] || undefined;
+                }
 
                 this.emit('transcript', {
                     text: transcript,
                     isFinal: msg.is_final ?? false,
-                    confidence: msg.channel?.alternatives?.[0]?.confidence ?? 1.0,
+                    confidence: alt?.confidence ?? 1.0,
+                    detectedLanguage,
                 });
             } catch (err) {
                 console.error('[DeepgramStreaming] Parse error:', err);
