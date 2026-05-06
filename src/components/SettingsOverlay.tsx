@@ -2556,19 +2556,22 @@ Core Skills
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 <div className="space-y-1.5">
-                                                    <label className="text-xs font-medium text-text-secondary block">Source language</label>
+                                                    <label className="text-xs font-medium text-text-secondary block">Source language hint</label>
                                                     <select
                                                         value={transcriptTranslationSourceLanguage}
                                                         onChange={(e) => setTranscriptTranslationSourceLanguage(e.target.value)}
                                                         className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
                                                     >
-                                                        <option value="auto">Auto (infer from text)</option>
+                                                        <option value="auto">Auto-detect (recommended)</option>
                                                         {translationLanguageOptions.map((o) => (
                                                             <option key={o.value} value={o.value}>
                                                                 {o.label}
                                                             </option>
                                                         ))}
                                                     </select>
+                                                    <p className="text-[10px] text-text-tertiary leading-snug">
+                                                        Translation always targets the language below. Source is auto-detected; this hint only nudges the model on short or ambiguous segments.
+                                                    </p>
                                                 </div>
                                                 <div className="space-y-1.5">
                                                     <label className="text-xs font-medium text-text-secondary block">Target language</label>

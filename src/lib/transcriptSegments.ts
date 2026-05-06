@@ -7,6 +7,7 @@ export interface TranscriptSegment {
   timestamp: number;
   speakerLabel: string;
   translationState: 'pending' | 'complete' | 'error' | 'skipped';
+  detectedLanguage?: string;
 }
 
 export interface TranscriptEventForSegment {
@@ -20,6 +21,7 @@ export interface TranscriptEventForSegment {
   speakerLabel?: string;
   timestamp?: number;
   translationState?: 'pending' | 'complete' | 'error' | 'skipped';
+  detectedLanguage?: string;
 }
 
 function defaultSpeakerLabelForEvent(event: TranscriptEventForSegment): string {
@@ -55,6 +57,7 @@ export function upsertTranscriptSegment(
         timestamp: event.timestamp ?? Date.now(),
         speakerLabel,
         translationState,
+        detectedLanguage: event.detectedLanguage || undefined,
       },
     ];
   }
@@ -70,6 +73,7 @@ export function upsertTranscriptSegment(
       ? event.speakerLabel.trim().slice(0, 32)
       : existing.speakerLabel,
     translationState: event.translationState || existing.translationState,
+    detectedLanguage: event.detectedLanguage || existing.detectedLanguage,
   };
   return updated;
 }

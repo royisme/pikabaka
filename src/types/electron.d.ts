@@ -106,7 +106,7 @@ export interface ElectronAPI {
   testSttConnection: (provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox', apiKey: string, region?: string) => Promise<{ success: boolean; error?: string }>
 
   // Native Audio Service Events
-  onNativeAudioTranscript: (callback: (transcript: { speaker: string; text: string; final: boolean; timestamp?: number; confidence?: number; segmentId?: string; sourceText?: string; translatedText?: string; translationState?: 'pending' | 'complete' | 'error' | 'skipped'; displayMode?: 'original' | 'translated' | 'both'; speakerLabel?: string }) => void) => () => void
+  onNativeAudioTranscript: (callback: (transcript: { speaker: string; text: string; final: boolean; timestamp?: number; confidence?: number; segmentId?: string; sourceText?: string; translatedText?: string; translationState?: 'pending' | 'complete' | 'error' | 'skipped'; displayMode?: 'original' | 'translated' | 'both'; speakerLabel?: string; detectedLanguage?: string }) => void) => () => void
   onNativeAudioSuggestion: (callback: (suggestion: { context: string; lastQuestion: string; confidence: number }) => void) => () => void
   onNativeAudioConnected: (callback: () => void) => () => void
   onNativeAudioDisconnected: (callback: () => void) => () => void
