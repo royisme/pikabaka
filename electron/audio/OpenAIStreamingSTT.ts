@@ -17,6 +17,7 @@ import WebSocket from 'ws';
 import axios from 'axios';
 import FormData from 'form-data';
 import { RECOGNITION_LANGUAGES } from '../config/languages';
+import { normalizeLanguageToIso639 } from '../transcript/translationExecutor';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -285,20 +286,23 @@ export class OpenAIStreamingSTT extends EventEmitter {
                 }
             }, 5_000);
 
-            // Configure the transcription session
-            const lang = this.languageKey
+            // Configure the transcription session.
+            // Auto-detect mode: omit `language` entirely so the server detects natively.
+            const lang = this.languageKey && this.languageKey !== 'auto'
                 ? (RECOGNITION_LANGUAGES[this.languageKey]?.iso639 ?? '')
                 : '';
+
+            const transcriptionCfg: Record<string, any> = {
+                model,
+                prompt: '',
+            };
+            if (lang) transcriptionCfg.language = lang;
 
             this.ws!.send(JSON.stringify({
                 type: 'transcription_session.update',
                 session: {
                     input_audio_format: 'pcm16',
-                    input_audio_transcription: {
-                        model,
-                        prompt: '',
-                        language: lang || '',
-                    },
+                    input_audio_transcription: transcriptionCfg,
                     // Server VAD — offload voice activity detection entirely to the server
                     turn_detection: {
                         type:                'server_vad',
@@ -645,13 +649,14 @@ export class OpenAIStreamingSTT extends EventEmitter {
         this.restIsUploading = true;
 
         try {
-            const transcript = await this._restUpload(wavBuffer);
+            const { transcript, detectedLanguage } = await this._restUpload(wavBuffer);
             if (transcript && transcript.trim().length > 0) {
-                console.log(`[OpenAIStreaming][REST] Transcript: "${transcript.substring(0, 60)}"`);
+                console.log(`[OpenAIStreaming][REST] Transcript: "${transcript.substring(0, 60)}"${detectedLanguage ? ` [lang=${detectedLanguage}]` : ''}`);
                 this.emit('transcript', {
                     text:       transcript.trim(),
                     isFinal:    true,
                     confidence: 1.0,
+                    detectedLanguage,
                 });
             }
         } catch (err) {
@@ -666,15 +671,18 @@ export class OpenAIStreamingSTT extends EventEmitter {
         }
     }
 
-    private async _restUpload(wavBuffer: Buffer): Promise<string> {
+    private async _restUpload(wavBuffer: Buffer): Promise<{ transcript: string; detectedLanguage?: string }> {
         const form = new FormData();
         form.append('file', wavBuffer, {
             filename:    'audio.wav',
             contentType: 'audio/wav',
         });
         form.append('model', 'whisper-1');
+        // verbose_json surfaces the detected `language` field on the response.
+        form.append('response_format', 'verbose_json');
 
-        const lang = this.languageKey
+        // Auto-detect mode: omit `language` so Whisper detects natively.
+        const lang = this.languageKey && this.languageKey !== 'auto'
             ? (RECOGNITION_LANGUAGES[this.languageKey]?.iso639 ?? '')
             : '';
         if (lang) form.append('language', lang);
@@ -688,8 +696,11 @@ export class OpenAIStreamingSTT extends EventEmitter {
         });
 
         const data = response.data;
-        if (typeof data === 'string') return data;
-        return data?.text ?? '';
+        if (typeof data === 'string') return { transcript: data };
+        return {
+            transcript: data?.text ?? '',
+            detectedLanguage: normalizeLanguageToIso639(data?.language),
+        };
     }
 
     // ─── Audio Utilities ──────────────────────────────────────────────────────
