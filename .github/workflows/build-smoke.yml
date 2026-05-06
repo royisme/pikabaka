@@ -26,11 +26,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Use the :raw scripts directly to skip `pnpm run verify` (lint + test).
+      # Lint/test infra is not part of the smoke contract; we only verify
+      # the renderer + electron main process compile cleanly.
       - name: Build renderer
-        run: pnpm run build
+        run: pnpm run build:web:raw
 
       - name: Build Electron main process
-        run: pnpm run build:electron
+        run: pnpm run build:electron:raw
 
       - name: Verify packaged entrypoint exists
         run: test -f dist-electron/electron/main.js
