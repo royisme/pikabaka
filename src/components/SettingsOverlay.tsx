@@ -669,9 +669,14 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         loadLanguages();
     }, []);
 
+    // Providers that don't support multi-language / auto-detect in a single request.
+    const STT_PROVIDERS_WITHOUT_AUTO = new Set(['azure', 'ibmwatson']);
+
     const handleLanguageChange = async (key: string) => {
         setRecognitionLanguage(key);
-        if (availableLanguages[key]) {
+        if (key === 'auto') {
+            setSelectedSttGroup('Auto');
+        } else if (availableLanguages[key]) {
             setSelectedSttGroup(availableLanguages[key].group);
         }
         if (window.electronAPI?.setRecognitionLanguage) {
@@ -681,6 +686,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
     const handleGroupChange = (group: string) => {
         setSelectedSttGroup(group);
+        if (group === 'Auto') {
+            handleLanguageChange('auto');
+            return;
+        }
         // Find default variant for this group (first one)
         const firstVariant = Object.entries(availableLanguages).find(([_, lang]) => lang.group === group);
         if (firstVariant) {
@@ -688,8 +697,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         }
     };
 
-    // Helper to get unique groups
-    const languageGroups = Array.from(new Set(Object.values(availableLanguages).map((l: any) => l.group)))
+    // Base list of unique language groups. The "Auto" group is injected at
+    // render time below (only when the current STT provider supports it).
+    const baseLanguageGroups = Array.from(new Set(Object.values(availableLanguages).map((l: any) => l.group)))
         .sort((a, b) => {
             if (a === 'English') return -1;
             if (b === 'English') return 1;
@@ -936,6 +946,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             await window.electronAPI?.setSttProvider?.(provider);
         } catch (e) {
             console.error('Failed to set STT provider:', e);
+        }
+        // If switching to a provider that doesn't support multi-language detection
+        // and the current STT language is "auto", fall back to a sensible default.
+        if (STT_PROVIDERS_WITHOUT_AUTO.has(provider) && recognitionLanguage === 'auto') {
+            await handleLanguageChange('english-us');
         }
     };
 
@@ -2417,9 +2432,12 @@ Core Skills
                                                 label="Language"
                                                 icon={<Globe size={14} />}
                                                 value={selectedSttGroup}
-                                                options={languageGroups.map(g => ({
+                                                options={(STT_PROVIDERS_WITHOUT_AUTO.has(sttProvider)
+                                                    ? baseLanguageGroups
+                                                    : ['Auto', ...baseLanguageGroups]
+                                                ).map(g => ({
                                                     deviceId: g,
-                                                    label: g,
+                                                    label: g === 'Auto' ? 'Auto (multi-language)' : g,
                                                     kind: 'audioinput' as MediaDeviceKind,
                                                     groupId: '',
                                                     toJSON: () => ({})
@@ -2445,7 +2463,9 @@ Core Skills
                                             <div className="flex gap-2 items-center mt-2 px-1">
                                                 <Info size={14} className="text-text-secondary shrink-0" />
                                                 <p className="text-xs text-text-secondary">
-                                                    Select the primary language being spoken in the meeting.
+                                                    {selectedSttGroup === 'Auto'
+                                                        ? 'Auto: detect language per segment for multilingual meetings. Not available on Azure / IBM Watson.'
+                                                        : 'Select the primary language being spoken in the meeting. Choose Auto for multilingual meetings.'}
                                                 </p>
                                             </div>
                                         </div>
