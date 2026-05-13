@@ -49,31 +49,17 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     useEffect(() => window.electronAPI?.onSessionReset?.(() => { console.log('[PikaInterface] Resetting session state...'); chat.setSystemMessages([]); chat.setInputValue(''); chat.setAttachedContext([]); audio.setManualTranscript(''); audio.setVoiceInput(''); chat.setIsProcessing(false); analytics.trackConversationStarted(); }), [chat.setSystemMessages, chat.setInputValue, chat.setAttachedContext, audio.setManualTranscript, audio.setVoiceInput, chat.setIsProcessing]);
 
     const handleScreenshotAttach = useCallback((data: ScreenshotAttachment) => { setIsExpanded(true); chat.setAttachedContext((prev) => (prev.some((s) => s.path === data.path) ? prev : [...prev, data].slice(-5))); }, [chat.setAttachedContext]);
-    const updateContentDimensions = useCallback(() => { const rect = contentRef.current?.getBoundingClientRect(); if (rect) window.electronAPI?.updateContentDimensions({ width: Math.ceil(rect.width), height: Math.ceil(rect.height) }); }, []);
+    const updateContentDimensions = useCallback(() => {
+        if (isExpanded) return;
+        const rect = contentRef.current?.getBoundingClientRect();
+        if (rect) window.electronAPI?.updateContentDimensions({ width: Math.ceil(rect.width), height: Math.ceil(rect.height) });
+    }, [isExpanded]);
     useLayoutEffect(() => { if (!contentRef.current) return; const observer = new ResizeObserver(updateContentDimensions); observer.observe(contentRef.current); return () => observer.disconnect(); }, [updateContentDimensions]);
     useEffect(() => { requestAnimationFrame(updateContentDimensions); }, [chat.attachedContext, updateContentDimensions]);
     useEffect(() => { const timer = setTimeout(updateContentDimensions, 600); return () => clearTimeout(timer); }, [updateContentDimensions]);
     useEffect(() => { if (isExpanded) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chat.messages, isExpanded, chat.isProcessing]);
 
-    const handleAnswerNow = useCallback(async () => {
-        if (!audio.isManualRecording) { audio.setVoiceInput(''); audio.voiceInputRef.current = ''; audio.setManualTranscript(''); audio.isRecordingRef.current = true; audio.setIsManualRecording(true); return; }
-        audio.isRecordingRef.current = false; audio.setIsManualRecording(false); audio.setManualTranscript(''); window.electronAPI.finalizeMicSTT().catch((err) => console.error('[PikaInterface] Failed to send finalizeMicSTT:', err));
-        const currentAttachments = chat.attachedContext;
-        const question = `${audio.voiceInputRef.current}${audio.manualTranscriptRef.current ? ` ${audio.manualTranscriptRef.current}` : ''}`.trim();
-        chat.setAttachedContext([]); audio.setVoiceInput(''); audio.voiceInputRef.current = ''; audio.setManualTranscript(''); audio.manualTranscriptRef.current = '';
-        if (!question && currentAttachments.length === 0) { chat.setSystemMessages((prev) => [...prev, { id: Date.now().toString(), role: 'system', text: 'No speech detected. Try speaking closer to your microphone.' }]); return; }
-        chat.setSystemMessages((prev) => [...prev, { id: Date.now().toString(), role: 'user', text: question, hasScreenshot: currentAttachments.length > 0, screenshotPreview: currentAttachments[0]?.preview }, { id: (Date.now() + 1).toString(), role: 'system', text: '', isStreaming: true }]);
-        chat.setIsProcessing(true);
-        try {
-            let prompt = '';
-            if (currentAttachments.length > 0) prompt = `You are a helper. The user has provided a screenshot and a spoken question/command.\nUser said: "${question}"\n\nInstructions:\n1. Analyze the screenshot in the context of what the user said.\n2. Provide a direct, helpful answer.\n3. Be concise.`;
-            else { const ragResult = await window.electronAPI.ragQueryLive?.(question); if (ragResult?.success) return; prompt = 'You are a real-time interview assistant. Extract the core interviewer question and provide only a concise, conversational answer the user can say out loud.'; }
-            await window.electronAPI.streamGeminiChat(question, currentAttachments.length ? currentAttachments.map((s) => s.path) : undefined, prompt, { skipSystemPrompt: true });
-        } catch (err) {
-            chat.setIsProcessing(false);
-            chat.setSystemMessages((prev) => { const last = prev[prev.length - 1]; const errorMessage = { id: Date.now().toString(), role: 'system' as const, text: `Error: ${err}` }; return last?.isStreaming && last.text === '' ? prev.slice(0, -1).concat(errorMessage) : [...prev, errorMessage]; });
-        }
-    }, [audio, chat]);
+    const handleAnswerNow = useCallback(() => chat.handleWhatToSay(), [chat.handleWhatToSay]);
 
     const handlersRef = useRef<CommandHandlers>(null!);
     handlersRef.current = { handleWhatToSay: chat.handleWhatToSay, handleFollowUp: chat.handleFollowUp, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleAnswerNow, handleClarify: chat.handleClarify, handleCodeHint: chat.handleCodeHint, handleBrainstorm: chat.handleBrainstorm };
@@ -121,10 +107,10 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const chatProps = { messages: chat.messages, knowledgeContext: chat.knowledgeContext, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, actionButtonMode: chat.actionButtonMode, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleWhatToSay: chat.handleWhatToSay, handleClarify: chat.handleClarify, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleBrainstorm: chat.handleBrainstorm, handleAnswerNow, handleManualSubmit: chat.handleManualSubmit, isManualRecording: audio.isManualRecording, manualTranscript: audio.manualTranscript, voiceInput: audio.voiceInput, appearance, isLightTheme, currentModel, isSettingsOpen, isMousePassthrough, setIsMousePassthrough, shortcuts, scrollContainerRef, messagesEndRef, textInputRef, contentRef, setMessages };
 
     return (
-        <div ref={contentRef} className="flex flex-col items-center w-full mx-auto h-fit min-h-0 bg-transparent p-0 rounded-[24px] font-sans gap-2 overlay-text-primary">
+        <div ref={contentRef} className={`flex flex-col items-center w-full mx-auto ${isExpanded ? 'h-screen' : 'h-fit'} min-h-0 bg-transparent p-0 rounded-[24px] font-sans gap-2 overlay-text-primary`}>
             <AnimatePresence>
                 {isExpanded && (
-                    <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="flex flex-col items-center gap-2 w-full">
+                    <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="flex flex-col items-center gap-2 w-full flex-1 min-h-0">
                         <TopPill expanded={isExpanded} onToggle={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} appearance={appearance} onLogoClick={() => window.electronAPI?.setWindowMode?.('launcher')} />
                         <SplitterShell left={<TranscriptColumn {...transcriptProps} />} right={<ChatColumn {...chatProps} />} splitterPosition={splitterPosition} onSplitterChange={setSplitterPosition} isExpanded={isExpanded} appearance={appearance} overlayPanelClass="overlay-text-primary" />
                     </motion.div>

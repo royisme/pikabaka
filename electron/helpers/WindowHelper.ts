@@ -196,12 +196,12 @@ export class WindowHelper {
     // }
 
     // --- 2. Create Overlay Window (Hidden initially) ---
-    const overlayDefaultWidth = Math.min(1000, Math.floor(primaryDisplay.workAreaSize.width * 0.9))
+    const overlayDefaultWidth = Math.min(600, Math.floor(primaryDisplay.workAreaSize.width * 0.9))
 
     const overlaySettings: Electron.BrowserWindowConstructorOptions = {
       width: overlayDefaultWidth,
       height: 1,
-      minWidth: 600,
+      minWidth: 380,
       minHeight: 1,
       webPreferences: {
         nodeIntegration: false,
@@ -456,7 +456,7 @@ export class WindowHelper {
       const workArea = primaryDisplay.workArea;
       const currentBounds = this.overlayWindow.getBounds();
       const targetHeight = Math.max(currentBounds.height, 216);
-      const overlayWidth = Math.min(1000, Math.floor(screen.getPrimaryDisplay().workAreaSize.width * 0.9));
+      const overlayWidth = Math.min(600, Math.floor(screen.getPrimaryDisplay().workAreaSize.width * 0.9));
       const overlayX = Math.floor(workArea.x + (workArea.width - overlayWidth) / 2)
       const overlayY = Math.floor(workArea.y + (workArea.height - targetHeight) / 2)
       this.overlayWindow.setBounds({ x: overlayX, y: overlayY, width: overlayWidth, height: targetHeight });

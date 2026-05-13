@@ -323,6 +323,93 @@ export function useMeetingChat() {
       }));
     }
 
+    // ---- Streaming: generic gemini-chat-stream (used by submitPrompt / handleWhatToSay) ----
+    console.log('[useMeetingChat] registering gemini-stream listeners. has onGeminiStreamToken:', !!window.electronAPI.onGeminiStreamToken);
+    if (window.electronAPI.onGeminiStreamToken) {
+      cleanups.push(window.electronAPI.onGeminiStreamToken((token) => {
+        console.log('[gemini-stream-token]', String(token).slice(0, 40));
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.isStreaming) {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...last, text: last.text + token };
+            return updated;
+          }
+          return [...prev, { id: Date.now().toString(), role: 'system', text: token, isStreaming: true }];
+        });
+      }));
+    }
+    if (window.electronAPI.onGeminiStreamDone) {
+      cleanups.push(window.electronAPI.onGeminiStreamDone(() => {
+        console.log('[gemini-stream-done]');
+        setIsProcessing(false);
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.isStreaming) {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...last, isStreaming: false };
+            return updated;
+          }
+          return prev;
+        });
+      }));
+    }
+    if (window.electronAPI.onGeminiStreamError) {
+      cleanups.push(window.electronAPI.onGeminiStreamError((error) => {
+        console.log('[gemini-stream-error]', error);
+        setIsProcessing(false);
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          const errMsg = { id: Date.now().toString(), role: 'system' as const, text: `❌ Error: ${error}` };
+          if (last && last.isStreaming && last.text === '') return prev.slice(0, -1).concat(errMsg);
+          return [...prev, errMsg];
+        });
+      }));
+    }
+
+    // ---- Streaming: RAG live query (rag:query-live) ----
+    if (window.electronAPI.onRAGStreamChunk) {
+      cleanups.push(window.electronAPI.onRAGStreamChunk((data) => {
+        console.log('[rag-stream-chunk]', String(data.chunk).slice(0, 40));
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.isStreaming) {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...last, text: last.text + data.chunk };
+            return updated;
+          }
+          return [...prev, { id: Date.now().toString(), role: 'system', text: data.chunk, isStreaming: true }];
+        });
+      }));
+    }
+    if (window.electronAPI.onRAGStreamComplete) {
+      cleanups.push(window.electronAPI.onRAGStreamComplete((data) => {
+        console.log('[rag-stream-complete]', data);
+        setIsProcessing(false);
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.isStreaming) {
+            const updated = [...prev];
+            updated[updated.length - 1] = { ...last, isStreaming: false };
+            return updated;
+          }
+          return prev;
+        });
+      }));
+    }
+    if (window.electronAPI.onRAGStreamError) {
+      cleanups.push(window.electronAPI.onRAGStreamError((data) => {
+        console.log('[rag-stream-error]', data);
+        setIsProcessing(false);
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          const errMsg = { id: Date.now().toString(), role: 'system' as const, text: `❌ Error: ${data.error}` };
+          if (last && last.isStreaming && last.text === '') return prev.slice(0, -1).concat(errMsg);
+          return [...prev, errMsg];
+        });
+      }));
+    }
+
     return () => cleanups.forEach((fn) => fn());
   }, []);
 
@@ -384,44 +471,58 @@ export function useMeetingChat() {
     if (!promptText && currentAttachments.length === 0) return;
     if (clearAttachments) setAttachedContext([]);
 
+    console.log('[submitPrompt] entry', { promptText: promptText.slice(0, 60), placeholderIntent, addUserMessage, attachments: currentAttachments.length });
+
     if (addUserMessage) {
-      setSystemMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          role: 'user',
-          text: promptText,
-          hasScreenshot: currentAttachments.length > 0,
-          screenshotPreview: currentAttachments[0]?.preview,
-        },
-      ]);
+      setSystemMessages((prev) => {
+        const next = [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: 'user' as const,
+            text: promptText,
+            hasScreenshot: currentAttachments.length > 0,
+            screenshotPreview: currentAttachments[0]?.preview,
+          },
+        ];
+        console.log('[submitPrompt] added user msg, systemMessages count =', next.length);
+        return next;
+      });
     }
 
-    setSystemMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        role: 'system',
-        text: '',
-        isStreaming: true,
-        ...(placeholderIntent ? { intent: placeholderIntent } : {}),
-      },
-    ]);
+    setSystemMessages((prev) => {
+      const next = [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: 'system' as const,
+          text: '',
+          isStreaming: true,
+          ...(placeholderIntent ? { intent: placeholderIntent } : {}),
+        },
+      ];
+      console.log('[submitPrompt] added streaming placeholder, systemMessages count =', next.length);
+      return next;
+    });
 
     setIsProcessing(true);
 
     try {
       if (!skipRag && currentAttachments.length === 0) {
+        console.log('[submitPrompt] calling ragQueryLive…');
         const ragResult = await window.electronAPI.ragQueryLive?.(promptText);
+        console.log('[submitPrompt] ragQueryLive result', ragResult);
         if (ragResult?.success) return;
       }
 
+      console.log('[submitPrompt] calling streamGeminiChat…');
       await window.electronAPI.streamGeminiChat(
         promptText,
         currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined,
         conversationContextRef.current,
         streamOptions
       );
+      console.log('[submitPrompt] streamGeminiChat invoke resolved');
     } catch (err) {
       setIsProcessing(false);
       setSystemMessages((prev) => {
@@ -603,17 +704,13 @@ export function useMeetingChat() {
         setIsProcessing(false);
       }
     } else {
-      // Text-only: try RAG first, then use useChat/sendMessage
-      try {
-        const ragResult = await window.electronAPI.ragQueryLive?.(userText || '');
-        if (ragResult?.success) return;
-      } catch {
-        // RAG unavailable — continue to useChat
-      }
-
-      sendMessage({ text: userText });
+      // Text-only: route through submitPrompt so IPC/RAG streams update the placeholder listeners.
+      await submitPrompt({
+        userText,
+        placeholderIntent: 'manual',
+      });
     }
-  }, [inputValue, attachedContext, sendMessage, pushSystemError]);
+  }, [inputValue, attachedContext, submitPrompt, pushSystemError]);
 
   return {
     knowledgeContext,

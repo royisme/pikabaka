@@ -5,12 +5,14 @@ interface ResizableSplitterProps {
   onPositionChange: (position: number) => void;
   min?: number;
   max?: number;
+  orientation?: 'vertical' | 'horizontal';
 }
 
 const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
   onPositionChange,
   min = 20,
   max = 80,
+  orientation = 'vertical',
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const splitterRef = useRef<HTMLDivElement>(null);
@@ -45,7 +47,9 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
       const parent = splitterRef.current?.parentElement;
       if (!parent) return;
       const rect = parent.getBoundingClientRect();
-      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      const pct = orientation === 'horizontal'
+        ? ((e.clientY - rect.top) / rect.height) * 100
+        : ((e.clientX - rect.left) / rect.width) * 100;
       onPositionChange(Math.min(max, Math.max(min, pct)));
     };
 
@@ -66,14 +70,19 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
     };
   }, [isDragging, max, min, onPositionChange]);
 
+  const isHorizontal = orientation === 'horizontal';
   return (
     <div
       ref={splitterRef}
       onMouseDown={handleMouseDown}
-      className={`relative w-1.5 cursor-col-resize flex-shrink-0 group ${isDragging ? 'z-50' : ''}`}
+      className={`relative flex-shrink-0 group ${isHorizontal ? 'h-1.5 cursor-row-resize' : 'w-1.5 cursor-col-resize'} ${isDragging ? 'z-50' : ''}`}
     >
       <div
-        className={`absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-px transition-colors ${
+        className={`absolute transition-colors ${
+          isHorizontal
+            ? 'top-1/2 -translate-y-1/2 left-0 right-0 h-px'
+            : 'left-1/2 -translate-x-1/2 top-0 bottom-0 w-px'
+        } ${
           isDragging
             ? 'bg-accent-primary shadow-[0_0_6px_rgba(59,130,246,0.5)]'
             : 'bg-border-subtle group-hover:bg-accent-primary/60'
