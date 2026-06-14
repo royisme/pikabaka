@@ -71,12 +71,13 @@ const UserMessage: React.FC<{ content: string }> = ({ content }) => (
     </motion.div>
 );
 
-const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = ({ content, isStreaming }) => {
+const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean; streamStatus?: string }> = ({ content, isStreaming, streamStatus }) => {
+    const displayContent = content || (isStreaming ? (streamStatus || 'Streaming response…') : '');
     const [copied, setCopied] = useState(false);
 
     const handleCopy = async () => {
         try {
-            await navigator.clipboard.writeText(content);
+            await navigator.clipboard.writeText(displayContent);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch (err) {
@@ -153,7 +154,7 @@ const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = (
                     />
                 )}
             </div>
-            {!isStreaming && content && (
+            {!isStreaming && displayContent && (
                 <button
                     onClick={handleCopy}
                     className="flex items-center gap-2 mt-3 text-[13px] text-text-tertiary hover:text-text-secondary transition-colors"
@@ -198,6 +199,20 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
     });
     const [input, setInput] = useState('');
     const isLoading = status === 'submitted' || status === 'streaming';
+    const [streamStatus, setStreamStatus] = useState('');
+
+    useEffect(() => {
+        const onStatus = (event: Event) => {
+            const detail = (event as CustomEvent<{ message?: string }>).detail;
+            if (detail?.message) setStreamStatus(detail.message);
+        };
+        window.addEventListener('pika-chat-stream-status', onStatus as EventListener);
+        return () => window.removeEventListener('pika-chat-stream-status', onStatus as EventListener);
+    }, []);
+
+    useEffect(() => {
+        if (!isLoading) setStreamStatus('');
+    }, [isLoading]);
 
     const handleFormSubmit = useCallback((e: React.FormEvent) => {
         e.preventDefault();
@@ -333,7 +348,7 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
                                 const content = getMessageText(msg);
                                 return msg.role === 'user'
                                     ? <UserMessage key={msg.id} content={content} />
-                                    : <AssistantMessage key={msg.id} content={content} isStreaming={isLoading && msg.id === messages[messages.length - 1]?.id} />;
+                                    : <AssistantMessage key={msg.id} content={content} isStreaming={isLoading && msg.id === messages[messages.length - 1]?.id} streamStatus={streamStatus} />;
                             })}
 
                             {isLoading && messages[messages.length - 1]?.role !== 'assistant' && <TypingIndicator />}

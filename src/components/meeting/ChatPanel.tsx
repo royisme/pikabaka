@@ -30,6 +30,7 @@ interface Message {
   role: 'user' | 'system' | 'interviewer';
   text: string;
   isStreaming?: boolean;
+  streamStatus?: string;
   hasScreenshot?: boolean;
   screenshotPreview?: string;
   isCode?: boolean;
@@ -383,7 +384,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             a: ({ node, ...props }: any) => <a className="underline hover:opacity-80" target="_blank" rel="noopener noreferrer" {...props} />,
           }}
         >
-          {msg.text}
+          {msg.text || (msg.isStreaming ? (msg.streamStatus || 'Streaming response…') : '')}
         </ReactMarkdown>
       </div>
     );

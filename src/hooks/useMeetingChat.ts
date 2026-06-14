@@ -9,6 +9,7 @@ export type Message = {
   role: 'user' | 'system' | 'interviewer';
   text: string;
   isStreaming?: boolean;
+  streamStatus?: string;
   hasScreenshot?: boolean;
   screenshotPreview?: string;
   isCode?: boolean;
@@ -60,6 +61,12 @@ export function useMeetingChat() {
   });
 
   const isChatLoading = status === 'submitted' || status === 'streaming';
+
+  const appendStreamingText = useCallback((message: Message, token: string): Message => {
+    const current = message.text || '';
+    const base = message.streamStatus && current === message.streamStatus ? '' : current;
+    return { ...message, text: base + token };
+  }, []);
 
   useEffect(() => {
     window.electronAPI?.getActionButtonMode?.()
@@ -154,6 +161,23 @@ export function useMeetingChat() {
     const cleanups: Array<() => void> = [];
 
     // ---- Assist (generic insight from streaming) ----
+    if (window.electronAPI.onGeminiStreamStatus) {
+      cleanups.push(window.electronAPI.onGeminiStreamStatus((data) => {
+        if (!data?.message) return;
+        setSystemMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (!last || !last.isStreaming) return prev;
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...last,
+            streamStatus: data.message,
+            text: last.text && last.text !== last.streamStatus ? last.text : data.message,
+          };
+          return updated;
+        });
+      }));
+    }
+
     if (window.electronAPI.onIntelligenceAssistUpdate) {
       cleanups.push(window.electronAPI.onIntelligenceAssistUpdate((data) => {
         setSystemMessages((prev) => {
@@ -161,7 +185,7 @@ export function useMeetingChat() {
           const text = (data as { insight?: string; token?: string }).insight ?? (data as { token?: string }).token ?? '';
           if (last && last.isStreaming && last.intent === 'assist') {
             const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: last.text + text };
+            updated[updated.length - 1] = appendStreamingText(last, text);
             return updated;
           }
           return [...prev, { id: Date.now().toString(), role: 'system', text, intent: 'assist', isStreaming: true }];
@@ -176,7 +200,7 @@ export function useMeetingChat() {
           const last = prev[prev.length - 1];
           if (last && last.isStreaming && last.intent === 'what_to_answer') {
             const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: last.text + data.token };
+            updated[updated.length - 1] = appendStreamingText(last, data.token);
             return updated;
           }
           return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: 'what_to_answer', isStreaming: true }];
@@ -205,7 +229,7 @@ export function useMeetingChat() {
           const last = prev[prev.length - 1];
           if (last && last.isStreaming && last.intent === data.intent) {
             const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: last.text + data.token };
+            updated[updated.length - 1] = appendStreamingText(last, data.token);
             return updated;
           }
           return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: data.intent, isStreaming: true }];
@@ -234,7 +258,7 @@ export function useMeetingChat() {
           const last = prev[prev.length - 1];
           if (last && last.isStreaming && last.intent === 'recap') {
             const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: last.text + data.token };
+            updated[updated.length - 1] = appendStreamingText(last, data.token);
             return updated;
           }
           return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: 'recap', isStreaming: true }];
@@ -263,7 +287,7 @@ export function useMeetingChat() {
           const last = prev[prev.length - 1];
           if (last && last.isStreaming && last.intent === 'follow_up_questions') {
             const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: last.text + data.token };
+            updated[updated.length - 1] = appendStreamingText(last, data.token);
             return updated;
           }
           return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: 'follow_up_questions', isStreaming: true }];
@@ -422,7 +446,7 @@ export function useMeetingChat() {
         const last = prev[prev.length - 1];
         if (last && last.isStreaming && last.intent === 'clarify') {
           const updated = [...prev];
-          updated[updated.length - 1] = { ...last, text: last.text + data.token };
+          updated[updated.length - 1] = appendStreamingText(last, data.token);
           return updated;
         }
         return [...prev, { id: Date.now().toString(), role: 'system' as const, text: data.token, intent: 'clarify', isStreaming: true }];
@@ -563,7 +587,7 @@ export function useMeetingChat() {
     } finally {
       setIsProcessing(false);
     }
-  }, [setIsProcessing, setSystemMessages]);
+  }, [appendStreamingText, setIsProcessing, setSystemMessages]);
 
   const handleCodeHint = useCallback(async () => {
     setIsProcessing(true);

@@ -121,6 +121,7 @@ import { KnowledgeDatabaseManager as KnowledgeDatabaseManagerClass } from './kno
 
 import { CredentialsManager } from "./services/CredentialsManager"
 import { SettingsManager } from "./services/SettingsManager"
+import { CompanionServer, CompanionCommand } from "./services/CompanionServer"
 import { setVerboseLoggingFlag } from "./lib/verboseLog"
 import { OllamaManager } from './services/OllamaManager'
 
@@ -163,6 +164,7 @@ export class AppState {
   public _dockReassertTimers: NodeJS.Timeout[] = []; // Re-assert dock-hidden state after show+focus
   private _ollamaBootstrapPromise: Promise<void> | null = null;
   public screenshotCaptureInProgress: boolean = false;
+  private companionServer: CompanionServer;
 
 
   // Processing events
@@ -205,6 +207,11 @@ export class AppState {
     // 3. Initialize other helpers
     this.screenshotHelper = new ScreenshotHelper(this.view)
     this.processingHelper = new ProcessingHelper(this)
+    this.companionServer = new CompanionServer({
+      userDataDir: app.getPath('userData'),
+      onCommand: (command: CompanionCommand) => this.broadcast('companion-command', command),
+      onStatusChanged: (status) => this.broadcast('companion-status-changed', status),
+    })
 
     this.windowHelper.setContentProtection(this.isUndetectable);
     this.settingsWindowHelper.setContentProtection(this.isUndetectable);
@@ -381,6 +388,10 @@ export class AppState {
         win.webContents.send(channel, ...args);
       }
     });
+  }
+
+  public getCompanionServer(): CompanionServer {
+    return this.companionServer;
   }
 
   public getIsMeetingActive(): boolean {

@@ -2,6 +2,119 @@ import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { DatabaseManager } from "../db/DatabaseManager"
+import { normalizeOpenAICompatibleBaseUrl } from "../utils/modelFetcher"
+
+type ChatStreamMessage = { role: 'user' | 'assistant'; content: string };
+type OpenAICompatibleChatProvider = { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string };
+
+function extractOpenAICompatibleChunkText(data: any): string {
+  const choice = data?.choices?.[0];
+  const candidates = [
+    choice?.delta?.content,
+    choice?.message?.content,
+    data?.delta?.content,
+    data?.content,
+    data?.text,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string') return candidate;
+    if (Array.isArray(candidate)) {
+      return candidate
+        .map((part: any) => typeof part === 'string' ? part : (part?.text || part?.content || ''))
+        .join('');
+    }
+  }
+  return '';
+}
+
+async function* streamOpenAICompatibleChatCompletion(
+  provider: OpenAICompatibleChatProvider,
+  model: string,
+  systemPrompt: string,
+  messages: ChatStreamMessage[],
+  signal: AbortSignal
+): AsyncGenerator<string, void, unknown> {
+  const base = normalizeOpenAICompatibleBaseUrl(provider.baseUrl);
+  const response = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${provider.apiKey}`,
+    },
+    signal,
+    body: JSON.stringify({
+      model,
+      system: undefined,
+      messages: [
+        ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+        ...messages.map((m) => ({ role: m.role, content: m.content })),
+      ],
+      temperature: 0.7,
+      max_tokens: 8192,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const raw = await response.text().catch(() => '');
+    const safe = raw.replaceAll(provider.apiKey, '[redacted]').slice(0, 800);
+    throw new Error(`OpenAI-compatible provider ${provider.name} failed (${response.status}): ${safe}`);
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const json = await response.json();
+    const text = extractOpenAICompatibleChunkText(json);
+    if (text) yield text;
+    return;
+  }
+
+  if (!response.body) throw new Error('No response body from OpenAI-compatible provider');
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (signal.aborted) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith(':')) continue;
+      const payload = trimmed.startsWith('data:') ? trimmed.slice(5).trim() : trimmed;
+      if (!payload || payload === '[DONE]') return;
+
+      try {
+        const json = JSON.parse(payload);
+        const text = extractOpenAICompatibleChunkText(json);
+        if (text) yield text;
+      } catch {
+        // Ignore keepalive / non-JSON SSE frames.
+      }
+    }
+  }
+
+  const tail = buffer.trim();
+  if (tail && tail !== '[DONE]') {
+    const payload = tail.startsWith('data:') ? tail.slice(5).trim() : tail;
+    if (payload && payload !== '[DONE]') {
+      try {
+        const json = JSON.parse(payload);
+        const text = extractOpenAICompatibleChunkText(json);
+        if (text) yield text;
+      } catch {
+        // Ignore incomplete trailing frames.
+      }
+    }
+  }
+}
 
 export function registerRagHandlers(appState: AppState): void {
   // ==========================================
@@ -231,6 +344,8 @@ export function registerRagHandlers(appState: AppState): void {
       // Build provider model using AI SDK based on model prefix
       const { streamText } = await import('ai');
       let providerModel: any;
+      let openAICompatibleProvider: OpenAICompatibleChatProvider | null = null;
+      let openAICompatibleModel = '';
 
       if (currentModel.startsWith('gemini-')) {
         const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
@@ -271,9 +386,11 @@ export function registerRagHandlers(appState: AppState): void {
         const compatProviders = cm.getOpenAICompatibleProviders() as Array<{ id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }>;
         const matchedProvider = compatProviders.find((p: { id: string; preferredModel?: string }) => p.preferredModel === currentModel || p.id === currentModel);
         if (matchedProvider) {
-          const { createOpenAI } = await import('@ai-sdk/openai');
-          const openai = createOpenAI({ baseURL: matchedProvider.baseUrl, apiKey: matchedProvider.apiKey });
-          providerModel = openai(matchedProvider.preferredModel || currentModel);
+          // BYOK OpenAI-compatible providers are streamed through raw Chat Completions
+          // instead of the AI SDK adapter so custom gateways receive /v1/chat/completions
+          // with stream=true and chunks are forwarded to the renderer immediately.
+          openAICompatibleProvider = matchedProvider;
+          openAICompatibleModel = matchedProvider.preferredModel?.trim() || currentModel;
         } else {
           // Fallback: attempt as Gemini
           const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
@@ -311,6 +428,33 @@ export function registerRagHandlers(appState: AppState): void {
       const systemPrompt = `You are a helpful meeting assistant. Answer questions about this meeting based on the context provided. Be concise and accurate.
 
 ${meetingContext || ''}`;
+
+      if (openAICompatibleProvider) {
+        sender.send('chat:stream-status', {
+          requestId,
+          provider: 'openai-compatible',
+          providerName: openAICompatibleProvider.name,
+          model: openAICompatibleModel,
+          message: `Streaming via OpenAI-compatible: ${openAICompatibleProvider.name}`
+        });
+
+        for await (const chunk of streamOpenAICompatibleChatCompletion(
+          openAICompatibleProvider,
+          openAICompatibleModel,
+          systemPrompt,
+          messages,
+          abortController.signal
+        )) {
+          if (abortController.signal.aborted) break;
+          sender.send('chat:stream-chunk', { requestId, chunk });
+        }
+
+        if (!abortController.signal.aborted) {
+          sender.send('chat:stream-complete', { requestId });
+        }
+
+        return { success: true };
+      }
 
       const result = streamText({
         model: providerModel,

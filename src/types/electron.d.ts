@@ -1,3 +1,8 @@
+type CompanionDevice = { id: string; name: string; pairedAt: number; lastSeenAt: number; userAgent?: string; remoteAddress?: string }
+type CompanionPairing = { token: string; url: string; qrDataUrl: string; expiresAt: number }
+type CompanionStatus = { running: boolean; port: number | null; urls: string[]; activeConnections: number; pairedDevices: CompanionDevice[]; pairing?: CompanionPairing | null }
+type CompanionCommand = { id: string; type: 'ask' | 'clarify' | 'recap' | 'brainstorm' | 'what_to_answer' | 'attach-file' | 'ping'; payload?: any; receivedAt: number; deviceId?: string }
+
 export interface ElectronAPI {
   updateContentDimensions: (dimensions: {
     width: number
@@ -72,8 +77,16 @@ export interface ElectronAPI {
   closeAdvancedSettings: () => Promise<void>
 
   // LLM Model Management
-  getCurrentLlmConfig: () => Promise<{ provider: "ollama" | "gemini"; model: string; isOllama: boolean }>
+  getCurrentLlmConfig: () => Promise<{ provider: "ollama" | "gemini" | "custom" | "openai-compatible"; model: string; isOllama: boolean }>
   getAvailableOllamaModels: () => Promise<string[]>
+  companionGetStatus: () => Promise<CompanionStatus>
+  companionStart: (preferredPort?: number) => Promise<CompanionStatus>
+  companionStop: () => Promise<CompanionStatus>
+  companionCreatePairingCode: () => Promise<CompanionStatus>
+  companionRevokeDevice: (deviceId: string) => Promise<CompanionStatus>
+  companionUpdateSnapshot: (snapshot: any) => Promise<any>
+  onCompanionStatusChanged: (callback: (status: CompanionStatus) => void) => () => void
+  onCompanionCommand: (callback: (command: CompanionCommand) => void) => () => void
   switchToOllama: (model?: string, url?: string) => Promise<{ success: boolean; error?: string }>
   switchToGemini: (apiKey?: string, modelId?: string) => Promise<{ success: boolean; error?: string }>
   testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey?: string) => Promise<{ success: boolean; error?: string }>
@@ -184,6 +197,7 @@ export interface ElectronAPI {
   // Streaming listeners
   streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean }) => Promise<void>
   onGeminiStreamToken: (callback: (token: string) => void) => () => void
+  onGeminiStreamStatus: (callback: (data: { provider?: string; providerName?: string; model?: string; message: string }) => void) => () => void
   onGeminiStreamDone: (callback: () => void) => () => void
   onGeminiStreamError: (callback: (error: string) => void) => () => void;
 
@@ -341,6 +355,7 @@ export interface ElectronAPI {
   chatStreamMeeting: (params: { requestId: string; meetingId: string; messages: Array<{ role: string; content: string }>; context?: string }) => Promise<{ success?: boolean; error?: string }>;
   chatCancelStream: (requestId: string) => Promise<{ success: boolean }>;
   onChatStreamChunk: (callback: (data: { requestId: string; chunk: string }) => void) => () => void;
+  onChatStreamStatus: (callback: (data: { requestId: string; provider?: string; providerName?: string; model?: string; message: string }) => void) => () => void;
   onChatStreamComplete: (callback: (data: { requestId: string }) => void) => () => void;
   onChatStreamError: (callback: (data: { requestId: string; error: string }) => void) => () => void;
 

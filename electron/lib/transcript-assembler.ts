@@ -276,7 +276,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
   const { CredentialsManager } = require('../services/CredentialsManager');
   const cm = CredentialsManager.getInstance();
   const displayMode = cm.getTranscriptTranslationDisplayMode();
-  const translationEnabled = cm.getTranscriptTranslationEnabled();
+  const translationEnabled = cm.getTranscriptTranslationEnabled() === true;
   const translationModelRaw = cm.getTranscriptTranslationModel();
   const translationProvider = cm.getTranscriptTranslationProvider();
   const translationPrompt = cm.getTranscriptTranslationPrompt();
@@ -286,7 +286,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
   );
   const effectiveTranslationModel =
     translationModelRaw.trim() || (oaiCompat?.preferredModel?.trim() ?? '');
-  const shouldTranslate = forceTranslate ? true : translationEnabled;
+  const shouldTranslate = forceTranslate === true ? true : translationEnabled === true;
   const isTranslationConfigured =
     isTranscriptTranslationConfigured(shouldTranslate, effectiveTranslationModel, translationPrompt) &&
     (standardProviders.has(translationProvider) ? true : !!oaiCompat);

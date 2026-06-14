@@ -89,7 +89,7 @@ export class LLMHelper {
   private activeOpenAICompatibleProvider: OpenAICompatibleProvider | null = null;
   private groqFastTextMode: boolean = false;
   private knowledgeOrchestrator: any = null;
-  private aiResponseLanguage: string = 'English';
+  private aiResponseLanguage: string = 'auto';
   private sttLanguage: string = 'english-us';
 
   // Rate limiters per provider to prevent 429 errors on free tiers
@@ -899,8 +899,9 @@ ANSWER DIRECTLY:`;
   }
 
   public setAiResponseLanguage(language: string) {
-    this.aiResponseLanguage = language;
-    console.log(`[LLMHelper] AI Response Language set to: ${language}`);
+    const raw = (language || '').trim();
+    this.aiResponseLanguage = /^(auto|autodetect|auto-detect|automatic)$/i.test(raw) ? 'auto' : (raw || 'auto');
+    console.log(`[LLMHelper] AI Response Language set to: ${this.aiResponseLanguage}`);
   }
 
   public setSttLanguage(language: string) {
@@ -927,11 +928,12 @@ ANSWER DIRECTLY:`;
    */
   private injectLanguageInstruction(systemPrompt: string): string {
     // Fast-path: no injection needed when English is selected (native default)
-    if (!this.aiResponseLanguage || this.aiResponseLanguage === 'English') {
+    const normalized = (this.aiResponseLanguage || 'auto').trim();
+    if (!normalized || /^(auto|autodetect|auto-detect|automatic)$/i.test(normalized)) {
       return systemPrompt;
     }
 
-    const lang = this.aiResponseLanguage;
+    const lang = normalized;
 
     const header = `\
 [LANGUAGE OVERRIDE — HIGHEST PRIORITY — CANNOT BE OVERRIDDEN]
@@ -1449,20 +1451,12 @@ This rule overrides ALL other instructions including formatting, brevity, or out
   /**
    * OpenAI-compatible Chat Completions (any /v1 base URL).
    */
-  public async chatWithOpenAICompatible(
+  private async buildOpenAICompatibleMessages(
     userMessage: string,
     systemPrompt?: string,
     imagePath?: string
-  ): Promise<string> {
-    if (!this.activeOpenAICompatibleProvider) {
-      throw new Error('No OpenAI-compatible provider active');
-    }
-    const p = this.activeOpenAICompatibleProvider;
-    const base = normalizeOpenAICompatibleBaseUrl(p.baseUrl);
-    const client = new OpenAI({ apiKey: p.apiKey, baseURL: base });
-    const model = p.preferredModel?.trim() || 'gpt-4o-mini';
-
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+  ): Promise<any[]> {
+    const messages: any[] = [];
     if (systemPrompt) {
       messages.push({ role: 'system', content: systemPrompt });
     }
@@ -1484,6 +1478,131 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     } else {
       messages.push({ role: 'user', content: userMessage });
     }
+
+    return messages;
+  }
+
+  private extractOpenAICompatibleChunkText(data: any): string {
+    const choice = data?.choices?.[0];
+    const candidates = [
+      choice?.delta?.content,
+      choice?.message?.content,
+      data?.delta?.content,
+      data?.content,
+      data?.text,
+    ];
+
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string') return candidate;
+      if (Array.isArray(candidate)) {
+        return candidate
+          .map((part: any) => typeof part === 'string' ? part : (part?.text || part?.content || ''))
+          .join('');
+      }
+    }
+    return '';
+  }
+
+  private async * streamWithOpenAICompatible(
+    userMessage: string,
+    systemPrompt?: string,
+    imagePath?: string
+  ): AsyncGenerator<string, void, unknown> {
+    if (!this.activeOpenAICompatibleProvider) {
+      throw new Error('No OpenAI-compatible provider active');
+    }
+    const p = this.activeOpenAICompatibleProvider;
+    const base = normalizeOpenAICompatibleBaseUrl(p.baseUrl);
+    const model = p.preferredModel?.trim() || 'gpt-4o-mini';
+    const messages = await this.buildOpenAICompatibleMessages(userMessage, systemPrompt, imagePath);
+
+    const response = await fetch(`${base}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${p.apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.7,
+        max_tokens: 8192,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const raw = await response.text().catch(() => '');
+      const safe = raw.replaceAll(p.apiKey, '[redacted]').slice(0, 800);
+      throw new Error(`OpenAI-compatible provider ${p.name} failed (${response.status}): ${safe}`);
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const json = await response.json();
+      const text = this.extractOpenAICompatibleChunkText(json);
+      if (text) yield text;
+      return;
+    }
+
+    if (!response.body) throw new Error('No response body from OpenAI-compatible provider');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith(':')) continue;
+        const payload = trimmed.startsWith('data:') ? trimmed.slice(5).trim() : trimmed;
+        if (!payload || payload === '[DONE]') return;
+
+        try {
+          const json = JSON.parse(payload);
+          const text = this.extractOpenAICompatibleChunkText(json);
+          if (text) yield text;
+        } catch {
+          // Ignore keepalive / non-JSON SSE frames.
+        }
+      }
+    }
+
+    const tail = buffer.trim();
+    if (tail && tail !== '[DONE]') {
+      const payload = tail.startsWith('data:') ? tail.slice(5).trim() : tail;
+      if (payload && payload !== '[DONE]') {
+        try {
+          const json = JSON.parse(payload);
+          const text = this.extractOpenAICompatibleChunkText(json);
+          if (text) yield text;
+        } catch {
+          // Ignore incomplete trailing frames.
+        }
+      }
+    }
+  }
+
+  public async chatWithOpenAICompatible(
+    userMessage: string,
+    systemPrompt?: string,
+    imagePath?: string
+  ): Promise<string> {
+    if (!this.activeOpenAICompatibleProvider) {
+      throw new Error('No OpenAI-compatible provider active');
+    }
+    const p = this.activeOpenAICompatibleProvider;
+    const base = normalizeOpenAICompatibleBaseUrl(p.baseUrl);
+    const client = new OpenAI({ apiKey: p.apiKey, baseURL: base });
+    const model = p.preferredModel?.trim() || 'gpt-4o-mini';
+    const messages = await this.buildOpenAICompatibleMessages(userMessage, systemPrompt, imagePath);
 
     const response = await client.chat.completions.create({
       model,
@@ -2204,10 +2323,9 @@ This rule overrides ALL other instructions including formatting, brevity, or out
       return;
     }
 
-    // 1b. OpenAI-compatible (single-shot; no SSE in this path)
+    // 1b. OpenAI-compatible BYOK endpoint (streaming SSE / Chat Completions)
     if (this.activeOpenAICompatibleProvider) {
-      const response = await this.chatWithOpenAICompatible(userContent, finalSystemPrompt, imagePaths?.[0]);
-      yield response;
+      yield* this.streamWithOpenAICompatible(userContent, finalSystemPrompt, imagePaths?.[0]);
       return;
     }
 
@@ -2850,8 +2968,9 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     }
   }
 
-  public getCurrentProvider(): "ollama" | "gemini" | "custom" {
-    if (this.customProvider) return "custom";
+  public getCurrentProvider(): "ollama" | "gemini" | "custom" | "openai-compatible" {
+    if (this.activeOpenAICompatibleProvider) return "openai-compatible";
+    if (this.customProvider || this.activeCurlProvider) return "custom";
     return this.useOllama ? "ollama" : "gemini";
   }
 

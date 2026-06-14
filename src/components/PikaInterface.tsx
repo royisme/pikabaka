@@ -93,6 +93,34 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
 
     useEffect(() => window.electronAPI.onCaptureAndProcess?.((data) => { handleScreenshotAttach(data as ScreenshotAttachment); setTimeout(() => handlersRef.current.handleWhatToSay(), 0); }), [handleScreenshotAttach]);
     useEffect(() => { const cleanups = [window.electronAPI.onScreenshotTaken(handleScreenshotAttach)]; const attachedCleanup = window.electronAPI.onScreenshotAttached?.(handleScreenshotAttach); if (attachedCleanup) cleanups.push(attachedCleanup); return () => cleanups.forEach((fn) => fn()); }, [handleScreenshotAttach]);
+    useEffect(() => {
+        window.electronAPI?.companionUpdateSnapshot?.({
+            transcriptSegments: transcript.transcriptSegments,
+            currentInterviewerPartial: transcript.currentInterviewerPartial,
+            messages: chat.messages,
+            currentModel,
+            audioHealth: audio.nativeAudioHealth,
+            meetingActive: audio.nativeAudioHealth?.meetingActive,
+        }).catch(() => {});
+    }, [transcript.transcriptSegments, transcript.currentInterviewerPartial, chat.messages, currentModel, audio.nativeAudioHealth]);
+    useEffect(() => window.electronAPI?.onCompanionCommand?.((command) => {
+        const text = String(command.payload?.text || '').trim();
+        if (command.type === 'ask') {
+            if (text || command.payload?.path) void chat.submitPrompt({ userText: text || `Review phone upload: ${command.payload?.name || command.payload?.path || 'file'}`, placeholderIntent: 'manual' });
+        } else if (command.type === 'what_to_answer') {
+            if (text) void chat.submitPrompt({ userText: text, placeholderIntent: 'manual' }); else void chat.handleWhatToSay();
+        } else if (command.type === 'clarify') {
+            void chat.handleClarify();
+        } else if (command.type === 'recap') {
+            void chat.handleRecap();
+        } else if (command.type === 'brainstorm') {
+            void chat.handleBrainstorm();
+        } else if (command.type === 'attach-file') {
+            const path = command.payload?.path; const preview = command.payload?.preview;
+            if (path && preview) handleScreenshotAttach({ path, preview });
+            else if (path) void chat.submitPrompt({ userText: `Phone uploaded ${command.payload?.name || 'a file'} at ${path}`, placeholderIntent: 'manual' });
+        }
+    }), [chat.submitPrompt, chat.handleWhatToSay, chat.handleClarify, chat.handleRecap, chat.handleBrainstorm, handleScreenshotAttach]);
     useEffect(() => window.electronAPI.onSuggestionProcessingStart?.(() => { chat.setIsProcessing(true); setIsExpanded(true); }), [chat.setIsProcessing]);
     useEffect(() => window.electronAPI.onGlobalShortcut?.(({ action }) => {
         const h = handlersRef.current; const g = generalHandlersRef.current; isStealthRef.current = true;

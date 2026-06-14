@@ -4,6 +4,7 @@ import { AppState } from "../main"
 import { DatabaseManager } from "../db/DatabaseManager"
 import * as path from "path"
 import { RECOGNITION_LANGUAGES, AI_RESPONSE_LANGUAGES } from "../config/languages"
+import { CredentialsManager } from "../services/CredentialsManager"
 
 let _chatStreamId = 0
 
@@ -357,6 +358,19 @@ export function registerCoreHandlers(appState: AppState): void {
       }
 
       try {
+        const currentProvider = llmHelper.getCurrentProvider?.();
+        if (currentProvider === 'openai-compatible') {
+          const activeModel = llmHelper.getCurrentModel?.();
+          const compat = CredentialsManager.getInstance().getOpenAICompatibleProviders().find((p: any) => p.id === activeModel);
+          const providerLabel = compat?.name || 'OpenAI-compatible';
+          event.sender.send("gemini-stream-status", {
+            provider: 'openai-compatible',
+            providerName: providerLabel,
+            model: compat?.preferredModel || activeModel,
+            message: `Streaming via OpenAI-compatible: ${providerLabel}`
+          });
+        }
+
         // USE streamChat which handles routing
         const stream = llmHelper.streamChat(message, imagePaths, context, options?.skipSystemPrompt ? "" : undefined);
 
@@ -892,7 +906,7 @@ export function registerCoreHandlers(appState: AppState): void {
         ibmWatsonRegion: creds.ibmWatsonRegion || 'us-south',
         hasSonioxKey: hasKey(creds.sonioxApiKey),
         hasTavilyKey: hasKey(creds.tavilyApiKey),
-        transcriptTranslationEnabled: !!creds.transcriptTranslationEnabled,
+        transcriptTranslationEnabled: creds.transcriptTranslationEnabled === true,
         transcriptTranslationProvider: creds.transcriptTranslationProvider || 'ollama',
         transcriptTranslationModel: creds.transcriptTranslationModel || '',
         transcriptTranslationPrompt: creds.transcriptTranslationPrompt || '',

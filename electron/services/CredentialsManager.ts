@@ -178,10 +178,13 @@ export class CredentialsManager {
     }
 
     public getAiResponseLanguage(): string {
-        return this.credentials.aiResponseLanguage || 'English';
+        const stored = typeof this.credentials.aiResponseLanguage === 'string'
+            ? this.credentials.aiResponseLanguage.trim()
+            : '';
+        return stored || 'auto';
     }
     public getTranscriptTranslationEnabled(): boolean {
-        return this.credentials.transcriptTranslationEnabled || false;
+        return this.credentials.transcriptTranslationEnabled === true;
     }
 
     public getTranscriptTranslationProvider(): string {
@@ -339,9 +342,11 @@ export class CredentialsManager {
     }
 
     public setAiResponseLanguage(language: string): void {
-        this.credentials.aiResponseLanguage = language;
+        const raw = (language || '').trim();
+        const normalized = /^(auto|autodetect|auto-detect|automatic)$/i.test(raw) ? 'auto' : raw;
+        this.credentials.aiResponseLanguage = normalized || 'auto';
         this.saveCredentials();
-        console.log(`[CredentialsManager] AI Response Language set to: ${language}`);
+        console.log(`[CredentialsManager] AI Response Language set to: ${this.credentials.aiResponseLanguage}`);
     }
 
     public setTranscriptTranslationEnabled(enabled: boolean): void {

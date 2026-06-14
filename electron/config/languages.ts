@@ -75,6 +75,7 @@ export const RECOGNITION_LANGUAGES: Record<string, LanguageOption> = {
 };
 
 export const AI_RESPONSE_LANGUAGES = [
+    { label: 'Autodetect', code: 'auto' },
     { label: 'English', code: 'English' },
     { label: 'Russian', code: 'Russian' },
     { label: 'Spanish', code: 'Spanish' },

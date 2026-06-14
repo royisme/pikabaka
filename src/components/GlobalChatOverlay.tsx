@@ -13,6 +13,7 @@ interface Message {
     role: 'user' | 'assistant';
     content: string;
     isStreaming?: boolean;
+    streamStatus?: string;
 }
 
 interface GlobalChatOverlayProps {
@@ -62,12 +63,13 @@ const UserMessage: React.FC<{ content: string }> = ({ content }) => (
     </motion.div>
 );
 
-const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = ({ content, isStreaming }) => {
+const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean; streamStatus?: string }> = ({ content, isStreaming, streamStatus }) => {
+    const displayContent = content || (isStreaming ? (streamStatus || 'Streaming response…') : '');
     const [copied, setCopied] = useState(false);
 
     const handleCopy = async () => {
         try {
-            await navigator.clipboard.writeText(content);
+            await navigator.clipboard.writeText(displayContent);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch (err) {
@@ -92,7 +94,7 @@ const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = (
                     />
                 )}
             </div>
-            {!isStreaming && content && (
+            {!isStreaming && displayContent && (
                 <button
                     onClick={handleCopy}
                     className="flex items-center gap-2 mt-3 text-[13px] text-text-tertiary hover:text-text-secondary transition-colors"
@@ -250,6 +252,14 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
 
                 // Setup fallback listeners (Standard Gemini)
                 streamBuffer.reset();
+                const oldStatusCleanup = window.electronAPI?.onGeminiStreamStatus?.((data: { message: string }) => {
+                    if (!data?.message) return;
+                    setMessages(prev => prev.map(msg =>
+                        msg.id === assistantMessageId
+                            ? { ...msg, streamStatus: data.message, content: msg.content || data.message }
+                            : msg
+                    ));
+                });
                 const oldTokenCleanup = window.electronAPI?.onGeminiStreamToken((token: string) => {
                     setChatState('streaming_response');
                     streamBuffer.appendToken(token, (content) => {
@@ -270,6 +280,7 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                     ));
                     setChatState('idle');
                     streamBuffer.reset();
+                    oldStatusCleanup?.();
                     oldTokenCleanup?.();
                     oldDoneCleanup?.();
                     oldErrorCleanup?.();
@@ -355,7 +366,7 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                             {messages.map((msg) => (
                                 msg.role === 'user'
                                     ? <UserMessage key={msg.id} content={msg.content} />
-                                    : <AssistantMessage key={msg.id} content={msg.content} isStreaming={msg.isStreaming} />
+                                    : <AssistantMessage key={msg.id} content={msg.content} isStreaming={msg.isStreaming} streamStatus={msg.streamStatus} />
                             ))}
 
                             {chatState === 'waiting_for_llm' && <TypingIndicator />}

@@ -21,6 +21,14 @@ export function llmChannels() {
         ipcRenderer.removeListener("gemini-stream-token", subscription)
       }
     },
+
+    onGeminiStreamStatus: (callback: (data: { provider?: string; providerName?: string; model?: string; message: string }) => void) => {
+      const subscription = (_: any, data: any) => callback(data)
+      ipcRenderer.on("gemini-stream-status", subscription)
+      return () => {
+        ipcRenderer.removeListener("gemini-stream-status", subscription)
+      }
+    },
     onGeminiStreamDone: (callback: () => void) => {
       const subscription = () => callback()
       ipcRenderer.on("gemini-stream-done", subscription)

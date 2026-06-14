@@ -59,6 +59,13 @@ export async function electronChatFetch(
 
       // --- IPC listeners ---
 
+      const statusCleanup = window.electronAPI?.onChatStreamStatus?.(
+        (data: { requestId: string; message: string }) => {
+          if (data.requestId !== requestId) return;
+          window.dispatchEvent(new CustomEvent('pika-chat-stream-status', { detail: data }));
+        }
+      );
+
       const chunkCleanup = window.electronAPI?.onChatStreamChunk(
         (data: { requestId: string; chunk: string }) => {
           if (data.requestId !== requestId) return;
@@ -85,6 +92,7 @@ export async function electronChatFetch(
       );
 
       function cleanup() {
+        statusCleanup?.();
         chunkCleanup?.();
         doneCleanup?.();
         errorCleanup?.();
