@@ -4,6 +4,8 @@ export function meetingChannels() {
   return {
     startMeeting: (metadata?: any) => ipcRenderer.invoke("start-meeting", metadata),
     endMeeting: () => ipcRenderer.invoke("end-meeting"),
+  getMeetingPaused: () => ipcRenderer.invoke("get-meeting-paused"),
+  setMeetingPaused: (paused: boolean) => ipcRenderer.invoke("set-meeting-paused", paused),
     getRecentMeetings: () => ipcRenderer.invoke("get-recent-meetings"),
     getMeetingDetails: (id: string) => ipcRenderer.invoke("get-meeting-details", id),
     updateMeetingTitle: (id: string, title: string) => ipcRenderer.invoke("update-meeting-title", { id, title }),

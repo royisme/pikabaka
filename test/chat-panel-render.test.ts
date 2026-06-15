@@ -3,10 +3,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { test } from 'tap';
 import {
   CHAT_PANEL_ACTION_BAR_CLASS,
+  CHAT_PANEL_CONTROL_BAR_CLASS,
+  CHAT_PANEL_DRAG_HANDLE_CLASS,
   CHAT_PANEL_FOOTER_CLASS,
   CHAT_PANEL_FOOTER_CONTROLS_CLASS,
   CHAT_PANEL_INPUT_BASE_CLASS,
   ChatPanelAttachedScreenshots,
+  ChatPanelControlBar,
   ChatPanelTextInput,
   getChatPanelModelDisplayName,
   handleChatInputPaste,
@@ -163,5 +166,41 @@ test('chat input renders and submits on Enter', (t) => {
 
   input.props.onPaste({ clipboardData: { items: [{ type: 'image/png' }] }, preventDefault: () => {} });
   t.equal(pasted, 1, 'input wires paste events to the paste handler');
+  t.end();
+});
+
+
+test('chat control bar exposes draggable handle plus no-drag pause and stop controls', (t) => {
+  let paused = 0;
+  let stopped = 0;
+  let collapsed = 0;
+  let home = 0;
+  const tree = ChatPanelControlBar({
+    isProcessing: true,
+    isPaused: false,
+    onTogglePause: () => { paused += 1; },
+    onStop: () => { stopped += 1; },
+    onToggleCollapse: () => { collapsed += 1; },
+    onOpenLauncher: () => { home += 1; },
+  });
+
+  const root = collectElements(tree, (element) => element.props.className === CHAT_PANEL_CONTROL_BAR_CLASS)[0];
+  t.ok(String(root.props.className).includes('draggable-area'), 'control bar is a drag region');
+
+  const dragHandle = collectElements(tree, (element) => element.props['aria-label'] === 'Drag chat window')[0];
+  t.ok(String(dragHandle.props.className).includes(CHAT_PANEL_DRAG_HANDLE_CLASS), 'explicit drag handle is rendered');
+
+  const buttons = collectElements(tree, (element) => element.type === 'button');
+  t.equal(buttons.length, 4, 'pause, stop, hide, and home buttons render');
+  buttons.forEach((button) => t.match(String(button.props.className), /no-drag/, 'interactive control is not draggable'));
+
+  buttons[0].props.onClick();
+  buttons[1].props.onClick();
+  buttons[2].props.onClick();
+  buttons[3].props.onClick();
+  t.equal(paused, 1);
+  t.equal(stopped, 1);
+  t.equal(collapsed, 1);
+  t.equal(home, 1);
   t.end();
 });

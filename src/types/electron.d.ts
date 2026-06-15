@@ -62,7 +62,10 @@ export interface ElectronAPI {
   showOverlay: () => Promise<void>
   hideOverlay: () => Promise<void>
   getMeetingActive: () => Promise<boolean>
+  getMeetingPaused: () => Promise<{ paused: boolean }>
+  setMeetingPaused: (paused: boolean) => Promise<{ success: boolean; paused: boolean; error?: string }>
   onMeetingStateChanged: (callback: (data: { isActive: boolean }) => void) => () => void
+  onMeetingPauseChanged: (callback: (data: { paused: boolean }) => void) => () => void
   onWindowMaximizedChanged: (callback: (isMaximized: boolean) => void) => () => void
   onEnsureExpanded: (callback: () => void) => () => void
   openExternal: (url: string) => Promise<void>
@@ -217,6 +220,7 @@ export interface ElectronAPI {
 
   // Streaming listeners
   streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean }) => Promise<void>
+  cancelGeminiChat: () => Promise<{ success: boolean }>
   onGeminiStreamToken: (callback: (token: string) => void) => () => void
   onGeminiStreamStatus: (callback: (data: { provider?: string; providerName?: string; model?: string; message: string }) => void) => () => void
   onGeminiStreamDone: (callback: () => void) => () => void

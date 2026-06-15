@@ -157,6 +157,7 @@ export class AppState {
 
   public hasDebugged: boolean = false
   private isMeetingActive: boolean = false; // Guard for session state leaks
+  private isMeetingPaused: boolean = false;
   private _isQuitting: boolean = false;
   public _verboseLogging: boolean = false;
   public _disguiseTimers: NodeJS.Timeout[] = []; // Track forceUpdate timeouts
@@ -388,6 +389,10 @@ export class AppState {
     return this.isMeetingActive;
   }
 
+  public getIsMeetingPaused(): boolean {
+    return this.isMeetingPaused;
+  }
+
   public isQuitting(): boolean {
     return this._isQuitting;
   }
@@ -398,6 +403,10 @@ export class AppState {
 
   private broadcastMeetingState(): void {
     this.broadcast('meeting-state-changed', { isActive: this.isMeetingActive });
+  }
+
+  private broadcastMeetingPauseState(): void {
+    this.broadcast('meeting-pause-changed', { paused: this.isMeetingPaused });
   }
 
   private async bootstrapOllamaEmbeddings() {
@@ -752,7 +761,7 @@ export class AppState {
     this.setupSystemAudioPipeline();
 
     // Restart audio captures and new STT instances if a meeting is active
-    if (this.isMeetingActive) {
+    if (this.isMeetingActive && !this.isMeetingPaused) {
       this.systemAudioCapture?.start();
       this.microphoneCapture?.start();
       this.googleSTT?.start();
@@ -846,12 +855,14 @@ export class AppState {
         this.setupSystemAudioPipeline();
 
         // Start System Audio
-        this.systemAudioCapture?.start();
-        this.googleSTT?.start();
+        if (!this.isMeetingPaused) {
+          this.systemAudioCapture?.start();
+          this.googleSTT?.start();
 
         // Start Microphone
-        this.microphoneCapture?.start();
-        this.googleSTT_User?.start();
+          this.microphoneCapture?.start();
+          this.googleSTT_User?.start();
+        }
 
         // Start JIT RAG live indexing
         if (this.ragManager) {
@@ -877,10 +888,46 @@ export class AppState {
     }, 0); // Defer to next event loop tick — ensures IPC response reaches renderer before audio init
   }
 
+
+  public async setMeetingPaused(paused: boolean): Promise<boolean> {
+    if (!this.isMeetingActive) {
+      this.isMeetingPaused = false;
+      this.broadcastMeetingPauseState();
+      return false;
+    }
+
+    if (this.isMeetingPaused === paused) {
+      this.broadcastMeetingPauseState();
+      return this.isMeetingPaused;
+    }
+
+    this.isMeetingPaused = paused;
+    if (paused) {
+      console.log('[Main] Pausing meeting audio/transcript capture...');
+      this.systemAudioCapture?.stop();
+      this.googleSTT?.stop();
+      this.microphoneCapture?.stop();
+      this.googleSTT_User?.stop();
+      this.resetBufferedTranscriptTurns();
+    } else {
+      console.log('[Main] Resuming meeting audio/transcript capture...');
+      this.setupSystemAudioPipeline();
+      this.systemAudioCapture?.start();
+      this.googleSTT?.start();
+      this.microphoneCapture?.start();
+      this.googleSTT_User?.start();
+    }
+
+    this.broadcastMeetingPauseState();
+    return this.isMeetingPaused;
+  }
+
   public async endMeeting(): Promise<void> {
     console.log('[Main] Ending Meeting...');
     this.isMeetingActive = false; // Block new data immediately
+    this.isMeetingPaused = false;
     this.broadcastMeetingState();
+    this.broadcastMeetingPauseState();
 
     // Reset Mouse Passthrough so the next meeting overlay starts fresh and focusable
     if (this.overlayMousePassthrough) {

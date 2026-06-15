@@ -39,6 +39,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const [splitterPosition, setSplitterPosition] = useState(readStoredSplitterPosition);
     const [isMousePassthrough, setIsMousePassthrough] = useState(false);
     const [isUndetectable, setIsUndetectable] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
     const [currentModel, setCurrentModel] = useState('gemini-3.1-flash-lite-preview');
     const isStealthRef = useRef(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -57,6 +58,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     useEffect(() => { window.electronAPI?.getUndetectable?.().then(setIsUndetectable); const unsubscribe = window.electronAPI?.onUndetectableChanged?.(setIsUndetectable); return () => unsubscribe?.(); }, []);
     useEffect(() => localStorage.setItem('pika_undetectable', String(isUndetectable)), [isUndetectable]);
     useEffect(() => { window.electronAPI?.getOverlayMousePassthrough?.().then(setIsMousePassthrough).catch(() => {}); const unsubscribe = window.electronAPI?.onOverlayMousePassthroughChanged?.(setIsMousePassthrough); return () => unsubscribe?.(); }, []);
+    useEffect(() => { window.electronAPI?.getMeetingPaused?.().then((state) => setIsPaused(!!state?.paused)).catch(() => {}); const unsubscribe = window.electronAPI?.onMeetingPauseChanged?.((state) => setIsPaused(!!state?.paused)); return () => unsubscribe?.(); }, []);
     useEffect(() => window.electronAPI?.onSettingsVisibilityChange?.(setIsSettingsOpen), []);
     useEffect(() => { if (isExpanded) { window.electronAPI.showWindow(isStealthRef.current); isStealthRef.current = false; } else setTimeout(() => window.electronAPI.hideWindow(), 400); }, [isExpanded]);
     useEffect(() => window.electronAPI?.onToggleExpand?.(() => setIsExpanded((prev) => !prev)), []);
@@ -99,7 +101,36 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     useEffect(() => { const timer = setTimeout(updateContentDimensions, 600); return () => clearTimeout(timer); }, [updateContentDimensions]);
     useEffect(() => { if (isExpanded) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chat.messages, isExpanded, chat.isProcessing]);
 
-    const handleAnswerNow = useCallback(() => chat.handleWhatToSay(), [chat.handleWhatToSay]);
+    const handleAnswerNow = useCallback(() => {
+        if (isPaused) setIsPaused(false);
+        chat.handleWhatToSay();
+    }, [chat.handleWhatToSay, isPaused]);
+    const handleStop = useCallback(async () => {
+        chat.stopActiveResponse();
+        chat.setIsProcessing(false);
+        await window.electronAPI.cancelGeminiChat?.().catch(() => {});
+        if (!chat.isProcessing) {
+            await window.electronAPI.resetIntelligence().catch(() => {});
+            chat.setSystemMessages([]);
+            chat.setAttachedContext([]);
+            chat.setInputValue('');
+        }
+    }, [chat]);
+    const handleTogglePause = useCallback(() => {
+        setIsPaused((prev) => {
+            const next = !prev;
+            if (next) audio.setIsManualRecording(false);
+            void window.electronAPI?.setMeetingPaused?.(next)
+                .then((result) => {
+                    if (typeof result?.paused === 'boolean') setIsPaused(result.paused);
+                })
+                .catch((err) => {
+                    console.error('Failed to toggle meeting pause:', err);
+                    setIsPaused(prev);
+                });
+            return next;
+        });
+    }, [audio.setIsManualRecording]);
 
     const handlersRef = useRef<CommandHandlers>(null!);
     handlersRef.current = { handleWhatToSay: chat.handleWhatToSay, handleFollowUp: chat.handleFollowUp, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleAnswerNow, handleClarify: chat.handleClarify, handleCodeHint: chat.handleCodeHint, handleBrainstorm: chat.handleBrainstorm };
@@ -117,7 +148,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const generalHandlersRef = useRef<GeneralHandlers>(null!);
     generalHandlersRef.current = {
         toggleVisibility: () => window.electronAPI.toggleWindow(), processScreenshots: chat.handleWhatToSay,
-        resetCancel: async () => { if (chat.isProcessing) chat.setIsProcessing(false); else { await window.electronAPI.resetIntelligence(); chat.setSystemMessages([]); chat.setAttachedContext([]); chat.setInputValue(''); } },
+        resetCancel: async () => { if (chat.isProcessing) await handleStop(); else { await window.electronAPI.resetIntelligence(); chat.setSystemMessages([]); chat.setAttachedContext([]); chat.setInputValue(''); } },
         toggleMousePassthrough: () => { const next = !isMousePassthrough; setIsMousePassthrough(next); window.electronAPI?.setOverlayMousePassthrough?.(next); },
         takeScreenshot: async () => {
             try {
@@ -222,14 +253,14 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     }, [handleScreenshotAttach, pushScreenshotError]);
     const setMessages = useCallback((updater: React.SetStateAction<Message[]>) => { chat.setSystemMessages((prev) => (typeof updater === 'function' ? (updater as (p: Message[]) => Message[])(prev) : updater)); }, [chat.setSystemMessages]);
     const transcriptProps = { ...transcript, ...audio, appearance, isLightTheme };
-    const chatProps = { messages: chat.messages, knowledgeContext: chat.knowledgeContext, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, actionButtonMode: chat.actionButtonMode, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleWhatToSay: chat.handleWhatToSay, handleClarify: chat.handleClarify, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleBrainstorm: chat.handleBrainstorm, handleAnswerNow, handleManualSubmit: chat.handleManualSubmit, handlePasteImage, isManualRecording: audio.isManualRecording, manualTranscript: audio.manualTranscript, voiceInput: audio.voiceInput, appearance, isLightTheme, currentModel, isSettingsOpen, isMousePassthrough, setIsMousePassthrough, shortcuts, scrollContainerRef, messagesEndRef, textInputRef, contentRef, setMessages };
+    const chatProps = { messages: chat.messages, knowledgeContext: chat.knowledgeContext, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, actionButtonMode: chat.actionButtonMode, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleWhatToSay: chat.handleWhatToSay, handleClarify: chat.handleClarify, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleBrainstorm: chat.handleBrainstorm, handleAnswerNow, handleManualSubmit: isPaused ? () => {} : chat.handleManualSubmit, handlePasteImage, handleStop, isPaused, handleTogglePause, handleCollapse: () => setIsExpanded(false), handleOpenLauncher: () => window.electronAPI?.setWindowMode?.('launcher'), isManualRecording: audio.isManualRecording, manualTranscript: chat.isProcessing ? audio.manualTranscript : (isPaused ? 'Paused' : audio.manualTranscript), voiceInput: isPaused ? '' : audio.voiceInput, appearance, isLightTheme, currentModel, isSettingsOpen, isMousePassthrough, setIsMousePassthrough, shortcuts, scrollContainerRef, messagesEndRef, textInputRef, contentRef, setMessages };
 
     return (
         <div ref={contentRef} className={`flex flex-col items-center w-full mx-auto ${isExpanded ? 'h-screen min-h-[560px]' : 'h-fit'} min-h-0 bg-transparent p-0 rounded-[24px] font-sans gap-2 overlay-text-primary`}>
             <AnimatePresence>
                 {isExpanded && (
                     <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="flex flex-col items-center gap-2 w-full flex-1 min-h-0 min-w-[420px]">
-                        <TopPill expanded={isExpanded} onToggle={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} appearance={appearance} onLogoClick={() => window.electronAPI?.setWindowMode?.('launcher')} />
+                        <TopPill expanded={isExpanded} onToggle={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} appearance={appearance} onLogoClick={() => window.electronAPI?.setWindowMode?.('launcher')} isPaused={isPaused} isProcessing={chat.isProcessing} onPauseToggle={handleTogglePause} onStop={handleStop} />
                         <SplitterShell left={<TranscriptColumn {...transcriptProps} />} right={<ChatColumn {...chatProps} />} splitterPosition={splitterPosition} onSplitterChange={handleSplitterChange} isExpanded={isExpanded} appearance={appearance} overlayPanelClass="overlay-text-primary" />
                     </motion.div>
                 )}

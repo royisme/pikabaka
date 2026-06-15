@@ -3,6 +3,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { electronChatFetch } from '../lib/electronChatFetch';
 import { analytics } from '../lib/analytics/analytics.service';
+import { sanitizeChatError } from '../utils/chatErrorUtils';
 
 export type Message = {
   id: string;
@@ -148,7 +149,7 @@ export function useMeetingChat() {
       {
         id: Date.now().toString(),
         role: 'system',
-        text: `Error: ${error}`,
+        text: `Error: ${sanitizeChatError(error)}`,
       },
     ]);
   }, []);
@@ -381,7 +382,7 @@ export function useMeetingChat() {
         setIsProcessing(false);
         setSystemMessages((prev) => {
           const last = prev[prev.length - 1];
-          const errMsg = { id: Date.now().toString(), role: 'system' as const, text: `❌ Error: ${error}` };
+          const errMsg = { id: Date.now().toString(), role: 'system' as const, text: `❌ Error: ${sanitizeChatError(error)}` };
           if (last && last.isStreaming && last.text === '') return prev.slice(0, -1).concat(errMsg);
           return [...prev, errMsg];
         });
@@ -560,6 +561,13 @@ export function useMeetingChat() {
       });
     }
   }, [attachedContext, conversationContextRef, setAttachedContext, setIsProcessing, setSystemMessages]);
+
+  const stopActiveResponse = useCallback(() => {
+    stop?.();
+    setIsProcessing(false);
+    window.electronAPI?.cancelGeminiChat?.().catch(() => {});
+    window.electronAPI?.ragCancelQuery?.({ meetingId: 'live-meeting-current' }).catch(() => {});
+  }, [stop]);
 
   const handleWhatToSay = useCallback(async () => {
     analytics.trackCommandExecuted('what_to_say');
@@ -746,6 +754,7 @@ export function useMeetingChat() {
     messages,
     setSystemMessages,
     stop,
+    stopActiveResponse,
     submitPrompt,
     handleWhatToSay,
     handleFollowUp,

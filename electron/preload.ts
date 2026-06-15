@@ -514,10 +514,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
   showOverlay: () => ipcRenderer.invoke("show-overlay"),
   hideOverlay: () => ipcRenderer.invoke("hide-overlay"),
   getMeetingActive: () => ipcRenderer.invoke("get-meeting-active"),
+  getMeetingPaused: () => ipcRenderer.invoke("get-meeting-paused"),
+  setMeetingPaused: (paused: boolean) => ipcRenderer.invoke("set-meeting-paused", paused),
   onMeetingStateChanged: (callback: (data: { isActive: boolean }) => void) => {
     const subscription = (_: any, data: { isActive: boolean }) => callback(data);
     ipcRenderer.on('meeting-state-changed', subscription);
     return () => { ipcRenderer.removeListener('meeting-state-changed', subscription); };
+  },
+  onMeetingPauseChanged: (callback: (data: { paused: boolean }) => void) => {
+    const subscription = (_: any, data: { paused: boolean }) => callback(data);
+    ipcRenderer.on('meeting-pause-changed', subscription);
+    return () => { ipcRenderer.removeListener('meeting-pause-changed', subscription); };
   },
   onWindowMaximizedChanged: (callback: (isMaximized: boolean) => void) => {
     const subscription = (_: any, isMaximized: boolean) => callback(isMaximized);
@@ -855,6 +862,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Streaming Chat
   streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean }) => ipcRenderer.invoke("gemini-chat-stream", message, imagePaths, context, options),
+  cancelGeminiChat: () => ipcRenderer.invoke("gemini-chat-cancel"),
 
   onGeminiStreamToken: (callback: (token: string) => void) => {
     const subscription = (_: any, token: string) => callback(token)

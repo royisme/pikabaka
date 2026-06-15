@@ -30,6 +30,7 @@ import {
   CHAT_PANEL_FOOTER_CLASS,
   CHAT_PANEL_FOOTER_CONTROLS_CLASS,
   ChatPanelAttachedScreenshots,
+  ChatPanelControlBar,
   ChatPanelTextInput,
   createChatInputPasteHandler,
   getChatPanelModelDisplayName,
@@ -81,6 +82,11 @@ interface ChatPanelProps {
   handleAnswerNow: () => void;
   handleManualSubmit: () => void;
   handlePasteImage: () => void;
+  handleStop?: () => void;
+  isPaused?: boolean;
+  handleTogglePause?: () => void;
+  handleCollapse?: () => void;
+  handleOpenLauncher?: () => void;
   isManualRecording: boolean;
   manualTranscript: string;
   voiceInput: string;
@@ -115,6 +121,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   handleAnswerNow,
   handleManualSubmit,
   handlePasteImage,
+  handleStop = () => {},
+  isPaused = false,
+  handleTogglePause = () => {},
+  handleCollapse,
+  handleOpenLauncher,
   isManualRecording,
   manualTranscript,
   voiceInput,
@@ -427,6 +438,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      <ChatPanelControlBar
+        isProcessing={isProcessing}
+        isPaused={isPaused}
+        onTogglePause={handleTogglePause}
+        onStop={handleStop}
+        onToggleCollapse={handleCollapse}
+        onOpenLauncher={handleOpenLauncher}
+      />
       <div
         ref={scrollContainerRef}
         className="flex-1 min-h-[112px] overflow-y-auto px-4 py-3.5 space-y-2.5 no-drag"

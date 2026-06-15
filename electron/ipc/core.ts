@@ -7,6 +7,30 @@ import { RECOGNITION_LANGUAGES, AI_RESPONSE_LANGUAGES } from "../config/language
 import { CredentialsManager } from "../services/CredentialsManager"
 
 let _chatStreamId = 0
+let _chatCancelRequested = false
+let _chatAbortController: AbortController | null = null
+
+function sanitizeStreamError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error || 'Unknown streaming error');
+  const text = raw
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const match = text.match(/OpenAI-compatible provider ([^ ]+) failed \((\d+)\)/i);
+  if (match) {
+    const status = Number(match[2]);
+    const hint = status >= 500
+      ? 'Provider server error. Try again, switch models, or check the provider status.'
+      : 'Check provider settings and try again.';
+    return `OpenAI-compatible provider ${match[1]} failed (${match[2]}). ${hint}`;
+  }
+  if (/Internal Server Error/i.test(text) && /nginx/i.test(text)) {
+    return 'Provider server returned 500 Internal Server Error. Try again or switch providers.';
+  }
+  return text || 'Unknown streaming error';
+}
 
 export function registerCoreHandlers(appState: AppState): void {
   // --- NEW Test Helper ---
@@ -318,6 +342,15 @@ export function registerCoreHandlers(appState: AppState): void {
     }
   });
 
+  safeHandle("gemini-chat-cancel", async () => {
+    _chatCancelRequested = true;
+    _chatStreamId += 1;
+    _chatAbortController?.abort();
+    _chatAbortController = null;
+    appState.getMainWindow()?.webContents.send("gemini-stream-done");
+    return { success: true };
+  });
+
   // Streaming IPC Handler
   // SECURITY FIX (P0-1): Monotonic stream ID prevents interleaved tokens from concurrent stream requests.
   // Each new invocation increments the ID; any in-flight iteration bails as soon as it detects
@@ -329,6 +362,10 @@ export function registerCoreHandlers(appState: AppState): void {
       const llmHelper = appState.processingHelper.getLLMHelper();
 
       // Claim a new stream ID — any prior stream will detect this and stop emitting.
+      _chatCancelRequested = false;
+      _chatAbortController?.abort();
+      const abortController = new AbortController();
+      _chatAbortController = abortController;
       const myStreamId = ++_chatStreamId;
 
       // Update IntelligenceManager with USER message immediately
@@ -372,11 +409,11 @@ export function registerCoreHandlers(appState: AppState): void {
         }
 
         // USE streamChat which handles routing
-        const stream = llmHelper.streamChat(message, imagePaths, context, options?.skipSystemPrompt ? "" : undefined);
+        const stream = llmHelper.streamChat(message, imagePaths, context, options?.skipSystemPrompt ? "" : undefined, abortController.signal);
 
         for await (const token of stream) {
           // Bail if a newer stream has taken over (user triggered a new request)
-          if (_chatStreamId !== myStreamId) {
+          if (abortController.signal.aborted || _chatCancelRequested || _chatStreamId !== myStreamId) {
             console.log(`[IPC] gemini-chat-stream ${myStreamId} superseded by ${_chatStreamId}, stopping.`);
             return null;
           }
@@ -385,7 +422,8 @@ export function registerCoreHandlers(appState: AppState): void {
         }
 
         // Final check: only send done if we are still the active stream
-        if (_chatStreamId === myStreamId) {
+        if (!_chatCancelRequested && _chatStreamId === myStreamId) {
+          _chatAbortController = null;
           event.sender.send("gemini-stream-done");
 
           // Update IntelligenceManager with ASSISTANT message after completion
@@ -398,8 +436,13 @@ export function registerCoreHandlers(appState: AppState): void {
 
       } catch (streamError: any) {
         console.error("[IPC] Streaming error:", streamError);
-        if (_chatStreamId === myStreamId) {
-          event.sender.send("gemini-stream-error", streamError.message || "Unknown streaming error");
+        if ((streamError as Error)?.name === "AbortError" || abortController.signal.aborted || _chatCancelRequested) {
+          console.log(`[IPC] gemini-chat-stream ${myStreamId} cancelled.`);
+          return null;
+        }
+        if (!_chatCancelRequested && _chatStreamId === myStreamId) {
+          _chatAbortController = null;
+          event.sender.send("gemini-stream-error", sanitizeStreamError(streamError));
         }
       }
 

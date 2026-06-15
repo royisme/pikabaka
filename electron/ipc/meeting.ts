@@ -32,6 +32,18 @@ export function registerMeetingHandlers(appState: AppState): void {
     }
   });
 
+  safeHandle("set-meeting-paused", async (_event, paused: boolean) => {
+    try {
+      const next = await appState.setMeetingPaused(!!paused);
+      return { success: true, paused: next };
+    } catch (error: any) {
+      console.error("Error setting meeting pause state:", error);
+      return { success: false, paused: appState.getIsMeetingPaused(), error: error.message };
+    }
+  });
+
+  safeHandle("get-meeting-paused", async () => ({ paused: appState.getIsMeetingPaused() }));
+
   safeHandle("get-recent-meetings", async () => {
     // Fetch from SQLite (limit 50)
     return DatabaseManager.getInstance().getRecentMeetings(50);

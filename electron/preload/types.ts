@@ -193,7 +193,10 @@ export interface ElectronAPI {
   showOverlay: () => Promise<void>
   hideOverlay: () => Promise<void>
   getMeetingActive: () => Promise<boolean>
+  getMeetingPaused: () => Promise<{ paused: boolean }>
+  setMeetingPaused: (paused: boolean) => Promise<{ success: boolean; paused: boolean; error?: string }>
   onMeetingStateChanged: (callback: (data: { isActive: boolean }) => void) => () => void
+  onMeetingPauseChanged: (callback: (data: { paused: boolean }) => void) => () => void
   onWindowMaximizedChanged: (callback: (isMaximized: boolean) => void) => () => void
   onEnsureExpanded: (callback: () => void) => () => void
   onToggleExpand: (callback: () => void) => () => void

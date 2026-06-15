@@ -1503,10 +1503,30 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     return '';
   }
 
+
+  private buildOpenAICompatibleHttpError(providerName: string, status: number, rawBody: string): Error {
+    const bodyText = rawBody
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const summary = bodyText && !/^nginx\//i.test(bodyText) ? ` ${bodyText.slice(0, 160)}` : '';
+    const retryHint = status >= 500
+      ? 'Provider server error. Try again, switch models, or check the provider status.'
+      : 'Check provider settings and try again.';
+    return new Error(`OpenAI-compatible provider ${providerName} failed (${status}). ${retryHint}${summary ? ` Details: ${summary}` : ''}`);
+  }
+
   private async * streamWithOpenAICompatible(
     userMessage: string,
     systemPrompt?: string,
-    imagePath?: string
+    imagePath?: string,
+    abortSignal?: AbortSignal
   ): AsyncGenerator<string, void, unknown> {
     if (!this.activeOpenAICompatibleProvider) {
       throw new Error('No OpenAI-compatible provider active');
@@ -1529,12 +1549,12 @@ This rule overrides ALL other instructions including formatting, brevity, or out
         max_tokens: 8192,
         stream: true,
       }),
+      signal: abortSignal,
     });
 
     if (!response.ok) {
       const raw = await response.text().catch(() => '');
-      const safe = raw.replaceAll(p.apiKey, '[redacted]').slice(0, 800);
-      throw new Error(`OpenAI-compatible provider ${p.name} failed (${response.status}): ${safe}`);
+      throw this.buildOpenAICompatibleHttpError(p.name, response.status, raw.replaceAll(p.apiKey, '[redacted]'));
     }
 
     const contentType = response.headers.get('content-type') || '';
@@ -1545,6 +1565,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
       return;
     }
 
+    if (abortSignal?.aborted) return;
     if (!response.body) throw new Error('No response body from OpenAI-compatible provider');
 
     const reader = response.body.getReader();
@@ -2249,7 +2270,8 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     message: string,
     imagePaths?: string[],
     context?: string,
-    systemPromptOverride?: string // Optional override (defaults to HARD_SYSTEM_PROMPT)
+    systemPromptOverride?: string, // Optional override (defaults to HARD_SYSTEM_PROMPT)
+    abortSignal?: AbortSignal
   ): AsyncGenerator<string, void, unknown> {
 
     // ============================================================
@@ -2325,7 +2347,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
 
     // 1b. OpenAI-compatible BYOK endpoint (streaming SSE / Chat Completions)
     if (this.activeOpenAICompatibleProvider) {
-      yield* this.streamWithOpenAICompatible(userContent, finalSystemPrompt, imagePaths?.[0]);
+      yield* this.streamWithOpenAICompatible(userContent, finalSystemPrompt, imagePaths?.[0], abortSignal);
       return;
     }
 

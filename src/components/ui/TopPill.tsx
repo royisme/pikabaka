@@ -1,4 +1,4 @@
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, Pause, Play, Square, GripHorizontal } from "lucide-react";
 import icon from "../../../assets/icon.png";
 import type { OverlayAppearance } from "../../lib/overlayAppearance";
 
@@ -8,6 +8,10 @@ interface TopPillProps {
     onQuit: () => void;
     appearance: OverlayAppearance;
     onLogoClick?: () => void;
+    isPaused?: boolean;
+    isProcessing?: boolean;
+    onPauseToggle?: () => void;
+    onStop?: () => void;
 }
 
 export default function TopPill({
@@ -16,6 +20,10 @@ export default function TopPill({
     onQuit,
     appearance,
     onLogoClick,
+    isPaused = false,
+    isProcessing = false,
+    onPauseToggle,
+    onStop,
 }: TopPillProps) {
     return (
         <div className="flex justify-center mt-2 select-none z-50">
@@ -83,12 +91,64 @@ export default function TopPill({
                     <span className="tracking-wide opacity-80 group-hover:opacity-100">{expanded ? "Hide" : "Show"}</span>
                 </button>
 
-                {/* STOP / QUIT BUTTON */}
+                <div
+                    className="draggable-area hidden min-[460px]:flex items-center gap-1 px-2 overlay-text-muted"
+                    aria-label="Drag Pika window"
+                    title="Drag Pika window"
+                >
+                    <GripHorizontal className="w-4 h-4" />
+                    <span className="text-[10px] uppercase tracking-[0.12em]">Drag</span>
+                </div>
+
+                {onPauseToggle && (
+                    <button
+                        onClick={onPauseToggle}
+                        aria-label={isPaused ? "Resume meeting" : "Pause meeting"}
+                        aria-pressed={isPaused}
+                        className={`
+              no-drag h-8 px-3
+              rounded-full
+              overlay-icon-surface overlay-icon-surface-hover
+              overlay-text-primary
+              flex items-center gap-1.5 justify-center
+              text-[11px] font-medium
+              interaction-base interaction-press
+              ${isPaused ? 'text-state-warning' : ''}
+            `}
+                        style={appearance.iconStyle}
+                    >
+                        {isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+                        <span className="hidden min-[390px]:inline">{isPaused ? "Resume" : "Pause"}</span>
+                    </button>
+                )}
+
+                {onStop && (
+                    <button
+                        onClick={onStop}
+                        aria-label={isProcessing ? "Stop current answer" : "Stop current action"}
+                        className={`
+              no-drag h-8 px-3
+              rounded-full
+              overlay-icon-surface
+              overlay-text-primary
+              flex items-center gap-1.5 justify-center
+              text-[11px] font-medium
+              interaction-base interaction-press
+              hover:bg-state-danger-soft hover:text-state-danger
+            `}
+                        style={appearance.iconStyle}
+                    >
+                        <Square className="w-3.5 h-3.5" />
+                        <span className="hidden min-[390px]:inline">Stop</span>
+                    </button>
+                )}
+
+                {/* QUIT BUTTON */}
                 <button
                     onClick={onQuit}
-                    aria-label="Stop and quit"
+                    aria-label="Quit Pika"
                     className={`
-            w-8 h-8
+            no-drag w-8 h-8
             rounded-full
             overlay-icon-surface
             overlay-text-primary
