@@ -1,6 +1,7 @@
-import { ChevronUp, ChevronDown, Pause, Play, Square, GripHorizontal } from "lucide-react";
+import { ChevronUp, ChevronDown, Pause, Play, Square, GripHorizontal, X } from "lucide-react";
 import icon from "../../../assets/icon.png";
 import type { OverlayAppearance } from "../../lib/overlayAppearance";
+import { shouldShowTopPillRunControls } from "./topPillControls";
 
 interface TopPillProps {
     expanded: boolean;
@@ -25,6 +26,8 @@ export default function TopPill({
     onPauseToggle,
     onStop,
 }: TopPillProps) {
+    const showRunControls = shouldShowTopPillRunControls(expanded, Boolean(onPauseToggle || onStop));
+
     return (
         <div className="flex justify-center mt-2 select-none z-50">
             <div
@@ -91,16 +94,18 @@ export default function TopPill({
                     <span className="tracking-wide opacity-80 group-hover:opacity-100">{expanded ? "Hide" : "Show"}</span>
                 </button>
 
-                <div
-                    className="draggable-area hidden min-[460px]:flex items-center gap-1 px-2 overlay-text-muted"
-                    aria-label="Drag Pika window"
-                    title="Drag Pika window"
-                >
-                    <GripHorizontal className="w-4 h-4" />
-                    <span className="text-[10px] uppercase tracking-[0.12em]">Drag</span>
-                </div>
+                {showRunControls && (
+                    <div
+                        className="draggable-area hidden min-[460px]:flex items-center gap-1 px-2 overlay-text-muted"
+                        aria-label="Drag Pika window"
+                        title="Drag Pika window"
+                    >
+                        <GripHorizontal className="w-4 h-4" />
+                        <span className="text-[10px] uppercase tracking-[0.12em]">Drag</span>
+                    </div>
+                )}
 
-                {onPauseToggle && (
+                {showRunControls && onPauseToggle && (
                     <button
                         onClick={onPauseToggle}
                         aria-label={isPaused ? "Resume meeting" : "Pause meeting"}
@@ -122,7 +127,7 @@ export default function TopPill({
                     </button>
                 )}
 
-                {onStop && (
+                {showRunControls && onStop && (
                     <button
                         onClick={onStop}
                         aria-label={isProcessing ? "Stop current answer" : "Stop current action"}
@@ -158,7 +163,7 @@ export default function TopPill({
           `}
                     style={appearance.iconStyle}
                 >
-                    <div className="w-3.5 h-3.5 rounded-[3px] bg-current opacity-80" />
+                    <X className="w-4 h-4" />
                 </button>
             </div>
         </div>

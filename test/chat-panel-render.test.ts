@@ -204,3 +204,17 @@ test('chat control bar exposes draggable handle plus no-drag pause and stop cont
   t.equal(home, 1);
   t.end();
 });
+
+
+test('chat control bar owns expanded-state run controls', (t) => {
+  const tree = ChatPanelControlBar({
+    isProcessing: false,
+    isPaused: false,
+    onTogglePause: () => {},
+    onStop: () => {},
+  });
+  const buttons = collectElements(tree, (element) => element.type === 'button');
+  t.equal(buttons.length, 2, 'expanded chat header has exactly Pause and Stop run controls');
+  t.same(buttons.map((button) => button.props['aria-label']), ['Pause meeting listening', 'Stop and clear chat']);
+  t.end();
+});
