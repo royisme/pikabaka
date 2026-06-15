@@ -43,6 +43,14 @@ type PermissionStatusReport = {
 type PermissionStatusSummary = {
     microphone: PermissionStatusReport;
     screen: PermissionStatusReport;
+    codeSignature?: {
+        checked: boolean;
+        isAdHoc: boolean;
+        hasTeamIdentifier: boolean;
+        teamIdentifier?: string;
+        authority?: string;
+        rejectedByGatekeeper?: boolean;
+    };
 };
 
 const DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT =
@@ -1735,6 +1743,16 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     {permissionStatus.screen.message && permissionStatus.screen.granted && (
                                                         <p className="mt-3 text-[11px] leading-4 text-state-warning">
                                                             {permissionStatus.screen.message}
+                                                        </p>
+                                                    )}
+                                                    {permissionStatus.codeSignature?.isAdHoc && (
+                                                        <p className="mt-3 text-[11px] leading-4 text-state-warning">
+                                                            This local Pika.app is ad-hoc signed, so macOS may treat every rebuild as a different app and keep showing the Screen &amp; System Audio Recording prompt even when the toggle is on. Reinstall local builds with <code>pnpm run app:install:local</code> so Pika is signed by a stable Apple Development certificate.
+                                                        </p>
+                                                    )}
+                                                    {permissionStatus.codeSignature?.rejectedByGatekeeper && !permissionStatus.codeSignature?.isAdHoc && (
+                                                        <p className="mt-3 text-[11px] leading-4 text-state-warning">
+                                                            Gatekeeper rejected this local build. If permission prompts persist, reinstall a signed local build or use a notarized release.
                                                         </p>
                                                     )}
                                                 </div>

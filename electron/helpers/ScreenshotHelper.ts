@@ -44,6 +44,19 @@ function getDisplayContainingRect(rect: Electron.Rectangle): Electron.Display {
   return screen.getPrimaryDisplay();
 }
 
+function clampCropArea(cropArea: Electron.Rectangle, imageSize: { width: number; height: number }): Electron.Rectangle | null {
+  const x = Math.max(0, Math.min(Math.round(cropArea.x), imageSize.width));
+  const y = Math.max(0, Math.min(Math.round(cropArea.y), imageSize.height));
+  const width = Math.max(0, Math.min(Math.round(cropArea.width), imageSize.width - x));
+  const height = Math.max(0, Math.min(Math.round(cropArea.height), imageSize.height - y));
+
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+
+  return { x, y, width, height };
+}
+
 
 /**
  * Represents a portion of the selection that lies on a specific display.
@@ -199,17 +212,13 @@ async function getDisplaysIntersectingSelection(
     console.log(`[ScreenshotHelper] Crop params: x=${cropX}, y=${cropY}, w=${cropWidth}, h=${cropHeight}`);
     
     // Ensure crop is within image bounds
-    const clampedX = Math.max(0, Math.min(cropX, sourceSize.width));
-    const clampedY = Math.max(0, Math.min(cropY, sourceSize.height));
-    const clampedWidth = Math.max(0, Math.min(cropWidth, sourceSize.width - clampedX));
-    const clampedHeight = Math.max(0, Math.min(cropHeight, sourceSize.height - clampedY));
+    const clampedArea = clampCropArea({ x: cropX, y: cropY, width: cropWidth, height: cropHeight }, sourceSize);
+    if (!clampedArea) {
+      console.warn('[ScreenshotHelper] Intersection produced an empty crop after clamping, skipping display', display.id);
+      continue;
+    }
     
-    const cropped = source.thumbnail.crop({
-      x: clampedX,
-      y: clampedY,
-      width: clampedWidth,
-      height: clampedHeight
-    });
+    const cropped = source.thumbnail.crop(clampedArea);
     
     captures.push({
       display,
@@ -479,30 +488,25 @@ export class ScreenshotHelper {
       // Calculate crop area relative to the target display
       // The thumbnail represents the target display's content
       // area coordinates are absolute screen coordinates
-      const cropX = Math.round((area.x - displayBounds.x) * scaleFactor);
-      const cropY = Math.round((area.y - displayBounds.y) * scaleFactor);
+      const imageSize = image.getSize();
+      const thumbnailToBoundsRatioX = displayBounds.width > 0 ? imageSize.width / displayBounds.width : scaleFactor;
+      const thumbnailToBoundsRatioY = displayBounds.height > 0 ? imageSize.height / displayBounds.height : scaleFactor;
+      const cropX = Math.round((area.x - displayBounds.x) * thumbnailToBoundsRatioX);
+      const cropY = Math.round((area.y - displayBounds.y) * thumbnailToBoundsRatioY);
       
-      const croppedArea = {
+      const requestedCropArea = {
         x: Math.max(0, cropX),
         y: Math.max(0, cropY),
-        width: Math.round(area.width * scaleFactor),
-        height: Math.round(area.height * scaleFactor)
+        width: Math.round(area.width * thumbnailToBoundsRatioX),
+        height: Math.round(area.height * thumbnailToBoundsRatioY)
       };
       
-      console.log(`[ScreenshotHelper] Cropping relative to display: ${JSON.stringify(croppedArea)}`);
+      console.log(`[ScreenshotHelper] Cropping relative to display: ${JSON.stringify(requestedCropArea)}, image=${imageSize.width}x${imageSize.height}, ratios=${thumbnailToBoundsRatioX}x${thumbnailToBoundsRatioY}`);
       
       // Ensure crop area is within image bounds
-      const imgWidth = image.getSize().width;
-      const imgHeight = image.getSize().height;
-      
-      if (croppedArea.x + croppedArea.width > imgWidth) {
-        croppedArea.width = imgWidth - croppedArea.x;
-      }
-      if (croppedArea.y + croppedArea.height > imgHeight) {
-        croppedArea.height = imgHeight - croppedArea.y;
-      }
-      
-      if (croppedArea.width > 0 && croppedArea.height > 0) {
+      const croppedArea = clampCropArea(requestedCropArea, imageSize);
+
+      if (croppedArea) {
         image = image.crop(croppedArea);
       } else {
         console.warn('[ScreenshotHelper] Invalid crop area, skipping crop');

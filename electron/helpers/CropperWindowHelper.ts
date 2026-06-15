@@ -40,6 +40,15 @@ function isRectangle(obj: unknown): obj is Electron.Rectangle {
            'height' in obj;
 }
 
+function roundRectangle(bounds: Electron.Rectangle): Electron.Rectangle {
+    return {
+        x: Math.round(bounds.x),
+        y: Math.round(bounds.y),
+        width: Math.round(bounds.width),
+        height: Math.round(bounds.height),
+    };
+}
+
 /**
  * Calculates the combined bounding box of all displays.
  * This represents the entire virtual screen across all monitors.
@@ -112,15 +121,21 @@ export class CropperWindowHelper {
                 return;
             }
 
-            // Validate input data for security
-            if (!this.validateBounds(bounds)) {
-                console.error('[CropperWindowHelper] Invalid bounds received:', bounds);
+            const screenBounds = this.toScreenBounds(bounds);
+
+            // Validate input data for security. Renderer mouse coordinates are
+            // window-local CSS pixels; ScreenshotHelper expects global screen
+            // coordinates in Electron display DIP. Translate before validating
+            // so selections on monitors left/above the primary display crop the
+            // intended area instead of an offset region.
+            if (!this.validateBounds(screenBounds)) {
+                console.error('[CropperWindowHelper] Invalid bounds received:', { rendererBounds: bounds, screenBounds });
                 this.rejectCurrentSelection(null);
                 this.hideOrClose();
                 return;
             }
 
-            this.resolveCurrentSelection(bounds);
+            this.resolveCurrentSelection(screenBounds);
             this.hideOrClose();
         };
 
@@ -203,6 +218,33 @@ export class CropperWindowHelper {
 
         console.log(`[CropperWindowHelper] validateBounds PASSED: x=${x}, y=${y}, w=${width}, h=${height}`);
         return true;
+    }
+
+    private toScreenBounds(rendererBounds: Electron.Rectangle): Electron.Rectangle {
+        const rounded = roundRectangle(rendererBounds);
+        if (!this.cropperWindow || this.cropperWindow.isDestroyed()) {
+            return rounded;
+        }
+
+        const windowBounds = this.cropperWindow.getBounds();
+        return {
+            x: windowBounds.x + rounded.x,
+            y: windowBounds.y + rounded.y,
+            width: rounded.width,
+            height: rounded.height,
+        };
+    }
+
+    private toWindowPoint(screenPoint: { x: number; y: number }): { x: number; y: number } {
+        if (!this.cropperWindow || this.cropperWindow.isDestroyed()) {
+            return screenPoint;
+        }
+
+        const windowBounds = this.cropperWindow.getBounds();
+        return {
+            x: screenPoint.x - windowBounds.x,
+            y: screenPoint.y - windowBounds.y,
+        };
     }
 
     /**
@@ -332,8 +374,8 @@ export class CropperWindowHelper {
                 console.log(`[CropperWindowHelper] Cursor at ${JSON.stringify(cursorPosition)}, display bounds: ${targetDisplay ? JSON.stringify(targetDisplay.bounds) : 'unknown'}`);
                 console.log(`[CropperWindowHelper] HUD position: ${JSON.stringify(hudPosition)}`);
                 
-                // Send reset with HUD position
-                this.cropperWindow.webContents.send('reset-cropper', { hudPosition });
+                // Send reset with HUD position in renderer/window-local coordinates.
+                this.cropperWindow.webContents.send('reset-cropper', { hudPosition: this.toWindowPoint(hudPosition) });
                 this.applyOpacityShield();
             } else {
                 // Window doesn't exist yet — createWindow will call applyOpacityShield

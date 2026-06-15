@@ -5,7 +5,8 @@ import type { getOverlayAppearance } from '../../lib/overlayAppearance';
 
 const MIN_TRANSCRIPT_SPLIT = 20;
 const MAX_TRANSCRIPT_SPLIT = 65;
-const MIN_CHAT_PANE_PX = 260;
+const MIN_TRANSCRIPT_PANE_PX = 96;
+const MIN_CHAT_PANE_PX = 360;
 const SPLITTER_THICKNESS_PX = 6;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -52,11 +53,20 @@ const SplitterShell: React.FC<SplitterShellProps> = ({
 
     const maxTranscriptSplit = useMemo(() => {
         if (contentHeight <= 0) return MAX_TRANSCRIPT_SPLIT;
-        const maxFromChatMin = ((contentHeight - MIN_CHAT_PANE_PX - SPLITTER_THICKNESS_PX) / contentHeight) * 100;
-        return clamp(maxFromChatMin, MIN_TRANSCRIPT_SPLIT, MAX_TRANSCRIPT_SPLIT);
+        const availableHeight = contentHeight - SPLITTER_THICKNESS_PX;
+        if (availableHeight <= 0) return MIN_TRANSCRIPT_SPLIT;
+
+        const chatRoomLimit = ((availableHeight - MIN_CHAT_PANE_PX) / contentHeight) * 100;
+        const transcriptMinLimit = (MIN_TRANSCRIPT_PANE_PX / contentHeight) * 100;
+        const maxAllowed = Math.max(transcriptMinLimit, chatRoomLimit);
+
+        return clamp(maxAllowed, transcriptMinLimit, MAX_TRANSCRIPT_SPLIT);
     }, [contentHeight]);
 
-    const safeSplitterPosition = clamp(splitterPosition, MIN_TRANSCRIPT_SPLIT, maxTranscriptSplit);
+    const minTranscriptSplit = contentHeight > 0
+        ? clamp((MIN_TRANSCRIPT_PANE_PX / contentHeight) * 100, MIN_TRANSCRIPT_SPLIT, maxTranscriptSplit)
+        : MIN_TRANSCRIPT_SPLIT;
+    const safeSplitterPosition = clamp(splitterPosition, minTranscriptSplit, maxTranscriptSplit);
 
     useEffect(() => {
         if (Math.abs(safeSplitterPosition - splitterPosition) > 0.1) {
@@ -66,7 +76,7 @@ const SplitterShell: React.FC<SplitterShellProps> = ({
 
     return (
         <div
-            className={`relative w-full flex-1 min-h-0 border rounded-[24px] overflow-hidden flex flex-col draggable-area overlay-shell-surface ${overlayPanelClass}`}
+            className={`relative w-full flex-1 min-h-[520px] border rounded-[24px] overflow-hidden flex flex-col draggable-area overlay-shell-surface ${overlayPanelClass}`}
             style={appearance.shellStyle}
         >
             <div ref={contentRef} className="flex-1 min-h-0 flex flex-col">
@@ -81,7 +91,7 @@ const SplitterShell: React.FC<SplitterShellProps> = ({
                     position={safeSplitterPosition}
                     onPositionChange={onSplitterChange}
                     orientation="horizontal"
-                    min={MIN_TRANSCRIPT_SPLIT}
+                    min={minTranscriptSplit}
                     max={maxTranscriptSplit}
                 />
                 <section className="min-w-0 min-h-0 flex-1 overflow-hidden flex flex-col bg-black/[0.04]">

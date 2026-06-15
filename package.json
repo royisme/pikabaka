@@ -39,7 +39,8 @@
     "watch": "tsc -p electron/tsconfig.json --watch",
     "start": "pnpm run app:dev",
     "dist": "pnpm run app:build",
-    "icons:generate": "node generate_icon.js"
+    "icons:generate": "node generate_icon.js",
+    "app:install:local": "node scripts/install-local-mac.js"
   },
   "build": {
     "generateUpdatesFilesForAllChannels": true,
@@ -94,7 +95,6 @@
         }
       ],
       "icon": "assets/pika.icns",
-      "identity": "shaoqing zhu (UL5T9WXYJT)",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "assets/entitlements.mac.plist",

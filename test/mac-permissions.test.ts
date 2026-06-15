@@ -4,6 +4,7 @@ import {
   getScreenCapturePermissionMessage,
   isMediaAccessGranted,
   normalizeMediaAccessStatus,
+  parseMacCodeSignatureStatus,
 } from '../electron/lib/mac-permissions';
 
 t.test('normalizes granted and authorized media statuses as granted', (t) => {
@@ -35,5 +36,31 @@ t.test('marks authorized screen status as restart-required instead of not grante
 t.test('screen capture failure after macOS grant reports restart guidance', (t) => {
   t.match(getScreenCapturePermissionMessage('authorized'), /Screen Recording is allowed/);
   t.match(getScreenCapturePermissionMessage('denied'), /grant Screen Recording permission/);
+  t.end();
+});
+
+t.test('detects ad-hoc cdhash-only macOS signatures', (t) => {
+  const status = parseMacCodeSignatureStatus(`Executable=/Applications/Pika.app/Contents/MacOS/Pika
+Identifier=com.royisme.pika
+Signature=adhoc
+TeamIdentifier=not set
+`);
+
+  t.equal(status.isAdHoc, true);
+  t.equal(status.hasTeamIdentifier, false);
+  t.end();
+});
+
+t.test('detects stable Apple Development macOS signatures', (t) => {
+  const status = parseMacCodeSignatureStatus(`Executable=/Applications/Pika.app/Contents/MacOS/Pika
+Identifier=com.royisme.pika
+Authority=Apple Development: nmifun0@gmail.com (MM8NNFG575)
+TeamIdentifier=MM8NNFG575
+`);
+
+  t.equal(status.isAdHoc, false);
+  t.equal(status.hasTeamIdentifier, true);
+  t.equal(status.teamIdentifier, 'MM8NNFG575');
+  t.match(status.authority || '', /Apple Development/);
   t.end();
 });

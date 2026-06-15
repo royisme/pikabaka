@@ -25,13 +25,58 @@ export interface PermissionStatusReport {
   message?: string;
 }
 
+export interface MacCodeSignatureStatus {
+  checked: boolean;
+  isAdHoc: boolean;
+  hasTeamIdentifier: boolean;
+  teamIdentifier?: string;
+  authority?: string;
+  rejectedByGatekeeper?: boolean;
+}
+
 export interface PermissionStatusSummary {
   microphone: PermissionStatusReport;
   screen: PermissionStatusReport;
+  codeSignature?: MacCodeSignatureStatus;
 }
 
 const GRANTED_MEDIA_STATUSES = new Set(['granted', 'authorized']);
 const LIMITED_MEDIA_STATUSES = new Set(['limited']);
+
+export function parseMacCodeSignatureStatus(output: string): MacCodeSignatureStatus {
+  const authority = output.match(/^Authority=(.+)$/m)?.[1];
+  const teamIdentifier = output.match(/^TeamIdentifier=(.+)$/m)?.[1];
+
+  return {
+    checked: true,
+    isAdHoc: /^Signature=adhoc$/m.test(output),
+    hasTeamIdentifier: Boolean(teamIdentifier && teamIdentifier !== 'not set'),
+    ...(teamIdentifier && teamIdentifier !== 'not set' ? { teamIdentifier } : {}),
+    ...(authority ? { authority } : {}),
+  };
+}
+
+function getCurrentMacCodeSignatureStatus(): MacCodeSignatureStatus | undefined {
+  if (process.platform !== 'darwin') return undefined;
+
+  try {
+    const { app } = require('electron') as typeof import('electron');
+    const { spawnSync } = require('node:child_process') as typeof import('node:child_process');
+    const appPath = app.getPath('exe').replace(/\/Contents\/MacOS\/[^/]+$/, '');
+    const codesign = spawnSync('/usr/bin/codesign', ['-dv', '--verbose=4', appPath], { encoding: 'utf8' });
+    const output = `${codesign.stdout || ''}${codesign.stderr || ''}`;
+    const status = parseMacCodeSignatureStatus(output);
+
+    const spctl = spawnSync('/usr/sbin/spctl', ['-a', '-t', 'execute', appPath], { encoding: 'utf8' });
+    const spctlOutput = `${spctl.stdout || ''}${spctl.stderr || ''}`;
+    return {
+      ...status,
+      rejectedByGatekeeper: /rejected/i.test(spctlOutput),
+    };
+  } catch {
+    return { checked: false, isAdHoc: false, hasTeamIdentifier: false };
+  }
+}
 
 export function normalizeMediaAccessStatus(status: MacPermissionStatus): NormalizedMacPermissionStatus {
   if (GRANTED_MEDIA_STATUSES.has(status)) return 'granted';
@@ -79,10 +124,12 @@ export function getMacPermissionStatusSummary(): PermissionStatusSummary {
   const { systemPreferences } = require("electron") as typeof import("electron");
   const microphone = systemPreferences.getMediaAccessStatus('microphone') as MacPermissionStatus;
   const screen = systemPreferences.getMediaAccessStatus('screen') as MacPermissionStatus;
+  const codeSignature = getCurrentMacCodeSignatureStatus();
 
   return {
     microphone: buildPermissionStatusReport(microphone, 'microphone'),
     screen: buildPermissionStatusReport(screen, 'screen'),
+    ...(codeSignature ? { codeSignature } : {}),
   };
 }
 

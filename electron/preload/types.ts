@@ -201,6 +201,7 @@ export interface ElectronAPI {
   getPermissionStatus: () => Promise<{
     microphone: { status: string; rawStatus: string; granted: boolean; limited: boolean; restartRequired: boolean; message?: string }
     screen: { status: string; rawStatus: string; granted: boolean; limited: boolean; restartRequired: boolean; message?: string }
+    codeSignature?: { checked: boolean; isAdHoc: boolean; hasTeamIdentifier: boolean; teamIdentifier?: string; authority?: string; rejectedByGatekeeper?: boolean }
   }>
   openPrivacySettings: (type: 'microphone' | 'screen') => Promise<{ success: boolean }>
 

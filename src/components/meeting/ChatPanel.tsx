@@ -25,6 +25,53 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { NegotiationCoachingCard } from '../../premium';
 
+
+const FRIENDLY_MODEL_NAMES: Record<string, string> = {
+  'gemini-3.1-flash-lite-preview': 'Gemini 3.1 Flash',
+  'gemini-3.1-pro-preview': 'Gemini 3.1 Pro',
+  'llama-3.3-70b-versatile': 'Groq Llama 3.3',
+  'gpt-5.4': 'GPT 5.4',
+  'claude-sonnet-4-6': 'Sonnet 4.6',
+};
+
+const MODEL_PROVIDER_WORDS: Record<string, string> = {
+  claude: 'Claude',
+  gemini: 'Gemini',
+  groq: 'Groq',
+  llama: 'Llama',
+  ollama: 'Ollama',
+  openai: 'OpenAI',
+};
+
+const getFriendlyModelName = (model: string): string => {
+  if (!model) return 'AI model';
+  if (FRIENDLY_MODEL_NAMES[model]) return FRIENDLY_MODEL_NAMES[model];
+
+  const cleaned = model
+    .replace(/^ollama[-_:]/i, '')
+    .replace(/[:/_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleaned) return 'AI model';
+
+  return cleaned
+    .split(' ')
+    .map((part) => {
+      const lower = part.toLowerCase();
+      if (lower === 'gpt') return 'GPT';
+      if (MODEL_PROVIDER_WORDS[lower]) return MODEL_PROVIDER_WORDS[lower];
+      if (/^\d+(?:\.\d+)*[a-z]?$/i.test(part)) return part.toUpperCase();
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(' ')
+    .replace(/\bFlash Lite Preview\b/i, 'Flash Lite')
+    .replace(/\bPro Preview\b/i, 'Pro')
+    .replace(/\bPreview\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 interface Message {
   id: string;
   role: 'user' | 'system' | 'interviewer';
@@ -32,7 +79,6 @@ interface Message {
   isStreaming?: boolean;
   streamStatus?: string;
   hasScreenshot?: boolean;
-  screenshotPreview?: string;
   isCode?: boolean;
   intent?: string;
   isNegotiationCoaching?: boolean;
@@ -121,6 +167,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 }) => {
   const codeTheme = isLightTheme ? oneLight : vscDarkPlus;
   const codeLineNumberColor = isLightTheme ? 'rgba(15,23,42,0.35)' : 'rgba(255,255,255,0.2)';
+  const modelDisplayName = getFriendlyModelName(currentModel);
   const subtleSurfaceClass = 'overlay-subtle-surface';
   const codeBlockClass = 'overlay-code-block-surface';
   const codeHeaderClass = 'overlay-code-header-surface';
@@ -394,7 +441,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto px-4 py-3.5 space-y-2.5 no-drag"
+        className="flex-1 min-h-[112px] overflow-y-auto px-4 py-3.5 space-y-2.5 no-drag"
         style={{ scrollbarWidth: 'none' }}
       >
         {messages.map((msg) => (
@@ -515,25 +562,25 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="shrink-0 flex flex-nowrap justify-start md:justify-center items-center gap-1.5 px-4 py-2.5 overflow-x-auto no-scrollbar no-drag">
-        <button onClick={handleWhatToSay} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+      <div className="shrink-0 grid grid-cols-2 min-[520px]:flex min-[520px]:flex-wrap justify-stretch min-[520px]:justify-center items-center gap-1.5 px-4 py-2.5 no-drag">
+        <button onClick={handleWhatToSay} className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap min-w-0 ${quickActionClass}`} style={appearance.chipStyle}>
           <Pencil className="w-3 h-3 opacity-65" /> Guide me
         </button>
-        <button onClick={handleClarify} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+        <button onClick={handleClarify} className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap min-w-0 ${quickActionClass}`} style={appearance.chipStyle}>
           <MessageSquare className="w-3 h-3 opacity-65" /> Clarify
         </button>
-        <button onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+        <button onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap} className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap min-w-0 ${quickActionClass}`} style={appearance.chipStyle}>
           {actionButtonMode === 'brainstorm'
             ? <><Lightbulb className="w-3 h-3 opacity-65" /> Ideas</>
             : <><RefreshCw className="w-3 h-3 opacity-65" /> Recap</>
           }
         </button>
-        <button onClick={handleFollowUpQuestions} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+        <button onClick={handleFollowUpQuestions} className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap min-w-0 ${quickActionClass}`} style={appearance.chipStyle}>
           <HelpCircle className="w-3 h-3 opacity-65" /> Follow-up
         </button>
         <button
           onClick={handleAnswerNow}
-          className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press min-w-[84px] whitespace-nowrap shrink-0 ${isManualRecording
+          className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press min-w-[84px] whitespace-nowrap col-span-2 min-[520px]:col-span-1 ${isManualRecording
             ? 'bg-state-danger-soft text-state-danger ring-1 ring-state-danger-border'
             : 'bg-[#007AFF] text-white shadow-[0_4px_14px_rgba(0,122,255,0.18)] hover:bg-[#0071E3]'
           }`}
@@ -549,7 +596,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         </button>
       </div>
 
-      <div className="shrink-0 p-3 pt-0 no-drag">
+      <div className="shrink-0 p-3 pt-0 no-drag min-h-[118px]">
         {attachedContext.length > 0 && (
           <div className={`mb-2 rounded-lg p-2 transition-all duration-200 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
             <div className="flex items-center justify-between mb-1.5">
@@ -594,14 +641,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
-            className={`w-full border focus:ring-1 rounded-xl pl-3 pr-10 py-2.5 focus:outline-none transition-all duration-200 ease-sculpted text-[13px] leading-relaxed ${inputClass}`}
+            className={`w-full min-h-[42px] border focus:ring-1 rounded-xl pl-3 pr-10 py-2.5 focus:outline-none transition-all duration-200 ease-sculpted text-[13px] leading-relaxed ${inputClass}`}
             style={appearance.inputStyle}
           />
 
           {!inputValue && (
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none text-[12px] overlay-text-muted/90 max-w-[calc(100%-56px)] overflow-hidden whitespace-nowrap text-ellipsis">
-              <span>Ask anything on screen or conversation, or</span>
-              <div className="flex items-center gap-1 opacity-80">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none text-[12px] overlay-text-muted/90 max-w-[calc(100%-56px)] overflow-hidden whitespace-nowrap">
+              <span className="truncate">Ask anything on screen or conversation</span>
+              <div className="hidden min-[500px]:flex items-center gap-1 opacity-80">
                 {(shortcuts.selectiveScreenshot || ['⌘', 'Shift', 'H']).map((key, i) => (
                   <React.Fragment key={i}>
                     {i > 0 && <span className="text-[10px]">+</span>}
@@ -609,7 +656,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   </React.Fragment>
                 ))}
               </div>
-              <span>for selective screenshot</span>
+              <span className="hidden min-[500px]:inline">for screenshot</span>
             </div>
           )}
 
@@ -620,8 +667,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-2 mt-3 px-0.5 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-3 px-0.5 min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
             <button
               onClick={(e) => {
                 if (!contentRef.current) return;
@@ -635,26 +682,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 window.electronAPI.toggleModelSelector({ x, y });
               }}
               className={`
-                flex items-center gap-2 px-3 py-1.5
+                flex items-center gap-2 px-2.5 py-1.5
                 border border-border-subtle/60 rounded-lg transition-colors
-                text-xs font-medium w-[140px]
+                text-xs font-medium min-w-[118px] max-w-[188px] flex-1 basis-[136px]
                 interaction-base interaction-press
                 ${controlSurfaceClass}
               `}
+              title={`Model: ${modelDisplayName}`}
               style={appearance.controlStyle}
             >
-              <span className="truncate min-w-0 flex-1">
-                {(() => {
-                  const m = currentModel;
-                  if (m.startsWith('ollama-')) return m.replace('ollama-', '');
-                  if (m === 'gemini-3.1-flash-lite-preview') return 'Gemini 3.1 Flash';
-                  if (m === 'gemini-3.1-pro-preview') return 'Gemini 3.1 Pro';
-                  if (m === 'llama-3.3-70b-versatile') return 'Groq Llama 3.3';
-                  if (m === 'gpt-5.4') return 'GPT 5.4';
-                  if (m === 'claude-sonnet-4-6') return 'Sonnet 4.6';
-                  return m;
-                })()}
-              </span>
+              <span className="truncate min-w-0 flex-1 text-left">{modelDisplayName}</span>
               <ChevronDown size={14} className="shrink-0 transition-transform" />
             </button>
 
@@ -680,7 +717,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   window.electronAPI.toggleSettingsWindow({ x, y });
                 }}
                 className={`
-                  w-7 h-7 flex items-center justify-center rounded-lg
+                  w-8 h-8 flex items-center justify-center rounded-lg
                   interaction-base interaction-press
                   ${isSettingsOpen
                     ? 'overlay-icon-surface overlay-icon-surface-hover overlay-text-primary'
@@ -702,7 +739,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   window.electronAPI?.setOverlayMousePassthrough?.(newState);
                 }}
                 className={`
-                  w-7 h-7 flex items-center justify-center rounded-lg
+                  w-8 h-8 flex items-center justify-center rounded-lg
                   interaction-base interaction-press
                   ${isMousePassthrough
                     ? 'overlay-icon-surface overlay-icon-surface-hover text-state-info opacity-100'
@@ -719,7 +756,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             onClick={handleManualSubmit}
             disabled={!inputValue.trim()}
             className={`
-              w-7 h-7 rounded-full flex items-center justify-center
+              w-8 h-8 rounded-full flex items-center justify-center shrink-0
               interaction-base interaction-press
               ${inputValue.trim()
                 ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20 hover:bg-[#0071E3]'

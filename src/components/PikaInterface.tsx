@@ -15,9 +15,11 @@ import { useMeetingAudio } from '../hooks/useMeetingAudio';
 interface PikaInterfaceProps { onEndMeeting?: () => void; overlayOpacity?: number; }
 
 const SPLITTER_STORAGE_KEY = 'pika_splitter_position';
-const DEFAULT_TRANSCRIPT_SPLIT = 45;
+const SPLITTER_STORAGE_VERSION_KEY = 'pika_splitter_position_version';
+const SPLITTER_STORAGE_VERSION = 'chat-polish-v2';
+const DEFAULT_TRANSCRIPT_SPLIT = 28;
 const MIN_TRANSCRIPT_SPLIT = 20;
-const MAX_TRANSCRIPT_SPLIT = 65;
+const MAX_TRANSCRIPT_SPLIT = 55;
 
 const clampSplitterPosition = (value: unknown) => {
     const parsed = Number(value);
@@ -27,9 +29,11 @@ const clampSplitterPosition = (value: unknown) => {
 
 const readStoredSplitterPosition = () => {
     try {
-        const stored = localStorage.getItem(SPLITTER_STORAGE_KEY);
+        const storedVersion = localStorage.getItem(SPLITTER_STORAGE_VERSION_KEY);
+        const stored = storedVersion === SPLITTER_STORAGE_VERSION ? localStorage.getItem(SPLITTER_STORAGE_KEY) : null;
         const next = stored === null ? DEFAULT_TRANSCRIPT_SPLIT : clampSplitterPosition(stored);
-        if (stored !== String(next)) localStorage.setItem(SPLITTER_STORAGE_KEY, String(next));
+        localStorage.setItem(SPLITTER_STORAGE_KEY, String(next));
+        localStorage.setItem(SPLITTER_STORAGE_VERSION_KEY, SPLITTER_STORAGE_VERSION);
         return next;
     } catch {
         return DEFAULT_TRANSCRIPT_SPLIT;
@@ -46,7 +50,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const [splitterPosition, setSplitterPosition] = useState(readStoredSplitterPosition);
     const [isMousePassthrough, setIsMousePassthrough] = useState(false);
     const [isUndetectable, setIsUndetectable] = useState(false);
-    const [currentModel, setCurrentModel] = useState('gemini-3-flash-preview');
+    const [currentModel, setCurrentModel] = useState('gemini-3.1-flash-lite-preview');
     const isStealthRef = useRef(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -58,7 +62,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const chat = useMeetingChat();
     const appearance = useMemo(() => getOverlayAppearance(overlayOpacity, isLightTheme ? 'light' : 'dark'), [overlayOpacity, isLightTheme]);
 
-    useEffect(() => { try { localStorage.setItem(SPLITTER_STORAGE_KEY, String(clampSplitterPosition(splitterPosition))); } catch {} }, [splitterPosition]);
+    useEffect(() => { try { localStorage.setItem(SPLITTER_STORAGE_KEY, String(clampSplitterPosition(splitterPosition))); localStorage.setItem(SPLITTER_STORAGE_VERSION_KEY, SPLITTER_STORAGE_VERSION); } catch {} }, [splitterPosition]);
     useEffect(() => { window.electronAPI?.getDefaultModel?.().then((result: any) => { if (result?.model) { setCurrentModel(result.model); window.electronAPI.setModel(result.model).catch(() => {}); } }).catch((err: any) => console.error('Failed to fetch default model:', err)); }, []);
     useEffect(() => { const unsubscribe = window.electronAPI?.onModelChanged?.((modelId: string) => setCurrentModel((prev) => (prev === modelId ? prev : modelId))); return () => unsubscribe?.(); }, []);
     useEffect(() => { window.electronAPI?.getUndetectable?.().then(setIsUndetectable); const unsubscribe = window.electronAPI?.onUndetectableChanged?.(setIsUndetectable); return () => unsubscribe?.(); }, []);
@@ -71,7 +75,16 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     useEffect(() => window.electronAPI?.onSessionReset?.(() => { console.log('[PikaInterface] Resetting session state...'); chat.setSystemMessages([]); chat.setInputValue(''); chat.setAttachedContext([]); audio.setManualTranscript(''); audio.setVoiceInput(''); chat.setIsProcessing(false); analytics.trackConversationStarted(); }), [chat.setSystemMessages, chat.setInputValue, chat.setAttachedContext, audio.setManualTranscript, audio.setVoiceInput, chat.setIsProcessing]);
 
     const handleScreenshotAttach = useCallback((data: ScreenshotAttachment) => { setIsExpanded(true); chat.setAttachedContext((prev) => (prev.some((s) => s.path === data.path) ? prev : [...prev, data].slice(-5))); }, [chat.setAttachedContext]);
-    const handleSplitterChange = useCallback((next: number) => setSplitterPosition(clampSplitterPosition(next)), []);
+    const handleSplitterChange = useCallback((next: number) => {
+        const safeNext = clampSplitterPosition(next);
+        setSplitterPosition(safeNext);
+        try {
+            localStorage.setItem(SPLITTER_STORAGE_KEY, String(safeNext));
+            localStorage.setItem(SPLITTER_STORAGE_VERSION_KEY, SPLITTER_STORAGE_VERSION);
+        } catch {
+            // Ignore storage failures; the in-memory split is still updated.
+        }
+    }, []);
     const updateContentDimensions = useCallback(() => {
         if (isExpanded) return;
         const rect = contentRef.current?.getBoundingClientRect();
@@ -172,10 +185,10 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const chatProps = { messages: chat.messages, knowledgeContext: chat.knowledgeContext, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, actionButtonMode: chat.actionButtonMode, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleWhatToSay: chat.handleWhatToSay, handleClarify: chat.handleClarify, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleBrainstorm: chat.handleBrainstorm, handleAnswerNow, handleManualSubmit: chat.handleManualSubmit, isManualRecording: audio.isManualRecording, manualTranscript: audio.manualTranscript, voiceInput: audio.voiceInput, appearance, isLightTheme, currentModel, isSettingsOpen, isMousePassthrough, setIsMousePassthrough, shortcuts, scrollContainerRef, messagesEndRef, textInputRef, contentRef, setMessages };
 
     return (
-        <div ref={contentRef} className={`flex flex-col items-center w-full mx-auto ${isExpanded ? 'h-screen' : 'h-fit'} min-h-0 bg-transparent p-0 rounded-[24px] font-sans gap-2 overlay-text-primary`}>
+        <div ref={contentRef} className={`flex flex-col items-center w-full mx-auto ${isExpanded ? 'h-screen min-h-[560px]' : 'h-fit'} min-h-0 bg-transparent p-0 rounded-[24px] font-sans gap-2 overlay-text-primary`}>
             <AnimatePresence>
                 {isExpanded && (
-                    <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="flex flex-col items-center gap-2 w-full flex-1 min-h-0">
+                    <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="flex flex-col items-center gap-2 w-full flex-1 min-h-0 min-w-[420px]">
                         <TopPill expanded={isExpanded} onToggle={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} appearance={appearance} onLogoClick={() => window.electronAPI?.setWindowMode?.('launcher')} />
                         <SplitterShell left={<TranscriptColumn {...transcriptProps} />} right={<ChatColumn {...chatProps} />} splitterPosition={splitterPosition} onSplitterChange={handleSplitterChange} isExpanded={isExpanded} appearance={appearance} overlayPanelClass="overlay-text-primary" />
                     </motion.div>
