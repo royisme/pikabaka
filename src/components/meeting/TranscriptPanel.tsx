@@ -78,7 +78,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
             {sttNeedsTroubleshooting && (
                 <div className="mx-4 mb-2 p-2 rounded-lg border border-state-warning-border bg-state-warning-soft no-drag">
                     <p className={`text-[10px] ${isLightTheme ? 'text-amber-800' : 'text-amber-200'}`}>
-                        STT has no usable system audio input. Check output device routing and permissions.
+                        {statusDetail || 'STT has no usable system audio input. Check output device routing and permissions.'}
                     </p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-2">
                         <button
@@ -89,7 +89,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                             Open audio settings
                         </button>
                         <span className={`text-[10px] ${isLightTheme ? 'text-amber-700/80' : 'text-amber-200/80'}`}>
-                            Tips: play audio on selected output device, then restart meeting if needed.
+                            {statusDetail ? 'Fix the STT provider/key/language in settings, then restart the meeting.' : 'Tips: play audio on selected output device, then restart meeting if needed.'}
                         </span>
                     </div>
                 </div>

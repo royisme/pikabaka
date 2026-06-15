@@ -10,8 +10,11 @@ import {
   CHAT_PANEL_FOOTER_CLASS,
   CHAT_PANEL_FOOTER_CONTROLS_CLASS,
   CHAT_PANEL_INPUT_BASE_CLASS,
+  CHAT_PANEL_MESSAGE_SCREENSHOT_IMAGE_CLASS,
+  CHAT_PANEL_MESSAGE_SCREENSHOT_PREVIEW_CLASS,
   ChatPanelAttachedScreenshots,
   ChatPanelControlBar,
+  ChatPanelMessageScreenshotPreview,
   ChatPanelTextInput,
   getChatPanelModelDisplayName,
   handleChatInputPaste,
@@ -107,6 +110,22 @@ test('attached screenshots render previews and remove controls with working call
 
   buttons[1].props.onClick();
   t.same(nextContext, [attachments[1]], 'per-preview remove drops only that screenshot');
+  t.end();
+});
+
+
+test('message screenshot attachments render an inline thumbnail preview', (t) => {
+  const tree = ChatPanelMessageScreenshotPreview({
+    preview: 'data:image/png;base64,inline-preview',
+    isLightTheme: false,
+  });
+  const markup = renderToStaticMarkup(tree);
+
+  t.match(markup, /data-testid="chat-message-screenshot-preview"/, 'message-level preview container is rendered');
+  t.match(markup, /src="data:image\/png;base64,inline-preview"/, 'thumbnail uses the screenshot preview data URI');
+  t.match(markup, /alt="Attached screenshot preview"/, 'thumbnail has accessible alt text');
+  t.match(CHAT_PANEL_MESSAGE_SCREENSHOT_PREVIEW_CLASS, /max-w-\[220px\]/, 'message preview is a small thumbnail, not a full-size image');
+  t.match(CHAT_PANEL_MESSAGE_SCREENSHOT_IMAGE_CLASS, /max-h-28/, 'message preview image height is capped');
   t.end();
 });
 
@@ -212,5 +231,16 @@ test('transcript pane stays compact and removes dashed empty-state pointers', (t
   t.match(transcriptPanelSource, /truncate/, 'STT status truncates instead of wrapping');
   t.notMatch(rollingTranscriptSource, /max-h-\[280px\]/, 'rolling transcript no longer has old fixed max height');
   t.match(rollingTranscriptSource, /h-full min-h-0 w-full overflow-y-auto/, 'rolling transcript fills pane and scrolls internally');
+  t.end();
+});
+
+
+test('chat message layout stays compact in small resizable columns', (t) => {
+  const chatPanelSource = readFileSync(path.join(process.cwd(), 'src/components/meeting/ChatPanel.tsx'), 'utf8');
+
+  t.match(chatPanelSource, /px-3 py-2 space-y-1\.5/, 'message scroll area uses compact padding and gaps');
+  t.match(chatPanelSource, /text-\[13px\] leading-\[1\.45\]/, 'message bubbles use compact readable text');
+  t.match(chatPanelSource, /max-w-\[92%\]/, 'assistant/system messages use more of the resizable chat column');
+  t.match(chatPanelSource, /ChatPanelMessageScreenshotPreview/, 'submitted screenshots render a thumbnail preview in the message');
   t.end();
 });

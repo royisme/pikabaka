@@ -9,6 +9,7 @@ interface ResizableSplitterProps {
 }
 
 const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
+  position,
   onPositionChange,
   min = 20,
   max = 80,
@@ -73,22 +74,45 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
     };
   }, [isDragging, max, min, onPositionChange, orientation]);
 
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 5 : 2;
+    const isDecrease =
+      (orientation === 'vertical' && e.key === 'ArrowLeft') ||
+      (orientation === 'horizontal' && e.key === 'ArrowUp');
+    const isIncrease =
+      (orientation === 'vertical' && e.key === 'ArrowRight') ||
+      (orientation === 'horizontal' && e.key === 'ArrowDown');
+
+    if (!isDecrease && !isIncrease) return;
+
+    e.preventDefault();
+    onPositionChange(Math.min(max, Math.max(min, position + (isIncrease ? step : -step))));
+  }, [max, min, onPositionChange, orientation, position]);
+
   const isHorizontal = orientation === 'horizontal';
   return (
     <div
       ref={splitterRef}
+      role="separator"
+      aria-label={isHorizontal ? 'Resize panes vertically' : 'Resize Live Transcript and AI Chat panes'}
+      aria-orientation={isHorizontal ? 'horizontal' : 'vertical'}
+      aria-valuemin={Math.round(min)}
+      aria-valuemax={Math.round(max)}
+      aria-valuenow={Math.round(position)}
+      tabIndex={0}
       onMouseDown={handleMouseDown}
-      className={`relative flex-shrink-0 group ${isHorizontal ? 'h-1.5 cursor-row-resize' : 'w-1.5 cursor-col-resize'} ${isDragging ? 'z-50' : ''}`}
+      onKeyDown={handleKeyDown}
+      className={`relative flex-shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/70 ${isHorizontal ? 'h-2.5 cursor-row-resize' : 'w-2.5 cursor-col-resize'} ${isDragging ? 'z-50' : ''}`}
     >
       <div
-        className={`absolute transition-colors ${
+        className={`absolute rounded-full transition-all duration-150 ${
           isHorizontal
-            ? 'top-1/2 -translate-y-1/2 left-0 right-0 h-px'
-            : 'left-1/2 -translate-x-1/2 top-0 bottom-0 w-px'
+            ? 'left-3 right-3 top-1/2 h-1 -translate-y-1/2'
+            : 'bottom-3 top-3 left-1/2 w-1 -translate-x-1/2'
         } ${
           isDragging
-            ? 'bg-accent-primary shadow-[0_0_6px_rgba(59,130,246,0.5)]'
-            : 'bg-border-subtle group-hover:bg-accent-primary/60'
+            ? 'bg-accent-primary shadow-[0_0_8px_rgba(59,130,246,0.6)]'
+            : 'bg-border-subtle group-hover:bg-accent-primary/70 group-focus-visible:bg-accent-primary/70'
         }`}
       />
     </div>

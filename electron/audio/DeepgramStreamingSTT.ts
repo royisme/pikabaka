@@ -46,6 +46,25 @@ export function buildDeepgramListenUrl(options: {
     return `${DEEPGRAM_LISTEN_BASE_URL}?${params.toString()}`;
 }
 
+export function describeDeepgramConnectionError(
+    error: Error,
+    context: { sampleRate: number; channels: number; languageCode?: string }
+): string {
+    const rawMessage = error.message || 'Deepgram realtime STT connection failed';
+    const languageLabel = context.languageCode || 'auto';
+    const prefix = `Deepgram STT connection failed (language=${languageLabel}, sample_rate=${context.sampleRate}, channels=${context.channels})`;
+
+    if (/Unexpected server response:\s*400/i.test(rawMessage)) {
+        return `${prefix}: Deepgram rejected the realtime WebSocket request with HTTP 400. Check the Deepgram API key/project/plan and selected recognition language. Auto mode should not send language=multi or detect_language=true.`;
+    }
+
+    if (/Unexpected server response:\s*(401|403)/i.test(rawMessage)) {
+        return `${prefix}: Deepgram rejected the API key or account permission (${rawMessage}). Update the Deepgram STT key in Settings.`;
+    }
+
+    return `${prefix}: ${rawMessage}`;
+}
+
 export class DeepgramStreamingSTT extends EventEmitter {
     private apiKey: string;
     private ws: WebSocket | null = null;
@@ -255,8 +274,13 @@ export class DeepgramStreamingSTT extends EventEmitter {
         });
 
         this.ws.on('error', (err: Error) => {
-            console.error('[DeepgramStreaming] WebSocket error:', err.message);
-            this.emit('error', err);
+            const detailedMessage = describeDeepgramConnectionError(err, {
+                sampleRate: this.sampleRate,
+                channels: this.numChannels,
+                languageCode: this.languageCode,
+            });
+            console.error('[DeepgramStreaming] WebSocket error:', detailedMessage);
+            this.emit('error', new Error(detailedMessage));
         });
 
         this.ws.on('close', (code: number, reason: Buffer) => {

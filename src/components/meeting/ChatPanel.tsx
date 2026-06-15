@@ -11,7 +11,6 @@ import {
   ChevronDown,
   SlidersHorizontal,
   PointerOff,
-  Image,
   X,
   Copy,
   Code,
@@ -31,6 +30,7 @@ import {
   CHAT_PANEL_FOOTER_CONTROLS_CLASS,
   ChatPanelAttachedScreenshots,
   ChatPanelControlBar,
+  ChatPanelMessageScreenshotPreview,
   ChatPanelTextInput,
   createChatInputPasteHandler,
   getChatPanelModelDisplayName,
@@ -44,6 +44,7 @@ interface Message {
   isStreaming?: boolean;
   streamStatus?: string;
   hasScreenshot?: boolean;
+  screenshotPreview?: string;
   isCode?: boolean;
   intent?: string;
   isNegotiationCoaching?: boolean;
@@ -217,10 +218,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           customStyle={{
                             margin: 0,
                             borderRadius: 0,
-                            fontSize: '13px',
-                            lineHeight: '1.6',
+                            fontSize: '12px',
+                            lineHeight: '1.45',
                             background: 'transparent',
-                            padding: '16px',
+                            padding: '10px',
                             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
                           }}
                           wrapLongLines={true}
@@ -240,11 +241,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     remarkPlugins={[remarkGfm, remarkMath]}
                     rehypePlugins={[rehypeKatex]}
                     components={{
-                      p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
+                      p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0 whitespace-pre-wrap" {...props} />,
                       strong: ({ node, ...props }: any) => <strong className="font-bold overlay-text-strong" {...props} />,
                       em: ({ node, ...props }: any) => <em className="italic overlay-text-secondary" {...props} />,
-                      ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
-                      ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
+                      ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-1.5 space-y-0.5" {...props} />,
+                      ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-1.5 space-y-0.5" {...props} />,
                       li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
                       h1: ({ node, ...props }: any) => <h1 className="text-lg font-bold mb-2 mt-3 overlay-text-strong" {...props} />,
                       h2: ({ node, ...props }: any) => <h2 className="text-base font-bold mb-2 mt-3 overlay-text-strong" {...props} />,
@@ -273,7 +274,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
           <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
-              p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
+              p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-cyan-800' : 'text-cyan-100'}`} {...props} />,
               ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2" {...props} />,
               li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
@@ -294,7 +295,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
           <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
-              p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
+              p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-indigo-800' : 'text-indigo-100'}`} {...props} />,
               ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2" {...props} />,
               li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
@@ -315,7 +316,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
           <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
-              p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
+              p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-amber-800' : 'text-[#FFF9C4]'}`} {...props} />,
               ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2" {...props} />,
               li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
@@ -365,10 +366,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           customStyle={{
                             margin: 0,
                             borderRadius: 0,
-                            fontSize: '13px',
-                            lineHeight: '1.6',
+                            fontSize: '12px',
+                            lineHeight: '1.45',
                             background: 'transparent',
-                            padding: '16px',
+                            padding: '10px',
                             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
                           }}
                           wrapLongLines={true}
@@ -388,11 +389,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     remarkPlugins={[remarkGfm, remarkMath]}
                     rehypePlugins={[rehypeKatex]}
                     components={{
-                      p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
+                      p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0" {...props} />,
                       strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-emerald-700' : 'text-state-success'}`} {...props} />,
                       em: ({ node, ...props }: any) => <em className={`italic ${isLightTheme ? 'text-emerald-700/80' : 'text-emerald-200/80'}`} {...props} />,
-                      ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
-                      ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
+                      ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-1.5 space-y-0.5" {...props} />,
+                      ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-1.5 space-y-0.5" {...props} />,
                       li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
                     }}
                   >
@@ -412,11 +413,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           remarkPlugins={[remarkGfm, remarkMath]}
           rehypePlugins={[rehypeKatex]}
           components={{
-            p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0 whitespace-pre-wrap" {...props} />,
+            p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0 whitespace-pre-wrap" {...props} />,
             strong: ({ node, ...props }: any) => <strong className="font-bold opacity-100 overlay-text-strong" {...props} />,
             em: ({ node, ...props }: any) => <em className="italic opacity-90 overlay-text-secondary" {...props} />,
-            ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
-            ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
+            ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-1.5 space-y-0.5" {...props} />,
+            ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-1.5 space-y-0.5" {...props} />,
             li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
             code: ({ node, ...props }: any) => <code className={`overlay-inline-code-surface rounded px-1 py-0.5 text-xs font-mono ${isLightTheme ? 'text-slate-800' : ''}`} {...props} />,
             a: ({ node, ...props }: any) => <a className="underline hover:opacity-80" target="_blank" rel="noopener noreferrer" {...props} />,
@@ -436,13 +437,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       />
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto px-4 py-3.5 space-y-2.5 no-drag"
+        className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-1.5 no-drag"
         style={{ scrollbarWidth: 'none' }}
       >
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
             <div className={`
-              ${msg.role === 'user' ? 'max-w-[72.25%] px-[13.6px] py-[10.2px]' : 'max-w-[85%] px-4 py-2.5'} text-[14px] leading-6 relative group whitespace-pre-wrap
+              ${msg.role === 'user' ? 'max-w-[72%] px-3 py-2' : 'max-w-[92%] px-3 py-2'} text-[13px] leading-[1.45] relative group min-w-0 whitespace-pre-wrap
               ${msg.role === 'user'
                 ? (isLightTheme
                   ? 'bg-blue-500/12 border border-blue-500/25 text-blue-950 rounded-[20px] rounded-tr-[4px] shadow-sm font-medium'
@@ -459,10 +460,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 </div>
               )}
               {msg.role === 'user' && msg.hasScreenshot && (
-                <div className={`flex items-center gap-1 text-[10px] opacity-70 mb-1 border-b pb-1 ${isLightTheme ? 'border-black/10' : 'border-white/10'}`}>
-                  <Image className="w-2.5 h-2.5" />
-                  <span>Screenshot attached</span>
-                </div>
+                <ChatPanelMessageScreenshotPreview preview={msg.screenshotPreview} isLightTheme={isLightTheme} />
               )}
               {msg.role === 'system' && !msg.isStreaming && (
                 <button

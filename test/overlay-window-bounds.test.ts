@@ -68,3 +68,14 @@ t.test('launcher window uses compact calculated bounds instead of fixed 1200x800
   t.match(createWindowBlock, /workArea\.y \+ topMargin/, 'top position uses workArea.y, not workArea.x');
   t.end();
 });
+
+
+t.test('overlay hide/show preserves resized bounds instead of resetting scale', (t) => {
+  const source = readFileSync(path.join(process.cwd(), 'electron/helpers/WindowHelper.ts'), 'utf8');
+  const switchBlock = source.slice(source.indexOf('public switchToOverlay'), source.indexOf('public switchToLauncher'));
+
+  t.match(switchBlock, /keepOverlayBoundsVisible\(\)/, 'show path only clamps existing overlay bounds onscreen');
+  t.notMatch(switchBlock, /calculateExpandedOverlayBounds\(primaryDisplay\.workArea\)/, 'show path does not recalculate default size');
+  t.notMatch(switchBlock, /setBounds\(overlayBounds\)/, 'show path does not reset user-resized bounds');
+  t.end();
+});

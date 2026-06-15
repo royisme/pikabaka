@@ -40,6 +40,38 @@ export const CHAT_PANEL_FOOTER_CONTROLS_CLASS =
 export const CHAT_PANEL_INPUT_BASE_CLASS =
   'w-full min-h-[42px] border focus:ring-1 rounded-xl pl-3 pr-10 py-2.5 focus:outline-none transition-all duration-200 ease-sculpted text-[13px] leading-relaxed';
 
+export const CHAT_PANEL_MESSAGE_SCREENSHOT_PREVIEW_CLASS =
+  'mb-2 flex w-full max-w-[220px] flex-col gap-1 rounded-lg border p-1.5 overlay-subtle-surface';
+export const CHAT_PANEL_MESSAGE_SCREENSHOT_IMAGE_CLASS =
+  'max-h-28 w-full rounded-md object-cover border';
+
+export function ChatPanelMessageScreenshotPreview({
+  preview,
+  isLightTheme,
+}: {
+  preview?: string;
+  isLightTheme: boolean;
+}) {
+  if (!preview) {
+    return (
+      <div className="mb-1 text-[10px] opacity-70" data-testid="chat-message-screenshot-missing-preview">
+        Screenshot attached
+      </div>
+    );
+  }
+
+  return (
+    <div className={CHAT_PANEL_MESSAGE_SCREENSHOT_PREVIEW_CLASS} data-testid="chat-message-screenshot-preview">
+      <img
+        src={preview}
+        alt="Attached screenshot preview"
+        className={`${CHAT_PANEL_MESSAGE_SCREENSHOT_IMAGE_CLASS} ${isLightTheme ? 'border-black/15' : 'border-white/20'}`}
+      />
+      <span className="text-[10px] leading-none opacity-70">Screenshot preview</span>
+    </div>
+  );
+}
+
 export function getChatPanelModelDisplayName(
   currentModel: string,
   openAICompatibleProviders: OpenAICompatibleProviderSummary[] = []

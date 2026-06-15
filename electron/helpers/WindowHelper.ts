@@ -350,6 +350,24 @@ export class WindowHelper {
     return screen.getDisplayMatching(bounds).id;
   }
 
+  private keepOverlayBoundsVisible(): void {
+    if (!this.overlayWindow || this.overlayWindow.isDestroyed()) return;
+
+    const bounds = this.overlayWindow.getBounds();
+    const workArea = screen.getDisplayMatching(bounds).workArea;
+    const width = Math.min(bounds.width, workArea.width);
+    const height = Math.min(bounds.height, workArea.height);
+    const maxX = workArea.x + workArea.width - width;
+    const maxY = workArea.y + workArea.height - height;
+    const x = Math.min(Math.max(bounds.x, workArea.x), maxX);
+    const y = Math.min(Math.max(bounds.y, workArea.y), maxY);
+
+    if (x !== bounds.x || y !== bounds.y || width !== bounds.width || height !== bounds.height) {
+      this.overlayWindow.setBounds({ x, y, width, height });
+    }
+  }
+
+
   public isVisible(): boolean {
     return this.isWindowVisible
   }
@@ -453,11 +471,9 @@ export class WindowHelper {
 
     // Show Overlay FIRST
     if (this.overlayWindow && !this.overlayWindow.isDestroyed()) {
-      // Reset overlay position to center or last known? 
-      // For now, center it nicely
-      const primaryDisplay = screen.getPrimaryDisplay()
-      const overlayBounds = calculateExpandedOverlayBounds(primaryDisplay.workArea)
-      this.overlayWindow.setBounds(overlayBounds);
+      // Preserve the user's resized/moved overlay bounds across hide/show.
+      // Only clamp back onscreen if the display layout changed while hidden.
+      this.keepOverlayBoundsVisible();
 
       if (process.platform === 'win32' && this.contentProtection) {
         // Opacity Shield: Show at 0 opacity first to prevent frame leak

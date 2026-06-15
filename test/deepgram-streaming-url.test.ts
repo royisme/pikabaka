@@ -1,5 +1,5 @@
 import t from 'tap';
-import { buildDeepgramListenUrl } from '../electron/audio/DeepgramStreamingSTT';
+import { buildDeepgramListenUrl, describeDeepgramConnectionError } from '../electron/audio/DeepgramStreamingSTT';
 
 t.test('Deepgram auto language omits unsupported realtime language detection params', (t) => {
   const url = new URL(buildDeepgramListenUrl({ sampleRate: 48000, channels: 1 }));
@@ -20,5 +20,20 @@ t.test('Deepgram explicit recognition language is still sent', (t) => {
   t.equal(url.searchParams.get('language'), 'en');
   t.equal(url.searchParams.get('sample_rate'), '16000');
   t.equal(url.searchParams.get('channels'), '2');
+  t.end();
+});
+
+
+t.test('Deepgram HTTP 400 errors explain provider, language, and likely fix', (t) => {
+  const message = describeDeepgramConnectionError(new Error('Unexpected server response: 400'), {
+    sampleRate: 48000,
+    channels: 1,
+  });
+
+  t.match(message, /Deepgram STT connection failed/, 'names the failing STT provider');
+  t.match(message, /HTTP 400/, 'keeps the server status code');
+  t.match(message, /language=auto/, 'includes the selected recognition language');
+  t.match(message, /API key\/project\/plan/, 'points to credential/account cause');
+  t.match(message, /language=multi/, 'mentions the previously unsupported auto-language parameter');
   t.end();
 });

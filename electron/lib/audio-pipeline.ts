@@ -24,6 +24,31 @@ export type STTProvider = (GoogleSTT | RestSTT | DeepgramStreamingSTT | SonioxSt
   notifySpeechEnded?: () => void;
 };
 
+export function formatSTTProviderError({
+  provider,
+  language,
+  speaker,
+  error,
+}: {
+  provider: string;
+  language: string;
+  speaker: 'interviewer' | 'user';
+  error: Error;
+}): string {
+  const rawMessage = error.message || 'STT error';
+  const languageLabel = language || 'default';
+
+  if (/Deepgram STT connection failed/i.test(rawMessage)) {
+    return `[${speaker}] ${rawMessage}`;
+  }
+
+  if (/Unexpected server response:\s*400/i.test(rawMessage)) {
+    return `[${speaker}] ${provider} STT rejected the realtime request with HTTP 400 (language=${languageLabel}). Check the STT provider key, account access, and recognition language in Settings.`;
+  }
+
+  return `[${speaker}] ${provider} STT error (language=${languageLabel}): ${rawMessage}`;
+}
+
 async function ensureMacMicrophoneAccess(context: string): Promise<boolean> {
   if (process.platform !== 'darwin') return true;
 
@@ -161,8 +186,14 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
   });
 
   stt.on('error', (err: Error) => {
-    console.error(`[Main] STT (${speaker}) Error:`, err);
-    state.lastAudioPipelineError = `[${speaker}] ${err.message || 'STT error'}`;
+    const detailedError = formatSTTProviderError({
+      provider: sttProvider,
+      language: sttLanguage,
+      speaker,
+      error: err,
+    });
+    console.error(`[Main] STT (${speaker}) Error:`, detailedError);
+    state.lastAudioPipelineError = detailedError;
   });
 
   return stt;
