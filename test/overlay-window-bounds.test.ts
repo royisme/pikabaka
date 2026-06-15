@@ -1,7 +1,11 @@
 import t from 'tap';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import {
   OVERLAY_EXPANDED_MIN_HEIGHT,
   OVERLAY_EXPANDED_MIN_WIDTH,
+  OVERLAY_EXPANDED_PREFERRED_MAX_HEIGHT,
+  OVERLAY_EXPANDED_PREFERRED_MAX_WIDTH,
   calculateExpandedOverlayBounds,
 } from '../electron/helpers/overlayBounds';
 
@@ -29,5 +33,26 @@ t.test('expanded overlay bounds degrade safely on small displays', (t) => {
   t.ok(bounds.x >= workArea.x && bounds.y >= workArea.y);
   t.ok(bounds.x + bounds.width <= workArea.x + workArea.width);
   t.ok(bounds.y + bounds.height <= workArea.y + workArea.height);
+  t.end();
+});
+
+
+t.test('large displays still open as a compact resizable modal', (t) => {
+  const workArea = { x: 0, y: 0, width: 3024, height: 1964 };
+  const bounds = calculateExpandedOverlayBounds(workArea);
+
+  t.ok(bounds.width <= OVERLAY_EXPANDED_PREFERRED_MAX_WIDTH, 'ultra-wide displays are capped to compact launch width');
+  t.ok(bounds.height <= OVERLAY_EXPANDED_PREFERRED_MAX_HEIGHT, 'tall displays are capped to compact launch height');
+  t.ok(bounds.width >= OVERLAY_EXPANDED_MIN_WIDTH, 'still wide enough for transcript/chat columns');
+  t.ok(bounds.height >= OVERLAY_EXPANDED_MIN_HEIGHT, 'still tall enough for footer controls');
+  t.end();
+});
+
+t.test('selective screenshot capture waits until cropper overlay is hidden', (t) => {
+  const source = readFileSync(path.join(process.cwd(), 'electron/helpers/CropperWindowHelper.ts'), 'utf8');
+  const confirmBlock = source.slice(source.indexOf('const screenBounds = this.toScreenBounds(bounds);'), source.indexOf('this.cancelledListener ='));
+
+  t.match(source, /HIDE_BEFORE_CAPTURE_DELAY_MS/, 'cropper has an explicit hide-before-capture settle delay');
+  t.ok(confirmBlock.indexOf('this.hideOrClose();') < confirmBlock.indexOf('this.resolveCurrentSelection(screenBounds);'), 'confirm hides cropper before resolving selection to ScreenshotHelper');
   t.end();
 });

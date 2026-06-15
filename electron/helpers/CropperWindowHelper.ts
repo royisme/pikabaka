@@ -26,6 +26,9 @@ const CROPPER_CONFIG = {
 
     /** Delay between load retries in ms */
     LOAD_RETRY_DELAY_MS: 1000,
+
+    /** Wait after hiding the cropper before desktop capture so the dim overlay is not captured. */
+    HIDE_BEFORE_CAPTURE_DELAY_MS: parseInt(process.env.CROPPER_HIDE_BEFORE_CAPTURE_DELAY || '140', 10),
 }
 
 /**
@@ -135,8 +138,10 @@ export class CropperWindowHelper {
                 return;
             }
 
-            this.resolveCurrentSelection(screenBounds);
             this.hideOrClose();
+            setTimeout(() => {
+                this.resolveCurrentSelection(screenBounds);
+            }, CROPPER_CONFIG.HIDE_BEFORE_CAPTURE_DELAY_MS);
         };
 
         this.cancelledListener = () => {
