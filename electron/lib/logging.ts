@@ -1,6 +1,7 @@
 import { app, systemPreferences } from "electron"
 import path from "path"
 import fs from "fs"
+import { isMediaAccessGranted } from "./mac-permissions"
 
 // CQ-04 fix: do NOT call app.getPath() at module load time.
 // app.getPath('documents') is not guaranteed to be available before app.whenReady().
@@ -56,7 +57,7 @@ export async function ensureMacMicrophoneAccess(context: string): Promise<boolea
     const currentStatus = systemPreferences.getMediaAccessStatus('microphone');
     console.log(`[Main] macOS microphone permission before ${context}: ${currentStatus}`);
 
-    if (currentStatus === 'granted') {
+    if (isMediaAccessGranted(currentStatus)) {
       return true;
     }
 

@@ -8,6 +8,7 @@ import { DeepgramStreamingSTT } from "../audio/DeepgramStreamingSTT"
 import { SonioxStreamingSTT } from "../audio/SonioxStreamingSTT"
 import { ElevenLabsStreamingSTT } from "../audio/ElevenLabsStreamingSTT"
 import { OpenAIStreamingSTT } from "../audio/OpenAIStreamingSTT"
+import { isMediaAccessGranted } from "./mac-permissions"
 import {
   TranscriptSpeaker,
   bufferFinalTranscriptChunk,
@@ -30,7 +31,7 @@ async function ensureMacMicrophoneAccess(context: string): Promise<boolean> {
     const currentStatus = systemPreferences.getMediaAccessStatus('microphone');
     console.log(`[Main] macOS microphone permission before ${context}: ${currentStatus}`);
 
-    if (currentStatus === 'granted') {
+    if (isMediaAccessGranted(currentStatus)) {
       return true;
     }
 

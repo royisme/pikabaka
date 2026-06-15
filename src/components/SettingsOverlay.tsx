@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQueryClient } from 'react-query';
 import packageJson from '../../package.json';
 import {
@@ -30,6 +30,20 @@ import { useProfileStatus } from '../hooks/useProfileStatus';
 import { useProfileData } from '../hooks/useProfileData';
 import { useUploadResume } from '../hooks/useUploadResume';
 import { useKnowledgeMode } from '../hooks/useKnowledgeMode';
+
+type PermissionStatusReport = {
+    status: string;
+    rawStatus: string;
+    granted: boolean;
+    limited: boolean;
+    restartRequired: boolean;
+    message?: string;
+};
+
+type PermissionStatusSummary = {
+    microphone: PermissionStatusReport;
+    screen: PermissionStatusReport;
+};
 
 const DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT =
     'You are a realtime subtitle translator. Preserve meaning, tone, technical terms, product names, numbers, and code tokens exactly when appropriate. Do not summarize, do not add explanations, and do not omit information. Return only the translated sentence(s), with no prefix/suffix and no markdown.';
@@ -498,7 +512,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     };
     const profileError = uploadResume.error instanceof Error ? uploadResume.error.message : '';
     const [verboseLogging, setVerboseLogging] = useState(false);
-    const [permissionStatus, setPermissionStatus] = useState<{ microphone: string; screen: string } | null>(null);
+    const [permissionStatus, setPermissionStatus] = useState<PermissionStatusSummary | null>(null);
+    const refreshPermissionStatus = useCallback(() => {
+        window.electronAPI?.getPermissionStatus?.().then(setPermissionStatus).catch(() => { });
+    }, []);
 
     // Close dropdown when clicking outside
     // Sync with global state changes
@@ -509,9 +526,24 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             window.electronAPI?.getOverlayMousePassthrough?.().then(setIsMousePassthrough).catch(() => { });
             window.electronAPI?.getDisguise?.().then(setDisguiseMode).catch(() => { });
             window.electronAPI?.getVerboseLogging?.().then(setVerboseLogging).catch(() => { });
-            window.electronAPI?.getPermissionStatus?.().then(setPermissionStatus).catch(() => { });
+            refreshPermissionStatus();
         }
-    }, [isOpen]);
+    }, [isOpen, refreshPermissionStatus]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleFocus = () => refreshPermissionStatus();
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', handleFocus);
+        const interval = window.setInterval(refreshPermissionStatus, 2500);
+
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('visibilitychange', handleFocus);
+            window.clearInterval(interval);
+        };
+    }, [isOpen, refreshPermissionStatus]);
 
     useEffect(() => {
         if (window.electronAPI?.onUndetectableChanged) {
@@ -1657,7 +1689,15 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             { key: 'microphone' as const, label: 'Microphone', icon: <Mic size={15} /> },
                                                             { key: 'screen' as const, label: 'Screen Recording', icon: <Monitor size={15} /> },
                                                         ]).map(({ key, label, icon }) => {
-                                                            const granted = permissionStatus[key] === 'granted';
+                                                            const report = permissionStatus[key];
+                                                            const granted = report.granted;
+                                                            const needsRestart = report.restartRequired;
+                                                            const isLimited = report.limited;
+                                                            const statusText = needsRestart
+                                                                ? 'Restart Pika'
+                                                                : isLimited
+                                                                    ? 'Limited'
+                                                                    : 'Granted';
                                                             return (
                                                                 <div key={key} className="flex items-center justify-between">
                                                                     <div className="flex items-center gap-2.5">
@@ -1665,14 +1705,23 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                         <span className="text-xs text-text-primary">{label}</span>
                                                                     </div>
                                                                     {granted ? (
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            <Check size={13} className="text-state-success" />
-                                                                            <span className="text-xs text-state-success">Granted</span>
+                                                                        <div className="flex items-center gap-1.5" title={report.message || `macOS reported: ${report.rawStatus}`}>
+                                                                            {needsRestart || isLimited ? (
+                                                                                <Info size={13} className="text-state-warning" />
+                                                                            ) : (
+                                                                                <Check size={13} className="text-state-success" />
+                                                                            )}
+                                                                            <span className={`text-xs ${needsRestart || isLimited ? 'text-state-warning' : 'text-state-success'}`}>{statusText}</span>
                                                                         </div>
                                                                     ) : (
                                                                         <button
-                                                                            onClick={() => window.electronAPI?.openPrivacySettings(key)}
+                                                                            onClick={() => {
+                                                                                window.electronAPI?.openPrivacySettings?.(key)?.finally(() => {
+                                                                                    window.setTimeout(refreshPermissionStatus, 750);
+                                                                                });
+                                                                            }}
                                                                             className="flex items-center gap-1.5 text-xs text-state-warning hover:text-amber-300 transition-colors"
+                                                                            title={report.message || `macOS reported: ${report.rawStatus}`}
                                                                         >
                                                                             <AlertCircle size={13} />
                                                                             <span>Not granted</span>
@@ -1683,6 +1732,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             );
                                                         })}
                                                     </div>
+                                                    {permissionStatus.screen.message && permissionStatus.screen.granted && (
+                                                        <p className="mt-3 text-[11px] leading-4 text-state-warning">
+                                                            {permissionStatus.screen.message}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             )}
 

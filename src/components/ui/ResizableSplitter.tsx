@@ -47,9 +47,12 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
       const parent = splitterRef.current?.parentElement;
       if (!parent) return;
       const rect = parent.getBoundingClientRect();
+      const dimension = orientation === 'horizontal' ? rect.height : rect.width;
+      if (dimension <= 0) return;
+
       const pct = orientation === 'horizontal'
-        ? ((e.clientY - rect.top) / rect.height) * 100
-        : ((e.clientX - rect.left) / rect.width) * 100;
+        ? ((e.clientY - rect.top) / dimension) * 100
+        : ((e.clientX - rect.left) / dimension) * 100;
       onPositionChange(Math.min(max, Math.max(min, pct)));
     };
 
@@ -68,7 +71,7 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, max, min, onPositionChange]);
+  }, [isDragging, max, min, onPositionChange, orientation]);
 
   const isHorizontal = orientation === 'horizontal';
   return (

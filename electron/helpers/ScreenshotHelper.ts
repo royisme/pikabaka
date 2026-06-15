@@ -2,10 +2,11 @@
 
 import path from "node:path"
 import fs from "node:fs"
-import { app, desktopCapturer, screen } from "electron"
+import { app, desktopCapturer, screen, systemPreferences } from "electron"
 import { v4 as uuidv4 } from "uuid"
 import util from "util"
 import sharp from "sharp"
+import { getScreenCapturePermissionMessage, isMediaAccessGranted, MacPermissionStatus } from "../lib/mac-permissions"
 
 /**
  * Finds the display that best contains the given rectangle.
@@ -87,6 +88,12 @@ async function getDisplaysIntersectingSelection(
     });
   } catch (error) {
     console.error('[ScreenshotHelper] Failed to get desktop sources:', error);
+    if ((error as NodeJS.ErrnoException).name === 'NotAllowedError') {
+      const rawStatus = process.platform === 'darwin'
+        ? systemPreferences.getMediaAccessStatus('screen') as MacPermissionStatus
+        : undefined;
+      throw new Error(getScreenCapturePermissionMessage(rawStatus));
+    }
     throw error;
   }
   
@@ -418,8 +425,11 @@ export class ScreenshotHelper {
       console.error('[ScreenshotHelper] desktopCapturer.getSources failed:', error);
       // Handle specific error types
       if ((error as NodeJS.ErrnoException).name === 'NotAllowedError') {
+        const rawStatus = process.platform === 'darwin'
+          ? systemPreferences.getMediaAccessStatus('screen') as MacPermissionStatus
+          : undefined;
         throw new Error(
-          'Screen capture permission denied. Please grant screen recording permission in System Settings > Privacy & Security > Screen Recording.'
+          getScreenCapturePermissionMessage(rawStatus)
         );
       }
       if ((error as NodeJS.ErrnoException).name === 'NotFoundError') {
@@ -430,8 +440,13 @@ export class ScreenshotHelper {
 
     if (sources.length === 0) {
       console.error('[ScreenshotHelper] No screen sources found');
+      const rawStatus = process.platform === 'darwin'
+        ? systemPreferences.getMediaAccessStatus('screen') as MacPermissionStatus
+        : undefined;
       throw new Error(
-        'No screen sources available. Check screen recording permissions in System Settings > Privacy & Security > Screen Recording.'
+        isMediaAccessGranted(rawStatus || 'unknown')
+          ? getScreenCapturePermissionMessage(rawStatus)
+          : 'No screen sources available. Check Screen Recording permissions in System Settings > Privacy & Security > Screen Recording.'
       );
     }
 

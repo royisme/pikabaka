@@ -1,6 +1,7 @@
-import { systemPreferences, shell } from "electron"
+import { shell } from "electron"
 import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
+import { getMacPermissionStatusSummary } from "../lib/mac-permissions"
 
 export function registerSystemHandlers(appState: AppState): void {
   // ==========================================
@@ -25,10 +26,7 @@ export function registerSystemHandlers(appState: AppState): void {
   // ==========================================
 
   safeHandle("get-permission-status", () => {
-    return {
-      microphone: systemPreferences.getMediaAccessStatus('microphone'),
-      screen: systemPreferences.getMediaAccessStatus('screen'),
-    };
+    return getMacPermissionStatusSummary();
   });
 
   safeHandle("open-privacy-settings", async (_, type: 'microphone' | 'screen') => {

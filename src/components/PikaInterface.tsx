@@ -13,6 +13,28 @@ import { useMeetingTranscript } from '../hooks/useMeetingTranscript';
 import { useMeetingAudio } from '../hooks/useMeetingAudio';
 
 interface PikaInterfaceProps { onEndMeeting?: () => void; overlayOpacity?: number; }
+
+const SPLITTER_STORAGE_KEY = 'pika_splitter_position';
+const DEFAULT_TRANSCRIPT_SPLIT = 45;
+const MIN_TRANSCRIPT_SPLIT = 20;
+const MAX_TRANSCRIPT_SPLIT = 65;
+
+const clampSplitterPosition = (value: unknown) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return DEFAULT_TRANSCRIPT_SPLIT;
+    return Math.min(MAX_TRANSCRIPT_SPLIT, Math.max(MIN_TRANSCRIPT_SPLIT, parsed));
+};
+
+const readStoredSplitterPosition = () => {
+    try {
+        const stored = localStorage.getItem(SPLITTER_STORAGE_KEY);
+        const next = stored === null ? DEFAULT_TRANSCRIPT_SPLIT : clampSplitterPosition(stored);
+        if (stored !== String(next)) localStorage.setItem(SPLITTER_STORAGE_KEY, String(next));
+        return next;
+    } catch {
+        return DEFAULT_TRANSCRIPT_SPLIT;
+    }
+};
 type ScreenshotAttachment = { path: string; preview: string };
 type CommandHandlers = { handleWhatToSay: () => void; handleFollowUp: (intent?: string) => void; handleFollowUpQuestions: () => void; handleRecap: () => void; handleAnswerNow: () => void; handleClarify: () => void; handleCodeHint: () => void; handleBrainstorm: () => void; };
 type GeneralHandlers = { toggleVisibility: () => void; processScreenshots: () => void; resetCancel: () => Promise<void>; toggleMousePassthrough: () => void; takeScreenshot: () => Promise<void>; selectiveScreenshot: () => Promise<void>; };
@@ -21,7 +43,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const isLightTheme = useResolvedTheme() === 'light';
     const [isExpanded, setIsExpanded] = useState(true);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [splitterPosition, setSplitterPosition] = useState(() => { const parsed = Number(localStorage.getItem('pika_splitter_position') ?? 40); return Number.isFinite(parsed) ? Math.min(80, Math.max(20, parsed)) : 40; });
+    const [splitterPosition, setSplitterPosition] = useState(readStoredSplitterPosition);
     const [isMousePassthrough, setIsMousePassthrough] = useState(false);
     const [isUndetectable, setIsUndetectable] = useState(false);
     const [currentModel, setCurrentModel] = useState('gemini-3-flash-preview');
@@ -36,7 +58,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const chat = useMeetingChat();
     const appearance = useMemo(() => getOverlayAppearance(overlayOpacity, isLightTheme ? 'light' : 'dark'), [overlayOpacity, isLightTheme]);
 
-    useEffect(() => localStorage.setItem('pika_splitter_position', String(splitterPosition)), [splitterPosition]);
+    useEffect(() => { try { localStorage.setItem(SPLITTER_STORAGE_KEY, String(clampSplitterPosition(splitterPosition))); } catch {} }, [splitterPosition]);
     useEffect(() => { window.electronAPI?.getDefaultModel?.().then((result: any) => { if (result?.model) { setCurrentModel(result.model); window.electronAPI.setModel(result.model).catch(() => {}); } }).catch((err: any) => console.error('Failed to fetch default model:', err)); }, []);
     useEffect(() => { const unsubscribe = window.electronAPI?.onModelChanged?.((modelId: string) => setCurrentModel((prev) => (prev === modelId ? prev : modelId))); return () => unsubscribe?.(); }, []);
     useEffect(() => { window.electronAPI?.getUndetectable?.().then(setIsUndetectable); const unsubscribe = window.electronAPI?.onUndetectableChanged?.(setIsUndetectable); return () => unsubscribe?.(); }, []);
@@ -49,6 +71,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     useEffect(() => window.electronAPI?.onSessionReset?.(() => { console.log('[PikaInterface] Resetting session state...'); chat.setSystemMessages([]); chat.setInputValue(''); chat.setAttachedContext([]); audio.setManualTranscript(''); audio.setVoiceInput(''); chat.setIsProcessing(false); analytics.trackConversationStarted(); }), [chat.setSystemMessages, chat.setInputValue, chat.setAttachedContext, audio.setManualTranscript, audio.setVoiceInput, chat.setIsProcessing]);
 
     const handleScreenshotAttach = useCallback((data: ScreenshotAttachment) => { setIsExpanded(true); chat.setAttachedContext((prev) => (prev.some((s) => s.path === data.path) ? prev : [...prev, data].slice(-5))); }, [chat.setAttachedContext]);
+    const handleSplitterChange = useCallback((next: number) => setSplitterPosition(clampSplitterPosition(next)), []);
     const updateContentDimensions = useCallback(() => {
         if (isExpanded) return;
         const rect = contentRef.current?.getBoundingClientRect();
@@ -154,7 +177,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
                 {isExpanded && (
                     <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="flex flex-col items-center gap-2 w-full flex-1 min-h-0">
                         <TopPill expanded={isExpanded} onToggle={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} appearance={appearance} onLogoClick={() => window.electronAPI?.setWindowMode?.('launcher')} />
-                        <SplitterShell left={<TranscriptColumn {...transcriptProps} />} right={<ChatColumn {...chatProps} />} splitterPosition={splitterPosition} onSplitterChange={setSplitterPosition} isExpanded={isExpanded} appearance={appearance} overlayPanelClass="overlay-text-primary" />
+                        <SplitterShell left={<TranscriptColumn {...transcriptProps} />} right={<ChatColumn {...chatProps} />} splitterPosition={splitterPosition} onSplitterChange={handleSplitterChange} isExpanded={isExpanded} appearance={appearance} overlayPanelClass="overlay-text-primary" />
                     </motion.div>
                 )}
             </AnimatePresence>

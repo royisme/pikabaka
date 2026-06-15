@@ -198,7 +198,10 @@ export interface ElectronAPI {
   toggleOverlayMousePassthrough: () => Promise<{ success: boolean; enabled: boolean }>
   getOverlayMousePassthrough: () => Promise<boolean>
   onOverlayMousePassthroughChanged: (callback: (enabled: boolean) => void) => () => void
-  getPermissionStatus: () => Promise<{ microphone: string; screen: string }>
+  getPermissionStatus: () => Promise<{
+    microphone: { status: string; rawStatus: string; granted: boolean; limited: boolean; restartRequired: boolean; message?: string }
+    screen: { status: string; rawStatus: string; granted: boolean; limited: boolean; restartRequired: boolean; message?: string }
+  }>
   openPrivacySettings: (type: 'microphone' | 'screen') => Promise<{ success: boolean }>
 
   // Streaming listeners

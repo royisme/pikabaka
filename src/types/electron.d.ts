@@ -73,7 +73,10 @@ export interface ElectronAPI {
   onDisguiseChanged: (callback: (mode: 'terminal' | 'settings' | 'activity' | 'none') => void) => () => void
   setOpenAtLogin: (open: boolean) => Promise<{ success: boolean; error?: string }>
   getOpenAtLogin: () => Promise<boolean>
-  getPermissionStatus: () => Promise<{ microphone: string; screen: string }>
+  getPermissionStatus: () => Promise<{
+    microphone: { status: string; rawStatus: string; granted: boolean; limited: boolean; restartRequired: boolean; message?: string }
+    screen: { status: string; rawStatus: string; granted: boolean; limited: boolean; restartRequired: boolean; message?: string }
+  }>
   openPrivacySettings: (type: 'microphone' | 'screen') => Promise<{ success: boolean }>
   onSettingsVisibilityChange: (callback: (isVisible: boolean) => void) => () => void
   toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>

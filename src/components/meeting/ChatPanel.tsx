@@ -391,10 +391,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-3.5 space-y-2.5 no-drag"
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-3.5 space-y-2.5 no-drag"
         style={{ scrollbarWidth: 'none' }}
       >
         {messages.map((msg) => (
@@ -515,7 +515,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="flex flex-nowrap justify-center items-center gap-1.5 px-4 pb-3 overflow-x-auto no-scrollbar pt-3.5 no-drag">
+      <div className="shrink-0 flex flex-nowrap justify-start md:justify-center items-center gap-1.5 px-4 py-2.5 overflow-x-auto no-scrollbar no-drag">
         <button onClick={handleWhatToSay} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
           <Pencil className="w-3 h-3 opacity-65" /> Guide me
         </button>
@@ -549,7 +549,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         </button>
       </div>
 
-      <div className="p-3 pt-0 no-drag">
+      <div className="shrink-0 p-3 pt-0 no-drag">
         {attachedContext.length > 0 && (
           <div className={`mb-2 rounded-lg p-2 transition-all duration-200 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
             <div className="flex items-center justify-between mb-1.5">
@@ -620,8 +620,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           )}
         </div>
 
-        <div className="flex items-center justify-between mt-3 px-0.5">
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-between gap-2 mt-3 px-0.5 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
             <button
               onClick={(e) => {
                 if (!contentRef.current) return;
