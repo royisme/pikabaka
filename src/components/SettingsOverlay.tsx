@@ -2196,6 +2196,9 @@ Core Skills
                             {activeTab === 'ai-providers' && (
                                 <AIProvidersSettings />
                             )}
+                            {activeTab === 'companion' && (
+                                <PhoneCompanionSettings />
+                            )}
                             {activeTab === 'keybinds' && (
                                 <div className="space-y-3 animated fadeIn select-text pb-4">
                                     <div className="flex items-start justify-between gap-4">
