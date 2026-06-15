@@ -58,7 +58,7 @@ const SplitterShell: React.FC<SplitterShellProps> = ({
 
     return (
         <div
-            className={`relative w-full flex-1 min-h-[360px] border rounded-[24px] overflow-hidden flex flex-col draggable-area overlay-shell-surface ${overlayPanelClass}`}
+            className={`relative w-full flex-1 min-h-0 border rounded-[24px] overflow-hidden flex flex-col draggable-area overlay-shell-surface ${overlayPanelClass}`}
             style={appearance.shellStyle}
         >
             <div ref={contentRef} className="flex-1 min-h-0 flex flex-col">

@@ -2,6 +2,7 @@
 import { BrowserWindow, screen, app, Menu } from "electron"
 import { AppState } from "../main"
 import { KeybindManager } from "../services/KeybindManager"
+import { calculateExpandedOverlayBounds } from "./overlayBounds"
 import path from "node:path"
 
 const isEnvDev = process.env.NODE_ENV === "development"
@@ -196,11 +197,13 @@ export class WindowHelper {
     // }
 
     // --- 2. Create Overlay Window (Hidden initially) ---
-    const overlayDefaultWidth = Math.min(600, Math.floor(primaryDisplay.workAreaSize.width * 0.9))
+    const initialOverlayBounds = calculateExpandedOverlayBounds(primaryDisplay.workArea)
 
     const overlaySettings: Electron.BrowserWindowConstructorOptions = {
-      width: overlayDefaultWidth,
-      height: 1,
+      x: initialOverlayBounds.x,
+      y: initialOverlayBounds.y,
+      width: initialOverlayBounds.width,
+      height: initialOverlayBounds.height,
       minWidth: 380,
       minHeight: 1,
       webPreferences: {
@@ -453,13 +456,8 @@ export class WindowHelper {
       // Reset overlay position to center or last known? 
       // For now, center it nicely
       const primaryDisplay = screen.getPrimaryDisplay()
-      const workArea = primaryDisplay.workArea;
-      const currentBounds = this.overlayWindow.getBounds();
-      const targetHeight = Math.max(currentBounds.height, 216);
-      const overlayWidth = Math.min(600, Math.floor(screen.getPrimaryDisplay().workAreaSize.width * 0.9));
-      const overlayX = Math.floor(workArea.x + (workArea.width - overlayWidth) / 2)
-      const overlayY = Math.floor(workArea.y + (workArea.height - targetHeight) / 2)
-      this.overlayWindow.setBounds({ x: overlayX, y: overlayY, width: overlayWidth, height: targetHeight });
+      const overlayBounds = calculateExpandedOverlayBounds(primaryDisplay.workArea)
+      this.overlayWindow.setBounds(overlayBounds);
 
       if (process.platform === 'win32' && this.contentProtection) {
         // Opacity Shield: Show at 0 opacity first to prevent frame leak

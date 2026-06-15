@@ -261,7 +261,7 @@ const App: React.FC = () => {
   if (isOverlayWindow) {
     return (
       <ErrorBoundary context="Overlay">
-        <div className="w-full relative bg-transparent">
+        <div className="h-screen max-h-screen w-full overflow-hidden relative bg-transparent">
           <QueryClientProvider client={queryClient}>
             <ToastProvider>
               <div
