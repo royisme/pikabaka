@@ -2,14 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Mic, MessageSquare } from 'lucide-react';
 import ResizableSplitter from '../ui/ResizableSplitter';
 import type { getOverlayAppearance } from '../../lib/overlayAppearance';
-
-const MIN_TRANSCRIPT_SPLIT = 20;
-const MAX_TRANSCRIPT_SPLIT = 65;
-const MIN_TRANSCRIPT_PANE_PX = 96;
-const MIN_CHAT_PANE_PX = 360;
-const SPLITTER_THICKNESS_PX = 6;
-
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+import { calculateSplitterBounds } from './chatLayout';
 
 interface SplitterShellProps {
     left: React.ReactNode;
@@ -51,22 +44,10 @@ const SplitterShell: React.FC<SplitterShellProps> = ({
         return () => observer.disconnect();
     }, []);
 
-    const maxTranscriptSplit = useMemo(() => {
-        if (contentHeight <= 0) return MAX_TRANSCRIPT_SPLIT;
-        const availableHeight = contentHeight - SPLITTER_THICKNESS_PX;
-        if (availableHeight <= 0) return MIN_TRANSCRIPT_SPLIT;
-
-        const chatRoomLimit = ((availableHeight - MIN_CHAT_PANE_PX) / contentHeight) * 100;
-        const transcriptMinLimit = (MIN_TRANSCRIPT_PANE_PX / contentHeight) * 100;
-        const maxAllowed = Math.max(transcriptMinLimit, chatRoomLimit);
-
-        return clamp(maxAllowed, transcriptMinLimit, MAX_TRANSCRIPT_SPLIT);
-    }, [contentHeight]);
-
-    const minTranscriptSplit = contentHeight > 0
-        ? clamp((MIN_TRANSCRIPT_PANE_PX / contentHeight) * 100, MIN_TRANSCRIPT_SPLIT, maxTranscriptSplit)
-        : MIN_TRANSCRIPT_SPLIT;
-    const safeSplitterPosition = clamp(splitterPosition, minTranscriptSplit, maxTranscriptSplit);
+    const { maxTranscriptSplit, minTranscriptSplit, safeSplitterPosition } = useMemo(
+        () => calculateSplitterBounds(contentHeight, splitterPosition),
+        [contentHeight, splitterPosition],
+    );
 
     useEffect(() => {
         if (Math.abs(safeSplitterPosition - splitterPosition) > 0.1) {

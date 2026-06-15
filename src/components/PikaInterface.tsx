@@ -11,33 +11,16 @@ import { getDefaultOverlayOpacity, getOverlayAppearance } from '../lib/overlayAp
 import { useMeetingChat, type Message } from '../hooks/useMeetingChat';
 import { useMeetingTranscript } from '../hooks/useMeetingTranscript';
 import { useMeetingAudio } from '../hooks/useMeetingAudio';
+import {
+    clampSplitterPosition,
+    persistSplitterPosition,
+    readStoredSplitterPosition as readStoredSplitterPositionFromStorage,
+} from './meeting/chatLayout';
 
 interface PikaInterfaceProps { onEndMeeting?: () => void; overlayOpacity?: number; }
 
-const SPLITTER_STORAGE_KEY = 'pika_splitter_position';
-const SPLITTER_STORAGE_VERSION_KEY = 'pika_splitter_position_version';
-const SPLITTER_STORAGE_VERSION = 'chat-polish-v2';
-const DEFAULT_TRANSCRIPT_SPLIT = 28;
-const MIN_TRANSCRIPT_SPLIT = 20;
-const MAX_TRANSCRIPT_SPLIT = 55;
-
-const clampSplitterPosition = (value: unknown) => {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return DEFAULT_TRANSCRIPT_SPLIT;
-    return Math.min(MAX_TRANSCRIPT_SPLIT, Math.max(MIN_TRANSCRIPT_SPLIT, parsed));
-};
-
 const readStoredSplitterPosition = () => {
-    try {
-        const storedVersion = localStorage.getItem(SPLITTER_STORAGE_VERSION_KEY);
-        const stored = storedVersion === SPLITTER_STORAGE_VERSION ? localStorage.getItem(SPLITTER_STORAGE_KEY) : null;
-        const next = stored === null ? DEFAULT_TRANSCRIPT_SPLIT : clampSplitterPosition(stored);
-        localStorage.setItem(SPLITTER_STORAGE_KEY, String(next));
-        localStorage.setItem(SPLITTER_STORAGE_VERSION_KEY, SPLITTER_STORAGE_VERSION);
-        return next;
-    } catch {
-        return DEFAULT_TRANSCRIPT_SPLIT;
-    }
+    return readStoredSplitterPositionFromStorage(localStorage);
 };
 type ScreenshotAttachment = { path: string; preview: string };
 
@@ -68,7 +51,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const chat = useMeetingChat();
     const appearance = useMemo(() => getOverlayAppearance(overlayOpacity, isLightTheme ? 'light' : 'dark'), [overlayOpacity, isLightTheme]);
 
-    useEffect(() => { try { localStorage.setItem(SPLITTER_STORAGE_KEY, String(clampSplitterPosition(splitterPosition))); localStorage.setItem(SPLITTER_STORAGE_VERSION_KEY, SPLITTER_STORAGE_VERSION); } catch {} }, [splitterPosition]);
+    useEffect(() => { try { persistSplitterPosition(localStorage, splitterPosition); } catch {} }, [splitterPosition]);
     useEffect(() => { window.electronAPI?.getDefaultModel?.().then((result: any) => { if (result?.model) { setCurrentModel(result.model); window.electronAPI.setModel(result.model).catch(() => {}); } }).catch((err: any) => console.error('Failed to fetch default model:', err)); }, []);
     useEffect(() => { const unsubscribe = window.electronAPI?.onModelChanged?.((modelId: string) => setCurrentModel((prev) => (prev === modelId ? prev : modelId))); return () => unsubscribe?.(); }, []);
     useEffect(() => { window.electronAPI?.getUndetectable?.().then(setIsUndetectable); const unsubscribe = window.electronAPI?.onUndetectableChanged?.(setIsUndetectable); return () => unsubscribe?.(); }, []);
@@ -101,8 +84,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         const safeNext = clampSplitterPosition(next);
         setSplitterPosition(safeNext);
         try {
-            localStorage.setItem(SPLITTER_STORAGE_KEY, String(safeNext));
-            localStorage.setItem(SPLITTER_STORAGE_VERSION_KEY, SPLITTER_STORAGE_VERSION);
+            persistSplitterPosition(localStorage, safeNext);
         } catch {
             // Ignore storage failures; the in-memory split is still updated.
         }
