@@ -56,3 +56,15 @@ t.test('selective screenshot capture waits until cropper overlay is hidden', (t)
   t.ok(confirmBlock.indexOf('this.hideOrClose();') < confirmBlock.indexOf('this.resolveCurrentSelection(screenBounds);'), 'confirm hides cropper before resolving selection to ScreenshotHelper');
   t.end();
 });
+
+
+t.test('launcher window uses compact calculated bounds instead of fixed 1200x800', (t) => {
+  const source = readFileSync(path.join(process.cwd(), 'electron/helpers/WindowHelper.ts'), 'utf8');
+  const createWindowBlock = source.slice(source.indexOf('public createWindow(): void'), source.indexOf('// --- 1. Create Launcher Window ---'));
+
+  t.match(createWindowBlock, /calculateExpandedOverlayBounds\(workArea\)/, 'launcher launch size comes from shared compact overlay bounds');
+  t.notMatch(createWindowBlock, /const width = 1200/, 'launcher no longer hard-codes old large width');
+  t.notMatch(createWindowBlock, /const height = 800/, 'launcher no longer hard-codes old large height');
+  t.match(createWindowBlock, /workArea\.y \+ topMargin/, 'top position uses workArea.y, not workArea.x');
+  t.end();
+});

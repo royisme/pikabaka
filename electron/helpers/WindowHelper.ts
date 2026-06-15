@@ -98,15 +98,15 @@ export class WindowHelper {
 
     const primaryDisplay = screen.getPrimaryDisplay()
     const workArea = primaryDisplay.workArea
-    // Fixed dimensions per user request
-    const width = 1200;
-    const height = 800;
+    const launcherBounds = calculateExpandedOverlayBounds(workArea)
+    const width = launcherBounds.width;
+    const height = launcherBounds.height;
 
     // Calculate centered X, and top-centered Y (5% from top)
-    const x = Math.round(workArea.x + (workArea.width - width) / 2);
+    const x = launcherBounds.x;
     // Ensure y is at least workArea.y (don't go offscreen top)
     const topMargin = Math.round(workArea.height * 0.05);
-    const y = Math.round(workArea.x + topMargin);
+    const y = Math.round(workArea.y + topMargin);
 
     // --- 1. Create Launcher Window ---
     const isMac = process.platform === "darwin";
