@@ -39,3 +39,47 @@ export const prettifyModelId = (id: string): string => {
     if (!id) return '';
     return id.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 };
+
+export interface OpenAICompatibleProviderSummary {
+    id: string;
+    name: string;
+    preferredModel?: string;
+}
+
+export interface ModelDisplayOption {
+    id: string;
+    name: string;
+    description?: string;
+}
+
+export const getOpenAICompatibleProviderDisplayName = (provider: OpenAICompatibleProviderSummary): string => {
+    const providerName = provider.name?.trim() || 'OpenAI-compatible';
+    const preferredModel = provider.preferredModel?.trim();
+    return preferredModel ? `${providerName} • ${prettifyModelId(preferredModel)}` : providerName;
+};
+
+export const buildOpenAICompatibleModelOption = (provider: OpenAICompatibleProviderSummary): ModelDisplayOption => ({
+    id: provider.id,
+    name: getOpenAICompatibleProviderDisplayName(provider),
+    description: provider.preferredModel?.trim()
+        ? `OpenAI-compatible • ${provider.preferredModel.trim()}`
+        : 'OpenAI-compatible',
+});
+
+export const getFriendlyModelDisplayName = (
+    modelId: string,
+    providers: OpenAICompatibleProviderSummary[] = []
+): string => {
+    if (!modelId) return 'AI model';
+
+    const provider = providers.find((p) => p.id === modelId || p.preferredModel === modelId);
+    if (provider) return getOpenAICompatibleProviderDisplayName(provider);
+
+    for (const cfg of Object.values(STANDARD_CLOUD_MODELS)) {
+        const standardIndex = cfg.ids.indexOf(modelId);
+        if (standardIndex !== -1) return cfg.names[standardIndex];
+    }
+
+    if (modelId.startsWith('ollama-')) return prettifyModelId(modelId.replace(/^ollama-/, ''));
+    return prettifyModelId(modelId);
+};

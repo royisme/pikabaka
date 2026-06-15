@@ -256,7 +256,7 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                     if (!data?.message) return;
                     setMessages(prev => prev.map(msg =>
                         msg.id === assistantMessageId
-                            ? { ...msg, streamStatus: data.message, content: msg.content || data.message }
+                            ? { ...msg, streamStatus: data.message }
                             : msg
                     ));
                 });

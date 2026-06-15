@@ -1705,7 +1705,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                 ? 'Restart Pika'
                                                                 : isLimited
                                                                     ? 'Limited'
-                                                                    : 'Granted';
+                                                                    : granted
+                                                                        ? 'Granted'
+                                                                        : 'Not granted';
                                                             return (
                                                                 <div key={key} className="flex items-center justify-between">
                                                                     <div className="flex items-center gap-2.5">
@@ -1740,9 +1742,14 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             );
                                                         })}
                                                     </div>
-                                                    {permissionStatus.screen.message && permissionStatus.screen.granted && (
+                                                    {permissionStatus.screen.message && (
                                                         <p className="mt-3 text-[11px] leading-4 text-state-warning">
                                                             {permissionStatus.screen.message}
+                                                        </p>
+                                                    )}
+                                                    {permissionStatus.screen.granted && !permissionStatus.screen.restartRequired && (
+                                                        <p className="mt-3 text-[11px] leading-4 text-text-secondary">
+                                                            If screenshots still fail after granting Screen Recording, quit and reopen Pika. If macOS still blocks capture, remove Pika from System Settings → Privacy &amp; Security → Screen &amp; System Audio Recording, reopen Pika, and grant access again.
                                                         </p>
                                                     )}
                                                     {permissionStatus.codeSignature?.isAdHoc && (

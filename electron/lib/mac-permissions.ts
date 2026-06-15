@@ -135,8 +135,8 @@ export function getMacPermissionStatusSummary(): PermissionStatusSummary {
 
 export function getScreenCapturePermissionMessage(rawStatus?: MacPermissionStatus): string {
   if (rawStatus && isMediaAccessGranted(rawStatus)) {
-    return 'macOS reports Screen Recording is allowed, but screen capture is not available yet. Quit and reopen Pika so macOS applies the Screen Recording change.';
+    return 'macOS reports Screen Recording is allowed, but screen capture is not available yet. Quit and reopen Pika so macOS applies the Screen Recording change. If it still fails, remove Pika from System Settings > Privacy & Security > Screen Recording, reopen Pika, and grant access again.';
   }
 
-  return 'Screen capture permission denied. Please grant Screen Recording permission in System Settings > Privacy & Security > Screen Recording, then quit and reopen Pika if capture still fails.';
+  return 'Screen capture permission denied. Please grant Screen Recording permission in System Settings > Privacy & Security > Screen Recording, then quit and reopen Pika. If the toggle is already on but screenshots still fail, remove Pika from that list, reopen Pika, and grant access again.';
 }

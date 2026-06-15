@@ -33,9 +33,11 @@ t.test('marks authorized screen status as restart-required instead of not grante
   t.end();
 });
 
-t.test('screen capture failure after macOS grant reports restart guidance', (t) => {
+t.test('screen capture failure after macOS grant reports restart and reset guidance', (t) => {
   t.match(getScreenCapturePermissionMessage('authorized'), /Screen Recording is allowed/);
+  t.match(getScreenCapturePermissionMessage('authorized'), /remove Pika/);
   t.match(getScreenCapturePermissionMessage('denied'), /grant Screen Recording permission/);
+  t.match(getScreenCapturePermissionMessage('denied'), /toggle is already on/);
   t.end();
 });
 

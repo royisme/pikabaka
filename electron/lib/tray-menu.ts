@@ -96,15 +96,8 @@ export function updateTrayMenu(appState: AppState) {
       accelerator: screenshotAccel,
       click: async () => {
         try {
-          const screenshotPath = await appState.takeScreenshot()
-          const preview = await appState.getImagePreview(screenshotPath)
-          const mainWindow = appState.getMainWindow()
-          if (mainWindow) {
-            mainWindow.webContents.send("screenshot-taken", {
-              path: screenshotPath,
-              preview
-            })
-          }
+          const attachment = await appState.takeScreenshotAttachment()
+          appState._broadcastToAllWindows("screenshot-taken", attachment)
         } catch (error) {
           console.error("Error taking screenshot from tray:", error)
         }

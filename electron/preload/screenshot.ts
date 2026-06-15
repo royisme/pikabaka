@@ -8,6 +8,7 @@ export function screenshotChannels() {
     getRecognitionLanguages: () => ipcRenderer.invoke("get-recognition-languages"),
     takeScreenshot: () => ipcRenderer.invoke("take-screenshot"),
     takeSelectiveScreenshot: () => ipcRenderer.invoke("take-selective-screenshot"),
+    saveClipboardImage: () => ipcRenderer.invoke("save-clipboard-image"),
     getScreenshots: () => ipcRenderer.invoke("get-screenshots"),
     deleteScreenshot: (path: string) =>
       ipcRenderer.invoke("delete-screenshot", path),
@@ -41,6 +42,15 @@ export function screenshotChannels() {
       ipcRenderer.on("capture-and-process", subscription)
       return () => {
         ipcRenderer.removeListener("capture-and-process", subscription)
+      }
+    },
+    onScreenshotError: (
+      callback: (error: string) => void
+    ) => {
+      const subscription = (_: any, error: string) => callback(error)
+      ipcRenderer.on("screenshot-error", subscription)
+      return () => {
+        ipcRenderer.removeListener("screenshot-error", subscription)
       }
     },
     onSolutionsReady: (callback: (solutions: string) => void) => {

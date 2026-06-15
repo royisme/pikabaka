@@ -691,6 +691,29 @@ export class ScreenshotHelper {
     return this.screenshotQueue
   }
 
+  public async saveClipboardImage(image: Electron.NativeImage): Promise<string> {
+    if (!image || image.isEmpty()) {
+      throw new Error('Clipboard does not contain an image. Copy an image, then paste it into chat again.');
+    }
+
+    const screenshotPath = path.join(this.screenshotDir, `${uuidv4()}.png`);
+    await fs.promises.writeFile(screenshotPath, image.toPNG());
+
+    this.screenshotQueue.push(screenshotPath);
+    if (this.screenshotQueue.length > this.MAX_SCREENSHOTS) {
+      const removedPath = this.screenshotQueue.shift();
+      if (removedPath) {
+        try {
+          await fs.promises.unlink(removedPath);
+        } catch {
+          // best-effort cleanup
+        }
+      }
+    }
+
+    return screenshotPath;
+  }
+
   public getExtraScreenshotQueue(): string[] {
     return this.extraScreenshotQueue
   }

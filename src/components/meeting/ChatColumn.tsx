@@ -29,6 +29,7 @@ interface ChatColumnProps {
     handleBrainstorm: () => void;
     handleAnswerNow: () => void;
     handleManualSubmit: () => void;
+    handlePasteImage: () => void;
     isManualRecording: boolean;
     manualTranscript: string;
     voiceInput: string;
@@ -62,6 +63,7 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
     handleBrainstorm,
     handleAnswerNow,
     handleManualSubmit,
+    handlePasteImage,
     isManualRecording,
     manualTranscript,
     voiceInput,
@@ -95,6 +97,7 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
             handleBrainstorm={handleBrainstorm}
             handleAnswerNow={handleAnswerNow}
             handleManualSubmit={handleManualSubmit}
+            handlePasteImage={handlePasteImage}
             isManualRecording={isManualRecording}
             manualTranscript={manualTranscript}
             voiceInput={voiceInput}

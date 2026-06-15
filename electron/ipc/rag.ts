@@ -435,7 +435,7 @@ ${meetingContext || ''}`;
           provider: 'openai-compatible',
           providerName: openAICompatibleProvider.name,
           model: openAICompatibleModel,
-          message: `Streaming via OpenAI-compatible: ${openAICompatibleProvider.name}`
+          message: `Using ${openAICompatibleProvider.name}`
         });
 
         for await (const chunk of streamOpenAICompatibleChatCompletion(

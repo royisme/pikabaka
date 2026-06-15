@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, ipcMain, screen } from "electron"
+import { app, BrowserWindow, Tray, ipcMain, screen, clipboard } from "electron"
 import path from "path"
 import fs from "fs"
 import { logToFile, ensureMacMicrophoneAccess, setupConsoleOverrides } from "./lib/logging"
@@ -247,30 +247,15 @@ export class AppState {
           // Adapted from public PR #113 — verify premium interaction
           this.toggleOverlayMousePassthrough();
         } else if (actionId === 'general:take-screenshot') {
-          const screenshotPath = await this.takeScreenshot(false);
-          const preview = await this.getImagePreview(screenshotPath);
-          const mainWindow = this.getMainWindow();
-          if (mainWindow) {
-            mainWindow.webContents.send("screenshot-taken", {
-              path: screenshotPath,
-              preview
-            });
-          }
+          const attachment = await this.takeScreenshotAttachment(false);
+          this._broadcastToAllWindows("screenshot-taken", attachment);
         } else if (actionId === 'general:selective-screenshot') {
-          const screenshotPath = await this.takeSelectiveScreenshot(false);
-          const preview = await this.getImagePreview(screenshotPath);
-          const mainWindow = this.getMainWindow();
-          if (mainWindow) {
-            // preload.ts maps 'screenshot-attached' to onScreenshotAttached
-            mainWindow.webContents.send("screenshot-attached", {
-              path: screenshotPath,
-              preview
-            });
-          }
+          const attachment = await this.takeSelectiveScreenshotAttachment(false);
+          // preload.ts maps 'screenshot-attached' to onScreenshotAttached
+          this._broadcastToAllWindows("screenshot-attached", attachment);
         } else if (actionId === 'general:capture-and-process') {
           // Single-trigger: capture current screen then immediately request AI analysis
-          const screenshotPath = await this.takeScreenshot(false);
-          const preview = await this.getImagePreview(screenshotPath);
+          const attachment = await this.takeScreenshotAttachment(false);
           // Ensure the window is visible so the user can see the response without stealing focus
           this.showMainWindow(true);
           // win.focus() can cause macOS to re-activate the app. Re-hide the dock
@@ -278,13 +263,7 @@ export class AppState {
           if (process.platform === 'darwin' && this.isUndetectable) {
             app.dock.hide();
           }
-          const mainWindow = this.getMainWindow();
-          if (mainWindow) {
-            mainWindow.webContents.send("capture-and-process", {
-              path: screenshotPath,
-              preview
-            });
-          }
+          this._broadcastToAllWindows("capture-and-process", attachment);
 
         // --- STEALTH SHORTCUTS: no focus, no show, pure IPC dispatch ---
 
@@ -349,6 +328,9 @@ export class AppState {
       } catch (e: any) {
         if (e.message !== "Selection cancelled" && e.message !== "Screenshot capture already in progress") {
           console.error(`[Main] Error handling global shortcut ${actionId}:`, e);
+          if (actionId === 'general:take-screenshot' || actionId === 'general:selective-screenshot' || actionId === 'general:capture-and-process') {
+            this._broadcastToAllWindows('screenshot-error', e?.message || String(e));
+          }
         }
       }
     });
@@ -1373,6 +1355,11 @@ export class AppState {
     )
   }
 
+  public async takeScreenshotAttachment(restoreFocus: boolean = true): Promise<{ path: string; preview: string }> {
+    const screenshotPath = await this.takeScreenshot(restoreFocus);
+    return { path: screenshotPath, preview: await this.getImagePreview(screenshotPath) };
+  }
+
   public async takeSelectiveScreenshot(restoreFocus: boolean = true): Promise<string> {
     return this.withScreenshotCaptureSession('selective', restoreFocus, async () => {
       let captureArea: Electron.Rectangle | undefined;
@@ -1387,6 +1374,17 @@ export class AppState {
 
       return this.screenshotHelper.takeSelectiveScreenshot(captureArea)
     })
+  }
+
+  public async takeSelectiveScreenshotAttachment(restoreFocus: boolean = true): Promise<{ path: string; preview: string }> {
+    const screenshotPath = await this.takeSelectiveScreenshot(restoreFocus);
+    return { path: screenshotPath, preview: await this.getImagePreview(screenshotPath) };
+  }
+
+  public async saveClipboardImageAttachment(): Promise<{ path: string; preview: string }> {
+    const image = clipboard.readImage();
+    const screenshotPath = await this.screenshotHelper.saveClipboardImage(image);
+    return { path: screenshotPath, preview: await this.getImagePreview(screenshotPath) };
   }
 
   public async getImagePreview(filepath: string): Promise<string> {

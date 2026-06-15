@@ -63,9 +63,7 @@ export function useMeetingChat() {
   const isChatLoading = status === 'submitted' || status === 'streaming';
 
   const appendStreamingText = useCallback((message: Message, token: string): Message => {
-    const current = message.text || '';
-    const base = message.streamStatus && current === message.streamStatus ? '' : current;
-    return { ...message, text: base + token };
+    return { ...message, text: (message.text || '') + token };
   }, []);
 
   useEffect(() => {
@@ -171,7 +169,6 @@ export function useMeetingChat() {
           updated[updated.length - 1] = {
             ...last,
             streamStatus: data.message,
-            text: last.text && last.text !== last.streamStatus ? last.text : data.message,
           };
           return updated;
         });

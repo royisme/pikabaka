@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as Select from '@radix-ui/react-select';
 import { Plus, Trash2, Edit2, AlertCircle, CheckCircle, Save, ChevronDown, Check, RefreshCw, Loader2 } from 'lucide-react';
-import { STANDARD_CLOUD_MODELS, prettifyModelId } from '../../utils/modelUtils';
+import { STANDARD_CLOUD_MODELS, buildOpenAICompatibleModelOption, getFriendlyModelDisplayName, prettifyModelId } from '../../utils/modelUtils';
 import { validateCurl } from '../../lib/curl-validator';
 import { ProviderCard } from './ProviderCard';
 
@@ -524,13 +524,14 @@ export const AIProvidersSettings: React.FC = () => {
                                 }
                             }
                             customProviders.forEach(p => opts.push({ id: p.id, name: p.name }));
-                            openaiCompatibleProviders.forEach(p =>
-                                opts.push({ id: p.id, name: `${p.name} (OpenAI-compatible)` })
-                            );
+                            openaiCompatibleProviders.forEach(p => {
+                                const option = buildOpenAICompatibleModelOption(p);
+                                opts.push({ id: option.id, name: option.name });
+                            });
                             ollamaModels.forEach(m => opts.push({ id: `ollama-${m}`, name: `${m} (Local)` }));
                             // Ensure current default model always appears
                             if (defaultModel && !opts.find(o => o.id === defaultModel)) {
-                                opts.unshift({ id: defaultModel, name: prettifyModelId(defaultModel) });
+                                opts.unshift({ id: defaultModel, name: getFriendlyModelDisplayName(defaultModel, openaiCompatibleProviders) });
                             }
                             return opts;
                         })()}

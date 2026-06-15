@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Check, Loader2 } from 'lucide-react';
-import { STANDARD_CLOUD_MODELS, prettifyModelId } from '../utils/modelUtils';
+import { STANDARD_CLOUD_MODELS, buildOpenAICompatibleModelOption, prettifyModelId } from '../utils/modelUtils';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 
 // Define Model Types
@@ -9,6 +9,7 @@ interface ModelOption {
     name: string;
     type: 'cloud' | 'local' | 'custom' | 'ollama';
     provider?: string;
+    description?: string;
 }
 
 
@@ -41,7 +42,10 @@ const ModelSelectorWindow = () => {
                 const creds = await window.electronAPI?.getStoredCredentials?.();
 
                 // 2. Custom Providers
-                const customProviders = await window.electronAPI?.getCustomProviders?.() || [];
+                const [customProviders, openAICompatibleProviders] = await Promise.all([
+                    window.electronAPI?.getCustomProviders?.() || [],
+                    window.electronAPI?.getOpenAICompatibleProviders?.() || [],
+                ]);
 
                 // 3. Ollama
                 let ollamaModels: string[] = [];
@@ -88,6 +92,13 @@ const ModelSelectorWindow = () => {
                 // Custom Providers
                 customProviders.forEach((p: any) => {
                     models.push({ id: p.id, name: p.name, type: 'custom' });
+                });
+
+                // OpenAI-compatible providers use the provider id for selection, but display
+                // the friendly provider name and preferred model instead of the raw UUID.
+                openAICompatibleProviders.forEach((p: any) => {
+                    const option = buildOpenAICompatibleModelOption(p);
+                    models.push({ ...option, type: 'custom' });
                 });
 
                 // Ollama
@@ -167,7 +178,12 @@ const ModelSelectorWindow = () => {
                                             }
                                         `}
                                     >
-                                        <span className="text-[12px] font-medium truncate flex-1 min-w-0">{model.name}</span>
+                                        <span className="flex-1 min-w-0">
+                                            <span className="block text-[12px] font-medium truncate">{model.name}</span>
+                                            {model.description && (
+                                                <span className="block text-[10px] opacity-70 truncate">{model.description}</span>
+                                            )}
+                                        </span>
                                         {isSelected && <Check className={`w-3.5 h-3.5 shrink-0 ml-2 ${isLight ? 'text-emerald-600' : 'text-state-success'}`} />}
                                     </button>
                                 );

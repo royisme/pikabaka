@@ -40,6 +40,12 @@ const readStoredSplitterPosition = () => {
     }
 };
 type ScreenshotAttachment = { path: string; preview: string };
+
+function getErrorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string') return error;
+    return String(error);
+}
 type CommandHandlers = { handleWhatToSay: () => void; handleFollowUp: (intent?: string) => void; handleFollowUpQuestions: () => void; handleRecap: () => void; handleAnswerNow: () => void; handleClarify: () => void; handleCodeHint: () => void; handleBrainstorm: () => void; };
 type GeneralHandlers = { toggleVisibility: () => void; processScreenshots: () => void; resetCancel: () => Promise<void>; toggleMousePassthrough: () => void; takeScreenshot: () => Promise<void>; selectiveScreenshot: () => Promise<void>; };
 
@@ -74,7 +80,23 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     useEffect(() => window.electronAPI?.onEnsureExpanded?.(() => { isStealthRef.current = true; setIsExpanded(true); }), []);
     useEffect(() => window.electronAPI?.onSessionReset?.(() => { console.log('[PikaInterface] Resetting session state...'); chat.setSystemMessages([]); chat.setInputValue(''); chat.setAttachedContext([]); audio.setManualTranscript(''); audio.setVoiceInput(''); chat.setIsProcessing(false); analytics.trackConversationStarted(); }), [chat.setSystemMessages, chat.setInputValue, chat.setAttachedContext, audio.setManualTranscript, audio.setVoiceInput, chat.setIsProcessing]);
 
-    const handleScreenshotAttach = useCallback((data: ScreenshotAttachment) => { setIsExpanded(true); chat.setAttachedContext((prev) => (prev.some((s) => s.path === data.path) ? prev : [...prev, data].slice(-5))); }, [chat.setAttachedContext]);
+    const pushScreenshotError = useCallback((error: unknown) => {
+        const message = getErrorMessage(error);
+        setIsExpanded(true);
+        chat.setSystemMessages((prev) => [
+            ...prev,
+            {
+                id: Date.now().toString(),
+                role: 'system',
+                text: `Screenshot failed: ${message}`,
+            },
+        ]);
+    }, [chat.setSystemMessages]);
+    const handleScreenshotAttach = useCallback((data: ScreenshotAttachment) => {
+        if (!data?.path || !data?.preview) return;
+        setIsExpanded(true);
+        chat.setAttachedContext((prev) => (prev.some((s) => s.path === data.path) ? prev : [...prev, data].slice(-5)));
+    }, [chat.setAttachedContext]);
     const handleSplitterChange = useCallback((next: number) => {
         const safeNext = clampSplitterPosition(next);
         setSplitterPosition(safeNext);
@@ -115,8 +137,24 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         toggleVisibility: () => window.electronAPI.toggleWindow(), processScreenshots: chat.handleWhatToSay,
         resetCancel: async () => { if (chat.isProcessing) chat.setIsProcessing(false); else { await window.electronAPI.resetIntelligence(); chat.setSystemMessages([]); chat.setAttachedContext([]); chat.setInputValue(''); } },
         toggleMousePassthrough: () => { const next = !isMousePassthrough; setIsMousePassthrough(next); window.electronAPI?.setOverlayMousePassthrough?.(next); },
-        takeScreenshot: async () => { const data = await window.electronAPI.takeScreenshot().catch((err) => console.error('Error triggering screenshot:', err)); if (data?.path) handleScreenshotAttach(data as ScreenshotAttachment); },
-        selectiveScreenshot: async () => { const data = await window.electronAPI.takeSelectiveScreenshot().catch((err) => console.error('Error triggering selective screenshot:', err)); if (data && !data.cancelled && data.path) handleScreenshotAttach(data as ScreenshotAttachment); },
+        takeScreenshot: async () => {
+            try {
+                const data = await window.electronAPI.takeScreenshot();
+                if (data?.path) handleScreenshotAttach(data as ScreenshotAttachment);
+            } catch (err) {
+                console.error('Error triggering screenshot:', err);
+                pushScreenshotError(err);
+            }
+        },
+        selectiveScreenshot: async () => {
+            try {
+                const data = await window.electronAPI.takeSelectiveScreenshot();
+                if (data && !data.cancelled && data.path) handleScreenshotAttach(data as ScreenshotAttachment);
+            } catch (err) {
+                console.error('Error triggering selective screenshot:', err);
+                pushScreenshotError(err);
+            }
+        },
     };
     useEffect(() => {
         const handleGeneralKeyDown = (e: KeyboardEvent) => {
@@ -128,7 +166,18 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     }, [isShortcutPressed]);
 
     useEffect(() => window.electronAPI.onCaptureAndProcess?.((data) => { handleScreenshotAttach(data as ScreenshotAttachment); setTimeout(() => handlersRef.current.handleWhatToSay(), 0); }), [handleScreenshotAttach]);
-    useEffect(() => { const cleanups = [window.electronAPI.onScreenshotTaken(handleScreenshotAttach)]; const attachedCleanup = window.electronAPI.onScreenshotAttached?.(handleScreenshotAttach); if (attachedCleanup) cleanups.push(attachedCleanup); return () => cleanups.forEach((fn) => fn()); }, [handleScreenshotAttach]);
+    useEffect(() => {
+        const cleanups: Array<() => void> = [];
+        const subscribe = (fn?: (callback: (data: ScreenshotAttachment) => void) => () => void) => {
+            const cleanup = fn?.(handleScreenshotAttach);
+            if (cleanup) cleanups.push(cleanup);
+        };
+        subscribe(window.electronAPI.onScreenshotTaken);
+        subscribe(window.electronAPI.onScreenshotAttached);
+        const errorCleanup = window.electronAPI.onScreenshotError?.((error) => pushScreenshotError(error));
+        if (errorCleanup) cleanups.push(errorCleanup);
+        return () => cleanups.forEach((fn) => fn());
+    }, [handleScreenshotAttach, pushScreenshotError]);
     useEffect(() => {
         window.electronAPI?.companionUpdateSnapshot?.({
             transcriptSegments: transcript.transcriptSegments,
@@ -180,9 +229,18 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         setTimeout(() => { isStealthRef.current = false; }, 500);
     }), [chat.actionButtonMode]);
 
+    const handlePasteImage = useCallback(async () => {
+        try {
+            const data = await window.electronAPI.saveClipboardImage();
+            handleScreenshotAttach(data as ScreenshotAttachment);
+        } catch (err) {
+            console.error('Error attaching clipboard image:', err);
+            pushScreenshotError(err);
+        }
+    }, [handleScreenshotAttach, pushScreenshotError]);
     const setMessages = useCallback((updater: React.SetStateAction<Message[]>) => { chat.setSystemMessages((prev) => (typeof updater === 'function' ? (updater as (p: Message[]) => Message[])(prev) : updater)); }, [chat.setSystemMessages]);
     const transcriptProps = { ...transcript, ...audio, appearance, isLightTheme };
-    const chatProps = { messages: chat.messages, knowledgeContext: chat.knowledgeContext, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, actionButtonMode: chat.actionButtonMode, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleWhatToSay: chat.handleWhatToSay, handleClarify: chat.handleClarify, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleBrainstorm: chat.handleBrainstorm, handleAnswerNow, handleManualSubmit: chat.handleManualSubmit, isManualRecording: audio.isManualRecording, manualTranscript: audio.manualTranscript, voiceInput: audio.voiceInput, appearance, isLightTheme, currentModel, isSettingsOpen, isMousePassthrough, setIsMousePassthrough, shortcuts, scrollContainerRef, messagesEndRef, textInputRef, contentRef, setMessages };
+    const chatProps = { messages: chat.messages, knowledgeContext: chat.knowledgeContext, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, actionButtonMode: chat.actionButtonMode, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleWhatToSay: chat.handleWhatToSay, handleClarify: chat.handleClarify, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleBrainstorm: chat.handleBrainstorm, handleAnswerNow, handleManualSubmit: chat.handleManualSubmit, handlePasteImage, isManualRecording: audio.isManualRecording, manualTranscript: audio.manualTranscript, voiceInput: audio.voiceInput, appearance, isLightTheme, currentModel, isSettingsOpen, isMousePassthrough, setIsMousePassthrough, shortcuts, scrollContainerRef, messagesEndRef, textInputRef, contentRef, setMessages };
 
     return (
         <div ref={contentRef} className={`flex flex-col items-center w-full mx-auto ${isExpanded ? 'h-screen min-h-[560px]' : 'h-fit'} min-h-0 bg-transparent p-0 rounded-[24px] font-sans gap-2 overlay-text-primary`}>

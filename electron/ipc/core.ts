@@ -136,9 +136,7 @@ export function registerCoreHandlers(appState: AppState): void {
 
   safeHandle("take-screenshot", async () => {
     try {
-      const screenshotPath = await appState.takeScreenshot()
-      const preview = await appState.getImagePreview(screenshotPath)
-      return { path: screenshotPath, preview }
+      return await appState.takeScreenshotAttachment()
     } catch (error) {
       // console.error("Error taking screenshot:", error)
       throw error
@@ -147,9 +145,7 @@ export function registerCoreHandlers(appState: AppState): void {
 
   safeHandle("take-selective-screenshot", async () => {
     try {
-      const screenshotPath = await appState.takeSelectiveScreenshot()
-      const preview = await appState.getImagePreview(screenshotPath)
-      return { path: screenshotPath, preview }
+      return await appState.takeSelectiveScreenshotAttachment()
     } catch (error) {
       // EC-04 fix: cast unknown error to Error before accessing .message
       if ((error as Error).message === "Selection cancelled") {
@@ -157,6 +153,10 @@ export function registerCoreHandlers(appState: AppState): void {
       }
       throw error
     }
+  })
+
+  safeHandle("save-clipboard-image", async () => {
+    return await appState.saveClipboardImageAttachment()
   })
 
   safeHandle("get-screenshots", async () => {
@@ -367,7 +367,7 @@ export function registerCoreHandlers(appState: AppState): void {
             provider: 'openai-compatible',
             providerName: providerLabel,
             model: compat?.preferredModel || activeModel,
-            message: `Streaming via OpenAI-compatible: ${providerLabel}`
+            message: `Using ${providerLabel}`
           });
         }
 

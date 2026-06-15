@@ -29,6 +29,9 @@ interface ElectronAPI {
   onCaptureAndProcess: (
     callback: (data: { path: string; preview: string }) => void
   ) => () => void
+  onScreenshotError: (
+    callback: (error: string) => void
+  ) => () => void
   onSolutionsReady: (callback: (solutions: string) => void) => () => void
   onResetView: (callback: () => void) => () => void
   onSolutionStart: (callback: () => void) => () => void
@@ -41,8 +44,9 @@ interface ElectronAPI {
 
   onUnauthorized: (callback: () => void) => () => void
   onDebugError: (callback: (error: string) => void) => () => void
-  takeScreenshot: () => Promise<void>
+  takeScreenshot: () => Promise<{ path: string; preview: string }>
   takeSelectiveScreenshot: () => Promise<{ path: string; preview: string; cancelled?: boolean }>
+  saveClipboardImage: () => Promise<{ path: string; preview: string }>
   moveWindowLeft: () => Promise<void>
   moveWindowRight: () => Promise<void>
   moveWindowUp: () => Promise<void>
@@ -360,6 +364,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getRecognitionLanguages: () => ipcRenderer.invoke("get-recognition-languages"),
   takeScreenshot: () => ipcRenderer.invoke("take-screenshot"),
   takeSelectiveScreenshot: () => ipcRenderer.invoke("take-selective-screenshot"),
+  saveClipboardImage: () => ipcRenderer.invoke("save-clipboard-image"),
   getScreenshots: () => ipcRenderer.invoke("get-screenshots"),
   deleteScreenshot: (path: string) =>
     ipcRenderer.invoke("delete-screenshot", path),
@@ -393,6 +398,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("capture-and-process", subscription)
     return () => {
       ipcRenderer.removeListener("capture-and-process", subscription)
+    }
+  },
+  onScreenshotError: (
+    callback: (error: string) => void
+  ) => {
+    const subscription = (_: any, error: string) => callback(error)
+    ipcRenderer.on("screenshot-error", subscription)
+    return () => {
+      ipcRenderer.removeListener("screenshot-error", subscription)
     }
   },
   onSolutionsReady: (callback: (solutions: string) => void) => {

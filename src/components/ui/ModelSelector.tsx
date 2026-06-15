@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check, Cloud, Terminal, Monitor, Server } from 'lucide-react';
-import { STANDARD_CLOUD_MODELS, prettifyModelId } from '../../utils/modelUtils';
+import { STANDARD_CLOUD_MODELS, buildOpenAICompatibleModelOption, getFriendlyModelDisplayName, prettifyModelId, type OpenAICompatibleProviderSummary } from '../../utils/modelUtils';
 
 interface ModelSelectorProps {
     currentModel: string;
@@ -10,7 +10,9 @@ interface ModelSelectorProps {
 interface CustomProvider {
     id: string;
     name: string;
-    curlCommand: string;
+    curlCommand?: string;
+    preferredModel?: string;
+    description?: string;
 }
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSelectModel }) => {
@@ -39,8 +41,19 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
         const loadData = async () => {
             try {
                 // Load Custom
-                const custom = await window.electronAPI?.getCustomProviders() as CustomProvider[];
-                if (custom) setCustomProviders(custom);
+                const [custom, openAICompatible] = await Promise.all([
+                    window.electronAPI?.getCustomProviders() as Promise<CustomProvider[]> | undefined,
+                    window.electronAPI?.getOpenAICompatibleProviders?.() as Promise<OpenAICompatibleProviderSummary[]> | undefined,
+                ]);
+                const openAICompatibleOptions = (openAICompatible || []).map((provider) => {
+                    const option = buildOpenAICompatibleModelOption(provider);
+                    return {
+                        ...provider,
+                        name: option.name,
+                        description: option.description,
+                    };
+                });
+                setCustomProviders([...(custom || []), ...openAICompatibleOptions]);
 
                 // Load Ollama
                 const local = await window.electronAPI?.getAvailableOllamaModels() as string[];
@@ -79,22 +92,11 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
     };
 
     const getModelDisplayName = (model: string) => {
-        if (model.startsWith('ollama-')) return model.replace('ollama-', '');
-        if (model === 'gemini-3.1-flash-lite-preview') return 'Gemini 3.1 Flash';
-        if (model === 'gemini-3.1-pro-preview') return 'Gemini 3.1 Pro';
-        if (model === 'llama-3.3-70b-versatile') return 'Groq Llama 3.3';
-        if (model === 'gpt-5.4') return 'GPT 5.4';
-        if (model === 'claude-sonnet-4-6') return 'Sonnet 4.6';
-
-        // Check dynamic cloud models
+        const custom = customProviders.find(p => p.id === model || p.preferredModel === model || p.name === model);
+        if (custom) return custom.name;
         const cloud = cloudModels.find(m => m.id === model);
         if (cloud) return cloud.name;
-
-        // Check custom providers
-        const custom = customProviders.find(p => p.id === model || p.name === model);
-        if (custom) return custom.name;
-
-        return model;
+        return getFriendlyModelDisplayName(model, customProviders);
     };
 
     return (
@@ -179,7 +181,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
                                             key={provider.id}
                                             id={provider.id}
                                             name={provider.name}
-                                            desc="Custom cURL"
+                                            desc={provider.description || (provider.preferredModel ? `OpenAI-compatible • ${provider.preferredModel}` : "Custom cURL")}
                                             icon={<Terminal size={14} />}
                                             selected={currentModel === provider.id}
                                             onSelect={() => handleSelect(provider.id)}
