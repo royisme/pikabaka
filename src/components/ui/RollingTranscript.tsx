@@ -104,13 +104,13 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
     if (!hasContent) return null;
 
     return (
-        <div className="px-4 pt-2 pb-1 no-drag">
+        <div className="flex h-full min-h-0 flex-col px-3 py-2 no-drag">
             <div
                 ref={containerRef}
                 onScroll={handleScroll}
                 aria-live="polite"
                 aria-label="Meeting transcript"
-                className="w-full min-h-[80px] max-h-[280px] overflow-y-auto"
+                className="h-full min-h-0 w-full overflow-y-auto"
             >
                 <div className="space-y-3 pr-0.5">
                     {segments.map((seg) => {

@@ -199,3 +199,18 @@ test('chat message scroll area can shrink inside responsive columns', (t) => {
   t.match(chatPanelSource, /flex-1 min-h-0 overflow-y-auto/, 'message area uses min-h-0 so footer/input stay reachable at small heights');
   t.end();
 });
+
+
+test('transcript pane stays compact and removes dashed empty-state pointers', (t) => {
+  const transcriptPanelSource = readFileSync(path.join(process.cwd(), 'src/components/meeting/TranscriptPanel.tsx'), 'utf8');
+  const rollingTranscriptSource = readFileSync(path.join(process.cwd(), 'src/components/ui/RollingTranscript.tsx'), 'utf8');
+
+  t.notMatch(transcriptPanelSource, /border-dashed/, 'empty transcript placeholder has no dashed corner pointers');
+  t.match(transcriptPanelSource, /items-center justify-center/, 'empty state remains centered');
+  t.match(transcriptPanelSource, /title=\{statusTitle\}/, 'full STT status/error remains available as title');
+  t.match(transcriptPanelSource, /max-w-full/, 'STT chip is constrained to the transcript column width');
+  t.match(transcriptPanelSource, /truncate/, 'STT status truncates instead of wrapping');
+  t.notMatch(rollingTranscriptSource, /max-h-\[280px\]/, 'rolling transcript no longer has old fixed max height');
+  t.match(rollingTranscriptSource, /h-full min-h-0 w-full overflow-y-auto/, 'rolling transcript fills pane and scrolls internally');
+  t.end();
+});

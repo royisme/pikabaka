@@ -58,7 +58,7 @@ t.test('splitter persistence clamps invalid, too-small, and too-large values', (
 });
 
 t.test('small content widths keep at least the minimum transcript column and give chat the remainder', (t) => {
-  const width = 500;
+  const width = 420;
   const layout = calculateSplitterBounds(width, MAX_TRANSCRIPT_SPLIT);
 
   t.equal(layout.minTranscriptSplit, (MIN_TRANSCRIPT_PANE_PX / width) * 100);
@@ -102,5 +102,12 @@ t.test('resize updates maximum split as more width becomes available', (t) => {
   t.equal(wide.maxTranscriptSplit, MAX_TRANSCRIPT_SPLIT);
   t.equal(wide.safeSplitterPosition, MAX_TRANSCRIPT_SPLIT);
   t.ok(wide.chatPanePx > MIN_CHAT_PANE_PX);
+  t.end();
+});
+
+
+t.test('column minimums stay compact enough for smaller overlays', (t) => {
+  t.ok(MIN_TRANSCRIPT_PANE_PX <= 180, 'transcript column can shrink compactly');
+  t.ok(MIN_CHAT_PANE_PX <= 300, 'chat column can shrink compactly');
   t.end();
 });

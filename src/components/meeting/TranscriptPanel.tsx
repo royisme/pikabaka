@@ -35,10 +35,12 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
 }) => {
     const hasTranscriptContent = transcriptSegments.length > 0 || isInterviewerSpeaking;
     const placeholderText = 'Transcript will appear here when meeting audio is detected';
+    const statusDetail = showSttErrorDetail && nativeAudioHealth.lastError ? nativeAudioHealth.lastError : null;
+    const statusTitle = statusDetail ? `${sttStatus.label} - ${statusDetail}` : sttStatus.label;
 
     return (
-        <div className="flex h-full flex-col overflow-y-auto custom-scrollbar">
-            <div className="flex-1">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden custom-scrollbar">
+            <div className="flex-1 min-h-0">
                 {showTranscript && hasTranscriptContent ? (
                     <RollingTranscript
                         segments={transcriptSegments}
@@ -49,9 +51,9 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                         onTranslateSegment={handleTranslateTranscriptSegment}
                     />
                 ) : (
-                    <div className="px-4 pt-3 pb-2 no-drag">
+                    <div className="flex h-full items-center justify-center px-3 py-3 no-drag">
                         <div
-                            className="rounded-2xl border border-dashed border-border-subtle/70 px-4 py-6 text-center text-sm text-text-tertiary overlay-transcript-surface"
+                            className="max-w-[320px] rounded-2xl px-4 py-5 text-center text-sm leading-relaxed text-text-tertiary/90 overlay-transcript-surface"
                             style={appearance.transcriptStyle}
                         >
                             {placeholderText}
@@ -60,14 +62,16 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                 )}
             </div>
 
-            <div className="px-4 pt-2 pb-1 no-drag" aria-live="polite" aria-atomic="true">
+            <div className="shrink-0 px-3 py-2 no-drag" aria-live="polite" aria-atomic="true">
                 <div
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium border border-border-subtle/70 ${subtleSurfaceClass} ${sttStatus.toneClass}`}
+                    title={statusTitle}
+                    className={`flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium border border-border-subtle/70 ${subtleSurfaceClass} ${sttStatus.toneClass}`}
                     style={appearance.subtleStyle}
                 >
-                    <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${sttStatus.dotClass}`} />
-                    <span>{sttStatus.label}</span>
-                    {showSttErrorDetail && <span className="opacity-80">- {nativeAudioHealth.lastError}</span>}
+                    <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${sttStatus.dotClass}`} />
+                    <span className="min-w-0 truncate">{sttStatus.label}</span>
+                    {statusDetail && <span className="shrink-0 opacity-60">•</span>}
+                    {statusDetail && <span className="min-w-0 truncate opacity-80">{statusDetail}</span>}
                 </div>
             </div>
 

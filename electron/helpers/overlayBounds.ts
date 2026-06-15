@@ -7,12 +7,12 @@ export interface OverlayWorkArea {
 
 export interface OverlayBounds extends OverlayWorkArea {}
 
-export const OVERLAY_EXPANDED_MIN_WIDTH = 720;
-export const OVERLAY_EXPANDED_MIN_HEIGHT = 560;
-export const OVERLAY_EXPANDED_WIDTH_RATIO = 0.72;
-export const OVERLAY_EXPANDED_HEIGHT_RATIO = 0.68;
-export const OVERLAY_EXPANDED_MAX_WIDTH_RATIO = 0.92;
-export const OVERLAY_EXPANDED_MAX_HEIGHT_RATIO = 0.86;
+export const OVERLAY_EXPANDED_MIN_WIDTH = 640;
+export const OVERLAY_EXPANDED_MIN_HEIGHT = 440;
+export const OVERLAY_EXPANDED_WIDTH_RATIO = 0.62;
+export const OVERLAY_EXPANDED_HEIGHT_RATIO = 0.58;
+export const OVERLAY_EXPANDED_MAX_WIDTH_RATIO = 0.88;
+export const OVERLAY_EXPANDED_MAX_HEIGHT_RATIO = 0.78;
 
 function fitDimension(total: number, preferredRatio: number, minimum: number, maximumRatio: number): number {
   const max = Math.max(1, Math.floor(total * maximumRatio));

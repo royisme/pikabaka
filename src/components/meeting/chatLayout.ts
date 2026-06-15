@@ -1,13 +1,13 @@
 export const SPLITTER_STORAGE_KEY = 'pika_splitter_position';
 export const SPLITTER_STORAGE_VERSION_KEY = 'pika_splitter_position_version';
-export const SPLITTER_STORAGE_VERSION = 'chat-columns-v3';
+export const SPLITTER_STORAGE_VERSION = 'chat-columns-v4';
 
-export const DEFAULT_TRANSCRIPT_SPLIT = 34;
-export const MIN_TRANSCRIPT_SPLIT = 22;
-export const MAX_TRANSCRIPT_SPLIT = 55;
+export const DEFAULT_TRANSCRIPT_SPLIT = 32;
+export const MIN_TRANSCRIPT_SPLIT = 18;
+export const MAX_TRANSCRIPT_SPLIT = 58;
 
-export const MIN_TRANSCRIPT_PANE_PX = 240;
-export const MIN_CHAT_PANE_PX = 360;
+export const MIN_TRANSCRIPT_PANE_PX = 180;
+export const MIN_CHAT_PANE_PX = 300;
 export const SPLITTER_THICKNESS_PX = 6;
 
 export interface SplitterStorageLike {
