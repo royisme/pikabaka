@@ -57,3 +57,41 @@ test('transcript and chat rendering distinguish action outputs and avoid ugly tr
   t.notMatch(rollingTranscript, /rounded-2xl border border-border-subtle\/80 px-4 py-3 overlay-transcript-surface/, 'live transcript bubbles do not draw the old partial border');
   t.end();
 });
+
+
+test('OpenAI-compatible chat sends all attached screenshots instead of only the first', (t) => {
+  const source = read('electron/core/LLMHelper.ts');
+  const builderStart = source.indexOf('private async buildOpenAICompatibleMessages');
+  const builderBody = source.slice(builderStart, source.indexOf('private extractOpenAICompatibleChunkText', builderStart));
+  const streamStart = source.indexOf('// 1b. OpenAI-compatible BYOK endpoint');
+  const streamBody = source.slice(streamStart, source.indexOf('// 2. Custom Provider Streaming', streamStart));
+
+  t.match(builderBody, /for \(const imagePath of imagePaths \|\| \[\]\)/, 'OpenAI-compatible message builder iterates every image path');
+  t.match(builderBody, /contentParts\.push\(\{\s*type: 'image_url'/s, 'each valid image is appended as an image_url part');
+  t.match(streamBody, /streamWithOpenAICompatible\(userContent, finalSystemPrompt, imagePaths, abortSignal\)/, 'streaming OpenAI-compatible path receives the whole image array');
+  t.notMatch(streamBody, /imagePaths\?\.\[0\]/, 'streaming OpenAI-compatible path does not truncate to the first screenshot');
+  t.end();
+});
+
+test('manual Answer/screenshot actions are not dropped by auto-trigger cooldown', (t) => {
+  const source = read('electron/core/IntelligenceEngine.ts');
+  const manualStart = source.indexOf('async runWhatShouldISay');
+  const manualBody = source.slice(manualStart, source.indexOf('async runFollowUp', manualStart));
+  const autoStart = source.indexOf('async handleSuggestionTrigger');
+  const autoBody = source.slice(autoStart, source.indexOf('// ============================================', autoStart));
+
+  t.match(autoBody, /now - this\.lastTriggerTime < this\.triggerCooldown/, 'auto suggestion trigger keeps cooldown protection');
+  t.notMatch(manualBody, /now - this\.lastTriggerTime < this\.triggerCooldown/, 'manual what-to-say path no longer checks the auto-trigger cooldown');
+  t.end();
+});
+
+test('meeting audio falls back from silent default CoreAudio to ScreenCaptureKit on macOS', (t) => {
+  const source = read('electron/main.ts');
+  const start = source.indexOf('private armSystemAudioHealthFallback');
+  const body = source.slice(start, source.indexOf('private async reconfigureAudio', start));
+
+  t.match(body, /triedAutoSck: boolean = false/, 'fallback tracks whether automatic SCK has already been attempted');
+  t.match(body, /No meeting audio from default CoreAudio\. Switching to ScreenCaptureKit capture automatically\./, 'silent default CoreAudio automatically switches to SCK');
+  t.match(body, /this\.armSystemAudioHealthFallback\(inputDeviceId, 'sck', true\)/, 'SCK retry is armed without creating an infinite fallback loop');
+  t.end();
+});

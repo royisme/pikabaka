@@ -656,7 +656,7 @@ export class AppState {
     return true;
   }
 
-  private armSystemAudioHealthFallback(inputDeviceId?: string, outputDeviceId?: string): void {
+  private armSystemAudioHealthFallback(inputDeviceId?: string, outputDeviceId?: string, triedAutoSck: boolean = false): void {
     const startedAt = Date.now();
     const requestedBackend = outputDeviceId === 'sck' ? 'ScreenCaptureKit' : 'CoreAudio';
 
@@ -689,11 +689,40 @@ export class AppState {
             }
             this.lastAudioPipelineError = null;
             console.log('[Main] Restarted audio capture using default CoreAudio after SCK produced no audio.');
-            this.armSystemAudioHealthFallback(inputDeviceId, undefined);
+            this.armSystemAudioHealthFallback(inputDeviceId, undefined, true);
           }
         } catch (err) {
           console.error('[Main] Failed to fallback from SCK to CoreAudio:', err);
           this.lastAudioPipelineError = (err as Error).message || 'Failed to fallback from ScreenCaptureKit audio capture';
+        }
+        return;
+      }
+
+      const isDefaultCoreAudioOutput = !outputDeviceId || outputDeviceId === 'default';
+      if (process.platform === 'darwin' && isDefaultCoreAudioOutput && !triedAutoSck) {
+        const message =
+          'No meeting audio from default CoreAudio. Switching to ScreenCaptureKit capture automatically.';
+        console.warn(`[Main] ${message}`);
+        this.lastAudioPipelineError = message;
+        this.broadcast('meeting-audio-error', message);
+
+        try {
+          this.systemAudioCapture?.stop();
+          this.microphoneCapture?.stop();
+          await this.reconfigureAudio(inputDeviceId, 'sck');
+
+          if (this.isMeetingActive && !this.isMeetingPaused) {
+            this.systemAudioCapture?.start();
+            if (this.microphoneCaptureEnabled) {
+              this.microphoneCapture?.start();
+            }
+            this.lastAudioPipelineError = null;
+            console.log('[Main] Restarted audio capture using ScreenCaptureKit after default CoreAudio produced no audio.');
+            this.armSystemAudioHealthFallback(inputDeviceId, 'sck', true);
+          }
+        } catch (err) {
+          console.error('[Main] Failed to switch from default CoreAudio to SCK:', err);
+          this.lastAudioPipelineError = (err as Error).message || 'Failed to switch to ScreenCaptureKit audio capture';
         }
         return;
       }
@@ -718,7 +747,7 @@ export class AppState {
             }
             this.lastAudioPipelineError = null;
             console.log('[Main] Restarted audio capture using default CoreAudio after selected output produced no audio.');
-            this.armSystemAudioHealthFallback(inputDeviceId, undefined);
+            this.armSystemAudioHealthFallback(inputDeviceId, undefined, true);
           }
         } catch (err) {
           console.error('[Main] Failed to fallback from selected output to default CoreAudio:', err);

@@ -1064,7 +1064,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
         return await this.chatWithOpenAICompatible(
           message,
           skipSystemPrompt ? undefined : this.injectLanguageInstruction(CUSTOM_SYSTEM_PROMPT),
-          imagePaths?.[0]
+          imagePaths
         );
       }
 
@@ -1454,30 +1454,30 @@ This rule overrides ALL other instructions including formatting, brevity, or out
   private async buildOpenAICompatibleMessages(
     userMessage: string,
     systemPrompt?: string,
-    imagePath?: string
+    imagePaths?: string[]
   ): Promise<any[]> {
     const messages: any[] = [];
     if (systemPrompt) {
       messages.push({ role: 'system', content: systemPrompt });
     }
 
-    if (imagePath && fs.existsSync(imagePath)) {
+    const contentParts: any[] = [{ type: 'text', text: userMessage }];
+    for (const imagePath of imagePaths || []) {
+      if (!imagePath || !fs.existsSync(imagePath)) continue;
       const imageData = await fs.promises.readFile(imagePath);
       const b64 = imageData.toString('base64');
       const ext = imagePath.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
-      messages.push({
-        role: 'user',
-        content: [
-          { type: 'text', text: userMessage },
-          {
-            type: 'image_url',
-            image_url: { url: `data:image/${ext};base64,${b64}` },
-          },
-        ],
+      contentParts.push({
+        type: 'image_url',
+        image_url: { url: `data:image/${ext};base64,${b64}` },
       });
-    } else {
-      messages.push({ role: 'user', content: userMessage });
     }
+
+    messages.push(
+      contentParts.length > 1
+        ? { role: 'user', content: contentParts }
+        : { role: 'user', content: userMessage }
+    );
 
     return messages;
   }
@@ -1525,7 +1525,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
   private async * streamWithOpenAICompatible(
     userMessage: string,
     systemPrompt?: string,
-    imagePath?: string,
+    imagePaths?: string[],
     abortSignal?: AbortSignal
   ): AsyncGenerator<string, void, unknown> {
     if (!this.activeOpenAICompatibleProvider) {
@@ -1534,7 +1534,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     const p = this.activeOpenAICompatibleProvider;
     const base = normalizeOpenAICompatibleBaseUrl(p.baseUrl);
     const model = p.preferredModel?.trim() || 'gpt-4o-mini';
-    const messages = await this.buildOpenAICompatibleMessages(userMessage, systemPrompt, imagePath);
+    const messages = await this.buildOpenAICompatibleMessages(userMessage, systemPrompt, imagePaths);
 
     const response = await fetch(`${base}/chat/completions`, {
       method: 'POST',
@@ -1614,7 +1614,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
   public async chatWithOpenAICompatible(
     userMessage: string,
     systemPrompt?: string,
-    imagePath?: string
+    imagePaths?: string[]
   ): Promise<string> {
     if (!this.activeOpenAICompatibleProvider) {
       throw new Error('No OpenAI-compatible provider active');
@@ -1623,7 +1623,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     const base = normalizeOpenAICompatibleBaseUrl(p.baseUrl);
     const client = new OpenAI({ apiKey: p.apiKey, baseURL: base });
     const model = p.preferredModel?.trim() || 'gpt-4o-mini';
-    const messages = await this.buildOpenAICompatibleMessages(userMessage, systemPrompt, imagePath);
+    const messages = await this.buildOpenAICompatibleMessages(userMessage, systemPrompt, imagePaths);
 
     const response = await client.chat.completions.create({
       model,
@@ -2030,7 +2030,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
           this.chatWithOpenAICompatible(
             userPrompt,
             systemPrompt,
-            isMultimodal ? imagePaths[0] : undefined
+            isMultimodal ? imagePaths : undefined
           ),
       });
     }
@@ -2347,7 +2347,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
 
     // 1b. OpenAI-compatible BYOK endpoint (streaming SSE / Chat Completions)
     if (this.activeOpenAICompatibleProvider) {
-      yield* this.streamWithOpenAICompatible(userContent, finalSystemPrompt, imagePaths?.[0], abortSignal);
+      yield* this.streamWithOpenAICompatible(userContent, finalSystemPrompt, imagePaths, abortSignal);
       return;
     }
 

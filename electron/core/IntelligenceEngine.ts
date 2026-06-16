@@ -157,6 +157,13 @@ export class IntelligenceEngine extends EventEmitter {
         if (trigger.confidence < 0.5) {
             return;
         }
+
+        const now = Date.now();
+        if (now - this.lastTriggerTime < this.triggerCooldown) {
+            return;
+        }
+        this.lastTriggerTime = now;
+
         await this.runWhatShouldISay(trigger.lastQuestion, trigger.confidence);
     }
 
@@ -220,19 +227,12 @@ export class IntelligenceEngine extends EventEmitter {
      * NEVER returns null - always provides a usable response
      */
     async runWhatShouldISay(question?: string, confidence: number = 0.8, imagePaths?: string[]): Promise<string | null> {
-        const now = Date.now();
-
-        if (now - this.lastTriggerTime < this.triggerCooldown) {
-            return null;
-        }
-
         if (this.assistCancellationToken) {
             this.assistCancellationToken.abort();
             this.assistCancellationToken = null;
         }
 
         this.setMode('what_to_say');
-        this.lastTriggerTime = now;
 
         try {
             if (!this.whatToAnswerLLM) {
