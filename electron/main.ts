@@ -547,6 +547,7 @@ export class AppState {
   private _audioTestStarting = false;               // P2-12: in-flight guard against concurrent calls
   public googleSTT: STTProvider | null = null; // Interviewer
   public googleSTT_User: STTProvider | null = null; // User
+  public microphoneCaptureEnabled: boolean = true;
   public lastSystemAudioChunkAt: number | null = null;
   public lastInterviewerTranscriptAt: number | null = null;
   public lastAudioPipelineError: string | null = null;
@@ -625,6 +626,34 @@ export class AppState {
     setupSystemAudioPipelineFn(this)
   }
 
+  private async resolveMicrophoneAccessForMeeting(timeoutMs = 4500): Promise<boolean> {
+    const timeoutResult = Symbol('microphone-permission-timeout');
+    const result = await Promise.race<boolean | typeof timeoutResult>([
+      ensureMacMicrophoneAccess('meeting start'),
+      new Promise<typeof timeoutResult>((resolve) => setTimeout(() => resolve(timeoutResult), timeoutMs)),
+    ]);
+
+    if (result === timeoutResult) {
+      const message =
+        'Microphone permission was not completed yet. Pika will start live transcript for meeting/system audio only; your own speech will not be transcribed until microphone access is allowed in macOS System Settings.';
+      console.warn(`[Main] ${message}`);
+      this.lastAudioPipelineError = message;
+      this.broadcast('meeting-audio-error', message);
+      return false;
+    }
+
+    if (!result) {
+      const message =
+        'Microphone access is not granted. Pika will start live transcript for meeting/system audio only; your own speech will not be transcribed until microphone access is allowed in macOS System Settings.';
+      console.warn(`[Main] ${message}`);
+      this.lastAudioPipelineError = message;
+      this.broadcast('meeting-audio-error', message);
+      return false;
+    }
+
+    return true;
+  }
+
   private armSystemAudioHealthFallback(inputDeviceId?: string, outputDeviceId?: string): void {
     const startedAt = Date.now();
     const requestedBackend = outputDeviceId === 'sck' ? 'ScreenCaptureKit' : 'CoreAudio';
@@ -655,7 +684,9 @@ export class AppState {
 
           if (this.isMeetingActive && !this.isMeetingPaused) {
             this.systemAudioCapture?.start();
-            this.microphoneCapture?.start();
+            if (this.microphoneCaptureEnabled) {
+              this.microphoneCapture?.start();
+            }
             console.log('[Main] Restarted audio capture using default CoreAudio after SCK produced no audio.');
           }
         } catch (err) {
@@ -738,6 +769,11 @@ export class AppState {
       this.microphoneCapture = null;
     }
 
+    if (!this.microphoneCaptureEnabled) {
+      console.warn('[Main] Skipping MicrophoneCapture because microphone access is not granted yet. System audio capture will continue.');
+      return;
+    }
+
     try {
       console.log('[Main] Initializing MicrophoneCapture...');
       this.microphoneCapture = new MicrophoneCapture(inputDeviceId || undefined);
@@ -814,9 +850,11 @@ export class AppState {
     // Restart audio captures and new STT instances if a meeting is active
     if (this.isMeetingActive && !this.isMeetingPaused) {
       this.systemAudioCapture?.start();
-      this.microphoneCapture?.start();
       this.googleSTT?.start();
-      this.googleSTT_User?.start();
+      if (this.microphoneCaptureEnabled) {
+        this.microphoneCapture?.start();
+        this.googleSTT_User?.start();
+      }
     }
 
     console.log('[Main] STT Provider reconfigured');
@@ -864,11 +902,7 @@ export class AppState {
   public async startMeeting(metadata?: any): Promise<void> {
     console.log('[Main] Starting Meeting...', metadata);
 
-    if (!(await ensureMacMicrophoneAccess('meeting start'))) {
-      const message = 'Microphone access denied. Please allow microphone access in System Settings.';
-      this.broadcast('meeting-audio-error', message);
-      throw new Error(message);
-    }
+    this.microphoneCaptureEnabled = await this.resolveMicrophoneAccessForMeeting();
 
     this.isMeetingActive = true;
     this.resetBufferedTranscriptTurns();
@@ -910,9 +944,11 @@ export class AppState {
           this.systemAudioCapture?.start();
           this.googleSTT?.start();
 
-        // Start Microphone
-          this.microphoneCapture?.start();
-          this.googleSTT_User?.start();
+          // Start Microphone only when macOS has granted access; system audio remains usable without it.
+          if (this.microphoneCaptureEnabled) {
+            this.microphoneCapture?.start();
+            this.googleSTT_User?.start();
+          }
         }
 
         // Start JIT RAG live indexing

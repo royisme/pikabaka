@@ -20,6 +20,9 @@ t.test('meeting start falls back from SCK when no system audio chunks arrive', (
   t.match(mainSource, /Screen & System Audio Recording permission is stale/, 'fallback tells the user which macOS permission to fix');
   t.match(mainSource, /reconfigureAudio\(inputDeviceId, undefined\)/, 'fallback switches back to default CoreAudio capture');
   t.match(mainSource, /lastAudioPipelineError = null;\n\s*this\.googleSTT\?\.write\(chunk\)/, 'system audio chunks clear stale permission warnings');
+  t.match(mainSource, /resolveMicrophoneAccessForMeeting/, 'microphone permission resolution is bounded');
+  t.match(mainSource, /start live transcript for meeting\/system audio only/, 'meeting still starts when microphone permission is pending or denied');
+  t.notMatch(mainSource, /throw new Error\(message\);\n\s*}\n\n\s*this\.isMeetingActive = true/, 'microphone permission failure no longer blocks system-audio transcription');
   t.end();
 });
 

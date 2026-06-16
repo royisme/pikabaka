@@ -219,7 +219,7 @@ export function setupSystemAudioPipeline(appState: AppState): void {
       });
     }
 
-    if (!state.microphoneCapture) {
+    if (!state.microphoneCapture && state.microphoneCaptureEnabled !== false) {
       state.microphoneCapture = new MicrophoneCapture();
       state.microphoneCapture.on('data', (chunk: Buffer) => {
         state.googleSTT_User?.write(chunk);
@@ -231,6 +231,8 @@ export function setupSystemAudioPipeline(appState: AppState): void {
       state.microphoneCapture.on('error', (err: Error) => {
         console.error('[Main] MicrophoneCapture Error:', err);
       });
+    } else if (state.microphoneCaptureEnabled === false && state._verboseLogging) {
+      console.log('[Main] MicrophoneCapture disabled because microphone access is not granted yet.');
     }
 
     if (!state.googleSTT) {
