@@ -4,6 +4,7 @@ type NativeAudioHealth = {
   connected: boolean;
   meetingActive: boolean;
   hasRecentSystemAudioChunk: boolean;
+  hasRecentSystemAudioSignal?: boolean;
   hasRecentInterviewerTranscript: boolean;
   hasRecentUserTranscript: boolean;
   lastSystemAudioChunkAt: number | null;
@@ -31,7 +32,8 @@ export function useMeetingAudio() {
   const [nativeAudioHealth, setNativeAudioHealth] = useState<NativeAudioHealth>(fallbackStatus);
   const [isConnected, setIsConnected] = useState(false);
   const [noSystemAudioSince, setNoSystemAudioSince] = useState<number | null>(null);
-  const hasAnyTranscriptThisMeeting = nativeAudioHealth.lastInterviewerTranscriptAt != null || nativeAudioHealth.lastUserTranscriptAt != null;
+  const hasSystemAudioThisMeeting = nativeAudioHealth.lastSystemAudioChunkAt != null || nativeAudioHealth.lastInterviewerTranscriptAt != null;
+  const hasMicTranscriptThisMeeting = nativeAudioHealth.lastUserTranscriptAt != null;
   const isRecordingRef = useRef(false);
   const voiceInputRef = useRef('');
   const manualTranscriptRef = useRef('');
@@ -100,8 +102,7 @@ export function useMeetingAudio() {
       isConnected &&
       !nativeAudioHealth.hasRecentSystemAudioChunk &&
       !nativeAudioHealth.hasRecentInterviewerTranscript &&
-      !nativeAudioHealth.hasRecentUserTranscript &&
-      !hasAnyTranscriptThisMeeting;
+      !hasSystemAudioThisMeeting;
 
     if (!shouldTrackMissingSystemAudio) {
       setNoSystemAudioSince(null);
@@ -114,8 +115,7 @@ export function useMeetingAudio() {
     nativeAudioHealth.meetingActive,
     nativeAudioHealth.hasRecentSystemAudioChunk,
     nativeAudioHealth.hasRecentInterviewerTranscript,
-    nativeAudioHealth.hasRecentUserTranscript,
-    hasAnyTranscriptThisMeeting,
+    hasSystemAudioThisMeeting,
   ]);
 
   const sttStatus = useMemo(() => {
@@ -125,27 +125,34 @@ export function useMeetingAudio() {
     if (!isConnected) {
       return { label: 'STT disconnected', toneClass: 'text-red-400', dotClass: 'bg-red-400' };
     }
-    if (nativeAudioHealth.hasRecentInterviewerTranscript || nativeAudioHealth.hasRecentUserTranscript) {
-      return { label: 'STT receiving transcript', toneClass: 'text-emerald-400', dotClass: 'bg-emerald-400 animate-pulse' };
-    }
-    if (hasAnyTranscriptThisMeeting) {
-      return { label: 'STT ready', toneClass: 'text-emerald-300', dotClass: 'bg-emerald-300' };
+    if (nativeAudioHealth.hasRecentInterviewerTranscript) {
+      return { label: 'Meeting audio transcribing', toneClass: 'text-emerald-400', dotClass: 'bg-emerald-400 animate-pulse' };
     }
     if (nativeAudioHealth.hasRecentSystemAudioChunk) {
-      return { label: 'STT listening (no transcript yet)', toneClass: 'text-amber-300', dotClass: 'bg-amber-300' };
+      return { label: 'Meeting audio signal detected', toneClass: 'text-emerald-300', dotClass: 'bg-emerald-300' };
     }
-    return { label: 'No system audio signal', toneClass: 'text-red-300', dotClass: 'bg-red-300' };
-  }, [isConnected, nativeAudioHealth, hasAnyTranscriptThisMeeting]);
+    if (nativeAudioHealth.hasRecentUserTranscript || hasMicTranscriptThisMeeting) {
+      return { label: 'Mic STT ready · no meeting audio', toneClass: 'text-amber-300', dotClass: 'bg-amber-300' };
+    }
+    if (hasSystemAudioThisMeeting) {
+      return { label: 'STT ready', toneClass: 'text-emerald-300', dotClass: 'bg-emerald-300' };
+    }
+    return { label: 'No meeting audio signal', toneClass: 'text-red-300', dotClass: 'bg-red-300' };
+  }, [isConnected, nativeAudioHealth, hasMicTranscriptThisMeeting, hasSystemAudioThisMeeting]);
 
-  const sttNeedsTroubleshooting = useMemo(() => {
-    if (!nativeAudioHealth.meetingActive || !isConnected) return false;
-    if (nativeAudioHealth.hasRecentSystemAudioChunk || nativeAudioHealth.hasRecentInterviewerTranscript || nativeAudioHealth.hasRecentUserTranscript || hasAnyTranscriptThisMeeting) return false;
-    if (nativeAudioHealth.lastError) return true;
-    if (!noSystemAudioSince) return false;
-    return Date.now() - noSystemAudioSince >= 8000;
-  }, [isConnected, nativeAudioHealth, noSystemAudioSince, hasAnyTranscriptThisMeeting]);
+  const systemAudioTroubleshootingMessage =
+    'No meeting/video audio is reaching Pika through Screen & System Audio Recording. This is separate from the microphone: “Me” transcript can work while YouTube/meeting audio is still blocked. Play audio through the selected output device, grant Screen & System Audio Recording permission for Pika, then restart the meeting (quit/reopen Pika after changing permission).';
 
-  const showSttErrorDetail = !!nativeAudioHealth.lastError && !nativeAudioHealth.hasRecentInterviewerTranscript && !nativeAudioHealth.hasRecentUserTranscript && !hasAnyTranscriptThisMeeting;
+  const sttTroubleshootingMessage = useMemo(() => {
+    if (!nativeAudioHealth.meetingActive || !isConnected) return null;
+    if (nativeAudioHealth.lastError) return nativeAudioHealth.lastError;
+    if (hasSystemAudioThisMeeting || nativeAudioHealth.hasRecentSystemAudioChunk || nativeAudioHealth.hasRecentInterviewerTranscript) return null;
+    if (!noSystemAudioSince) return null;
+    return Date.now() - noSystemAudioSince >= 8000 ? systemAudioTroubleshootingMessage : null;
+  }, [isConnected, nativeAudioHealth, noSystemAudioSince, hasSystemAudioThisMeeting, systemAudioTroubleshootingMessage]);
+
+  const sttNeedsTroubleshooting = !!sttTroubleshootingMessage;
+  const showSttErrorDetail = !!sttTroubleshootingMessage;
 
   return {
     isManualRecording,
@@ -163,5 +170,6 @@ export function useMeetingAudio() {
     sttStatus,
     sttNeedsTroubleshooting,
     showSttErrorDetail,
+    sttTroubleshootingMessage,
   };
 }

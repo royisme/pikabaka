@@ -14,6 +14,7 @@ interface TranscriptPanelProps {
     sttStatus: { label: string; toneClass: string; dotClass: string };
     sttNeedsTroubleshooting: boolean;
     showSttErrorDetail: boolean;
+    sttTroubleshootingMessage?: string | null;
     nativeAudioHealth: { lastError: string | null };
     appearance: ReturnType<typeof import('../../lib/overlayAppearance').getOverlayAppearance>;
     isLightTheme: boolean;
@@ -33,6 +34,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
     sttStatus,
     sttNeedsTroubleshooting,
     showSttErrorDetail,
+    sttTroubleshootingMessage,
     nativeAudioHealth,
     appearance,
     isLightTheme,
@@ -41,7 +43,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
     const partialText = currentUserPartial || currentInterviewerPartial;
     const partialSpeakerLabel = currentUserPartial ? 'Me' : 'Interviewer';
     const placeholderText = 'Transcript will appear here when meeting audio is detected';
-    const statusDetail = showSttErrorDetail && nativeAudioHealth.lastError ? nativeAudioHealth.lastError : null;
+    const statusDetail = showSttErrorDetail ? (sttTroubleshootingMessage || nativeAudioHealth.lastError) : null;
     const statusTitle = statusDetail ? `${sttStatus.label} - ${statusDetail}` : sttStatus.label;
 
     return (
@@ -85,7 +87,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
             {sttNeedsTroubleshooting && (
                 <div className="mx-4 mb-2 p-2 rounded-lg border border-state-warning-border bg-state-warning-soft no-drag">
                     <p className={`text-[10px] ${isLightTheme ? 'text-amber-800' : 'text-amber-200'}`}>
-                        {statusDetail || 'STT has no usable system audio input. Check output device routing and permissions.'}
+                        {sttTroubleshootingMessage || statusDetail || 'STT has no usable meeting audio input. Check output device routing and Screen & System Audio Recording permission.'}
                     </p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-2">
                         <button
@@ -96,7 +98,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                             Open audio settings
                         </button>
                         <span className={`text-[10px] ${isLightTheme ? 'text-amber-700/80' : 'text-amber-200/80'}`}>
-                            {statusDetail ? 'Review the message above, update permissions/audio settings, then restart the meeting.' : 'Tips: play audio on selected output device, then restart meeting if needed.'}
+                            Microphone and Screen & System Audio Recording are separate permissions; update the blocked one, then restart the meeting.
                         </span>
                     </div>
                 </div>

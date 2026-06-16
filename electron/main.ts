@@ -75,6 +75,7 @@ import {
   finalizeMicSTT as finalizeMicSTTFn,
   translateTranscriptSegment as translateTranscriptSegmentFn,
   getNativeAudioStatus as getNativeAudioStatusFn,
+  handleSystemAudioChunk as handleSystemAudioChunkFn,
 } from "./lib/audio-pipeline"
 import {
   createTray as createTrayFn,
@@ -670,9 +671,9 @@ export class AppState {
 
       if (outputDeviceId === 'sck') {
         const message =
-          'No meeting/system audio was received from the ScreenCaptureKit backend after start. ' +
+          'No meeting/system audio signal was received from the ScreenCaptureKit backend after start. ' +
           'This usually means Screen & System Audio Recording permission is stale, or the experimental SCK backend is blocked. ' +
-          'Pika is switching this meeting to the default CoreAudio capture path. If live transcript still has no meeting audio, grant Screen & System Audio Recording in macOS System Settings, then quit and reopen Pika.';
+          'This is separate from microphone permission. Pika is switching this meeting to the default CoreAudio capture path. If live transcript still has no meeting audio, grant Screen & System Audio Recording in macOS System Settings, then quit and reopen Pika.';
 
         console.warn(`[Main] ${message}`);
         this.lastAudioPipelineError = message;
@@ -698,8 +699,9 @@ export class AppState {
       }
 
       const message =
-        `No meeting/system audio was received from ${requestedBackend} after start. ` +
-        'Check that meeting audio is playing through the selected output device and that macOS Screen & System Audio Recording permission is granted for Pika, then quit and reopen Pika if you just changed permissions.';
+        `No meeting/system audio signal was received from ${requestedBackend} after start. ` +
+        'This is separate from microphone permission: your own speech can transcribe while YouTube/meeting audio is still blocked. ' +
+        'Check that the video or meeting is playing through the selected output device, grant macOS Screen & System Audio Recording permission for Pika, then quit and reopen Pika if you just changed permissions.';
       console.warn(`[Main] ${message}`);
       this.lastAudioPipelineError = message;
       this.broadcast('meeting-audio-error', message);
@@ -724,10 +726,7 @@ export class AppState {
       this.googleSTT?.setSampleRate(rate);
 
       this.systemAudioCapture.on('data', (chunk: Buffer) => {
-        // console.log('[Main] SysAudio chunk', chunk.length);
-        this.lastSystemAudioChunkAt = Date.now();
-        this.lastAudioPipelineError = null;
-        this.googleSTT?.write(chunk);
+        handleSystemAudioChunkFn(this, chunk);
       });
       this.systemAudioCapture.on('speech_ended', () => {
         this.googleSTT?.notifySpeechEnded?.();
@@ -747,9 +746,7 @@ export class AppState {
         this.googleSTT?.setSampleRate(rate);
 
         this.systemAudioCapture.on('data', (chunk: Buffer) => {
-          this.lastSystemAudioChunkAt = Date.now();
-          this.lastAudioPipelineError = null;
-          this.googleSTT?.write(chunk);
+          handleSystemAudioChunkFn(this, chunk);
         });
         this.systemAudioCapture.on('speech_ended', () => {
           this.googleSTT?.notifySpeechEnded?.();
@@ -892,6 +889,7 @@ export class AppState {
     connected: boolean;
     meetingActive: boolean;
     hasRecentSystemAudioChunk: boolean;
+    hasRecentSystemAudioSignal: boolean;
     hasRecentInterviewerTranscript: boolean;
     hasRecentUserTranscript: boolean;
     lastSystemAudioChunkAt: number | null;

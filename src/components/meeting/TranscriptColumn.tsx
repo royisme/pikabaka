@@ -15,6 +15,7 @@ interface TranscriptColumnProps {
     sttStatus: { label: string; toneClass: string; dotClass: string };
     sttNeedsTroubleshooting: boolean;
     showSttErrorDetail: boolean;
+    sttTroubleshootingMessage?: string | null;
     nativeAudioHealth: { lastError: string | null };
     appearance: ReturnType<typeof getOverlayAppearance>;
     isLightTheme: boolean;
@@ -32,6 +33,7 @@ const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
     sttStatus,
     sttNeedsTroubleshooting,
     showSttErrorDetail,
+    sttTroubleshootingMessage,
     nativeAudioHealth,
     appearance,
     isLightTheme,
@@ -49,6 +51,7 @@ const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
             sttStatus={sttStatus}
             sttNeedsTroubleshooting={sttNeedsTroubleshooting}
             showSttErrorDetail={showSttErrorDetail}
+            sttTroubleshootingMessage={sttTroubleshootingMessage}
             nativeAudioHealth={nativeAudioHealth}
             appearance={appearance}
             isLightTheme={isLightTheme}

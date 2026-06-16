@@ -19,14 +19,16 @@ t.test('meeting start falls back from SCK when no system audio chunks arrive', (
   t.match(mainSource, /outputDeviceId === 'sck'/, 'fallback specifically handles the experimental SCK backend');
   t.match(mainSource, /Screen & System Audio Recording permission is stale/, 'fallback tells the user which macOS permission to fix');
   t.match(mainSource, /reconfigureAudio\(inputDeviceId, undefined\)/, 'fallback switches back to default CoreAudio capture');
-  t.match(mainSource, /lastAudioPipelineError = null;\n\s*this\.googleSTT\?\.write\(chunk\)/, 'system audio chunks clear stale permission warnings');
+  t.match(mainSource, /handleSystemAudioChunkFn\(this, chunk\)/, 'system audio chunks are inspected for real signal before clearing stale warnings');
   t.match(mainSource, /resolveMicrophoneAccessForMeeting/, 'microphone permission resolution is bounded');
   t.match(mainSource, /start live transcript for meeting\/system audio only/, 'meeting still starts when microphone permission is pending or denied');
   t.notMatch(mainSource, /throw new Error\(message\);\n\s*}\n\n\s*this\.isMeetingActive = true/, 'microphone permission failure no longer blocks system-audio transcription');
   t.match(mainSource, /lastUserTranscriptAt/, 'user microphone transcripts are tracked in native audio health');
 
   const meetingAudioHookSource = readFileSync(path.join(process.cwd(), 'src/hooks/useMeetingAudio.ts'), 'utf8');
-  t.match(meetingAudioHookSource, /hasAnyTranscriptThisMeeting/, 'any successful transcript suppresses stale no-system-audio troubleshooting');
+  t.match(meetingAudioHookSource, /Mic STT ready · no meeting audio/, 'mic-only transcript is not shown as full system-audio readiness');
+  t.match(meetingAudioHookSource, /Screen & System Audio Recording.*separate from the microphone/s, 'system-audio warning explains it is separate from microphone permission');
+  t.notMatch(meetingAudioHookSource, /hasAnyTranscriptThisMeeting/, 'user microphone transcript no longer suppresses system-audio troubleshooting');
   t.end();
 });
 

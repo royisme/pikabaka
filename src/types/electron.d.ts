@@ -163,6 +163,7 @@ export interface ElectronAPI {
     connected: boolean;
     meetingActive: boolean;
     hasRecentSystemAudioChunk: boolean;
+    hasRecentSystemAudioSignal?: boolean;
     hasRecentInterviewerTranscript: boolean;
     hasRecentUserTranscript: boolean;
     lastSystemAudioChunkAt: number | null;

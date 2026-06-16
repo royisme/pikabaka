@@ -24,6 +24,41 @@ export type STTProvider = (GoogleSTT | RestSTT | DeepgramStreamingSTT | SonioxSt
   notifySpeechEnded?: () => void;
 };
 
+
+const SYSTEM_AUDIO_SIGNAL_RMS_THRESHOLD = 35;
+const SYSTEM_AUDIO_SIGNAL_PEAK_THRESHOLD = 120;
+
+export function pcm16ChunkHasAudioSignal(chunk: Buffer): boolean {
+  if (!chunk || chunk.length < 2) return false;
+
+  let sumSquares = 0;
+  let peak = 0;
+  let samples = 0;
+
+  for (let offset = 0; offset + 1 < chunk.length; offset += 2) {
+    const sample = chunk.readInt16LE(offset);
+    const abs = Math.abs(sample);
+    if (abs > peak) peak = abs;
+    sumSquares += sample * sample;
+    samples += 1;
+  }
+
+  if (samples === 0) return false;
+  const rms = Math.sqrt(sumSquares / samples);
+  return rms >= SYSTEM_AUDIO_SIGNAL_RMS_THRESHOLD || peak >= SYSTEM_AUDIO_SIGNAL_PEAK_THRESHOLD;
+}
+
+export function handleSystemAudioChunk(appState: AppState, chunk: Buffer): void {
+  const state = appState as any;
+  if (pcm16ChunkHasAudioSignal(chunk)) {
+    state.lastSystemAudioChunkAt = Date.now();
+    if (typeof state.lastAudioPipelineError === 'string' && /^No meeting\/system audio/.test(state.lastAudioPipelineError)) {
+      state.lastAudioPipelineError = null;
+    }
+  }
+  state.googleSTT?.write(chunk);
+}
+
 export function formatSTTProviderError({
   provider,
   language,
@@ -184,7 +219,7 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
       state.lastAudioPipelineError = null;
     } else if (speaker === 'user') {
       state.lastUserTranscriptAt = Date.now();
-      if (typeof state.lastAudioPipelineError === 'string' && /^(No meeting\/system audio was received|Microphone permission|Microphone access)/.test(state.lastAudioPipelineError)) {
+      if (typeof state.lastAudioPipelineError === 'string' && /^(Microphone permission|Microphone access)/.test(state.lastAudioPipelineError)) {
         state.lastAudioPipelineError = null;
       }
     }
@@ -210,9 +245,7 @@ export function setupSystemAudioPipeline(appState: AppState): void {
     if (!state.systemAudioCapture) {
       state.systemAudioCapture = new SystemAudioCapture();
       state.systemAudioCapture.on('data', (chunk: Buffer) => {
-        state.lastSystemAudioChunkAt = Date.now();
-        state.lastAudioPipelineError = null;
-        state.googleSTT?.write(chunk);
+        handleSystemAudioChunk(appState, chunk);
       });
       state.systemAudioCapture.on('speech_ended', () => {
         state.googleSTT?.notifySpeechEnded?.();
@@ -385,6 +418,7 @@ export function getNativeAudioStatus(appState: AppState): {
   connected: boolean;
   meetingActive: boolean;
   hasRecentSystemAudioChunk: boolean;
+  hasRecentSystemAudioSignal: boolean;
   hasRecentInterviewerTranscript: boolean;
   hasRecentUserTranscript: boolean;
   lastSystemAudioChunkAt: number | null;
@@ -405,6 +439,7 @@ export function getNativeAudioStatus(appState: AppState): {
     connected: state.isMeetingActive && !!state.systemAudioCapture && !!state.googleSTT,
     meetingActive: state.isMeetingActive,
     hasRecentSystemAudioChunk,
+    hasRecentSystemAudioSignal: hasRecentSystemAudioChunk,
     hasRecentInterviewerTranscript,
     hasRecentUserTranscript,
     lastSystemAudioChunkAt: state.lastSystemAudioChunkAt,

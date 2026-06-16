@@ -19,7 +19,6 @@ pub mod silence_suppression;
 pub mod speaker;
 
 use crate::audio_config::DSP_POLL_MS;
-use crate::silence_suppression::{FrameAction, SilenceSuppressionConfig, SilenceSuppressor};
 
 // ============================================================================
 // HELPERS — i16 slice → zero-copy LE bytes
@@ -78,7 +77,7 @@ impl SystemAudioCapture {
         on_speech_ended: Option<ThreadsafeFunction<bool>>,
     ) -> napi::Result<()> {
         let tsfn = callback;
-        let speech_ended_tsfn = on_speech_ended;
+        let _speech_ended_tsfn = on_speech_ended;
 
         self.stop_signal.store(false, Ordering::SeqCst);
         let stop_signal = self.stop_signal.clone();
@@ -142,16 +141,18 @@ impl SystemAudioCapture {
                 native_rate
             );
 
-            // 2. DSP loop with silence suppression + WebRTC VAD
-            let mut suppressor = SilenceSuppressor::new(SilenceSuppressionConfig {
-                native_sample_rate: native_rate,
-                ..SilenceSuppressionConfig::for_system_audio()
-            });
-
-            // 20ms chunks at native rate (e.g. 960 samples at 48kHz)
+            // 2. DSP loop: stream every system-audio frame to STT.
+            // The old local WebRTC VAD emitted periodic silence keepalives and could
+            // drop browser/YouTube speech before Deepgram saw it. Deepgram already
+            // performs endpointing server-side, so system audio should stay continuous.
             let chunk_size = (native_rate as usize / 1000) * 20;
             let mut frame_buffer: Vec<i16> = Vec::with_capacity(chunk_size * 4);
             let mut raw_batch: Vec<f32> = Vec::with_capacity(4096);
+
+            println!(
+                "[SystemAudioCapture] DSP thread started (continuous STT stream, rate={}Hz, chunk={})",
+                native_rate, chunk_size
+            );
 
             loop {
                 if stop_signal.load(Ordering::Relaxed) {
@@ -172,39 +173,13 @@ impl SystemAudioCapture {
                     raw_batch.clear();
                 }
 
-                // Process in 20ms chunks through the two-stage gate
                 while frame_buffer.len() >= chunk_size {
                     let frame: Vec<i16> = frame_buffer.drain(0..chunk_size).collect();
-
-                    let (action, speech_ended) = suppressor.process(&frame);
-
-                    match action {
-                        FrameAction::Send(data) => {
-                            let bytes = i16_slice_to_le_bytes(&data);
-                            tsfn.call(
-                                Ok(Buffer::from(bytes)),
-                                ThreadsafeFunctionCallMode::NonBlocking,
-                            );
-                        }
-                        FrameAction::SendSilence => {
-                            // Send zero-filled buffer to keep streaming APIs alive
-                            let silence = vec![0u8; chunk_size * 2];
-                            tsfn.call(
-                                Ok(Buffer::from(silence)),
-                                ThreadsafeFunctionCallMode::NonBlocking,
-                            );
-                        }
-                        FrameAction::Suppress => {
-                            // Do nothing — bandwidth saving
-                        }
-                    }
-
-                    // Fire speech_ended callback on the exact transition frame
-                    if speech_ended {
-                        if let Some(ref se_tsfn) = speech_ended_tsfn {
-                            se_tsfn.call(Ok(true), ThreadsafeFunctionCallMode::NonBlocking);
-                        }
-                    }
+                    let bytes = i16_slice_to_le_bytes(&frame);
+                    tsfn.call(
+                        Ok(Buffer::from(bytes)),
+                        ThreadsafeFunctionCallMode::NonBlocking,
+                    );
                 }
 
                 // Keep the sleep small so we quickly read the ring buffer
