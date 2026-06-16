@@ -45,7 +45,7 @@ export class IntelligenceManager extends EventEmitter {
             if (activeMode !== 'idle' && activeMode !== 'assist') {
                 throw new Error(`Auto Answer skipped because ${activeMode} is already generating.`);
             }
-            return this.engine.runWhatShouldISay(question, confidence, imagePaths);
+            return this.engine.runWhatShouldISay(question, confidence, imagePaths, true);
         });
 
         // Forward all engine/controller events through the facade

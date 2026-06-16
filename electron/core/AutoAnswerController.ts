@@ -61,6 +61,10 @@ export class AutoAnswerController extends EventEmitter {
     private activeDetection: QuestionDetection | null = null;
     private lastGenerationAt = 0;
     private screenshotProvider: () => string[] = () => [];
+    private pendingDetection: QuestionDetection | null = null;
+    private pendingTimer: NodeJS.Timeout | null = null;
+    private readonly generationDelayMs = 1200;
+    private readonly partialGenerationDelayMs = 6000;
 
     constructor(private readonly answerRunner: AnswerRunner) {
         super();
@@ -110,33 +114,26 @@ export class AutoAnswerController extends EventEmitter {
     public reset(): void {
         this.detector.reset();
         this.activeDetection = null;
+        this.pendingDetection = null;
+        if (this.pendingTimer) {
+            clearTimeout(this.pendingTimer);
+            this.pendingTimer = null;
+        }
         this.state = { mode: this.getSettings().mode, status: this.getSettings().mode === 'off' ? 'off' : 'detecting', updatedAt: Date.now() };
     }
 
-    public handleTranscript(segment: TranscriptSegment): void {
+
+
+    private getGenerationDelayMs(detection: QuestionDetection): number {
+        const text = detection.question.trim();
+        const wordCount = text.split(/\s+/).filter(Boolean).length;
+        if (/[?？]\s*$/.test(text)) return this.generationDelayMs;
+        if (detection.confidence < 0.85 || wordCount < 12) return this.partialGenerationDelayMs;
+        return Math.max(this.generationDelayMs, 3000);
+    }
+
+    private startGeneration(detection: QuestionDetection): void {
         const settings = this.getSettings();
-        if (settings.mode === 'off') {
-            this.state = { mode: settings.mode, status: 'off', updatedAt: Date.now() };
-            return;
-        }
-
-        const detection = this.detector.detect(segment);
-        if (!detection || detection.confidence < settings.minConfidence) {
-            this.state = { ...this.state, mode: settings.mode, status: 'detecting', updatedAt: Date.now() };
-            return;
-        }
-
-        this.state = {
-            mode: settings.mode,
-            status: 'detected',
-            question: detection.question,
-            confidence: detection.confidence,
-            type: detection.type,
-            reason: detection.reason,
-            updatedAt: Date.now(),
-        };
-        this.emit('auto_answer_question_detected', detection, settings);
-
         if (settings.mode !== 'auto_answer') return;
 
         const now = Date.now();
@@ -189,5 +186,47 @@ export class AutoAnswerController extends EventEmitter {
                 };
                 this.emit('auto_answer_error', { detection, error: message });
             });
+    }
+
+    public handleTranscript(segment: TranscriptSegment): void {
+        const settings = this.getSettings();
+        if (settings.mode === 'off') {
+            this.state = { mode: settings.mode, status: 'off', updatedAt: Date.now() };
+            return;
+        }
+
+        const detection = this.detector.detect(segment);
+        if (!detection || detection.confidence < settings.minConfidence) {
+            this.state = { ...this.state, mode: settings.mode, status: 'detecting', updatedAt: Date.now() };
+            return;
+        }
+
+        this.state = {
+            mode: settings.mode,
+            status: 'detected',
+            question: detection.question,
+            confidence: detection.confidence,
+            type: detection.type,
+            reason: detection.reason,
+            updatedAt: Date.now(),
+        };
+        this.emit('auto_answer_question_detected', detection, settings);
+
+        if (settings.mode !== 'auto_answer') return;
+
+        this.pendingDetection = detection;
+        if (this.pendingTimer) {
+            clearTimeout(this.pendingTimer);
+            this.pendingTimer = null;
+        }
+        const delayMs = this.getGenerationDelayMs(detection);
+        this.pendingTimer = setTimeout(() => {
+            this.pendingTimer = null;
+            const latestDetection = this.pendingDetection;
+            this.pendingDetection = null;
+            if (latestDetection) {
+                this.startGeneration(latestDetection);
+            }
+        }, delayMs);
     }
 }

@@ -59,7 +59,7 @@ ANSWER SHAPE: ${intentResult.answerShape}
 
         } catch (error) {
             console.error("[WhatToAnswerLLM] Stream failed:", error);
-            yield "Could you repeat that? I want to make sure I address your question properly.";
+            throw error;
         }
     }
 }

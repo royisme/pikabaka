@@ -226,7 +226,7 @@ export class IntelligenceEngine extends EventEmitter {
      * Manual trigger - uses clean transcript pipeline for question inference
      * NEVER returns null - always provides a usable response
      */
-    async runWhatShouldISay(question?: string, confidence: number = 0.8, imagePaths?: string[]): Promise<string | null> {
+    async runWhatShouldISay(question?: string, confidence: number = 0.8, imagePaths?: string[], strictErrors = false): Promise<string | null> {
         if (this.assistCancellationToken) {
             this.assistCancellationToken.abort();
             this.assistCancellationToken = null;
@@ -251,6 +251,25 @@ export class IntelligenceEngine extends EventEmitter {
             }
 
             const contextItems = this.session.getContext(180);
+
+            // Auto Answer passes the detected question explicitly. Make it a first-class
+            // interviewer turn so generation does not depend on STT buffering catching up.
+            const explicitQuestion = question?.trim();
+            if (explicitQuestion) {
+                const normalizedExplicit = explicitQuestion.toLowerCase().replace(/\s+/g, ' ');
+                const alreadyPresent = contextItems.some((item) => {
+                    if (item.role !== 'interviewer') return false;
+                    const normalizedItem = item.text.toLowerCase().replace(/\s+/g, ' ');
+                    return normalizedItem.includes(normalizedExplicit) || normalizedExplicit.includes(normalizedItem);
+                });
+                if (!alreadyPresent) {
+                    contextItems.push({
+                        role: 'interviewer',
+                        text: explicitQuestion,
+                        timestamp: Date.now()
+                    });
+                }
+            }
 
             // Inject latest interim transcript if available
             const lastInterim = this.session.getLastInterimInterviewer();
@@ -284,7 +303,7 @@ export class IntelligenceEngine extends EventEmitter {
                 180
             );
 
-            const lastInterviewerTurn = this.session.getLastInterviewerTurn();
+            const lastInterviewerTurn = explicitQuestion || this.session.getLastInterviewerTurn();
             const intentResult = await classifyIntent(
                 lastInterviewerTurn,
                 preparedTranscript,
@@ -342,6 +361,7 @@ export class IntelligenceEngine extends EventEmitter {
         } catch (error) {
             this.emit('error', error as Error, 'what_to_say');
             this.setMode('idle');
+            if (strictErrors) throw error;
             return "Could you repeat that? I want to make sure I address your question properly.";
         }
     }
