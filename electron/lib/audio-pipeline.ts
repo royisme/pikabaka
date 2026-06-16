@@ -206,6 +206,7 @@ export function setupSystemAudioPipeline(appState: AppState): void {
       state.systemAudioCapture = new SystemAudioCapture();
       state.systemAudioCapture.on('data', (chunk: Buffer) => {
         state.lastSystemAudioChunkAt = Date.now();
+        state.lastAudioPipelineError = null;
         state.googleSTT?.write(chunk);
       });
       state.systemAudioCapture.on('speech_ended', () => {

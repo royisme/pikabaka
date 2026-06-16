@@ -20,7 +20,7 @@ t.test('treats limited as allowed but marked limited', (t) => {
   t.equal(report.status, 'limited');
   t.equal(report.granted, true);
   t.equal(report.limited, true);
-  t.match(report.message || '', /limited Screen Recording access/);
+  t.match(report.message || '', /limited Screen \& System Audio Recording access/);
   t.end();
 });
 
@@ -34,9 +34,9 @@ t.test('marks authorized screen status as restart-required instead of not grante
 });
 
 t.test('screen capture failure after macOS grant reports restart and reset guidance', (t) => {
-  t.match(getScreenCapturePermissionMessage('authorized'), /Screen Recording is allowed/);
+  t.match(getScreenCapturePermissionMessage('authorized'), /Screen \& System Audio Recording is allowed/);
   t.match(getScreenCapturePermissionMessage('authorized'), /remove Pika/);
-  t.match(getScreenCapturePermissionMessage('denied'), /grant Screen Recording permission/);
+  t.match(getScreenCapturePermissionMessage('denied'), /grant Screen \& System Audio Recording permission/);
   t.match(getScreenCapturePermissionMessage('denied'), /toggle is already on/);
   t.end();
 });

@@ -99,7 +99,13 @@
       "gatekeeperAssess": false,
       "entitlements": "assets/entitlements.mac.plist",
       "entitlementsInherit": "assets/entitlements.mac.plist",
-      "notarize": true
+      "notarize": true,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Pika uses the microphone to transcribe your speech during meetings.",
+        "NSCameraUsageDescription": "Pika can use the camera for meeting and screenshot workflows when you choose to enable it.",
+        "NSScreenCaptureUsageDescription": "Pika needs Screen & System Audio Recording access to capture meeting audio and screenshots for live transcription.",
+        "NSAudioCaptureUsageDescription": "Pika needs System Audio Recording access to capture meeting audio for live transcription."
+      }
     },
     "win": {
       "target": [

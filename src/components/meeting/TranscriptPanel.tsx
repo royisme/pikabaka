@@ -89,7 +89,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                             Open audio settings
                         </button>
                         <span className={`text-[10px] ${isLightTheme ? 'text-amber-700/80' : 'text-amber-200/80'}`}>
-                            {statusDetail ? 'Fix the STT provider/key/language in settings, then restart the meeting.' : 'Tips: play audio on selected output device, then restart meeting if needed.'}
+                            {statusDetail ? 'Review the message above, update permissions/audio settings, then restart the meeting.' : 'Tips: play audio on selected output device, then restart meeting if needed.'}
                         </span>
                     </div>
                 </div>

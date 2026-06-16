@@ -1695,7 +1695,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     <div className="space-y-2">
                                                         {([
                                                             { key: 'microphone' as const, label: 'Microphone', icon: <Mic size={15} /> },
-                                                            { key: 'screen' as const, label: 'Screen Recording', icon: <Monitor size={15} /> },
+                                                            { key: 'screen' as const, label: 'Screen & System Audio Recording', icon: <Monitor size={15} /> },
                                                         ]).map(({ key, label, icon }) => {
                                                             const report = permissionStatus[key];
                                                             const granted = report.granted;
@@ -1749,7 +1749,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     )}
                                                     {permissionStatus.screen.granted && !permissionStatus.screen.restartRequired && (
                                                         <p className="mt-3 text-[11px] leading-4 text-text-secondary">
-                                                            If screenshots still fail after granting Screen Recording, quit and reopen Pika. If macOS still blocks capture, remove Pika from System Settings → Privacy &amp; Security → Screen &amp; System Audio Recording, reopen Pika, and grant access again.
+                                                            If live transcript still receives no meeting audio, quit and reopen Pika after granting Screen &amp; System Audio Recording. If macOS still blocks capture, remove Pika from that privacy list, reopen Pika, and grant access again.
                                                         </p>
                                                     )}
                                                     {permissionStatus.codeSignature?.isAdHoc && (
@@ -3015,10 +3015,10 @@ Core Skills
                                                         <div>
                                                             <div className="flex items-center gap-2 mb-0.5">
                                                                 <h3 className="text-sm font-bold text-text-primary">SCK Backend</h3>
-                                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-state-info-soft text-state-info uppercase tracking-wide">Alternative</span>
+                                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-state-info-soft text-state-info uppercase tracking-wide">Experimental</span>
                                                             </div>
                                                             <p className="text-xs text-text-secondary leading-relaxed max-w-[300px]">
-                                                                Use the ScreenCaptureKit backend. An optimized alternative to CoreAudio if you experience any capture issues.
+                                                                Experimental system-audio capture path. Requires Screen & System Audio Recording permission; leave off unless CoreAudio capture fails.
                                                             </p>
                                                         </div>
                                                     </div>

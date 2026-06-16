@@ -101,9 +101,9 @@ export function buildPermissionStatusReport(
 
   let message: string | undefined;
   if (type === 'screen' && rawStatus === 'authorized') {
-    message = 'macOS reports Screen Recording is allowed. If capture still fails, quit and reopen Pika so macOS applies the change.';
+    message = 'macOS reports Screen & System Audio Recording is allowed. If capture still fails, quit and reopen Pika so macOS applies the change.';
   } else if (type === 'screen' && limited) {
-    message = 'macOS reports limited Screen Recording access. If capture is incomplete, allow full access or restart Pika after changing this setting.';
+    message = 'macOS reports limited Screen & System Audio Recording access. If capture is incomplete, allow full access or restart Pika after changing this setting.';
   } else if (limited) {
     message = 'macOS reports limited access.';
   } else if (rawStatus !== status) {
@@ -135,8 +135,8 @@ export function getMacPermissionStatusSummary(): PermissionStatusSummary {
 
 export function getScreenCapturePermissionMessage(rawStatus?: MacPermissionStatus): string {
   if (rawStatus && isMediaAccessGranted(rawStatus)) {
-    return 'macOS reports Screen Recording is allowed, but screen capture is not available yet. Quit and reopen Pika so macOS applies the Screen Recording change. If it still fails, remove Pika from System Settings > Privacy & Security > Screen Recording, reopen Pika, and grant access again.';
+    return 'macOS reports Screen & System Audio Recording is allowed, but screen capture is not available yet. Quit and reopen Pika so macOS applies the Screen & System Audio Recording change. If it still fails, remove Pika from System Settings > Privacy & Security > Screen Recording, reopen Pika, and grant access again.';
   }
 
-  return 'Screen capture permission denied. Please grant Screen Recording permission in System Settings > Privacy & Security > Screen Recording, then quit and reopen Pika. If the toggle is already on but screenshots still fail, remove Pika from that list, reopen Pika, and grant access again.';
+  return 'Screen/System Audio capture permission denied. Please grant Screen & System Audio Recording permission in System Settings > Privacy & Security > Screen Recording, then quit and reopen Pika. If the toggle is already on but screenshots still fail, remove Pika from that list, reopen Pika, and grant access again.';
 }

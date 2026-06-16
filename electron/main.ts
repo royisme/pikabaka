@@ -625,6 +625,55 @@ export class AppState {
     setupSystemAudioPipelineFn(this)
   }
 
+  private armSystemAudioHealthFallback(inputDeviceId?: string, outputDeviceId?: string): void {
+    const startedAt = Date.now();
+    const requestedBackend = outputDeviceId === 'sck' ? 'ScreenCaptureKit' : 'CoreAudio';
+
+    setTimeout(async () => {
+      if (!this.isMeetingActive || this.isMeetingPaused) return;
+
+      const hasSystemAudio =
+        this.lastSystemAudioChunkAt != null &&
+        this.lastSystemAudioChunkAt >= startedAt;
+
+      if (hasSystemAudio) return;
+
+      if (outputDeviceId === 'sck') {
+        const message =
+          'No meeting/system audio was received from the ScreenCaptureKit backend after start. ' +
+          'This usually means Screen & System Audio Recording permission is stale, or the experimental SCK backend is blocked. ' +
+          'Pika is switching this meeting to the default CoreAudio capture path. If live transcript still has no meeting audio, grant Screen & System Audio Recording in macOS System Settings, then quit and reopen Pika.';
+
+        console.warn(`[Main] ${message}`);
+        this.lastAudioPipelineError = message;
+        this.broadcast('meeting-audio-error', message);
+
+        try {
+          this.systemAudioCapture?.stop();
+          this.microphoneCapture?.stop();
+          await this.reconfigureAudio(inputDeviceId, undefined);
+
+          if (this.isMeetingActive && !this.isMeetingPaused) {
+            this.systemAudioCapture?.start();
+            this.microphoneCapture?.start();
+            console.log('[Main] Restarted audio capture using default CoreAudio after SCK produced no audio.');
+          }
+        } catch (err) {
+          console.error('[Main] Failed to fallback from SCK to CoreAudio:', err);
+          this.lastAudioPipelineError = (err as Error).message || 'Failed to fallback from ScreenCaptureKit audio capture';
+        }
+        return;
+      }
+
+      const message =
+        `No meeting/system audio was received from ${requestedBackend} after start. ` +
+        'Check that meeting audio is playing through the selected output device and that macOS Screen & System Audio Recording permission is granted for Pika, then quit and reopen Pika if you just changed permissions.';
+      console.warn(`[Main] ${message}`);
+      this.lastAudioPipelineError = message;
+      this.broadcast('meeting-audio-error', message);
+    }, 9000);
+  }
+
   private async reconfigureAudio(inputDeviceId?: string, outputDeviceId?: string): Promise<void> {
     console.log(`[Main] Reconfiguring Audio: Input=${inputDeviceId}, Output=${outputDeviceId}`);
     this.resetBufferedTranscriptTurns();
@@ -645,6 +694,7 @@ export class AppState {
       this.systemAudioCapture.on('data', (chunk: Buffer) => {
         // console.log('[Main] SysAudio chunk', chunk.length);
         this.lastSystemAudioChunkAt = Date.now();
+        this.lastAudioPipelineError = null;
         this.googleSTT?.write(chunk);
       });
       this.systemAudioCapture.on('speech_ended', () => {
@@ -666,6 +716,7 @@ export class AppState {
 
         this.systemAudioCapture.on('data', (chunk: Buffer) => {
           this.lastSystemAudioChunkAt = Date.now();
+          this.lastAudioPipelineError = null;
           this.googleSTT?.write(chunk);
         });
         this.systemAudioCapture.on('speech_ended', () => {
@@ -879,6 +930,7 @@ export class AppState {
         }
         console.log('[Main] Audio pipeline started successfully.');
         this.lastAudioPipelineError = null;
+        this.armSystemAudioHealthFallback(metadata?.audio?.inputDeviceId, metadata?.audio?.outputDeviceId);
       } catch (err) {
         console.error('[Main] Error initializing audio pipeline:', err);
         this.lastAudioPipelineError = (err as Error).message || 'Audio pipeline failed to start';
