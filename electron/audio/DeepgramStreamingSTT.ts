@@ -71,7 +71,7 @@ export class DeepgramStreamingSTT extends EventEmitter {
 
     private sampleRate = 16000;
     private numChannels = 1;
-    private languageCode: string | undefined = 'en'; // Default to English; undefined ⇒ multi/auto-detect
+    private languageCode: string | undefined = undefined; // Default to multi/auto-detect
 
     private reconnectAttempts = 0;
     private reconnectTimer: NodeJS.Timeout | null = null;

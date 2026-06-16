@@ -20,7 +20,7 @@ export class ElevenLabsStreamingSTT extends EventEmitter {
     private buffer: Buffer[] = [];
     private isConnecting = false;
     private isSessionReady = false;
-    private languageCode = 'en'; // Default to English
+    private languageCode: string | undefined = undefined; // Default to auto language detection
     
     private debugWriteStream: fs.WriteStream | null = null;
     
@@ -56,20 +56,20 @@ export class ElevenLabsStreamingSTT extends EventEmitter {
     /** No-op - channel count is expected to be mono by ElevenLabs Scribe */
     public setAudioChannelCount(_count: number): void {}
 
-    /** Recognition language - maps Pika key to ISO-639-1 for ElevenLabs */
+    /** Recognition language - maps Pika key to ISO-639-1 for ElevenLabs; 'auto' omits language_code */
     public setRecognitionLanguage(key: string): void {
         const config = RECOGNITION_LANGUAGES[key];
-        if (config) {
-            const newCode = config.iso639;
-            if (this.languageCode !== newCode) {
-                console.log(`[ElevenLabsStreaming] Language changed: ${this.languageCode} -> ${newCode}`);
-                this.languageCode = newCode;
-                
-                if (this.isActive) {
-                    console.log('[ElevenLabsStreaming] Restarting session to apply new language...');
-                    this.stop();
-                    this.start();
-                }
+        const newCode = key === 'auto' ? undefined : config?.iso639;
+        if (key !== 'auto' && !config) return;
+
+        if (this.languageCode !== newCode) {
+            console.log(`[ElevenLabsStreaming] Language changed: ${this.languageCode || 'auto'} -> ${newCode || 'auto'}`);
+            this.languageCode = newCode;
+
+            if (this.isActive) {
+                console.log('[ElevenLabsStreaming] Restarting session to apply new language...');
+                this.stop();
+                this.start();
             }
         }
     }

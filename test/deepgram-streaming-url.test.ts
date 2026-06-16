@@ -1,4 +1,6 @@
 import t from 'tap';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { buildDeepgramListenUrl, describeDeepgramConnectionError } from '../electron/audio/DeepgramStreamingSTT';
 
 t.test('Deepgram auto language uses realtime multilingual mode without detect_language', (t) => {
@@ -37,5 +39,25 @@ t.test('Deepgram HTTP 400 errors explain provider, language, and likely fix', (t
   t.match(message, /language=auto/, 'includes the selected recognition language');
   t.match(message, /API key\/project\/plan/, 'points to credential/account cause');
   t.match(message, /detect_language=true/, 'mentions the unsupported realtime detect_language parameter');
+  t.end();
+});
+
+
+t.test('default STT language is auto/multilingual, not English', (t) => {
+  const credentialsSource = readFileSync(join(process.cwd(), 'electron/services/CredentialsManager.ts'), 'utf8');
+  const deepgramSource = readFileSync(join(process.cwd(), 'electron/audio/DeepgramStreamingSTT.ts'), 'utf8');
+  const openAiSource = readFileSync(join(process.cwd(), 'electron/audio/OpenAIStreamingSTT.ts'), 'utf8');
+  const elevenLabsSource = readFileSync(join(process.cwd(), 'electron/audio/ElevenLabsStreamingSTT.ts'), 'utf8');
+  const settingsSource = readFileSync(join(process.cwd(), 'src/components/SettingsOverlay.tsx'), 'utf8');
+  const llmHelperSource = readFileSync(join(process.cwd(), 'electron/core/LLMHelper.ts'), 'utf8');
+
+  t.match(credentialsSource, /return raw \|\| 'auto'/, 'credentials manager defaults STT language to auto');
+  t.notMatch(credentialsSource, /sttLanguage \|\| 'english-us'/, 'credentials manager no longer defaults to English');
+  t.match(deepgramSource, /languageCode: string \| undefined = undefined/, 'Deepgram defaults to language=multi');
+  t.match(openAiSource, /private languageKey = 'auto'/, 'OpenAI STT defaults to native language detection');
+  t.match(elevenLabsSource, /languageCode: string \| undefined = undefined/, 'ElevenLabs STT defaults to language detection');
+  t.match(elevenLabsSource, /key === 'auto' \? undefined/, 'ElevenLabs auto mode omits language_code');
+  t.match(settingsSource, /const currentLangKey = storedStt \|\| 'auto'/, 'settings UI shows Auto on fresh installs');
+  t.match(llmHelperSource, /private sttLanguage: string = 'auto'/, 'LLM helper language hint starts in auto mode');
   t.end();
 });

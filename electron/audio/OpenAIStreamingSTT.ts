@@ -69,7 +69,7 @@ type Mode = 'ws' | 'rest';
 export class OpenAIStreamingSTT extends EventEmitter {
     // Public config
     private apiKey: string;
-    private languageKey = 'en';
+    private languageKey = 'auto';
 
     // Audio config (set from pipeline)
     private inputSampleRate = 16_000;

@@ -174,7 +174,10 @@ export class CredentialsManager {
     }
 
     public getSttLanguage(): string {
-        return this.credentials.sttLanguage || 'english-us';
+        const raw = typeof this.credentials.sttLanguage === 'string'
+            ? this.credentials.sttLanguage.trim()
+            : '';
+        return raw || 'auto';
     }
 
     public getAiResponseLanguage(): string {

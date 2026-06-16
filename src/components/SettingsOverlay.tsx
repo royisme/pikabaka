@@ -770,34 +770,20 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 const langs = await window.electronAPI.getRecognitionLanguages();
                 setAvailableLanguages(langs);
 
-                // Load stored preference or auto-detect
+                // Load stored preference. Fresh installs default to Auto/multi-language,
+                // never to English based on system locale.
                 const storedStt = await window.electronAPI.getSttLanguage();
-                let currentLangKey = storedStt;
-
-                if (!currentLangKey) {
-                    const systemLocale = navigator.language;
-                    // Try to find exact match or primary match
-                    const match = Object.entries(langs).find(([_, config]: [string, any]) =>
-                        config.bcp47 === systemLocale ||
-                        config.iso639 === systemLocale ||
-                        (config.alternates && config.alternates.includes(systemLocale))
-                    );
-
-                    currentLangKey = match ? match[0] : 'english-us';
-
-                    // Save the auto-detected default
-                    if (window.electronAPI?.setRecognitionLanguage) {
-                        window.electronAPI.setRecognitionLanguage(currentLangKey);
-                    }
-                }
+                const currentLangKey = storedStt || 'auto';
 
                 setRecognitionLanguage(currentLangKey);
 
                 // Initialize Group based on current language
-                if (langs[currentLangKey]) {
+                if (currentLangKey === 'auto') {
+                    setSelectedSttGroup('Auto');
+                } else if (langs[currentLangKey]) {
                     setSelectedSttGroup(langs[currentLangKey].group);
                 } else {
-                    setSelectedSttGroup('English');
+                    setSelectedSttGroup('Auto');
                 }
             }
 

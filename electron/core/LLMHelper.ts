@@ -90,7 +90,7 @@ export class LLMHelper {
   private groqFastTextMode: boolean = false;
   private knowledgeOrchestrator: any = null;
   private aiResponseLanguage: string = 'auto';
-  private sttLanguage: string = 'english-us';
+  private sttLanguage: string = 'auto';
 
   // Rate limiters per provider to prevent 429 errors on free tiers
   private rateLimiters: ReturnType<typeof createProviderRateLimiters>;
