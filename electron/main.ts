@@ -550,6 +550,7 @@ export class AppState {
   public microphoneCaptureEnabled: boolean = true;
   public lastSystemAudioChunkAt: number | null = null;
   public lastInterviewerTranscriptAt: number | null = null;
+  public lastUserTranscriptAt: number | null = null;
   public lastAudioPipelineError: string | null = null;
   public transcriptAssemblerProfile: TranscriptAssemblerProfile = 'sentence_bias';
   public transcriptTurnBuffers: Record<TranscriptSpeaker, BufferedTranscriptTurn | null> = {
@@ -892,8 +893,10 @@ export class AppState {
     meetingActive: boolean;
     hasRecentSystemAudioChunk: boolean;
     hasRecentInterviewerTranscript: boolean;
+    hasRecentUserTranscript: boolean;
     lastSystemAudioChunkAt: number | null;
     lastInterviewerTranscriptAt: number | null;
+    lastUserTranscriptAt: number | null;
     lastError: string | null;
   } {
     return getNativeAudioStatusFn(this)
@@ -908,6 +911,7 @@ export class AppState {
     this.resetBufferedTranscriptTurns();
     this.lastSystemAudioChunkAt = null;
     this.lastInterviewerTranscriptAt = null;
+    this.lastUserTranscriptAt = null;
     this.lastAudioPipelineError = null;
     this.broadcastMeetingState();
     if (metadata) {
@@ -1030,6 +1034,7 @@ export class AppState {
     this.resetBufferedTranscriptTurns();
     this.lastSystemAudioChunkAt = null;
     this.lastInterviewerTranscriptAt = null;
+    this.lastUserTranscriptAt = null;
     this.lastAudioPipelineError = null;
 
     // Save session state and reset context — MeetingPersistence.stopMeeting() is

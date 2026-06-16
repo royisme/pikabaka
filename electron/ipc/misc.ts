@@ -12,8 +12,10 @@ export function registerMiscHandlers(appState: AppState): void {
     return {
       hasRecentSystemAudioChunk: status.hasRecentSystemAudioChunk,
       hasRecentInterviewerTranscript: status.hasRecentInterviewerTranscript,
+      hasRecentUserTranscript: status.hasRecentUserTranscript,
       lastSystemAudioChunkAt: status.lastSystemAudioChunkAt,
       lastInterviewerTranscriptAt: status.lastInterviewerTranscriptAt,
+      lastUserTranscriptAt: status.lastUserTranscriptAt,
     };
   });
 

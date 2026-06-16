@@ -77,6 +77,7 @@ export function windowChannels() {
         ipcRenderer.removeListener('overlay-opacity-changed', subscription)
       }
     },
-    toggleSettingsWindow: (coords?: { x: number; y: number }) => ipcRenderer.invoke('toggle-settings-window', coords),
+    toggleSettingsWindow: (coords?: { x?: number; y?: number; tab?: string }) => ipcRenderer.invoke('toggle-settings-window', coords),
+    closeSettingsWindow: () => ipcRenderer.invoke('close-settings-window'),
   }
 }

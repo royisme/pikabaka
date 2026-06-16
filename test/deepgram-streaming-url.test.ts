@@ -1,7 +1,7 @@
 import t from 'tap';
 import { buildDeepgramListenUrl, describeDeepgramConnectionError } from '../electron/audio/DeepgramStreamingSTT';
 
-t.test('Deepgram auto language omits unsupported realtime language detection params', (t) => {
+t.test('Deepgram auto language uses realtime multilingual mode without detect_language', (t) => {
   const url = new URL(buildDeepgramListenUrl({ sampleRate: 48000, channels: 1 }));
 
   t.equal(url.origin + url.pathname, 'wss://api.deepgram.com/v1/listen');
@@ -9,7 +9,7 @@ t.test('Deepgram auto language omits unsupported realtime language detection par
   t.equal(url.searchParams.get('encoding'), 'linear16');
   t.equal(url.searchParams.get('sample_rate'), '48000');
   t.equal(url.searchParams.get('channels'), '1');
-  t.equal(url.searchParams.has('language'), false, 'auto mode must not send language=multi');
+  t.equal(url.searchParams.get('language'), 'multi', 'auto mode must enable multilingual English/Russian recognition');
   t.equal(url.searchParams.has('detect_language'), false, 'auto mode must not send detect_language=true');
   t.end();
 });
@@ -34,6 +34,6 @@ t.test('Deepgram HTTP 400 errors explain provider, language, and likely fix', (t
   t.match(message, /HTTP 400/, 'keeps the server status code');
   t.match(message, /language=auto/, 'includes the selected recognition language');
   t.match(message, /API key\/project\/plan/, 'points to credential/account cause');
-  t.match(message, /language=multi/, 'mentions the previously unsupported auto-language parameter');
+  t.match(message, /detect_language=true/, 'mentions the unsupported realtime detect_language parameter');
   t.end();
 });

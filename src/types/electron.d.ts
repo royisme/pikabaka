@@ -87,7 +87,7 @@ export interface ElectronAPI {
   }>
   openPrivacySettings: (type: 'microphone' | 'screen') => Promise<{ success: boolean }>
   onSettingsVisibilityChange: (callback: (isVisible: boolean) => void) => () => void
-  toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>
+  toggleSettingsWindow: (coords?: { x?: number; y?: number; tab?: string }) => Promise<void>
   closeSettingsWindow: () => Promise<void>
   toggleAdvancedSettings: () => Promise<void>
   closeAdvancedSettings: () => Promise<void>
@@ -164,8 +164,10 @@ export interface ElectronAPI {
     meetingActive: boolean;
     hasRecentSystemAudioChunk: boolean;
     hasRecentInterviewerTranscript: boolean;
+    hasRecentUserTranscript: boolean;
     lastSystemAudioChunkAt: number | null;
     lastInterviewerTranscriptAt: number | null;
+    lastUserTranscriptAt: number | null;
     lastError: string | null;
   }>
 
@@ -234,7 +236,7 @@ export interface ElectronAPI {
   forceRestartOllama: () => Promise<void>;
 
   // Settings Window
-  toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>;
+  toggleSettingsWindow: (coords?: { x?: number; y?: number; tab?: string }) => Promise<void>;
 
   // Groq Fast Text Mode
   getGroqFastTextMode: () => Promise<{ enabled: boolean }>;

@@ -127,8 +127,10 @@ interface ElectronAPI {
     meetingActive: boolean;
     hasRecentSystemAudioChunk: boolean;
     hasRecentInterviewerTranscript: boolean;
+    hasRecentUserTranscript: boolean;
     lastSystemAudioChunkAt: number | null;
     lastInterviewerTranscriptAt: number | null;
+    lastUserTranscriptAt: number | null;
     lastError: string | null;
   }>
 
@@ -172,7 +174,8 @@ interface ElectronAPI {
   forceRestartOllama: () => Promise<void>
 
   // Settings Window
-  toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>
+  toggleSettingsWindow: (coords?: { x?: number; y?: number; tab?: string }) => Promise<void>
+  closeSettingsWindow: () => Promise<void>
 
   // Groq Fast Text Mode
   getGroqFastTextMode: () => Promise<{ enabled: boolean }>
@@ -904,7 +907,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   forceRestartOllama: () => ipcRenderer.invoke('force-restart-ollama'),
 
   // Settings Window
-  toggleSettingsWindow: (coords?: { x: number; y: number }) => ipcRenderer.invoke('toggle-settings-window', coords),
+  toggleSettingsWindow: (coords?: { x?: number; y?: number; tab?: string }) => ipcRenderer.invoke('toggle-settings-window', coords),
+  closeSettingsWindow: () => ipcRenderer.invoke('close-settings-window'),
 
   // Groq Fast Text Mode
   getGroqFastTextMode: () => ipcRenderer.invoke('get-groq-fast-text-mode'),

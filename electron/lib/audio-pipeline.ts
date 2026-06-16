@@ -182,6 +182,11 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
     if (speaker === 'interviewer') {
       state.lastInterviewerTranscriptAt = Date.now();
       state.lastAudioPipelineError = null;
+    } else if (speaker === 'user') {
+      state.lastUserTranscriptAt = Date.now();
+      if (typeof state.lastAudioPipelineError === 'string' && /^(No meeting\/system audio was received|Microphone permission|Microphone access)/.test(state.lastAudioPipelineError)) {
+        state.lastAudioPipelineError = null;
+      }
     }
   });
 
@@ -381,8 +386,10 @@ export function getNativeAudioStatus(appState: AppState): {
   meetingActive: boolean;
   hasRecentSystemAudioChunk: boolean;
   hasRecentInterviewerTranscript: boolean;
+  hasRecentUserTranscript: boolean;
   lastSystemAudioChunkAt: number | null;
   lastInterviewerTranscriptAt: number | null;
+  lastUserTranscriptAt: number | null;
   lastError: string | null;
 } {
   const state = appState as any;
@@ -391,14 +398,18 @@ export function getNativeAudioStatus(appState: AppState): {
     state.lastSystemAudioChunkAt != null && now - state.lastSystemAudioChunkAt < 3000;
   const hasRecentInterviewerTranscript =
     state.lastInterviewerTranscriptAt != null && now - state.lastInterviewerTranscriptAt < 6000;
+  const hasRecentUserTranscript =
+    state.lastUserTranscriptAt != null && now - state.lastUserTranscriptAt < 6000;
 
   return {
     connected: state.isMeetingActive && !!state.systemAudioCapture && !!state.googleSTT,
     meetingActive: state.isMeetingActive,
     hasRecentSystemAudioChunk,
     hasRecentInterviewerTranscript,
+    hasRecentUserTranscript,
     lastSystemAudioChunkAt: state.lastSystemAudioChunkAt,
     lastInterviewerTranscriptAt: state.lastInterviewerTranscriptAt,
+    lastUserTranscriptAt: state.lastUserTranscriptAt,
     lastError: state.lastAudioPipelineError,
   };
 }

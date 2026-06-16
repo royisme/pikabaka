@@ -34,14 +34,11 @@ export function buildDeepgramListenUrl(options: {
         keepalive: 'true',
     });
 
-    // Deepgram's realtime endpoint currently rejects `language=multi` and
-    // `detect_language=true` with HTTP 400 during the WebSocket handshake.
-    // For Pika's `auto` recognition mode, omit language params entirely so
-    // the stream opens and transcripts can flow. Explicit language selections
-    // still send the concrete ISO-639 code.
-    if (options.languageCode) {
-        params.set('language', options.languageCode);
-    }
+    // Deepgram Nova-3 realtime supports multilingual recognition with
+    // language=multi. Do not use detect_language=true here: that parameter is
+    // still rejected by the WebSocket endpoint on some projects/plans. Explicit
+    // language selections send their concrete ISO-639 code.
+    params.set('language', options.languageCode || 'multi');
 
     return `${DEEPGRAM_LISTEN_BASE_URL}?${params.toString()}`;
 }
@@ -55,7 +52,7 @@ export function describeDeepgramConnectionError(
     const prefix = `Deepgram STT connection failed (language=${languageLabel}, sample_rate=${context.sampleRate}, channels=${context.channels})`;
 
     if (/Unexpected server response:\s*400/i.test(rawMessage)) {
-        return `${prefix}: Deepgram rejected the realtime WebSocket request with HTTP 400. Check the Deepgram API key/project/plan and selected recognition language. Auto mode should not send language=multi or detect_language=true.`;
+        return `${prefix}: Deepgram rejected the realtime WebSocket request with HTTP 400. Check the Deepgram API key/project/plan and selected recognition language. Auto mode uses language=multi and must not send detect_language=true.`;
     }
 
     if (/Unexpected server response:\s*(401|403)/i.test(rawMessage)) {

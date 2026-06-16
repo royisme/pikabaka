@@ -83,7 +83,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                     <div className="mt-1.5 flex flex-wrap items-center gap-2">
                         <button
                             type="button"
-                            onClick={() => window.electronAPI.toggleSettingsWindow()}
+                            onClick={() => window.electronAPI.toggleSettingsWindow({ tab: 'audio' })}
                             className="px-2.5 py-1 rounded-md text-[10px] font-medium border border-border-subtle bg-bg-input hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary text-text-primary transition-colors"
                         >
                             Open audio settings

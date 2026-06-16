@@ -15,6 +15,7 @@ type WindowActivationOptions = {
 export class SettingsWindowHelper {
     private settingsWindow: BrowserWindow | null = null
     private windowHelper: WindowHelper | null = null;
+    private activeTab: string | null = null;
     private opacityTimeout: NodeJS.Timeout | null = null;
 
     public getSettingsWindow(): BrowserWindow | null {
@@ -58,12 +59,33 @@ export class SettingsWindowHelper {
         this.windowHelper = wh;
     }
 
-    public toggleWindow(x?: number, y?: number): void {
+    public toggleWindow(x?: number, y?: number, tab?: string): void {
         const mainWindow = BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && w !== this.settingsWindow);
         if (mainWindow && x !== undefined && y !== undefined) {
             const bounds = mainWindow.getBounds();
             this.offsetX = x - bounds.x;
             this.offsetY = y - (bounds.y + bounds.height);
+        }
+
+        // A tab request is an explicit request for the full settings UI. Do not
+        // toggle it closed if it is already visible; focus/replace it instead.
+        if (tab) {
+            if (this.settingsWindow && !this.settingsWindow.isDestroyed() && this.activeTab === tab) {
+                this.showWindow(x, y);
+                return;
+            }
+            if (this.settingsWindow && !this.settingsWindow.isDestroyed()) {
+                this.settingsWindow.destroy();
+                this.settingsWindow = null;
+            }
+            this.createWindow(x, y, true, tab);
+            return;
+        }
+
+        if (this.settingsWindow && !this.settingsWindow.isDestroyed() && this.activeTab) {
+            this.settingsWindow.destroy();
+            this.settingsWindow = null;
+            this.activeTab = null;
         }
 
         if (this.settingsWindow && !this.settingsWindow.isDestroyed()) {
@@ -147,13 +169,15 @@ export class SettingsWindowHelper {
         }
     }
 
-    private createWindow(x?: number, y?: number, showWhenReady: boolean = true): void {
+    private createWindow(x?: number, y?: number, showWhenReady: boolean = true, tab?: string): void {
+        this.activeTab = tab ?? null;
+        const isFullSettingsWindow = !!tab;
         const windowSettings: Electron.BrowserWindowConstructorOptions = {
-            width: 200, // Match React component width
-            height: 238, // Increased to accommodate new Transcript toggle
+            width: isFullSettingsWindow ? 980 : 200,
+            height: isFullSettingsWindow ? 760 : 238,
             frame: false,
             transparent: true,
-            resizable: false,
+            resizable: isFullSettingsWindow,
             fullscreenable: false,
             hasShadow: false,
             alwaysOnTop: true,
@@ -185,9 +209,10 @@ export class SettingsWindowHelper {
         this.settingsWindow.setContentProtection(this.contentProtection);
 
         // Load with query param
+        const encodedTab = tab ? `&tab=${encodeURIComponent(tab)}` : '';
         const settingsUrl = isDev
-            ? `${startUrl}?window=settings`
-            : `${startUrl}?window=settings` // file url also works with search params in modern Electron
+            ? `${startUrl}?window=settings${encodedTab}`
+            : `${startUrl}?window=settings${encodedTab}` // file url also works with search params in modern Electron
 
         this.settingsWindow.loadURL(settingsUrl).catch(e => {
             console.error('[SettingsWindowHelper] Failed to load URL:', e);
@@ -205,7 +230,7 @@ export class SettingsWindowHelper {
         // Let's keep it simple: clicks outside close it if we want "popover" behavior.
         // For now, let it stay open until toggled or ESC.
         this.settingsWindow.on('blur', () => {
-            if (this.ignoreBlur) return;
+            if (this.ignoreBlur || this.activeTab) return;
             this.lastBlurTime = Date.now();
             this.closeWindow();
         })

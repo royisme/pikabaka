@@ -5,8 +5,10 @@ type NativeAudioHealth = {
   meetingActive: boolean;
   hasRecentSystemAudioChunk: boolean;
   hasRecentInterviewerTranscript: boolean;
+  hasRecentUserTranscript: boolean;
   lastSystemAudioChunkAt: number | null;
   lastInterviewerTranscriptAt: number | null;
+  lastUserTranscriptAt: number | null;
   lastError: string | null;
 };
 
@@ -15,8 +17,10 @@ const fallbackStatus: NativeAudioHealth = {
   meetingActive: false,
   hasRecentSystemAudioChunk: false,
   hasRecentInterviewerTranscript: false,
+  hasRecentUserTranscript: false,
   lastSystemAudioChunkAt: null,
   lastInterviewerTranscriptAt: null,
+  lastUserTranscriptAt: null,
   lastError: null,
 };
 
@@ -27,6 +31,7 @@ export function useMeetingAudio() {
   const [nativeAudioHealth, setNativeAudioHealth] = useState<NativeAudioHealth>(fallbackStatus);
   const [isConnected, setIsConnected] = useState(false);
   const [noSystemAudioSince, setNoSystemAudioSince] = useState<number | null>(null);
+  const hasAnyTranscriptThisMeeting = nativeAudioHealth.lastInterviewerTranscriptAt != null || nativeAudioHealth.lastUserTranscriptAt != null;
   const isRecordingRef = useRef(false);
   const voiceInputRef = useRef('');
   const manualTranscriptRef = useRef('');
@@ -94,7 +99,9 @@ export function useMeetingAudio() {
       nativeAudioHealth.meetingActive &&
       isConnected &&
       !nativeAudioHealth.hasRecentSystemAudioChunk &&
-      !nativeAudioHealth.hasRecentInterviewerTranscript;
+      !nativeAudioHealth.hasRecentInterviewerTranscript &&
+      !nativeAudioHealth.hasRecentUserTranscript &&
+      !hasAnyTranscriptThisMeeting;
 
     if (!shouldTrackMissingSystemAudio) {
       setNoSystemAudioSince(null);
@@ -107,6 +114,8 @@ export function useMeetingAudio() {
     nativeAudioHealth.meetingActive,
     nativeAudioHealth.hasRecentSystemAudioChunk,
     nativeAudioHealth.hasRecentInterviewerTranscript,
+    nativeAudioHealth.hasRecentUserTranscript,
+    hasAnyTranscriptThisMeeting,
   ]);
 
   const sttStatus = useMemo(() => {
@@ -116,24 +125,27 @@ export function useMeetingAudio() {
     if (!isConnected) {
       return { label: 'STT disconnected', toneClass: 'text-red-400', dotClass: 'bg-red-400' };
     }
-    if (nativeAudioHealth.hasRecentInterviewerTranscript) {
+    if (nativeAudioHealth.hasRecentInterviewerTranscript || nativeAudioHealth.hasRecentUserTranscript) {
       return { label: 'STT receiving transcript', toneClass: 'text-emerald-400', dotClass: 'bg-emerald-400 animate-pulse' };
+    }
+    if (hasAnyTranscriptThisMeeting) {
+      return { label: 'STT ready', toneClass: 'text-emerald-300', dotClass: 'bg-emerald-300' };
     }
     if (nativeAudioHealth.hasRecentSystemAudioChunk) {
       return { label: 'STT listening (no transcript yet)', toneClass: 'text-amber-300', dotClass: 'bg-amber-300' };
     }
     return { label: 'No system audio signal', toneClass: 'text-red-300', dotClass: 'bg-red-300' };
-  }, [isConnected, nativeAudioHealth]);
+  }, [isConnected, nativeAudioHealth, hasAnyTranscriptThisMeeting]);
 
   const sttNeedsTroubleshooting = useMemo(() => {
     if (!nativeAudioHealth.meetingActive || !isConnected) return false;
-    if (nativeAudioHealth.hasRecentSystemAudioChunk || nativeAudioHealth.hasRecentInterviewerTranscript) return false;
+    if (nativeAudioHealth.hasRecentSystemAudioChunk || nativeAudioHealth.hasRecentInterviewerTranscript || nativeAudioHealth.hasRecentUserTranscript || hasAnyTranscriptThisMeeting) return false;
     if (nativeAudioHealth.lastError) return true;
     if (!noSystemAudioSince) return false;
     return Date.now() - noSystemAudioSince >= 8000;
-  }, [isConnected, nativeAudioHealth, noSystemAudioSince]);
+  }, [isConnected, nativeAudioHealth, noSystemAudioSince, hasAnyTranscriptThisMeeting]);
 
-  const showSttErrorDetail = !!nativeAudioHealth.lastError && !nativeAudioHealth.hasRecentInterviewerTranscript;
+  const showSttErrorDetail = !!nativeAudioHealth.lastError && !nativeAudioHealth.hasRecentInterviewerTranscript && !nativeAudioHealth.hasRecentUserTranscript && !hasAnyTranscriptThisMeeting;
 
   return {
     isManualRecording,

@@ -17,8 +17,10 @@ import { ErrorBoundary } from "./components/ErrorBoundary"
 const queryClient = new QueryClient()
 
 const App: React.FC = () => {
-  const isSettingsWindow = new URLSearchParams(window.location.search).get('window') === 'settings';
-  const isLauncherWindow = new URLSearchParams(window.location.search).get('window') === 'launcher';
+  const searchParams = new URLSearchParams(window.location.search);
+  const isSettingsWindow = searchParams.get('window') === 'settings';
+  const settingsWindowTab = searchParams.get('tab') || 'general';
+  const isLauncherWindow = searchParams.get('window') === 'launcher';
   const isOverlayWindow = new URLSearchParams(window.location.search).get('window') === 'overlay';
   const isModelSelectorWindow = new URLSearchParams(window.location.search).get('window') === 'model-selector';
   const isCropperWindow = new URLSearchParams(window.location.search).get('window') === 'cropper';
@@ -228,12 +230,21 @@ const App: React.FC = () => {
 
   // Render Logic
   if (isSettingsWindow) {
+    const isFullSettingsWindow = searchParams.has('tab');
     return (
-      <ErrorBoundary context="SettingsPopup">
+      <ErrorBoundary context={isFullSettingsWindow ? "SettingsOverlayWindow" : "SettingsPopup"}>
         <div className="h-full min-h-0 w-full">
           <QueryClientProvider client={queryClient}>
             <ToastProvider>
-              <SettingsPopup />
+              {isFullSettingsWindow ? (
+                <SettingsOverlay
+                  isOpen={true}
+                  onClose={() => window.electronAPI?.closeSettingsWindow?.()}
+                  initialTab={settingsWindowTab}
+                />
+              ) : (
+                <SettingsPopup />
+              )}
               <ToastViewport />
             </ToastProvider>
           </QueryClientProvider>

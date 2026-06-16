@@ -532,8 +532,8 @@ export function registerCoreHandlers(appState: AppState): void {
   });
 
   // Settings Window
-  safeHandle("toggle-settings-window", (event, { x, y } = {}) => {
-    appState.settingsWindowHelper.toggleWindow(x, y)
+  safeHandle("toggle-settings-window", (event, { x, y, tab } = {}) => {
+    appState.settingsWindowHelper.toggleWindow(x, y, typeof tab === 'string' ? tab : undefined)
   })
 
   safeHandle("close-settings-window", () => {
