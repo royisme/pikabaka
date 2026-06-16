@@ -30,6 +30,12 @@ t.test('user speech appears quickly with partials and low final flush latency', 
 
   t.match(assemblerSource, /speaker === 'user'[\s\S]*Math\.min\(baseFlushDelayMs/, 'user final transcript flush is capped for low latency');
   t.match(audioPipelineSource, /pcm16ChunkHasAudioSignal/, 'system audio health uses real PCM signal rather than silence keepalives');
+
+  const rollingTranscriptSource = readFileSync(path.join(process.cwd(), 'src/components/ui/RollingTranscript.tsx'), 'utf8');
+  const transcriptPanelSource = readFileSync(path.join(process.cwd(), 'src/components/meeting/TranscriptPanel.tsx'), 'utf8');
+  t.match(rollingTranscriptSource, /h-8 w-8/, 'speaker avatar has enough room to avoid clipped initials/ring');
+  t.match(rollingTranscriptSource, /space-y-3 px-1 pr-1/, 'transcript rows add horizontal padding so avatars are not clipped by the scroll area');
+  t.match(transcriptPanelSource, /WebkitLineClamp: 2/, 'meeting audio warning is capped to two compact lines');
   t.match(assemblerSource, /fragmentFlushDelayMs: 950/, 'default fragment flush is below one second');
   t.end();
 });

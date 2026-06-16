@@ -17,7 +17,7 @@ t.test('meeting start falls back from SCK when no system audio chunks arrive', (
 
   t.match(mainSource, /armSystemAudioHealthFallback/, 'health fallback is armed on meeting start');
   t.match(mainSource, /outputDeviceId === 'sck'/, 'fallback specifically handles the experimental SCK backend');
-  t.match(mainSource, /Screen & System Audio Recording permission is stale/, 'fallback tells the user which macOS permission to fix');
+  t.match(mainSource, /No meeting audio from ScreenCaptureKit/, 'SCK fallback uses compact user-facing copy');
   t.match(mainSource, /reconfigureAudio\(inputDeviceId, undefined\)/, 'fallback switches back to default CoreAudio capture');
   t.match(mainSource, /handleSystemAudioChunkFn\(this, chunk\)/, 'system audio chunks are inspected for real signal before clearing stale warnings');
   t.match(mainSource, /resolveMicrophoneAccessForMeeting/, 'microphone permission resolution is bounded');
@@ -27,8 +27,10 @@ t.test('meeting start falls back from SCK when no system audio chunks arrive', (
 
   const meetingAudioHookSource = readFileSync(path.join(process.cwd(), 'src/hooks/useMeetingAudio.ts'), 'utf8');
   t.match(meetingAudioHookSource, /Mic STT ready · no meeting audio/, 'mic-only transcript is not shown as full system-audio readiness');
-  t.match(meetingAudioHookSource, /Screen & System Audio Recording.*separate from the microphone/s, 'system-audio warning explains it is separate from microphone permission');
+  t.match(meetingAudioHookSource, /Mic can still show it as Me/, 'system-audio warning explains mic-only transcription separately from meeting audio');
   t.notMatch(meetingAudioHookSource, /hasAnyTranscriptThisMeeting/, 'user microphone transcript no longer suppresses system-audio troubleshooting');
+  t.match(mainSource, /selected output produced no audio/, 'selected but silent output device falls back to default CoreAudio capture');
+  t.match(mainSource, /Switching to Default output capture automatically/, 'fallback warning is compact and action-oriented');
   t.end();
 });
 

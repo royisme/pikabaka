@@ -671,9 +671,7 @@ export class AppState {
 
       if (outputDeviceId === 'sck') {
         const message =
-          'No meeting/system audio signal was received from the ScreenCaptureKit backend after start. ' +
-          'This usually means Screen & System Audio Recording permission is stale, or the experimental SCK backend is blocked. ' +
-          'This is separate from microphone permission. Pika is switching this meeting to the default CoreAudio capture path. If live transcript still has no meeting audio, grant Screen & System Audio Recording in macOS System Settings, then quit and reopen Pika.';
+          'No meeting audio from ScreenCaptureKit. Switching to default CoreAudio capture.';
 
         console.warn(`[Main] ${message}`);
         this.lastAudioPipelineError = message;
@@ -689,7 +687,9 @@ export class AppState {
             if (this.microphoneCaptureEnabled) {
               this.microphoneCapture?.start();
             }
+            this.lastAudioPipelineError = null;
             console.log('[Main] Restarted audio capture using default CoreAudio after SCK produced no audio.');
+            this.armSystemAudioHealthFallback(inputDeviceId, undefined);
           }
         } catch (err) {
           console.error('[Main] Failed to fallback from SCK to CoreAudio:', err);
@@ -698,10 +698,38 @@ export class AppState {
         return;
       }
 
+      const isExplicitCoreAudioOutput = !!outputDeviceId && outputDeviceId !== 'default';
+      if (isExplicitCoreAudioOutput) {
+        const message =
+          'No meeting audio from the selected output device. Switching to Default output capture automatically.';
+        console.warn(`[Main] ${message} outputDeviceId=${outputDeviceId}`);
+        this.lastAudioPipelineError = message;
+        this.broadcast('meeting-audio-error', message);
+
+        try {
+          this.systemAudioCapture?.stop();
+          this.microphoneCapture?.stop();
+          await this.reconfigureAudio(inputDeviceId, undefined);
+
+          if (this.isMeetingActive && !this.isMeetingPaused) {
+            this.systemAudioCapture?.start();
+            if (this.microphoneCaptureEnabled) {
+              this.microphoneCapture?.start();
+            }
+            this.lastAudioPipelineError = null;
+            console.log('[Main] Restarted audio capture using default CoreAudio after selected output produced no audio.');
+            this.armSystemAudioHealthFallback(inputDeviceId, undefined);
+          }
+        } catch (err) {
+          console.error('[Main] Failed to fallback from selected output to default CoreAudio:', err);
+          this.lastAudioPipelineError = (err as Error).message || 'Failed to fallback to default system audio capture';
+        }
+        return;
+      }
+
       const message =
-        `No meeting/system audio signal was received from ${requestedBackend} after start. ` +
-        'This is separate from microphone permission: your own speech can transcribe while YouTube/meeting audio is still blocked. ' +
-        'Check that the video or meeting is playing through the selected output device, grant macOS Screen & System Audio Recording permission for Pika, then quit and reopen Pika if you just changed permissions.';
+        `No meeting audio signal from ${requestedBackend}. ` +
+        'Mic can still transcribe as Me; choose the output that is playing the video or Default, then restart the meeting.';
       console.warn(`[Main] ${message}`);
       this.lastAudioPipelineError = message;
       this.broadcast('meeting-audio-error', message);

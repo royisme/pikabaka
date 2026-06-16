@@ -85,21 +85,18 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
             </div>
 
             {sttNeedsTroubleshooting && (
-                <div className="mx-4 mb-2 p-2 rounded-lg border border-state-warning-border bg-state-warning-soft no-drag">
-                    <p className={`text-[10px] ${isLightTheme ? 'text-amber-800' : 'text-amber-200'}`}>
-                        {sttTroubleshootingMessage || statusDetail || 'STT has no usable meeting audio input. Check output device routing and Screen & System Audio Recording permission.'}
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <div className="mx-4 mb-2 rounded-lg border border-state-warning-border bg-state-warning-soft px-2.5 py-1.5 no-drag">
+                    <div className="flex items-start gap-2">
+                        <p className={`min-w-0 flex-1 overflow-hidden text-[10px] leading-snug ${isLightTheme ? 'text-amber-800' : 'text-amber-200'}`} style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                            {sttTroubleshootingMessage || statusDetail || 'No meeting audio detected. Try Default or the output playing the video.'}
+                        </p>
                         <button
                             type="button"
                             onClick={() => window.electronAPI.toggleSettingsWindow({ tab: 'audio' })}
-                            className="px-2.5 py-1 rounded-md text-[10px] font-medium border border-border-subtle bg-bg-input hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary text-text-primary transition-colors"
+                            className="shrink-0 rounded-md border border-border-subtle bg-bg-input px-2 py-0.5 text-[10px] font-medium text-text-primary transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
                         >
-                            Open audio settings
+                            Audio
                         </button>
-                        <span className={`text-[10px] ${isLightTheme ? 'text-amber-700/80' : 'text-amber-200/80'}`}>
-                            Microphone and Screen & System Audio Recording are separate permissions; update the blocked one, then restart the meeting.
-                        </span>
                     </div>
                 </div>
             )}

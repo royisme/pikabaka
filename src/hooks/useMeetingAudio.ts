@@ -141,7 +141,7 @@ export function useMeetingAudio() {
   }, [isConnected, nativeAudioHealth, hasMicTranscriptThisMeeting, hasSystemAudioThisMeeting]);
 
   const systemAudioTroubleshootingMessage =
-    'No meeting/video audio is reaching Pika through Screen & System Audio Recording. This is separate from the microphone: “Me” transcript can work while YouTube/meeting audio is still blocked. Play audio through the selected output device, grant Screen & System Audio Recording permission for Pika, then restart the meeting (quit/reopen Pika after changing permission).';
+    'No meeting/video audio detected. Mic can still show it as Me; choose the output playing the video or Default, then restart the meeting.';
 
   const sttTroubleshootingMessage = useMemo(() => {
     if (!nativeAudioHealth.meetingActive || !isConnected) return null;
