@@ -1,8 +1,8 @@
 {
   "name": "pika",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "main": "dist-electron/electron/main.js",
-  "description": "Open-source AI interview copilot and meeting assistant. Real-time transcription, AI-suggested answers, and screenshot reasoning \u2014 bring your own LLM key or run fully offline with Ollama.",
+  "description": "Open-source AI interview copilot and meeting assistant. Real-time transcription, AI-suggested answers, and screenshot reasoning — bring your own LLM key or run fully offline with Ollama.",
   "homepage": "https://github.com/royisme/pikabaka#readme",
   "repository": {
     "type": "git",
