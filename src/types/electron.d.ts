@@ -1,5 +1,10 @@
 type CompanionDevice = { id: string; name: string; nickname?: string; role: 'controller' | 'viewer' | 'uploader'; pairedAt: number; createdAt: number; lastSeenAt: number; userAgent?: string; remoteAddress?: string; connected?: boolean }
 type CompanionPairing = { token?: string; url: string; qrDataUrl: string; expiresAt: number }
+type AutoAnswerMode = 'off' | 'detect_only' | 'auto_answer'
+type AutoAnswerSettings = { mode: AutoAnswerMode; minConfidence: number; cooldownMs: number; includeRecentScreenshots: boolean }
+type AutoAnswerState = { mode: AutoAnswerMode; status: 'off' | 'detecting' | 'detected' | 'generating' | 'answered' | 'skipped' | 'error'; question?: string; confidence?: number; type?: string; reason?: string; answer?: string | null; error?: string; updatedAt: number }
+type AutoAnswerEventPayload = { detection?: { question: string; confidence: number; type?: string; reason?: string; timestamp?: number }; settings?: AutoAnswerSettings; answer?: string | null; error?: string; reason?: string }
+
 type CompanionStatus = { running: boolean; port: number | null; urls: string[]; activeConnections: number; pairedDevices: CompanionDevice[]; pairing?: CompanionPairing | null; settings: { autoStart: boolean; preferredPort: number } }
 type CompanionCommand = { id: string; type: 'ask' | 'clarify' | 'recap' | 'brainstorm' | 'what_to_answer' | 'follow_up' | 'code_hint' | 'attach-file' | 'reset_cancel' | 'toggle_visibility' | 'mouse_passthrough' | 'screenshot' | 'selective_screenshot' | 'ping'; payload?: any; receivedAt: number; deviceId?: string }
 
@@ -131,6 +136,15 @@ export interface ElectronAPI {
   getSttProvider: () => Promise<string>
   getTranscriptAssemblerProfile: () => Promise<'sentence_bias' | 'low_latency' | 'coherent'>
   setTranscriptAssemblerProfile: (profile: 'sentence_bias' | 'low_latency' | 'coherent') => Promise<{ success: boolean; error?: string }>
+  getAutoAnswerSettings: () => Promise<AutoAnswerSettings>
+  setAutoAnswerSettings: (patch: Partial<AutoAnswerSettings>) => Promise<{ success: boolean; settings: AutoAnswerSettings; error?: string }>
+  getAutoAnswerState: () => Promise<AutoAnswerState>
+  onAutoAnswerSettingsChanged: (callback: (settings: AutoAnswerSettings) => void) => () => void
+  onAutoAnswerQuestionDetected: (callback: (payload: AutoAnswerEventPayload) => void) => () => void
+  onAutoAnswerGenerationStarted: (callback: (payload: AutoAnswerEventPayload) => void) => () => void
+  onAutoAnswerComplete: (callback: (payload: AutoAnswerEventPayload) => void) => () => void
+  onAutoAnswerError: (callback: (payload: AutoAnswerEventPayload) => void) => () => void
+  onAutoAnswerSkipped: (callback: (payload: AutoAnswerEventPayload) => void) => () => void
   setGroqSttApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   setOpenAiSttApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   setDeepgramApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>

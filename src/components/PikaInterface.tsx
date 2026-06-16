@@ -266,7 +266,16 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         }
     }, [handleScreenshotAttach, pushScreenshotError]);
     const setMessages = useCallback((updater: React.SetStateAction<Message[]>) => { chat.setSystemMessages((prev) => (typeof updater === 'function' ? (updater as (p: Message[]) => Message[])(prev) : updater)); }, [chat.setSystemMessages]);
-    const transcriptProps = { ...transcript, ...audio, appearance, isLightTheme };
+    const transcriptProps = {
+        ...transcript,
+        ...audio,
+        appearance,
+        isLightTheme,
+        autoAnswerState: chat.autoAnswerState,
+        setAutoAnswerMode: chat.setAutoAnswerMode,
+        dismissAutoAnswerQuestion: chat.dismissAutoAnswerQuestion,
+        answerDetectedQuestion: chat.answerDetectedQuestion,
+    };
     const chatProps = { messages: chat.messages, knowledgeContext: chat.knowledgeContext, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, actionButtonMode: chat.actionButtonMode, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleWhatToSay: chat.handleWhatToSay, handleClarify: chat.handleClarify, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleBrainstorm: chat.handleBrainstorm, handleAnswerNow, handleManualSubmit: isPaused ? () => {} : chat.handleManualSubmit, handlePasteImage, isPaused, isManualRecording: audio.isManualRecording, manualTranscript: chat.isProcessing ? audio.manualTranscript : (isPaused ? 'Paused' : audio.manualTranscript), voiceInput: isPaused ? '' : audio.voiceInput, appearance, isLightTheme, currentModel, isSettingsOpen, isMousePassthrough, setIsMousePassthrough, shortcuts, scrollContainerRef, messagesEndRef, textInputRef, contentRef, setMessages };
 
     return (

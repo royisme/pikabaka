@@ -57,6 +57,13 @@ const DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT =
     'You are a realtime subtitle translator. Preserve meaning, tone, technical terms, product names, numbers, and code tokens exactly when appropriate. Do not summarize, do not add explanations, and do not omit information. Return only the translated sentence(s), with no prefix/suffix and no markdown.';
 
 type TranscriptAssemblerProfile = 'sentence_bias' | 'low_latency' | 'coherent';
+type AutoAnswerMode = 'off' | 'detect_only' | 'auto_answer';
+
+const AUTO_ANSWER_MODE_OPTIONS: Array<{ value: AutoAnswerMode; label: string; desc: string }> = [
+    { value: 'off', label: 'Off', desc: 'Manual Answer and screenshot workflows only.' },
+    { value: 'detect_only', label: 'Detect only', desc: 'Highlight interviewer questions without generating answers.' },
+    { value: 'auto_answer', label: 'Auto Answer', desc: 'Automatically generate a suggested answer when a question is detected.' },
+];
 
 const TRANSCRIPT_ASSEMBLER_PROFILE_OPTIONS: Array<{ value: TranscriptAssemblerProfile; label: string; desc: string }> = [
     { value: 'sentence_bias', label: 'Sentence-biased', desc: 'Balanced sentence completeness with moderate delay.' },
@@ -912,6 +919,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     // STT Provider settings
     const [sttProvider, setSttProvider] = useState<'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'>('google');
     const [transcriptAssemblerProfile, setTranscriptAssemblerProfile] = useState<TranscriptAssemblerProfile>('sentence_bias');
+    const [autoAnswerMode, setAutoAnswerMode] = useState<AutoAnswerMode>('off');
+    const [autoAnswerIncludeScreenshots, setAutoAnswerIncludeScreenshots] = useState(false);
     const [groqSttModel, setGroqSttModel] = useState('whisper-large-v3-turbo');
     const [sttGroqKey, setSttGroqKey] = useState('');
     const [sttOpenaiKey, setSttOpenaiKey] = useState('');
@@ -1021,6 +1030,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 if (assemblerProfile) {
                     setTranscriptAssemblerProfile(assemblerProfile);
                 }
+                const autoAnswer = await window.electronAPI?.getAutoAnswerSettings?.();
+                if (autoAnswer) {
+                    setAutoAnswerMode(autoAnswer.mode || 'off');
+                    setAutoAnswerIncludeScreenshots(autoAnswer.includeRecentScreenshots === true);
+                }
             } catch (e) {
                 console.error('Failed to load STT settings:', e);
             }
@@ -1088,6 +1102,39 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         // and the current STT language is "auto", fall back to a sensible default.
         if (STT_PROVIDERS_WITHOUT_AUTO.has(provider) && recognitionLanguage === 'auto') {
             await handleLanguageChange('english-us');
+        }
+    };
+
+    const handleAutoAnswerModeChange = async (mode: AutoAnswerMode) => {
+        const previousMode = autoAnswerMode;
+        setAutoAnswerMode(mode);
+        try {
+            const result = await window.electronAPI?.setAutoAnswerSettings?.({ mode });
+            if (result?.settings?.mode) {
+                setAutoAnswerMode(result.settings.mode);
+            } else if (result && !result.success) {
+                setAutoAnswerMode(previousMode);
+            }
+        } catch (e) {
+            console.error('Failed to set Auto Answer mode:', e);
+            setAutoAnswerMode(previousMode);
+        }
+    };
+
+    const handleAutoAnswerScreenshotToggle = async () => {
+        const next = !autoAnswerIncludeScreenshots;
+        const previous = autoAnswerIncludeScreenshots;
+        setAutoAnswerIncludeScreenshots(next);
+        try {
+            const result = await window.electronAPI?.setAutoAnswerSettings?.({ includeRecentScreenshots: next });
+            if (result?.settings) {
+                setAutoAnswerIncludeScreenshots(result.settings.includeRecentScreenshots === true);
+            } else if (result && !result.success) {
+                setAutoAnswerIncludeScreenshots(previous);
+            }
+        } catch (e) {
+            console.error('Failed to update Auto Answer screenshots setting:', e);
+            setAutoAnswerIncludeScreenshots(previous);
         }
     };
 
@@ -2688,6 +2735,54 @@ Core Skills
                                                     </button>
                                                 );
                                             })}
+                                        </div>
+                                    </div>
+
+
+                                    <div>
+                                        <h3 className="text-lg font-bold text-text-primary mb-1">Auto Answer Mode</h3>
+                                        <p className="text-xs text-text-secondary mb-5">
+                                            Detect interviewer questions from final meeting transcript and optionally generate suggested answers automatically.
+                                        </p>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                            {AUTO_ANSWER_MODE_OPTIONS.map((option) => {
+                                                const selected = autoAnswerMode === option.value;
+                                                return (
+                                                    <button
+                                                        key={option.value}
+                                                        type="button"
+                                                        onClick={() => handleAutoAnswerModeChange(option.value)}
+                                                        className={`rounded-xl border p-4 text-left transition-all duration-base ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary ${selected
+                                                            ? 'bg-accent-primary/10 border-accent-primary text-text-primary shadow-sm'
+                                                            : 'bg-bg-card border-border-subtle text-text-secondary hover:bg-bg-elevated hover:text-text-primary'
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-center justify-between gap-3 mb-2">
+                                                            <span className="text-sm font-semibold">{option.label}</span>
+                                                            {selected && <Check size={15} className="text-accent-primary" />}
+                                                        </div>
+                                                        <p className="text-xs leading-relaxed text-text-tertiary">{option.desc}</p>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div className="mt-3 rounded-xl border border-border-subtle bg-bg-card p-4 flex items-start justify-between gap-4">
+                                            <div>
+                                                <div className="text-sm font-semibold text-text-primary">Include recent screenshots</div>
+                                                <p className="text-xs text-text-tertiary mt-1">
+                                                    When Auto Answer is enabled, attach the most recent queued screenshots for screen-aware answers.
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleAutoAnswerScreenshotToggle}
+                                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${autoAnswerIncludeScreenshots ? 'bg-accent-primary' : 'bg-bg-input'}`}
+                                                aria-pressed={autoAnswerIncludeScreenshots}
+                                            >
+                                                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${autoAnswerIncludeScreenshots ? 'translate-x-5' : 'translate-x-0'}`} />
+                                            </button>
                                         </div>
                                     </div>
 

@@ -1,6 +1,15 @@
 import fs from 'fs';
 import { getSettingsJsonPath } from './configPaths';
 
+export type AutoAnswerMode = 'off' | 'detect_only' | 'auto_answer';
+
+export interface AutoAnswerSettings {
+    mode: AutoAnswerMode;
+    minConfidence: number;
+    cooldownMs: number;
+    includeRecentScreenshots: boolean;
+}
+
 export interface AppSettings {
     // Only boot-critical or non-encrypted settings should live here.
     // In the future, other non-secret data like 'language' or 'theme'
@@ -10,6 +19,7 @@ export interface AppSettings {
     verboseLogging?: boolean;
     actionButtonMode?: 'recap' | 'brainstorm';
     transcriptAssemblerProfile?: 'sentence_bias' | 'low_latency' | 'coherent';
+    autoAnswer?: Partial<AutoAnswerSettings>;
     companion?: {
         autoStart?: boolean;
         preferredPort?: number;

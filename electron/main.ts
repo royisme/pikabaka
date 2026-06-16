@@ -347,6 +347,7 @@ export class AppState {
 
     // Initialize IntelligenceManager with LLMHelper
     this.intelligenceManager = new IntelligenceManager(this.processingHelper.getLLMHelper())
+    this.intelligenceManager.setAutoAnswerScreenshotProvider(() => this.getScreenshotQueue())
 
     // Initialize ThemeManager
     this.themeManager = ThemeManager.getInstance()
@@ -964,6 +965,7 @@ export class AppState {
 
     this.isMeetingActive = true;
     this.resetBufferedTranscriptTurns();
+    this.intelligenceManager.resetAutoAnswer();
     this.lastSystemAudioChunkAt = null;
     this.lastInterviewerTranscriptAt = null;
     this.lastUserTranscriptAt = null;
@@ -1087,6 +1089,7 @@ export class AppState {
     this.microphoneCapture?.stop();
     this.googleSTT_User?.stop();
     this.resetBufferedTranscriptTurns();
+    this.intelligenceManager.resetAutoAnswer();
     this.lastSystemAudioChunkAt = null;
     this.lastInterviewerTranscriptAt = null;
     this.lastUserTranscriptAt = null;
@@ -1213,6 +1216,31 @@ export class AppState {
 
     this.intelligenceManager.on('suggested_answer_token', (token: string, question: string, confidence: number) => {
       sendToChatWindows('intelligence-suggested-answer-token', { token, question, confidence })
+    })
+
+
+    this.intelligenceManager.on('auto_answer_settings_changed', (settings: unknown) => {
+      sendToChatWindows('auto-answer-settings-changed', settings)
+    })
+
+    this.intelligenceManager.on('auto_answer_question_detected', (detection: unknown, settings: unknown) => {
+      sendToChatWindows('auto-answer-question-detected', { detection, settings })
+    })
+
+    this.intelligenceManager.on('auto_answer_generation_started', (detection: unknown) => {
+      sendToChatWindows('auto-answer-generation-started', { detection })
+    })
+
+    this.intelligenceManager.on('auto_answer_complete', (payload: unknown) => {
+      sendToChatWindows('auto-answer-complete', payload)
+    })
+
+    this.intelligenceManager.on('auto_answer_error', (payload: unknown) => {
+      sendToChatWindows('auto-answer-error', payload)
+    })
+
+    this.intelligenceManager.on('auto_answer_skipped', (payload: unknown) => {
+      sendToChatWindows('auto-answer-skipped', payload)
     })
 
     this.intelligenceManager.on('refined_answer_token', (token: string, intent: string) => {

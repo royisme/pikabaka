@@ -37,6 +37,21 @@ type KnowledgeContext = {
 
 type AttachedContext = Array<{ path: string; preview: string }>;
 
+export type AutoAnswerMode = 'off' | 'detect_only' | 'auto_answer';
+
+export type AutoAnswerUiState = {
+  mode: AutoAnswerMode;
+  status: 'off' | 'detecting' | 'detected' | 'generating' | 'answered' | 'skipped' | 'error';
+  question?: string;
+  confidence?: number;
+  type?: string;
+  reason?: string;
+  error?: string;
+  updatedAt: number;
+};
+
+const defaultAutoAnswerState: AutoAnswerUiState = { mode: 'off', status: 'off', updatedAt: Date.now() };
+
 const getAttachmentPreviews = (attachments: AttachedContext): string[] => attachments.map((s) => s.preview).filter(Boolean);
 
 const getSuggestedAnswerIntent = (question?: string): string => {
@@ -74,6 +89,7 @@ export function useMeetingChat() {
   const [conversationContext, setConversationContext] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [autoAnswerState, setAutoAnswerState] = useState<AutoAnswerUiState>(defaultAutoAnswerState);
   // systemMessages holds quick-action responses (WhatToSay, Clarify, Recap, etc.)
   const [systemMessages, setSystemMessages] = useState<Message[]>([]);
   const knowledgeContextTimeoutRef = useRef<number | null>(null);
@@ -110,6 +126,118 @@ export function useMeetingChat() {
     });
 
     return () => unsubscribe?.();
+  }, []);
+
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api) return;
+    let cancelled = false;
+
+    const normalizeState = (raw: any): AutoAnswerUiState => ({
+      mode: raw?.mode === 'detect_only' || raw?.mode === 'auto_answer' ? raw.mode : 'off',
+      status: raw?.status || (raw?.mode === 'off' ? 'off' : 'detecting'),
+      question: raw?.question,
+      confidence: raw?.confidence,
+      type: raw?.type,
+      reason: raw?.reason,
+      error: raw?.error,
+      updatedAt: raw?.updatedAt || Date.now(),
+    });
+
+    api.getAutoAnswerState?.()
+      .then((state) => { if (!cancelled && state) setAutoAnswerState(normalizeState(state)); })
+      .catch(() => {});
+    api.getAutoAnswerSettings?.()
+      .then((settings) => {
+        if (!cancelled && settings) {
+          setAutoAnswerState((prev) => ({
+            ...prev,
+            mode: settings.mode,
+            status: settings.mode === 'off' ? 'off' : (prev.status === 'off' ? 'detecting' : prev.status),
+            updatedAt: Date.now(),
+          }));
+        }
+      })
+      .catch(() => {});
+
+    const cleanups: Array<() => void> = [];
+    cleanups.push(api.onAutoAnswerSettingsChanged?.((settings) => {
+      setAutoAnswerState((prev) => ({
+        ...prev,
+        mode: settings.mode,
+        status: settings.mode === 'off' ? 'off' : 'detecting',
+        error: undefined,
+        updatedAt: Date.now(),
+      }));
+    }) || (() => {}));
+    cleanups.push(api.onAutoAnswerQuestionDetected?.((payload) => {
+      const detection = payload?.detection;
+      if (!detection) return;
+      setAutoAnswerState({
+        mode: payload?.settings?.mode || 'detect_only',
+        status: 'detected',
+        question: detection.question,
+        confidence: detection.confidence,
+        type: detection.type,
+        reason: detection.reason,
+        updatedAt: Date.now(),
+      });
+    }) || (() => {}));
+    cleanups.push(api.onAutoAnswerGenerationStarted?.((payload) => {
+      const detection = payload?.detection;
+      setAutoAnswerState((prev) => ({
+        ...prev,
+        status: 'generating',
+        question: detection?.question || prev.question,
+        confidence: detection?.confidence ?? prev.confidence,
+        type: detection?.type || prev.type,
+        reason: detection?.reason || prev.reason,
+        updatedAt: Date.now(),
+      }));
+    }) || (() => {}));
+    cleanups.push(api.onAutoAnswerComplete?.((payload) => {
+      const detection = payload?.detection;
+      setAutoAnswerState((prev) => ({
+        ...prev,
+        status: 'answered',
+        question: detection?.question || prev.question,
+        confidence: detection?.confidence ?? prev.confidence,
+        type: detection?.type || prev.type,
+        reason: detection?.reason || prev.reason,
+        error: undefined,
+        updatedAt: Date.now(),
+      }));
+    }) || (() => {}));
+    cleanups.push(api.onAutoAnswerError?.((payload) => {
+      const detection = payload?.detection;
+      setAutoAnswerState((prev) => ({
+        ...prev,
+        status: 'error',
+        question: detection?.question || prev.question,
+        confidence: detection?.confidence ?? prev.confidence,
+        type: detection?.type || prev.type,
+        reason: detection?.reason || prev.reason,
+        error: payload?.error || 'Auto Answer failed',
+        updatedAt: Date.now(),
+      }));
+    }) || (() => {}));
+    cleanups.push(api.onAutoAnswerSkipped?.((payload) => {
+      const detection = payload?.detection;
+      setAutoAnswerState((prev) => ({
+        ...prev,
+        status: 'skipped',
+        question: detection?.question || prev.question,
+        confidence: detection?.confidence ?? prev.confidence,
+        type: detection?.type || prev.type,
+        reason: payload?.reason || prev.reason,
+        updatedAt: Date.now(),
+      }));
+    }) || (() => {}));
+
+    return () => {
+      cancelled = true;
+      cleanups.forEach((cleanup) => cleanup());
+    };
   }, []);
 
   useEffect(() => {
@@ -618,14 +746,14 @@ export function useMeetingChat() {
     ]);
   }, [setSystemMessages]);
 
-  const handleWhatToSay = useCallback(async (attachmentsOverride?: AttachedContext) => {
+  const handleWhatToSay = useCallback(async (attachmentsOverride?: AttachedContext, questionOverride?: string) => {
     const currentAttachments = attachmentsOverride ?? attachedContext;
-    const userQuestion = inputValue.trim();
+    const userQuestion = (questionOverride || inputValue).trim();
     const promptText = userQuestion || (currentAttachments.length > 0 ? 'What should I say about this?' : 'Guide me on what to say next');
 
     analytics.trackCommandExecuted('what_to_say');
     setIsProcessing(true);
-    if (userQuestion) setInputValue('');
+    if (userQuestion && !questionOverride) setInputValue('');
     if (currentAttachments.length > 0) setAttachedContext([]);
     addQuickActionMessage(promptText, currentAttachments);
 
@@ -640,6 +768,34 @@ export function useMeetingChat() {
       setIsProcessing(false);
     }
   }, [attachedContext, inputValue, addQuickActionMessage, pushSystemError, setAttachedContext, setInputValue, setIsProcessing]);
+
+  const setAutoAnswerMode = useCallback(async (mode: AutoAnswerMode) => {
+    const previous = autoAnswerState;
+    setAutoAnswerState((prev) => ({ ...prev, mode, status: mode === 'off' ? 'off' : 'detecting', error: undefined, updatedAt: Date.now() }));
+    try {
+      const result = await window.electronAPI?.setAutoAnswerSettings?.({ mode });
+      if (result?.settings) {
+        setAutoAnswerState((prev) => ({
+          ...prev,
+          mode: result.settings.mode,
+          status: result.settings.mode === 'off' ? 'off' : 'detecting',
+          updatedAt: Date.now(),
+        }));
+      }
+    } catch (err) {
+      setAutoAnswerState(previous);
+      pushSystemError(err);
+    }
+  }, [autoAnswerState, pushSystemError]);
+
+  const dismissAutoAnswerQuestion = useCallback(() => {
+    setAutoAnswerState((prev) => ({ ...prev, status: prev.mode === 'off' ? 'off' : 'detecting', question: undefined, error: undefined, updatedAt: Date.now() }));
+  }, []);
+
+  const answerDetectedQuestion = useCallback(async () => {
+    if (!autoAnswerState.question) return;
+    await handleWhatToSay(undefined, autoAnswerState.question);
+  }, [autoAnswerState.question, handleWhatToSay]);
 
   const handleFollowUp = useCallback(async (intent: string = 'rephrase') => {
     setIsProcessing(true);
@@ -789,6 +945,10 @@ export function useMeetingChat() {
     attachedContext,
     setAttachedContext,
     actionButtonMode,
+    autoAnswerState,
+    setAutoAnswerMode,
+    dismissAutoAnswerQuestion,
+    answerDetectedQuestion,
     conversationContext,
     inputValue,
     setInputValue,

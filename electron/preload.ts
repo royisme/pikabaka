@@ -95,6 +95,15 @@ interface ElectronAPI {
   getSttProvider: () => Promise<string>
   getTranscriptAssemblerProfile: () => Promise<'sentence_bias' | 'low_latency' | 'coherent'>
   setTranscriptAssemblerProfile: (profile: 'sentence_bias' | 'low_latency' | 'coherent') => Promise<{ success: boolean; error?: string }>
+  getAutoAnswerSettings: () => Promise<any>
+  setAutoAnswerSettings: (patch: any) => Promise<{ success: boolean; settings: any; error?: string }>
+  getAutoAnswerState: () => Promise<any>
+  onAutoAnswerSettingsChanged: (callback: (settings: any) => void) => () => void
+  onAutoAnswerQuestionDetected: (callback: (payload: any) => void) => () => void
+  onAutoAnswerGenerationStarted: (callback: (payload: any) => void) => () => void
+  onAutoAnswerComplete: (callback: (payload: any) => void) => () => void
+  onAutoAnswerError: (callback: (payload: any) => void) => () => void
+  onAutoAnswerSkipped: (callback: (payload: any) => void) => () => void
   setGroqSttApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   setOpenAiSttApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   setDeepgramApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
@@ -626,6 +635,39 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getSttProvider: () => ipcRenderer.invoke("get-stt-provider"),
   getTranscriptAssemblerProfile: () => ipcRenderer.invoke("get-transcript-assembler-profile"),
   setTranscriptAssemblerProfile: (profile: 'sentence_bias' | 'low_latency' | 'coherent') => ipcRenderer.invoke("set-transcript-assembler-profile", profile),
+  getAutoAnswerSettings: () => ipcRenderer.invoke("get-auto-answer-settings"),
+  setAutoAnswerSettings: (patch: any) => ipcRenderer.invoke("set-auto-answer-settings", patch),
+  getAutoAnswerState: () => ipcRenderer.invoke("get-auto-answer-state"),
+  onAutoAnswerSettingsChanged: (callback: (settings: any) => void) => {
+    const subscription = (_: any, data: any) => callback(data);
+    ipcRenderer.on("auto-answer-settings-changed", subscription);
+    return () => ipcRenderer.removeListener("auto-answer-settings-changed", subscription);
+  },
+  onAutoAnswerQuestionDetected: (callback: (payload: any) => void) => {
+    const subscription = (_: any, data: any) => callback(data);
+    ipcRenderer.on("auto-answer-question-detected", subscription);
+    return () => ipcRenderer.removeListener("auto-answer-question-detected", subscription);
+  },
+  onAutoAnswerGenerationStarted: (callback: (payload: any) => void) => {
+    const subscription = (_: any, data: any) => callback(data);
+    ipcRenderer.on("auto-answer-generation-started", subscription);
+    return () => ipcRenderer.removeListener("auto-answer-generation-started", subscription);
+  },
+  onAutoAnswerComplete: (callback: (payload: any) => void) => {
+    const subscription = (_: any, data: any) => callback(data);
+    ipcRenderer.on("auto-answer-complete", subscription);
+    return () => ipcRenderer.removeListener("auto-answer-complete", subscription);
+  },
+  onAutoAnswerError: (callback: (payload: any) => void) => {
+    const subscription = (_: any, data: any) => callback(data);
+    ipcRenderer.on("auto-answer-error", subscription);
+    return () => ipcRenderer.removeListener("auto-answer-error", subscription);
+  },
+  onAutoAnswerSkipped: (callback: (payload: any) => void) => {
+    const subscription = (_: any, data: any) => callback(data);
+    ipcRenderer.on("auto-answer-skipped", subscription);
+    return () => ipcRenderer.removeListener("auto-answer-skipped", subscription);
+  },
   setGroqSttApiKey: (apiKey: string) => ipcRenderer.invoke("set-groq-stt-api-key", apiKey),
   setOpenAiSttApiKey: (apiKey: string) => ipcRenderer.invoke("set-openai-stt-api-key", apiKey),
   setDeepgramApiKey: (apiKey: string) => ipcRenderer.invoke("set-deepgram-api-key", apiKey),

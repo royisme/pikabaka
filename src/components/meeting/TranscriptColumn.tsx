@@ -2,6 +2,7 @@ import React from 'react';
 import TranscriptPanel from './TranscriptPanel';
 import type { TranscriptDisplayMode, TranscriptSegment } from '../../lib/transcriptSegments';
 import type { getOverlayAppearance } from '../../lib/overlayAppearance';
+import type { AutoAnswerMode, AutoAnswerUiState } from '../../hooks/useMeetingChat';
 
 interface TranscriptColumnProps {
     transcriptSegments: TranscriptSegment[];
@@ -19,6 +20,10 @@ interface TranscriptColumnProps {
     nativeAudioHealth: { lastError: string | null };
     appearance: ReturnType<typeof getOverlayAppearance>;
     isLightTheme: boolean;
+    autoAnswerState: AutoAnswerUiState;
+    setAutoAnswerMode: (mode: AutoAnswerMode) => void;
+    dismissAutoAnswerQuestion: () => void;
+    answerDetectedQuestion: () => void;
 }
 
 const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
@@ -37,6 +42,10 @@ const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
     nativeAudioHealth,
     appearance,
     isLightTheme,
+    autoAnswerState,
+    setAutoAnswerMode,
+    dismissAutoAnswerQuestion,
+    answerDetectedQuestion,
 }) => {
     return (
         <TranscriptPanel
@@ -55,6 +64,10 @@ const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
             nativeAudioHealth={nativeAudioHealth}
             appearance={appearance}
             isLightTheme={isLightTheme}
+            autoAnswerState={autoAnswerState}
+            setAutoAnswerMode={setAutoAnswerMode}
+            dismissAutoAnswerQuestion={dismissAutoAnswerQuestion}
+            answerDetectedQuestion={answerDetectedQuestion}
         />
     );
 };

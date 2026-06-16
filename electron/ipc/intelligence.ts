@@ -93,6 +93,19 @@ export function registerIntelligenceHandlers(appState: AppState): void {
     }
   });
 
+  // Auto Answer Mode settings/state
+  safeHandle("get-auto-answer-settings", () => {
+    return appState.getIntelligenceManager().getAutoAnswerSettings();
+  });
+
+  safeHandle("set-auto-answer-settings", (_, patch: any) => {
+    return { success: true, settings: appState.getIntelligenceManager().setAutoAnswerSettings(patch || {}) };
+  });
+
+  safeHandle("get-auto-answer-state", () => {
+    return appState.getIntelligenceManager().getAutoAnswerState();
+  });
+
   // Dynamic Action Button Mode (Recap vs Brainstorm)
   safeHandle("get-action-button-mode", () => {
     const { SettingsManager } = require('../services/SettingsManager');

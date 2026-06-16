@@ -12,10 +12,12 @@ import { LLMHelper } from './core/LLMHelper';
 import { SessionTracker } from './core/SessionTracker';
 import { IntelligenceEngine } from './core/IntelligenceEngine';
 import { MeetingPersistence } from './core/MeetingPersistence';
+import { AutoAnswerController, AutoAnswerSettings, AutoAnswerState } from './core/AutoAnswerController';
 
 // Re-export types for backward compatibility
 export type { TranscriptSegment, SuggestionTrigger, ContextItem } from './core/SessionTracker';
 export type { IntelligenceMode, IntelligenceModeEvents } from './core/IntelligenceEngine';
+export type { AutoAnswerSettings, AutoAnswerState, AutoAnswerMode } from './core/AutoAnswerController';
 
 export const GEMINI_FLASH_MODEL = "gemini-3.1-flash-lite-preview";
 
@@ -31,15 +33,24 @@ export class IntelligenceManager extends EventEmitter {
     private session: SessionTracker;
     private engine: IntelligenceEngine;
     private persistence: MeetingPersistence;
+    private autoAnswerController: AutoAnswerController;
 
     constructor(llmHelper: LLMHelper) {
         super();
         this.session = new SessionTracker();
         this.engine = new IntelligenceEngine(llmHelper, this.session);
         this.persistence = new MeetingPersistence(this.session, llmHelper);
+        this.autoAnswerController = new AutoAnswerController(async (question, confidence, imagePaths) => {
+            const activeMode = this.engine.getActiveMode();
+            if (activeMode !== 'idle' && activeMode !== 'assist') {
+                throw new Error(`Auto Answer skipped because ${activeMode} is already generating.`);
+            }
+            return this.engine.runWhatShouldISay(question, confidence, imagePaths);
+        });
 
-        // Forward all engine events through the facade
+        // Forward all engine/controller events through the facade
         this.forwardEngineEvents();
+        this.forwardAutoAnswerEvents();
     }
 
     /**
@@ -58,6 +69,25 @@ export class IntelligenceManager extends EventEmitter {
 
         for (const event of events) {
             this.engine.on(event, (...args: any[]) => {
+                this.emit(event, ...args);
+            });
+        }
+    }
+
+
+
+    private forwardAutoAnswerEvents(): void {
+        const events = [
+            'auto_answer_settings_changed',
+            'auto_answer_question_detected',
+            'auto_answer_generation_started',
+            'auto_answer_complete',
+            'auto_answer_error',
+            'auto_answer_skipped',
+        ];
+
+        for (const event of events) {
+            this.autoAnswerController.on(event as any, (...args: any[]) => {
                 this.emit(event, ...args);
             });
         }
@@ -126,10 +156,32 @@ export class IntelligenceManager extends EventEmitter {
 
     handleTranscript(segment: import('./core/SessionTracker').TranscriptSegment): void {
         this.engine.handleTranscript(segment);
+        this.autoAnswerController.handleTranscript(segment);
     }
 
     async handleSuggestionTrigger(trigger: import('./core/SessionTracker').SuggestionTrigger): Promise<void> {
         return this.engine.handleSuggestionTrigger(trigger);
+    }
+
+
+    getAutoAnswerSettings(): AutoAnswerSettings {
+        return this.autoAnswerController.getSettings();
+    }
+
+    setAutoAnswerSettings(patch: Partial<AutoAnswerSettings>): AutoAnswerSettings {
+        return this.autoAnswerController.setSettings(patch);
+    }
+
+    getAutoAnswerState(): AutoAnswerState {
+        return this.autoAnswerController.getState();
+    }
+
+    setAutoAnswerScreenshotProvider(provider: () => string[]): void {
+        this.autoAnswerController.setScreenshotProvider(provider);
+    }
+
+    resetAutoAnswer(): void {
+        this.autoAnswerController.reset();
     }
 
     // ============================================
