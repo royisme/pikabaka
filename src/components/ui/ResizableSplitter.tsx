@@ -94,7 +94,7 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
     <div
       ref={splitterRef}
       role="separator"
-      aria-label={isHorizontal ? 'Resize panes vertically' : 'Resize Live Transcript and AI Chat panes'}
+      aria-label={isHorizontal ? 'Resize panes vertically' : 'Resize panes'}
       aria-orientation={isHorizontal ? 'horizontal' : 'vertical'}
       aria-valuemin={Math.round(min)}
       aria-valuemax={Math.round(max)}
