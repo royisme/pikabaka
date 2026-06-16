@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Mic, MessageSquare } from 'lucide-react';
+import { Mic } from 'lucide-react';
 import ResizableSplitter from '../ui/ResizableSplitter';
 import type { getOverlayAppearance } from '../../lib/overlayAppearance';
 import { calculateSplitterBounds } from './chatLayout';
@@ -85,7 +85,6 @@ const SplitterShell: React.FC<SplitterShellProps> = ({
                     max={maxTranscriptSplit}
                 />
                 <section className={SPLITTER_RIGHT_SECTION_CLASS}>
-                    <ZoneHeader icon={<MessageSquare className="w-2.5 h-2.5" />} label="AI Chat" />
                     <div className={SPLITTER_PANE_BODY_CLASS}>{right}</div>
                 </section>
             </div>

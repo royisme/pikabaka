@@ -5,15 +5,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { test } from 'tap';
 import {
   CHAT_PANEL_ACTION_BAR_CLASS,
-  CHAT_PANEL_CONTROL_BAR_CLASS,
-  CHAT_PANEL_DRAG_HANDLE_CLASS,
   CHAT_PANEL_FOOTER_CLASS,
   CHAT_PANEL_FOOTER_CONTROLS_CLASS,
   CHAT_PANEL_INPUT_BASE_CLASS,
   CHAT_PANEL_MESSAGE_SCREENSHOT_IMAGE_CLASS,
   CHAT_PANEL_MESSAGE_SCREENSHOT_PREVIEW_CLASS,
   ChatPanelAttachedScreenshots,
-  ChatPanelControlBar,
   ChatPanelMessageScreenshotPreview,
   ChatPanelTextInput,
   getChatPanelModelDisplayName,
@@ -191,24 +188,14 @@ test('chat input renders and submits on Enter', (t) => {
 });
 
 
-test('chat control bar is only a draggable AI chat pane header', (t) => {
-  let called = 0;
-  const tree = ChatPanelControlBar({
-    isProcessing: true,
-    isPaused: false,
-    onTogglePause: () => { called += 1; },
-    onStop: () => { called += 1; },
-  });
+test('AI chat pane does not render the redundant ready/status header', (t) => {
+  const chatPanelSource = readFileSync(path.join(process.cwd(), 'src/components/meeting/ChatPanel.tsx'), 'utf8');
+  const renderPartsSource = readFileSync(path.join(process.cwd(), 'src/components/meeting/chatPanelRenderParts.tsx'), 'utf8');
+  const splitterShellSource = readFileSync(path.join(process.cwd(), 'src/components/meeting/SplitterShell.tsx'), 'utf8');
 
-  const root = collectElements(tree, (element) => element.props.className === CHAT_PANEL_CONTROL_BAR_CLASS)[0];
-  t.ok(String(root.props.className).includes('draggable-area'), 'AI chat header is a drag region');
-
-  const dragHandle = collectElements(tree, (element) => element.props['aria-label'] === 'Drag AI chat pane')[0];
-  t.ok(String(dragHandle.props.className).includes(CHAT_PANEL_DRAG_HANDLE_CLASS), 'explicit AI chat drag handle is rendered');
-
-  const buttons = collectElements(tree, (element) => element.type === 'button');
-  t.equal(buttons.length, 0, 'AI chat header does not duplicate top-level Pause/Stop buttons');
-  t.equal(called, 0, 'duplicate run-control callbacks are not wired in the pane header');
+  t.notMatch(chatPanelSource, /ChatPanelControlBar/, 'chat panel no longer renders the inner AI Chat READY header');
+  t.notMatch(renderPartsSource, /statusLabel|Drag AI chat pane|chat-control-bar/, 'removed status/ready header implementation');
+  t.notMatch(splitterShellSource, /label=\"AI Chat\"/, 'right pane no longer renders the outer AI CHAT header');
   t.end();
 });
 

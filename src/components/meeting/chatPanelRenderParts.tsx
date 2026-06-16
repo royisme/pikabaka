@@ -23,12 +23,6 @@ export interface KeyDownEventLike {
   key: string;
 }
 
-export const CHAT_PANEL_CONTROL_BAR_CLASS =
-  'shrink-0 draggable-area flex items-center gap-2 px-4 py-2 border-b overlay-border-subtle min-h-[42px]';
-export const CHAT_PANEL_CONTROL_BUTTON_CLASS =
-  'no-drag flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium border overlay-chip-surface overlay-text-interactive interaction-base interaction-hover interaction-press min-h-[30px]';
-export const CHAT_PANEL_DRAG_HANDLE_CLASS =
-  'draggable-area flex min-w-0 flex-1 items-center gap-2 rounded-full px-1 py-1 text-[11px] overlay-text-muted';
 export const CHAT_PANEL_ACTION_BAR_CLASS =
   'shrink-0 grid grid-cols-2 min-[520px]:flex min-[520px]:flex-wrap justify-stretch min-[520px]:justify-center items-center gap-1.5 px-3 py-2 no-drag';
 
@@ -103,45 +97,6 @@ export function handleChatInputKeyDown(
 ): void {
   if (event.key === 'Enter') handleManualSubmit();
 }
-
-export type ChatRunState = 'running' | 'paused' | 'idle';
-
-export interface ChatPanelControlBarProps {
-  isProcessing: boolean;
-  isPaused: boolean;
-  onTogglePause?: () => void;
-  onStop?: () => void;
-}
-
-export function getChatPanelRunState(isProcessing: boolean, isPaused: boolean): ChatRunState {
-  if (isPaused) return 'paused';
-  if (isProcessing) return 'running';
-  return 'idle';
-}
-
-export function ChatPanelControlBar({
-  isProcessing,
-  isPaused,
-}: ChatPanelControlBarProps) {
-  const runState = getChatPanelRunState(isProcessing, isPaused);
-  const statusLabel = runState === 'paused' ? 'Paused' : runState === 'running' ? 'Answering' : 'Ready';
-
-  return (
-    <div className={CHAT_PANEL_CONTROL_BAR_CLASS} data-testid="chat-control-bar">
-      <div className={CHAT_PANEL_DRAG_HANDLE_CLASS} aria-label="Drag AI chat pane" title="Drag AI chat pane">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full overlay-icon-surface" aria-hidden="true">
-          <span className="text-[15px] leading-none">⋮⋮</span>
-        </span>
-        <div className="min-w-0 flex items-baseline gap-2">
-          <span className="truncate text-[12px] font-medium overlay-text-primary">AI Chat</span>
-          <span className="truncate text-[10px] uppercase tracking-[0.12em] overlay-text-muted">{statusLabel}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
 
 interface ChatPanelAttachedScreenshotsProps {
   attachedContext: ChatPanelAttachment[];
