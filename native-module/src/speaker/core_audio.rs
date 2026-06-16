@@ -161,10 +161,10 @@ extern "C" fn proc(
     if let Some(view) = av::AudioPcmBuf::with_buf_list_no_copy(&ctx.format, input_data, None) {
         if let Some(data) = view.data_f32_at(0) {
             let buffer_channels = input_data.buffers[0].number_channels;
-            let actual_ch = if buffer_channels > 1 {
+            let actual_ch = if buffer_channels > 0 {
                 buffer_channels
             } else {
-                2
+                ctx.channels.max(1)
             };
             push_audio(ctx, data, actual_ch);
         }
@@ -177,13 +177,13 @@ extern "C" fn proc(
             let data =
                 unsafe { std::slice::from_raw_parts(first_buffer.data as *const f32, float_count) };
 
-            // BUGFIX: macOS CoreAudio Tap notoriously ignores mono ASBD requests
-            // and secretly returns interleaved stereo (L,R,L,R).
+            // Trust the buffer channel count. Forcing mono buffers to stereo halves
+            // the sample count and corrupts speech captured from browser/video audio.
             let buffer_channels = first_buffer.number_channels;
-            let actual_ch = if buffer_channels > 1 {
+            let actual_ch = if buffer_channels > 0 {
                 buffer_channels
             } else {
-                2
+                ctx.channels.max(1)
             };
 
             push_audio(ctx, data, actual_ch);

@@ -12,6 +12,10 @@ t.test('native audio streams continuously to STT instead of local VAD dropping s
   t.match(micStart, /Send every 20ms chunk/, 'microphone path sends every frame to Deepgram');
   t.notMatch(systemStart, /SilenceSuppressor::new\(SilenceSuppressionConfig[\s\S]*for_system_audio\(\)/, 'system path no longer uses local silence suppression');
   t.notMatch(micStart, /SilenceSuppressor::new\(SilenceSuppressionConfig[\s\S]*for_microphone\(\)/, 'microphone path no longer uses local silence suppression');
+
+  const coreAudioSource = readFileSync(path.join(process.cwd(), 'native-module/src/speaker/core_audio.rs'), 'utf8');
+  t.match(coreAudioSource, /Trust the buffer channel count/, 'CoreAudio tap keeps mono buffers at mono instead of forcing stereo');
+  t.notMatch(coreAudioSource, /else \{\n\s*2\n\s*\}/, 'CoreAudio tap no longer halves mono browser audio by assuming hidden stereo');
   t.end();
 });
 
