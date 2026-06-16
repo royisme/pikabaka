@@ -19,6 +19,17 @@ test('quick answer actions use the intelligence transcript path instead of gener
   t.end();
 });
 
+
+test('capture-and-process sends the captured screenshot directly instead of relying on pending attachment state', (t) => {
+  const source = read('src/components/PikaInterface.tsx');
+  const start = source.indexOf('onCaptureAndProcess');
+  const body = source.slice(start, source.indexOf('useEffect(() => {', start));
+
+  t.match(body, /handleWhatToSay\(\[attachment\]\)/, 'immediate capture processing passes the exact captured attachment into Answer');
+  t.notMatch(body, /handleScreenshotAttach\(data as ScreenshotAttachment\).*handleWhatToSay\(\)/s, 'does not depend on async React attachment state before sending');
+  t.end();
+});
+
 test('stream chat captures transcript context before adding the current prompt', (t) => {
   const source = read('electron/ipc/core.ts');
   const streamStart = source.indexOf('safeHandle("gemini-chat-stream"');

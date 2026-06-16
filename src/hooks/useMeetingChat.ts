@@ -13,6 +13,7 @@ export type Message = {
   streamStatus?: string;
   hasScreenshot?: boolean;
   screenshotPreview?: string;
+  screenshotPreviews?: string[];
   isCode?: boolean;
   intent?: string;
   isNegotiationCoaching?: boolean;
@@ -35,6 +36,8 @@ type KnowledgeContext = {
 };
 
 type AttachedContext = Array<{ path: string; preview: string }>;
+
+const getAttachmentPreviews = (attachments: AttachedContext): string[] => attachments.map((s) => s.preview).filter(Boolean);
 
 const getSuggestedAnswerIntent = (question?: string): string => {
   const normalized = (question || '').toLowerCase();
@@ -535,6 +538,7 @@ export function useMeetingChat() {
             text: promptText,
             hasScreenshot: currentAttachments.length > 0,
             screenshotPreview: currentAttachments[0]?.preview,
+            screenshotPreviews: getAttachmentPreviews(currentAttachments),
           },
         ];
         console.log('[submitPrompt] added user msg, systemMessages count =', next.length);
@@ -609,12 +613,13 @@ export function useMeetingChat() {
         text,
         hasScreenshot: screenshots.length > 0,
         screenshotPreview: screenshots[0]?.preview,
+        screenshotPreviews: getAttachmentPreviews(screenshots),
       },
     ]);
   }, [setSystemMessages]);
 
-  const handleWhatToSay = useCallback(async () => {
-    const currentAttachments = attachedContext;
+  const handleWhatToSay = useCallback(async (attachmentsOverride?: AttachedContext) => {
+    const currentAttachments = attachmentsOverride ?? attachedContext;
     const userQuestion = inputValue.trim();
     const promptText = userQuestion || (currentAttachments.length > 0 ? 'What should I say about this?' : 'Guide me on what to say next');
 
@@ -754,6 +759,7 @@ export function useMeetingChat() {
           text: userText || 'Analyze this screenshot',
           hasScreenshot: true,
           screenshotPreview: currentAttachments[0].preview,
+          screenshotPreviews: getAttachmentPreviews(currentAttachments),
         },
       ]);
       setIsProcessing(true);

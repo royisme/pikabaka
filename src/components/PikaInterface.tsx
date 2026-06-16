@@ -29,7 +29,7 @@ function getErrorMessage(error: unknown): string {
     if (typeof error === 'string') return error;
     return String(error);
 }
-type CommandHandlers = { handleWhatToSay: () => void; handleFollowUp: (intent?: string) => void; handleFollowUpQuestions: () => void; handleRecap: () => void; handleAnswerNow: () => void; handleClarify: () => void; handleCodeHint: () => void; handleBrainstorm: () => void; };
+type CommandHandlers = { handleWhatToSay: (attachmentsOverride?: ScreenshotAttachment[]) => void; handleFollowUp: (intent?: string) => void; handleFollowUpQuestions: () => void; handleRecap: () => void; handleAnswerNow: () => void; handleClarify: () => void; handleCodeHint: () => void; handleBrainstorm: () => void; };
 type GeneralHandlers = { toggleVisibility: () => void; processScreenshots: () => void; resetCancel: () => Promise<void>; toggleMousePassthrough: () => void; takeScreenshot: () => Promise<void>; selectiveScreenshot: () => Promise<void>; };
 
 const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpacity = getDefaultOverlayOpacity() }) => {
@@ -187,7 +187,12 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         window.addEventListener('keydown', handleGeneralKeyDown); return () => window.removeEventListener('keydown', handleGeneralKeyDown);
     }, [isShortcutPressed]);
 
-    useEffect(() => window.electronAPI.onCaptureAndProcess?.((data) => { handleScreenshotAttach(data as ScreenshotAttachment); setTimeout(() => handlersRef.current.handleWhatToSay(), 0); }), [handleScreenshotAttach]);
+    useEffect(() => window.electronAPI.onCaptureAndProcess?.((data) => {
+        const attachment = data as ScreenshotAttachment;
+        if (!attachment?.path || !attachment?.preview) return;
+        setIsExpanded(true);
+        setTimeout(() => handlersRef.current.handleWhatToSay([attachment]), 0);
+    }), []);
     useEffect(() => {
         const cleanups: Array<() => void> = [];
         const subscribe = (fn?: (callback: (data: ScreenshotAttachment) => void) => () => void) => {

@@ -126,6 +126,21 @@ test('message screenshot attachments render an inline thumbnail preview', (t) =>
   t.end();
 });
 
+
+test('message screenshot attachments render every screenshot sent to AI chat', (t) => {
+  const tree = ChatPanelMessageScreenshotPreview({
+    previews: ['data:image/png;base64,first', 'data:image/png;base64,second'],
+    isLightTheme: true,
+  });
+  const markup = renderToStaticMarkup(tree);
+
+  t.match(markup, /src="data:image\/png;base64,first"/, 'first sent screenshot preview is rendered');
+  t.match(markup, /src="data:image\/png;base64,second"/, 'second sent screenshot preview is rendered');
+  t.match(markup, /2 screenshots sent to AI chat/, 'message confirms all previews were sent');
+  t.match(markup, /alt="Attached screenshot preview 2"/, 'multiple screenshots get indexed alt text');
+  t.end();
+});
+
 test('footer and action layout classes keep adaptive wrap/grid/min-height behavior', (t) => {
   t.match(CHAT_PANEL_ACTION_BAR_CLASS, /\bgrid\b/, 'action bar starts as a grid on narrow widths');
   t.match(CHAT_PANEL_ACTION_BAR_CLASS, /min-\[520px\]:flex/, 'action bar switches to flex at larger modal widths');
@@ -133,6 +148,7 @@ test('footer and action layout classes keep adaptive wrap/grid/min-height behavi
   t.match(CHAT_PANEL_FOOTER_CLASS, /min-h-\[96px\]/, 'footer reserves a stable compact minimum height');
   t.match(CHAT_PANEL_FOOTER_CONTROLS_CLASS, /flex-wrap/, 'footer controls wrap on narrow widths');
   t.match(CHAT_PANEL_FOOTER_CONTROLS_CLASS, /min-w-0/, 'footer controls may shrink instead of forcing overflow');
+  t.match(CHAT_PANEL_FOOTER_CONTROLS_CLASS, /overflow-visible/, 'footer send button is not clipped by the control row');
   t.match(CHAT_PANEL_INPUT_BASE_CLASS, /min-h-\[42px\]/, 'input keeps a tappable minimum height');
   t.end();
 });

@@ -44,6 +44,7 @@ interface Message {
   streamStatus?: string;
   hasScreenshot?: boolean;
   screenshotPreview?: string;
+  screenshotPreviews?: string[];
   isCode?: boolean;
   intent?: string;
   isNegotiationCoaching?: boolean;
@@ -455,7 +456,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 </div>
               )}
               {msg.role === 'user' && msg.hasScreenshot && (
-                <ChatPanelMessageScreenshotPreview preview={msg.screenshotPreview} isLightTheme={isLightTheme} />
+                <ChatPanelMessageScreenshotPreview previews={msg.screenshotPreviews ?? (msg.screenshotPreview ? [msg.screenshotPreview] : [])} isLightTheme={isLightTheme} />
               )}
               {msg.role === 'system' && !msg.isStreaming && (
                 <button
@@ -609,7 +610,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         />
 
         <div className={CHAT_PANEL_FOOTER_CONTROLS_CLASS}>
-          <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1 max-w-[calc(100%-44px)]">
             <button
               onClick={(e) => {
                 if (!contentRef.current) return;
@@ -696,8 +697,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           <button
             onClick={handleManualSubmit}
             disabled={!canSubmitPrompt}
+            aria-label={canSubmitPrompt ? 'Send message to AI chat' : 'Type a message or attach screenshots before sending'}
+            title={canSubmitPrompt ? 'Send to AI chat' : 'Type a message or attach screenshots first'}
             className={`
-              w-8 h-8 rounded-full flex items-center justify-center shrink-0
+              w-9 h-9 min-w-9 rounded-full flex items-center justify-center shrink-0 relative z-10
               interaction-base interaction-press
               ${canSubmitPrompt
                 ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20 hover:bg-[#0071E3]'
@@ -706,7 +709,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             `}
             style={canSubmitPrompt ? undefined : appearance.iconStyle}
           >
-            <ArrowRight className="w-3.5 h-3.5" />
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </div>

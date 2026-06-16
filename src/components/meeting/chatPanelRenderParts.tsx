@@ -29,7 +29,7 @@ export const CHAT_PANEL_ACTION_BAR_CLASS =
 export const CHAT_PANEL_FOOTER_CLASS = 'shrink-0 p-2.5 pt-0 no-drag min-h-[96px]';
 
 export const CHAT_PANEL_FOOTER_CONTROLS_CLASS =
-  'flex flex-wrap items-center justify-between gap-2 mt-3 px-0.5 min-w-0';
+  'flex flex-wrap items-center justify-between gap-2 mt-3 px-0.5 min-w-0 overflow-visible';
 
 export const CHAT_PANEL_INPUT_BASE_CLASS =
   'w-full min-h-[42px] border focus:ring-1 rounded-xl pl-3 pr-10 py-2.5 focus:outline-none transition-all duration-200 ease-sculpted text-[13px] leading-relaxed';
@@ -41,12 +41,16 @@ export const CHAT_PANEL_MESSAGE_SCREENSHOT_IMAGE_CLASS =
 
 export function ChatPanelMessageScreenshotPreview({
   preview,
+  previews,
   isLightTheme,
 }: {
   preview?: string;
+  previews?: string[];
   isLightTheme: boolean;
 }) {
-  if (!preview) {
+  const visiblePreviews = (previews && previews.length > 0 ? previews : preview ? [preview] : []).filter(Boolean);
+
+  if (visiblePreviews.length === 0) {
     return (
       <div className="mb-1 text-[10px] opacity-70" data-testid="chat-message-screenshot-missing-preview">
         Screenshot attached
@@ -56,12 +60,19 @@ export function ChatPanelMessageScreenshotPreview({
 
   return (
     <div className={CHAT_PANEL_MESSAGE_SCREENSHOT_PREVIEW_CLASS} data-testid="chat-message-screenshot-preview">
-      <img
-        src={preview}
-        alt="Attached screenshot preview"
-        className={`${CHAT_PANEL_MESSAGE_SCREENSHOT_IMAGE_CLASS} ${isLightTheme ? 'border-black/15' : 'border-white/20'}`}
-      />
-      <span className="text-[10px] leading-none opacity-70">Screenshot preview</span>
+      <div className="flex max-w-full gap-1.5 overflow-x-auto pb-0.5">
+        {visiblePreviews.map((src, idx) => (
+          <img
+            key={`${src}-${idx}`}
+            src={src}
+            alt={visiblePreviews.length > 1 ? `Attached screenshot preview ${idx + 1}` : 'Attached screenshot preview'}
+            className={`${CHAT_PANEL_MESSAGE_SCREENSHOT_IMAGE_CLASS} shrink-0 ${isLightTheme ? 'border-black/15' : 'border-white/20'}`}
+          />
+        ))}
+      </div>
+      <span className="text-[10px] leading-none opacity-70">
+        {visiblePreviews.length} screenshot{visiblePreviews.length > 1 ? 's' : ''} sent to AI chat
+      </span>
     </div>
   );
 }
@@ -162,7 +173,7 @@ export function ChatPanelAttachedScreenshots({
           </div>
         ))}
       </div>
-      <span className="text-[10px] overlay-text-muted">Ask a question or click Answer</span>
+      <span className="text-[10px] overlay-text-muted">Ask a question or click Answer — all screenshots will be sent</span>
     </div>
   );
 }
