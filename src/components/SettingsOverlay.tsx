@@ -416,10 +416,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [openOnLogin, setOpenOnLogin] = useState(false);
     const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
     const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
-    const [isAiLangDropdownOpen, setIsAiLangDropdownOpen] = useState(false);
     const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'uptodate' | 'error'>('idle');
     const themeDropdownRef = React.useRef<HTMLDivElement>(null);
-    const aiLangDropdownRef = React.useRef<HTMLDivElement>(null);
 
     // Profile Engine State
     const queryClient = useQueryClient();
@@ -592,19 +590,16 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             if (themeDropdownRef.current && !themeDropdownRef.current.contains(event.target as Node)) {
                 setIsThemeDropdownOpen(false);
             }
-            if (aiLangDropdownRef.current && !aiLangDropdownRef.current.contains(event.target as Node)) {
-                setIsAiLangDropdownOpen(false);
-            }
         };
 
-        if (isThemeDropdownOpen || isAiLangDropdownOpen) {
+        if (isThemeDropdownOpen) {
             document.addEventListener('mousedown', handleClickOutside);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [isThemeDropdownOpen, isAiLangDropdownOpen]);
+    }, [isThemeDropdownOpen]);
 
     const [showTranscript, setShowTranscript] = useState(() => {
         const stored = localStorage.getItem('pika_interviewer_transcript');
@@ -616,9 +611,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [selectedSttGroup, setSelectedSttGroup] = useState('');
     const [availableLanguages, setAvailableLanguages] = useState<Record<string, any>>({});
 
-    // AI Response Language
+    // AI Response Language (free-form; not limited to a hardcoded language list)
     const [aiResponseLanguage, setAiResponseLanguage] = useState('auto');
-    const [availableAiLanguages, setAvailableAiLanguages] = useState<any[]>([]);
 
     // Overlay Opacity state
     const [overlayOpacity, setOverlayOpacity] = useState<number>(() => {
@@ -794,18 +788,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 }
             }
 
-            if (window.electronAPI?.getAiResponseLanguages) {
-                const aiLangs = await window.electronAPI.getAiResponseLanguages();
-                // Sort: Autodetect first, English second, then alphabetical
-                const sortedAiLangs = [...aiLangs].sort((a, b) => {
-                    if (a.code === 'auto') return -1;
-                    if (b.code === 'auto') return 1;
-                    if (a.label === 'English') return -1;
-                    if (b.label === 'English') return 1;
-                    return a.label.localeCompare(b.label);
-                });
-                setAvailableAiLanguages(sortedAiLangs);
-
+            if (window.electronAPI?.getAiResponseLanguage) {
                 const storedAi = await window.electronAPI.getAiResponseLanguage();
                 setAiResponseLanguage(storedAi || 'auto');
             }
@@ -954,7 +937,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         claude: false,
     });
     const [translationOpenAICompatFromSettings, setTranslationOpenAICompatFromSettings] = useState<
-        Array<{ id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }>
+        Array<{ id: string; name: string; baseUrl: string; apiKey?: string; hasApiKey?: boolean; preferredModel?: string }>
     >([]);
     const [transcriptTranslationPrompt, setTranscriptTranslationPrompt] = useState(DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT);
     const [transcriptTranslationDisplayMode, setTranscriptTranslationDisplayMode] = useState<'original' | 'translated' | 'both'>('original');
@@ -1350,7 +1333,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                     setTranslationModelsFetchError('This endpoint is not in AI Providers. Add it under AI Providers, then reopen settings.');
                     return;
                 }
-                const result = await window.electronAPI.fetchOpenAICompatibleModels(ep.baseUrl, ep.apiKey);
+                const result = await window.electronAPI.fetchOpenAICompatibleModels(ep.baseUrl, ep.apiKey || '');
                 if (result?.success && result.models && result.models.length > 0) {
                     setTranslationModelOptions(result.models);
                     if (!transcriptTranslationModel.trim()) {
@@ -1936,34 +1919,30 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         </div>
                                                     </div>
 
-                                                    <div className="relative" ref={aiLangDropdownRef}>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            value={aiResponseLanguage === 'auto' ? '' : aiResponseLanguage}
+                                                            onChange={(event) => setAiResponseLanguage(event.target.value)}
+                                                            onBlur={(event) => handleAiLanguageChange(event.target.value)}
+                                                            onKeyDown={(event) => {
+                                                                if (event.key === 'Enter') {
+                                                                    event.currentTarget.blur();
+                                                                }
+                                                            }}
+                                                            placeholder="Auto or any language / mix"
+                                                            aria-label="Custom AI response language"
+                                                            className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-tertiary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors min-w-[190px] focus:outline-none focus:ring-2 focus:ring-accent-primary/60"
+                                                        />
                                                         <button
-                                                            onClick={() => setIsAiLangDropdownOpen(!isAiLangDropdownOpen)}
-                                                            className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary pl-4 pr-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 min-w-[110px] justify-between"
+                                                            type="button"
+                                                            onClick={() => handleAiLanguageChange('auto')}
+                                                            className={`border border-border-subtle rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${aiResponseLanguage === 'auto'
+                                                                ? 'bg-accent-primary text-white'
+                                                                : 'bg-bg-component text-text-secondary hover:bg-bg-elevated hover:text-text-primary'
+                                                                }`}
                                                         >
-                                                            <span className="capitalize text-ellipsis overflow-hidden whitespace-nowrap">
-                                                                {availableAiLanguages.find((option) => option.code === aiResponseLanguage)?.label || aiResponseLanguage}
-                                                            </span>
-                                                            <ChevronDown size={12} className={`shrink-0 transition-transform ${isAiLangDropdownOpen ? 'rotate-180' : ''}`} />
+                                                            Auto
                                                         </button>
-
-                                                        {/* Dropdown Menu */}
-                                                        {isAiLangDropdownOpen && (
-                                                            <div className="absolute right-0 top-full mt-1 min-w-full w-max bg-bg-elevated border border-border-subtle rounded-lg shadow-xl overflow-hidden z-20 p-1 animated fadeIn select-none max-h-60 overflow-y-auto custom-scrollbar">
-                                                                {availableAiLanguages.map((option) => (
-                                                                    <button
-                                                                        key={option.code}
-                                                                        onClick={() => {
-                                                                            handleAiLanguageChange(option.code);
-                                                                            setIsAiLangDropdownOpen(false);
-                                                                        }}
-                                                                        className={`w-full text-left px-2 py-1.5 rounded-md text-xs flex items-center gap-2 transition-colors ${aiResponseLanguage === option.code ? 'text-text-primary bg-bg-item-active/50' : 'text-text-secondary hover:bg-bg-input hover:text-text-primary'}`}
-                                                                    >
-                                                                        <span className="font-medium">{option.label}</span>
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 </div>
 

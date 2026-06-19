@@ -24,15 +24,15 @@ export interface KeyDownEventLike {
 }
 
 export const CHAT_PANEL_ACTION_BAR_CLASS =
-  'shrink-0 grid grid-cols-2 min-[520px]:flex min-[520px]:flex-wrap justify-stretch min-[520px]:justify-center items-center gap-1.5 px-3 py-2 no-drag';
+  'pika-chat-actions shrink-0 grid grid-cols-2 min-[520px]:flex min-[520px]:flex-wrap justify-stretch min-[520px]:justify-center items-center gap-1.5 px-3 py-2 no-drag';
 
-export const CHAT_PANEL_FOOTER_CLASS = 'shrink-0 p-2.5 pt-0 no-drag min-h-[96px]';
+export const CHAT_PANEL_FOOTER_CLASS = 'pika-chat-footer shrink-0 p-2.5 pt-0 no-drag min-h-[96px]';
 
 export const CHAT_PANEL_FOOTER_CONTROLS_CLASS =
-  'flex flex-wrap items-center justify-between gap-2 mt-3 px-0.5 min-w-0 overflow-visible';
+  'pika-chat-footer-controls flex flex-wrap items-center justify-between gap-2 mt-3 px-0.5 min-w-0 overflow-visible';
 
 export const CHAT_PANEL_INPUT_BASE_CLASS =
-  'w-full min-h-[42px] border focus:ring-1 rounded-xl pl-3 pr-10 py-2.5 focus:outline-none transition-all duration-200 ease-sculpted text-[13px] leading-relaxed';
+  'pika-chat-main-input w-full min-h-[42px] border focus:ring-1 rounded-xl pl-3 pr-10 py-2.5 focus:outline-none transition-all duration-200 ease-sculpted text-[13px] leading-relaxed';
 
 export const CHAT_PANEL_MESSAGE_SCREENSHOT_PREVIEW_CLASS =
   'mb-2 flex w-full max-w-[220px] flex-col gap-1 rounded-lg border p-1.5 overlay-subtle-surface';
@@ -204,7 +204,7 @@ export function ChatPanelTextInput({
   const shortcut = selectiveScreenshotShortcut || ['⌘', 'Shift', 'H'];
 
   return (
-    <div className="relative group">
+    <div className="pika-chat-input-wrapper relative group">
       <input
         ref={textInputRef}
         type="text"

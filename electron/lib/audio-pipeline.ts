@@ -186,7 +186,7 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
 
     const timestamp = Date.now();
 
-    state.intelligenceManager.handleTranscript({
+    const transcriptResult = state.intelligenceManager.handleTranscript({
       speaker: speaker,
       text: segment.text,
       timestamp,
@@ -198,7 +198,9 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
     const displayMode = CredentialsManager.getInstance().getTranscriptTranslationDisplayMode();
 
     if (segment.isFinal) {
-      bufferFinalTranscriptChunk(appState, speaker, segment.text, timestamp, segment.confidence, segment.detectedLanguage);
+      if (!(transcriptResult?.droppedAsDuplicate && speaker === 'user')) {
+        bufferFinalTranscriptChunk(appState, speaker, segment.text, timestamp, segment.confidence, segment.detectedLanguage);
+      }
     } else {
       emitNativeAudioTranscript(appState, {
         speaker,

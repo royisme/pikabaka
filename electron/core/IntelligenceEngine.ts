@@ -4,7 +4,7 @@
 
 import { EventEmitter } from 'events';
 import { LLMHelper } from './LLMHelper';
-import { SessionTracker, TranscriptSegment, SuggestionTrigger, ContextItem } from './SessionTracker';
+import { SessionTracker, TranscriptSegment, SuggestionTrigger, ContextItem, TranscriptAddResult } from './SessionTracker';
 import {
     AnswerLLM, AssistLLM, BrainstormLLM, ClarifyLLM, CodeHintLLM, FollowUpLLM, RecapLLM,
     FollowUpQuestionsLLM, WhatToAnswerLLM,
@@ -136,7 +136,7 @@ export class IntelligenceEngine extends EventEmitter {
     /**
      * Process transcript from native audio, and trigger follow-up if appropriate
      */
-    handleTranscript(segment: TranscriptSegment, skipRefinementCheck: boolean = false): void {
+    handleTranscript(segment: TranscriptSegment, skipRefinementCheck: boolean = false): TranscriptAddResult | null {
         const result = this.session.handleTranscript(segment);
         this.lastTranscriptTime = Date.now();
 
@@ -147,6 +147,8 @@ export class IntelligenceEngine extends EventEmitter {
                 this.runFollowUp(intent, segment.text.trim());
             }
         }
+
+        return result;
     }
 
     /**

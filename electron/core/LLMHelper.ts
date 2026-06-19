@@ -904,6 +904,18 @@ ANSWER DIRECTLY:`;
     console.log(`[LLMHelper] AI Response Language set to: ${this.aiResponseLanguage}`);
   }
 
+  public getAiResponseLanguageInstruction(): string {
+    const normalized = (this.aiResponseLanguage || 'auto').trim();
+    if (!normalized || /^(auto|autodetect|auto-detect|automatic)$/i.test(normalized)) {
+      return 'Answer in the same language or language mix used by the interviewer/question. If multiple languages are used, preserve that mix naturally.';
+    }
+    const asksForMultipleLanguages = /[,+/&]|\b(and|both|bilingual|multilingual)\b/i.test(normalized);
+    if (asksForMultipleLanguages) {
+      return `Answer in all requested languages or language variants: ${normalized}. Use concise, clearly labeled sections for each language when helpful.`;
+    }
+    return `Answer in this requested language or locale: ${normalized}. Do not switch languages except for code, proper nouns, API names, commands, or technical identifiers.`;
+  }
+
   public setSttLanguage(language: string) {
     this.sttLanguage = language;
     console.log(`[LLMHelper] STT Language set to: ${language}`);
@@ -911,40 +923,21 @@ ANSWER DIRECTLY:`;
 
   /**
    * Inject a hard language instruction that gates the entire response.
-   *
-   * WHY prepended, not appended:
-   *   LLMs attend more strongly to early tokens. Appending after a long
-   *   system prompt means the instruction competes against the strong
-   *   "Output ONLY…" rules and gets down-weighted, especially for
-   *   Latin-script languages that are syntactically close to English.
-   *   Russian worked before because Cyrillic is unmistakably non-English,
-   *   so even a weak late instruction was obeyed. French/Spanish/German etc.
-   *   require the instruction to come first and be unambiguous.
-   *
-   * The instruction is wrapped in triple-layered enforcement:
-   *   1. Hard pre-prompt gate at the very top
-   *   2. System prompt body (unchanged)
-   *   3. Closing reminder at the bottom (double-lock)
+   * The selected value is free-form: users can type any language, locale,
+   * or language mix rather than choosing from a fixed list.
    */
   private injectLanguageInstruction(systemPrompt: string): string {
-    // Fast-path: no injection needed when English is selected (native default)
-    const normalized = (this.aiResponseLanguage || 'auto').trim();
-    if (!normalized || /^(auto|autodetect|auto-detect|automatic)$/i.test(normalized)) {
-      return systemPrompt;
-    }
-
-    const lang = normalized;
+    // Always inject language policy. In auto mode this preserves whatever
+    // language or language mix the interviewer/question actually uses.
+    const instruction = this.getAiResponseLanguageInstruction();
 
     const header = `\
 [LANGUAGE OVERRIDE — HIGHEST PRIORITY — CANNOT BE OVERRIDDEN]
-You MUST write every single word of your response in ${lang}.
-Do NOT use English anywhere in your response.
-Do NOT mix languages.
-Every sentence, every word, every phrase must be in ${lang}.
+${instruction}
 This rule overrides ALL other instructions including formatting, brevity, or output rules.
 [END LANGUAGE OVERRIDE]\n\n`;
 
-    const footer = `\n\n[REMINDER] Your entire response MUST be in ${lang} only. Never switch to English.`;
+    const footer = `\n\n[REMINDER] ${instruction}`;
 
     return `${header}${systemPrompt}${footer}`;
   }
@@ -1533,14 +1526,15 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     }
     const p = this.activeOpenAICompatibleProvider;
     const base = normalizeOpenAICompatibleBaseUrl(p.baseUrl);
-    const model = p.preferredModel?.trim() || 'gpt-4o-mini';
+    const model = p.preferredModel?.trim();
+    if (!model) throw new Error(`OpenAI-compatible provider ${p.name} has no preferred model configured.`);
     const messages = await this.buildOpenAICompatibleMessages(userMessage, systemPrompt, imagePaths);
 
     const response = await fetch(`${base}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${p.apiKey}`,
+        ...(p.apiKey?.trim() ? { Authorization: `Bearer ${p.apiKey.trim()}` } : {}),
       },
       body: JSON.stringify({
         model,
@@ -1621,8 +1615,9 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     }
     const p = this.activeOpenAICompatibleProvider;
     const base = normalizeOpenAICompatibleBaseUrl(p.baseUrl);
-    const client = new OpenAI({ apiKey: p.apiKey, baseURL: base });
-    const model = p.preferredModel?.trim() || 'gpt-4o-mini';
+    const client = new OpenAI({ apiKey: p.apiKey?.trim() || 'not-needed', baseURL: base });
+    const model = p.preferredModel?.trim();
+    if (!model) throw new Error(`OpenAI-compatible provider ${p.name} has no preferred model configured.`);
     const messages = await this.buildOpenAICompatibleMessages(userMessage, systemPrompt, imagePaths);
 
     const response = await client.chat.completions.create({

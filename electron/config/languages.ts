@@ -74,17 +74,4 @@ export const RECOGNITION_LANGUAGES: Record<string, LanguageOption> = {
     'turkish': { label: 'Turkish', code: 'turkish', bcp47: 'tr-TR', iso639: 'tr', group: 'Turkish' },
 };
 
-export const AI_RESPONSE_LANGUAGES = [
-    { label: 'Autodetect', code: 'auto' },
-    { label: 'English', code: 'English' },
-    { label: 'Russian', code: 'Russian' },
-    { label: 'Spanish', code: 'Spanish' },
-    { label: 'French', code: 'French' },
-    { label: 'German', code: 'German' },
-    { label: 'Italian', code: 'Italian' },
-    { label: 'Portuguese', code: 'Portuguese' },
-    { label: 'Japanese', code: 'Japanese' },
-    { label: 'Korean', code: 'Korean' },
-    { label: 'Chinese', code: 'Chinese' },
-    { label: 'Turkish', code: 'Turkish' },
-];
+export const AI_RESPONSE_LANGUAGES: Array<{ label: string; code: string }> = [];

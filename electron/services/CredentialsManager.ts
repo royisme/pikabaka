@@ -184,7 +184,8 @@ export class CredentialsManager {
         const stored = typeof this.credentials.aiResponseLanguage === 'string'
             ? this.credentials.aiResponseLanguage.trim()
             : '';
-        return stored || 'auto';
+        if (!stored || /^(auto|autodetect|auto-detect|automatic)$/i.test(stored)) return 'auto';
+        return stored;
     }
     public getTranscriptTranslationEnabled(): boolean {
         return this.credentials.transcriptTranslationEnabled === true;

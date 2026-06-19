@@ -17,6 +17,8 @@ interface SplitterShellProps {
 
 export const SPLITTER_SHELL_CLASS = 'relative w-full flex-1 min-h-0 min-w-0 border rounded-[24px] overflow-hidden flex flex-col draggable-area overlay-shell-surface';
 export const SPLITTER_CONTENT_CLASS = 'flex-1 min-h-0 min-w-0 flex flex-row';
+export const SPLITTER_STACKED_CONTENT_CLASS = 'flex-1 min-h-0 min-w-0 flex flex-col';
+export const STACKED_LAYOUT_WIDTH_PX = 900;
 export const SPLITTER_LEFT_SECTION_CLASS = 'min-w-0 min-h-0 overflow-hidden flex flex-col bg-white/[0.02]';
 export const SPLITTER_RIGHT_SECTION_CLASS = 'min-w-0 min-h-0 flex-1 overflow-hidden flex flex-col bg-black/[0.04]';
 export const SPLITTER_PANE_BODY_CLASS = 'flex-1 min-h-0 min-w-0 overflow-hidden flex flex-col';
@@ -39,24 +41,30 @@ const SplitterShell: React.FC<SplitterShellProps> = ({
     overlayPanelClass,
 }) => {
     const contentRef = useRef<HTMLDivElement>(null);
-    const [contentWidth, setContentWidth] = useState(0);
+    const [contentSize, setContentSize] = useState({ width: 0, height: 0 });
 
     useEffect(() => {
         const node = contentRef.current;
         if (!node) return;
 
-        const updateWidth = () => setContentWidth(node.getBoundingClientRect().width);
-        updateWidth();
+        const updateSize = () => {
+            const rect = node.getBoundingClientRect();
+            setContentSize({ width: rect.width, height: rect.height });
+        };
+        updateSize();
 
-        const observer = new ResizeObserver(updateWidth);
+        const observer = new ResizeObserver(updateSize);
         observer.observe(node);
         return () => observer.disconnect();
     }, []);
 
     const { maxTranscriptSplit, minTranscriptSplit, safeSplitterPosition } = useMemo(
-        () => calculateSplitterBounds(contentWidth, splitterPosition),
-        [contentWidth, splitterPosition],
+        () => calculateSplitterBounds(contentSize.width, splitterPosition),
+        [contentSize.width, splitterPosition],
     );
+
+    const useStackedLayout = contentSize.width > 0 && contentSize.width < STACKED_LAYOUT_WIDTH_PX;
+    const stackedTranscriptHeight = Math.max(112, Math.min(220, Math.round(contentSize.height * 0.42)));
 
     useEffect(() => {
         if (Math.abs(safeSplitterPosition - splitterPosition) > 0.1) {
@@ -69,21 +77,23 @@ const SplitterShell: React.FC<SplitterShellProps> = ({
             className={`${SPLITTER_SHELL_CLASS} ${overlayPanelClass}`}
             style={appearance.shellStyle}
         >
-            <div ref={contentRef} className={SPLITTER_CONTENT_CLASS}>
+            <div ref={contentRef} className={useStackedLayout ? SPLITTER_STACKED_CONTENT_CLASS : SPLITTER_CONTENT_CLASS}>
                 <section
                     className={SPLITTER_LEFT_SECTION_CLASS}
-                    style={{ flex: `0 0 ${safeSplitterPosition}%` }}
+                    style={useStackedLayout ? { flex: `0 0 ${stackedTranscriptHeight}px` } : { flex: `0 0 ${safeSplitterPosition}%` }}
                 >
                     <ZoneHeader icon={<Mic className="w-2.5 h-2.5" />} label="Live Transcript" />
                     <div className={SPLITTER_PANE_BODY_CLASS}>{left}</div>
                 </section>
-                <ResizableSplitter
-                    position={safeSplitterPosition}
-                    onPositionChange={onSplitterChange}
-                    orientation={SPLITTER_ORIENTATION}
-                    min={minTranscriptSplit}
-                    max={maxTranscriptSplit}
-                />
+                {!useStackedLayout && (
+                    <ResizableSplitter
+                        position={safeSplitterPosition}
+                        onPositionChange={onSplitterChange}
+                        orientation={SPLITTER_ORIENTATION}
+                        min={minTranscriptSplit}
+                        max={maxTranscriptSplit}
+                    />
+                )}
                 <section className={SPLITTER_RIGHT_SECTION_CLASS}>
                     <div className={SPLITTER_PANE_BODY_CLASS}>{right}</div>
                 </section>

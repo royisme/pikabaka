@@ -27,6 +27,68 @@ export interface ContextItem {
     timestamp: number;
 }
 
+export interface TranscriptAddResult {
+    role: 'interviewer' | 'user' | 'assistant';
+    droppedAsDuplicate?: boolean;
+    duplicateOfRole?: 'interviewer' | 'user' | 'assistant';
+    acceptedText?: string;
+}
+
+function normalizeTranscriptDuplicateKey(text: string): string {
+    return (text || '')
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]+/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function longestCommonWordRun(left: string[], right: string[]): number {
+    let best = 0;
+    const dp = new Array(right.length + 1).fill(0);
+    for (let i = 1; i <= left.length; i += 1) {
+        for (let j = right.length; j >= 1; j -= 1) {
+            if (left[i - 1] === right[j - 1]) {
+                dp[j] = dp[j - 1] + 1;
+                if (dp[j] > best) best = dp[j];
+            } else {
+                dp[j] = 0;
+            }
+        }
+    }
+    return best;
+}
+
+function areTranscriptTextsNearDuplicate(left: string, right: string): boolean {
+    const a = normalizeTranscriptDuplicateKey(left);
+    const b = normalizeTranscriptDuplicateKey(right);
+    if (!a || !b) return false;
+    if (a === b) return true;
+
+    const aWords = a.split(' ').filter(Boolean);
+    const bWords = b.split(' ').filter(Boolean);
+    const minWords = Math.min(aWords.length, bWords.length);
+    if (minWords < 3) return false;
+
+    const shorter = a.length <= b.length ? a : b;
+    const longer = a.length <= b.length ? b : a;
+    // STT often splits the same speaker into mismatched mic/system chunks. A short
+    // contiguous phrase such as "given an array of integers" or "to return the
+    // maximum subarray" is enough to identify same-audio echo within the time window.
+    const commonRun = longestCommonWordRun(aWords, bWords);
+    if (commonRun >= 4 || (minWords <= 5 && commonRun >= Math.max(3, minWords - 1))) {
+        return true;
+    }
+    if (minWords >= 4 && longer.includes(shorter) && shorter.length / Math.max(1, longer.length) >= 0.30) {
+        return true;
+    }
+
+    const aSet = new Set(aWords);
+    const bSet = new Set(bWords);
+    const intersection = [...aSet].filter((word) => bSet.has(word)).length;
+    const union = new Set([...aWords, ...bWords]).size;
+    return union > 0 && (intersection / union >= 0.72 || intersection / Math.max(1, minWords) >= 0.78);
+}
+
 export interface AssistantResponse {
     text: string;
     timestamp: number;
@@ -72,7 +134,9 @@ export class SessionTracker {
 
     // Rolling buffer for multi-segment interviewer question detection
     private recentInterviewerBuffer: { text: string; timestamp: number }[] = [];
+    private recentFinalTranscriptKeys: Array<{ role: 'interviewer' | 'user' | 'assistant'; text: string; timestamp: number }> = [];
     private static readonly INTERVIEWER_BUFFER_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+    private static readonly CROSS_ROLE_DUPLICATE_WINDOW_MS = 8000;
     // Screenshot-detected question stays sticky for 3 min before transcript can override
     private static readonly SCREENSHOT_STALE_MS = 3 * 60 * 1000;
 
@@ -188,7 +252,7 @@ export class SessionTracker {
      * Only stores FINAL transcripts.
      * Returns { role, isRefinementCandidate } so the engine can decide whether to trigger follow-up.
      */
-    addTranscript(segment: TranscriptSegment): { role: 'interviewer' | 'user' | 'assistant' } | null {
+    addTranscript(segment: TranscriptSegment): TranscriptAddResult | null {
         if (!segment.final) return null;
 
         const role = this.mapSpeakerToRole(segment.speaker);
@@ -196,13 +260,32 @@ export class SessionTracker {
 
         if (!text) return null;
 
-        // Deduplicate: check if this exact item already exists
+        // Deduplicate exact/near repeats. Prefer interviewer/system audio over mic echo
+        // when the same utterance lands on both channels.
         const lastItem = this.contextItems[this.contextItems.length - 1];
         if (lastItem &&
             lastItem.role === role &&
-            Math.abs(lastItem.timestamp - segment.timestamp) < 500 &&
-            lastItem.text === text) {
-            return null;
+            Math.abs(lastItem.timestamp - segment.timestamp) < 1200 &&
+            areTranscriptTextsNearDuplicate(lastItem.text, text)) {
+            return { role, droppedAsDuplicate: true, duplicateOfRole: role };
+        }
+
+        const duplicateWindowStart = segment.timestamp - SessionTracker.CROSS_ROLE_DUPLICATE_WINDOW_MS;
+        this.recentFinalTranscriptKeys = this.recentFinalTranscriptKeys.filter((item) => item.timestamp >= duplicateWindowStart);
+        const crossRoleDuplicates = this.recentFinalTranscriptKeys.filter((item) =>
+            item.role !== role &&
+            Math.abs(item.timestamp - segment.timestamp) <= SessionTracker.CROSS_ROLE_DUPLICATE_WINDOW_MS &&
+            areTranscriptTextsNearDuplicate(item.text, text)
+        );
+
+        if (role === 'user' && crossRoleDuplicates.some((item) => item.role === 'interviewer')) {
+            return { role, droppedAsDuplicate: true, duplicateOfRole: 'interviewer' };
+        }
+
+        if (role === 'interviewer' && crossRoleDuplicates.some((item) => item.role === 'user')) {
+            this.contextItems = this.contextItems.filter((item) => !(item.role === 'user' && Math.abs(item.timestamp - segment.timestamp) <= SessionTracker.CROSS_ROLE_DUPLICATE_WINDOW_MS && areTranscriptTextsNearDuplicate(item.text, text)));
+            this.fullTranscript = this.fullTranscript.filter((item) => !(this.mapSpeakerToRole(item.speaker) === 'user' && Math.abs(item.timestamp - segment.timestamp) <= SessionTracker.CROSS_ROLE_DUPLICATE_WINDOW_MS && areTranscriptTextsNearDuplicate(item.text, text)));
+            this.recentFinalTranscriptKeys = this.recentFinalTranscriptKeys.filter((item) => !(item.role === 'user' && Math.abs(item.timestamp - segment.timestamp) <= SessionTracker.CROSS_ROLE_DUPLICATE_WINDOW_MS && areTranscriptTextsNearDuplicate(item.text, text)));
         }
 
         this.contextItems.push({
@@ -210,6 +293,7 @@ export class SessionTracker {
             text,
             timestamp: segment.timestamp
         });
+        this.recentFinalTranscriptKeys.push({ role, text, timestamp: segment.timestamp });
 
         this.evictOldEntries();
 
@@ -293,7 +377,7 @@ export class SessionTracker {
     /**
      * Handle incoming transcript from native audio service
      */
-    handleTranscript(segment: TranscriptSegment): { role: 'interviewer' | 'user' | 'assistant' } | null {
+    handleTranscript(segment: TranscriptSegment): TranscriptAddResult | null {
         // Track interim segments for interviewer to prevent data loss on stop
         if (segment.speaker === 'user') {
             if (isVerboseLogging() && (Math.random() < 0.05 || segment.final)) {
@@ -490,6 +574,7 @@ export class SessionTracker {
 
     reset(): void {
         this.contextItems = [];
+        this.recentFinalTranscriptKeys = [];
         this.fullTranscript = [];
         this.fullUsage = [];
         this.transcriptEpochSummaries = [];

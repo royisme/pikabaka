@@ -9,7 +9,7 @@
 
 import { EventEmitter } from 'events';
 import { LLMHelper } from './core/LLMHelper';
-import { SessionTracker } from './core/SessionTracker';
+import { SessionTracker, TranscriptAddResult } from './core/SessionTracker';
 import { IntelligenceEngine } from './core/IntelligenceEngine';
 import { MeetingPersistence } from './core/MeetingPersistence';
 import { AutoAnswerController, AutoAnswerSettings, AutoAnswerState } from './core/AutoAnswerController';
@@ -154,9 +154,12 @@ export class IntelligenceManager extends EventEmitter {
     // Transcript Handling (delegates to engine)
     // ============================================
 
-    handleTranscript(segment: import('./core/SessionTracker').TranscriptSegment): void {
-        this.engine.handleTranscript(segment);
-        this.autoAnswerController.handleTranscript(segment);
+    handleTranscript(segment: import('./core/SessionTracker').TranscriptSegment): TranscriptAddResult | null {
+        const result = this.engine.handleTranscript(segment);
+        if (result?.role === 'interviewer' && !result.droppedAsDuplicate) {
+            this.autoAnswerController.handleTranscript(segment);
+        }
+        return result;
     }
 
     async handleSuggestionTrigger(trigger: import('./core/SessionTracker').SuggestionTrigger): Promise<void> {

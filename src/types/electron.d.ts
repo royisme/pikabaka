@@ -264,8 +264,8 @@ export interface ElectronAPI {
   saveCustomProvider: (provider: any) => Promise<{ success: boolean; id?: string; error?: string }>;
   getCustomProviders: () => Promise<any[]>;
   deleteCustomProvider: (id: string) => Promise<{ success: boolean; error?: string }>;
-  getOpenAICompatibleProviders: () => Promise<Array<{ id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }>>;
-  saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) => Promise<{ success: boolean; error?: string }>;
+  getOpenAICompatibleProviders: () => Promise<Array<{ id: string; name: string; baseUrl: string; apiKey?: string; hasApiKey?: boolean; preferredModel?: string }>>;
+  saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey?: string; preferredModel?: string }) => Promise<{ success: boolean; error?: string }>;
   deleteOpenAICompatibleProvider: (id: string) => Promise<{ success: boolean; error?: string }>;
   fetchOpenAICompatibleModels: (baseUrl: string, apiKey: string) => Promise<{ success: boolean; models?: { id: string; label: string }[]; error?: string }>;
 

@@ -16,7 +16,8 @@ interface OpenAICompatibleProviderRow {
     id: string;
     name: string;
     baseUrl: string;
-    apiKey: string;
+    apiKey?: string;
+    hasApiKey?: boolean;
     preferredModel?: string;
 }
 
@@ -427,7 +428,7 @@ export const AIProvidersSettings: React.FC = () => {
         setEditingOai(p);
         setOaiName(p.name);
         setOaiBaseUrl(p.baseUrl);
-        setOaiApiKey(p.apiKey);
+        setOaiApiKey('');
         setOaiPreferredModel(p.preferredModel || '');
         setOaiModelOptions([]);
         setOaiError(null);
@@ -436,8 +437,8 @@ export const AIProvidersSettings: React.FC = () => {
 
     const handleSaveOai = async () => {
         setOaiError(null);
-        if (!oaiName.trim() || !oaiBaseUrl.trim() || !oaiApiKey.trim()) {
-            setOaiError('Name, base URL, and API key are required.');
+        if (!oaiName.trim() || !oaiBaseUrl.trim()) {
+            setOaiError('Name and base URL are required.');
             return;
         }
         try {
@@ -445,7 +446,7 @@ export const AIProvidersSettings: React.FC = () => {
                 id: editingOai?.id || crypto.randomUUID(),
                 name: oaiName.trim(),
                 baseUrl: oaiBaseUrl.trim(),
-                apiKey: oaiApiKey.trim(),
+                apiKey: oaiApiKey.trim() || undefined,
                 preferredModel: oaiPreferredModel.trim() || undefined,
             };
             // @ts-ignore
@@ -800,9 +801,12 @@ export const AIProvidersSettings: React.FC = () => {
                                     type="password"
                                     value={oaiApiKey}
                                     onChange={(e) => setOaiApiKey(e.target.value)}
-                                    placeholder="sk-..."
+                                    placeholder={editingOai?.hasApiKey ? 'Saved key is preserved; enter a new key to replace' : 'Optional for local servers; sk-...'}
                                     className="w-full bg-bg-input border border-border-subtle rounded-lg px-4 py-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
                                 />
+                                <p className="text-[10px] text-text-tertiary mt-1">
+                                    {editingOai?.hasApiKey ? 'Leave blank to keep the saved key.' : 'Authorization is sent only when a key is saved.'}
+                                </p>
                             </div>
                             <div className="flex flex-wrap items-end gap-2">
                                 <div className="flex-1 min-w-[140px] space-y-1">

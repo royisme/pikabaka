@@ -104,7 +104,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
     if (!hasContent) return null;
 
     return (
-        <div className="flex h-full min-h-0 flex-col px-4 py-2 no-drag">
+        <div className="flex h-full min-h-0 flex-col px-2 py-2 sm:px-4 no-drag">
             <div
                 ref={containerRef}
                 onScroll={handleScroll}
@@ -148,7 +148,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                                 type="button"
                                                 onClick={() => onTranslateSegment(seg)}
                                                 disabled={isTranslationPending}
-                                                className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2 py-1 text-[10px] text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary disabled:cursor-wait disabled:opacity-70"
+                                                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border-subtle px-2 py-1 text-[10px] text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary disabled:cursor-wait disabled:opacity-70"
                                             >
                                                 {isTranslationPending ? (
                                                     <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
@@ -160,7 +160,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                         )}
                                     </div>
                                     <div
-                                        className="rounded-2xl px-4 py-3 shadow-sm overlay-transcript-surface"
+                                        className="rounded-2xl px-3 py-2.5 shadow-sm overlay-transcript-surface sm:px-4 sm:py-3"
                                         style={surfaceStyle}
                                     >
                                         <p className="overlay-text-primary text-[13px] leading-[1.55] whitespace-pre-wrap break-words">

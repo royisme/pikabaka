@@ -50,6 +50,93 @@ function compactWhitespace(text: string): string {
     return text.replace(/\s+/g, ' ').trim();
 }
 
+
+function questionKeysAreSimilar(left: string, right: string): boolean {
+    const a = normalizeQuestionKey(left);
+    const b = normalizeQuestionKey(right);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    const aWords = a.split(' ').filter(Boolean);
+    const bWords = b.split(' ').filter(Boolean);
+    const minWords = Math.min(aWords.length, bWords.length);
+    if (minWords < 4) return false;
+    const shorter = a.length <= b.length ? a : b;
+    const longer = a.length <= b.length ? b : a;
+    if (longer.includes(shorter) && shorter.length / Math.max(1, longer.length) >= 0.52) return true;
+    const aSet = new Set(aWords);
+    const bSet = new Set(bWords);
+    const overlap = [...aSet].filter((word) => bSet.has(word)).length;
+    const union = new Set([...aWords, ...bWords]).size;
+    return union > 0 && overlap / union >= 0.74;
+}
+
+function isMeaningfullyFullerQuestion(candidate: string, previous: string): boolean {
+    const a = normalizeQuestionKey(candidate);
+    const b = normalizeQuestionKey(previous);
+    if (!a || !b || a === b) return false;
+    const aWords = a.split(' ').length;
+    const bWords = b.split(' ').length;
+    const hasBetterEnding = /[?？]\s*$/.test(candidate) && !/[?？]\s*$/.test(previous);
+    return (a.includes(b) && aWords >= bWords + 3) || hasBetterEnding;
+}
+
+function mergeQuestionText(existing: string, incoming: string): string {
+    const left = compactWhitespace(existing);
+    const right = compactWhitespace(incoming);
+    if (!left) return right;
+    if (!right) return left;
+    if (left === right || left.endsWith(right)) return left;
+    if (right.startsWith(left)) return right;
+    if (questionKeysAreSimilar(left, right) && !isMeaningfullyFullerQuestion(right, left)) return left;
+
+    const leftWords = left.split(/\s+/);
+    const rightWords = right.split(/\s+/);
+    const maxOverlap = Math.min(14, leftWords.length, rightWords.length);
+    for (let overlap = maxOverlap; overlap >= 3; overlap -= 1) {
+        if (leftWords.slice(-overlap).join(' ').toLowerCase() === rightWords.slice(0, overlap).join(' ').toLowerCase()) {
+            return `${leftWords.join(' ')} ${rightWords.slice(overlap).join(' ')}`.trim();
+        }
+    }
+    return `${left} ${right}`.trim();
+}
+
+function splitSentences(text: string): string[] {
+    return compactWhitespace(text)
+        .split(/(?<=[?!.])\s+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+}
+
+function hasSetupSignal(text: string): boolean {
+    return /(given|suppose|imagine|scenario|problem|requirement|constraint|input|output|array|string|service|api|database|queue|cache|architecture)/i.test(text);
+}
+
+function pickQuestionCandidate(text: string): string {
+    const normalized = compactWhitespace(text);
+    const sentences = splitSentences(normalized);
+    if (sentences.length === 0) return normalized;
+
+    let anchorIndex = -1;
+    for (let i = sentences.length - 1; i >= 0; i -= 1) {
+        if (/[?？]/.test(sentences[i]) || QUESTION_PHRASES.some((r) => r.test(sentences[i])) || QUESTION_START.test(sentences[i])) {
+            anchorIndex = i;
+            break;
+        }
+    }
+    if (anchorIndex === -1) return sentences.slice(-3).join(' ');
+
+    const selected = sentences.slice(anchorIndex);
+    const previous = sentences[anchorIndex - 1];
+    if (previous && hasSetupSignal(previous) && !/[?？]/.test(previous)) {
+        selected.unshift(previous);
+    }
+    return selected.slice(-3).join(' ');
+}
+
+function assembleBufferedQuestionText(turns: BufferedInterviewerTurn[]): string {
+    return turns.reduce((merged, turn) => mergeQuestionText(merged, turn.text), '');
+}
+
 function classifyQuestion(text: string): DetectedQuestionType {
     if (CLARIFYING_SIGNALS.test(text)) return 'clarifying';
     const codingSignalCount = CODING_SIGNALS.filter((r) => r.test(text)).length;
@@ -66,12 +153,7 @@ function extractLikelyQuestion(text: string): { question: string; reason: string
     const normalized = compactWhitespace(text);
     if (!normalized || normalized.length < 12 || FILLER_QUESTIONS.test(normalized)) return null;
 
-    const sentences = normalized
-        .split(/(?<=[?!.])\s+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-    const tail = sentences.slice(-3).join(' ');
-    const candidate = tail || normalized;
+    const candidate = pickQuestionCandidate(normalized);
 
     let score = 0;
     const reasons: string[] = [];
@@ -123,6 +205,7 @@ export class QuestionDetector {
     private readonly duplicateWindowMs: number;
     private buffer: BufferedInterviewerTurn[] = [];
     private lastQuestionKey: string | null = null;
+    private lastQuestionText: string | null = null;
     private lastQuestionAt = 0;
 
     constructor(options?: { bufferWindowMs?: number; maxBufferedTurns?: number; duplicateWindowMs?: number }) {
@@ -148,18 +231,21 @@ export class QuestionDetector {
         this.buffer = this.buffer.filter((turn) => turn.timestamp >= cutoff).slice(-this.maxBufferedTurns);
 
         const current = extractLikelyQuestion(text);
-        const combinedText = this.buffer.map((turn) => turn.text).join(' ');
+        const combinedText = assembleBufferedQuestionText(this.buffer);
         const combined = this.buffer.length > 1 ? extractLikelyQuestion(combinedText) : null;
         const picked = current && (!combined || current.score >= combined.score - 0.08) ? current : combined;
         if (!picked) return null;
 
         const key = normalizeQuestionKey(picked.question);
         if (!key) return null;
-        if (this.lastQuestionKey === key && now - this.lastQuestionAt < this.duplicateWindowMs) {
-            return null;
+        if (this.lastQuestionKey && now - this.lastQuestionAt < this.duplicateWindowMs && questionKeysAreSimilar(this.lastQuestionKey, key)) {
+            if (!this.lastQuestionText || !isMeaningfullyFullerQuestion(picked.question, this.lastQuestionText)) {
+                return null;
+            }
         }
 
         this.lastQuestionKey = key;
+        this.lastQuestionText = picked.question;
         this.lastQuestionAt = now;
         const avgAudioConfidence = this.buffer.reduce((sum, turn) => sum + turn.confidence, 0) / Math.max(1, this.buffer.length);
         const confidence = Math.max(0.5, Math.min(0.99, picked.score * 0.78 + avgAudioConfidence * 0.22));
@@ -178,6 +264,7 @@ export class QuestionDetector {
     reset(): void {
         this.buffer = [];
         this.lastQuestionKey = null;
+        this.lastQuestionText = null;
         this.lastQuestionAt = 0;
     }
 }

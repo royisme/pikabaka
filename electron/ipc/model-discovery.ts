@@ -36,14 +36,18 @@ export function registerModelDiscoveryHandlers(appState: AppState): void {
   safeHandle("fetch-openai-compatible-models", async (_, baseUrl: string, apiKey: string) => {
     try {
       const u = (baseUrl || '').trim();
-      const k = (apiKey || '').trim();
+      let k = (apiKey || '').trim();
       if (!u) {
         return { success: false, error: 'Base URL is required' };
       }
+      const { CredentialsManager } = require('../services/CredentialsManager');
+      const { fetchOpenAICompatibleModels, normalizeOpenAICompatibleBaseUrl } = require('../utils/modelFetcher');
       if (!k) {
-        return { success: false, error: 'API key is required' };
+        const normalized = normalizeOpenAICompatibleBaseUrl(u);
+        const saved = CredentialsManager.getInstance().getOpenAICompatibleProviders()
+          .find((p: { baseUrl: string }) => normalizeOpenAICompatibleBaseUrl(p.baseUrl) === normalized);
+        k = saved?.apiKey?.trim() || '';
       }
-      const { fetchOpenAICompatibleModels } = require('../utils/modelFetcher');
       const models = await fetchOpenAICompatibleModels(u, k);
       return { success: true, models };
     } catch (error: any) {
@@ -56,7 +60,14 @@ export function registerModelDiscoveryHandlers(appState: AppState): void {
   safeHandle("get-openai-compatible-providers", async () => {
     try {
       const { CredentialsManager } = require('../services/CredentialsManager');
-      return CredentialsManager.getInstance().getOpenAICompatibleProviders();
+      return CredentialsManager.getInstance().getOpenAICompatibleProviders().map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        baseUrl: p.baseUrl,
+        apiKey: '',
+        hasApiKey: !!p.apiKey,
+        preferredModel: p.preferredModel,
+      }));
     } catch (error: any) {
       console.error('[IPC] get-openai-compatible-providers failed:', error);
       return [];
@@ -70,17 +81,20 @@ export function registerModelDiscoveryHandlers(appState: AppState): void {
         typeof (provider as any).id !== 'string' ||
         typeof (provider as any).name !== 'string' ||
         typeof (provider as any).baseUrl !== 'string' ||
-        typeof (provider as any).apiKey !== 'string'
+        (typeof (provider as any).apiKey !== 'string' && typeof (provider as any).apiKey !== 'undefined')
       ) {
         return { success: false, error: 'Invalid OpenAI-compatible provider payload' };
       }
       const { CredentialsManager } = require('../services/CredentialsManager');
-      const p = provider as { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string };
-      CredentialsManager.getInstance().saveOpenAICompatibleProvider({
+      const cm = CredentialsManager.getInstance();
+      const p = provider as { id: string; name: string; baseUrl: string; apiKey?: string; preferredModel?: string };
+      const existing = cm.getOpenAICompatibleProviders().find((item: { id: string }) => item.id === p.id);
+      const apiKey = typeof p.apiKey === 'string' && p.apiKey.trim() ? p.apiKey.trim() : (existing?.apiKey || '');
+      cm.saveOpenAICompatibleProvider({
         id: p.id,
         name: p.name.trim(),
         baseUrl: p.baseUrl.trim(),
-        apiKey: p.apiKey,
+        apiKey,
         preferredModel: typeof p.preferredModel === 'string' ? p.preferredModel.trim() : undefined,
       });
       broadcastOpenAICompatibleProvidersChanged();

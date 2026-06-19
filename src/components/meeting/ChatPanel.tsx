@@ -15,8 +15,6 @@ import {
   Copy,
   Code,
 } from 'lucide-react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneLight, vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -100,6 +98,13 @@ interface ChatPanelProps {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 }
 
+const formatShortcutHint = (keys?: string[]): string => {
+  const compact = (keys || []).filter(Boolean);
+  if (!compact.length) return 'shortcut';
+  const symbolic = compact.every((key) => key.length === 1 || ['⌘', '⇧', '⌥', '⌃'].includes(key));
+  return compact.join(symbolic ? '' : '+');
+};
+
 const ChatPanel: React.FC<ChatPanelProps> = ({
   messages,
   knowledgeContext,
@@ -133,8 +138,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   contentRef,
   setMessages,
 }) => {
-  const codeTheme = isLightTheme ? oneLight : vscDarkPlus;
-  const codeLineNumberColor = isLightTheme ? 'rgba(15,23,42,0.35)' : 'rgba(255,255,255,0.2)';
   const [openAICompatibleProviders, setOpenAICompatibleProviders] = useState<OpenAICompatibleProviderSummary[]>([]);
 
   useEffect(() => {
@@ -164,9 +167,36 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const inputClass = `${isLightTheme ? 'focus:ring-black/10' : 'focus:ring-white/10'} overlay-input-surface overlay-input-text`;
   const controlSurfaceClass = 'overlay-control-surface overlay-text-interactive';
   const canSubmitPrompt = inputValue.trim().length > 0 || attachedContext.length > 0;
+  const mousePassthroughShortcut = formatShortcutHint(shortcuts.toggleMousePassthrough);
+  const mousePassthroughHint = isMousePassthrough
+    ? `Disable ${mousePassthroughShortcut}`
+    : `Toggle ${mousePassthroughShortcut}`;
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text).catch(console.error);
+  };
+
+  const renderCodeBlock = (code: string, lang: string, key?: React.Key) => {
+    const codeLines = code.replace(/\s+$/g, '').split('\n');
+    return (
+      <div key={key} className={`my-3 max-w-full min-w-0 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
+        <div className={`px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
+          <span className={`text-[10px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
+            {lang || 'CODE'}
+          </span>
+        </div>
+        <pre className="m-0 max-w-full overflow-x-auto whitespace-pre-wrap break-words bg-transparent p-2.5 text-[12px] leading-[1.45]" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}>
+          <code className="block min-w-0 max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+            {codeLines.map((line, idx) => (
+              <span key={idx} className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)] gap-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                <span className="select-none text-right opacity-35">{idx + 1}</span>
+                <span className="min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{line || ' '}</span>
+              </span>
+            ))}
+          </code>
+        </pre>
+      </div>
+    );
   };
 
   const handleInputPaste = createChatInputPasteHandler(handlePasteImage);
@@ -203,44 +233,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 if (match) {
                   const lang = match[1] || 'python';
                   const code = match[2].trim();
-                  return (
-                    <div key={i} className={`my-3 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
-                      <div className={`px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
-                        <span className={`text-[10px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
-                          {lang || 'CODE'}
-                        </span>
-                      </div>
-                      <div className="bg-transparent">
-                        <SyntaxHighlighter
-                          language={lang}
-                          style={codeTheme}
-                          customStyle={{
-                            margin: 0,
-                            borderRadius: 0,
-                            fontSize: '12px',
-                            lineHeight: '1.45',
-                            background: 'transparent',
-                            padding: '10px',
-                            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
-                          }}
-                          wrapLongLines={true}
-                          showLineNumbers={true}
-                          lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1.2em', color: codeLineNumberColor, textAlign: 'right', fontSize: '11px' }}
-                        >
-                          {code}
-                        </SyntaxHighlighter>
-                      </div>
-                    </div>
-                  );
+                  return renderCodeBlock(code, lang, i);
                 }
               }
               return (
-                <div key={i} className="markdown-content">
+                <div key={i} className="markdown-content min-w-0 max-w-full overflow-hidden break-words">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkMath]}
                     rehypePlugins={[rehypeKatex]}
                     components={{
-                      p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0 whitespace-pre-wrap" {...props} />,
+                      p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0 whitespace-pre-wrap break-words" {...props} />,
                       strong: ({ node, ...props }: any) => <strong className="font-bold overlay-text-strong" {...props} />,
                       em: ({ node, ...props }: any) => <em className="italic overlay-text-secondary" {...props} />,
                       ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-1.5 space-y-0.5" {...props} />,
@@ -249,7 +251,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                       h1: ({ node, ...props }: any) => <h1 className="text-lg font-bold mb-2 mt-3 overlay-text-strong" {...props} />,
                       h2: ({ node, ...props }: any) => <h2 className="text-base font-bold mb-2 mt-3 overlay-text-strong" {...props} />,
                       h3: ({ node, ...props }: any) => <h3 className="text-sm font-bold mb-1 mt-2 overlay-text-primary" {...props} />,
-                      code: ({ node, ...props }: any) => <code className={`overlay-inline-code-surface rounded px-1 py-0.5 text-xs font-mono whitespace-pre-wrap ${isLightTheme ? 'text-violet-700' : 'text-purple-200'}`} {...props} />,
+                      code: ({ node, ...props }: any) => <code className={`overlay-inline-code-surface rounded px-1 py-0.5 text-xs font-mono whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${isLightTheme ? 'text-violet-700' : 'text-purple-200'}`} {...props} />,
                       blockquote: ({ node, ...props }: any) => <blockquote className={`border-l-2 pl-3 italic my-2 ${isLightTheme ? 'border-violet-500/30 text-text-tertiary' : 'border-purple-500/50 text-text-secondary'}`} {...props} />,
                       a: ({ node, ...props }: any) => <a className={`hover:underline ${isLightTheme ? 'text-blue-600 hover:text-blue-700' : 'text-blue-400 hover:text-blue-300'}`} target="_blank" rel="noopener noreferrer" {...props} />,
                     }}
@@ -271,7 +273,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <MessageSquare className="w-3.5 h-3.5" />
             <span>Shortened</span>
           </div>
-          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
+          <div className={`min-w-0 max-w-full overflow-hidden break-words text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
               p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-cyan-800' : 'text-cyan-100'}`} {...props} />,
@@ -292,7 +294,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Recap</span>
           </div>
-          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
+          <div className={`min-w-0 max-w-full overflow-hidden break-words text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
               p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-indigo-800' : 'text-indigo-100'}`} {...props} />,
@@ -313,7 +315,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <HelpCircle className="w-3.5 h-3.5" />
             <span>Follow-Up Questions</span>
           </div>
-          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
+          <div className={`min-w-0 max-w-full overflow-hidden break-words text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
               p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-amber-800' : 'text-[#FFF9C4]'}`} {...props} />,
@@ -351,40 +353,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     code = part.replace(/^```\w*\s*/, '').replace(/```$/, '').trim();
                   }
 
-                  return (
-                    <div key={i} className={`my-3 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
-                      <div className={`px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
-                        <span className={`text-[10px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
-                          {lang || 'CODE'}
-                        </span>
-                      </div>
-
-                      <div className="bg-transparent">
-                        <SyntaxHighlighter
-                          language={lang}
-                          style={codeTheme}
-                          customStyle={{
-                            margin: 0,
-                            borderRadius: 0,
-                            fontSize: '12px',
-                            lineHeight: '1.45',
-                            background: 'transparent',
-                            padding: '10px',
-                            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
-                          }}
-                          wrapLongLines={true}
-                          showLineNumbers={true}
-                          lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1.2em', color: codeLineNumberColor, textAlign: 'right', fontSize: '11px' }}
-                        >
-                          {code}
-                        </SyntaxHighlighter>
-                      </div>
-                    </div>
-                  );
+                  return renderCodeBlock(code, lang, i);
                 }
               }
               return (
-                <div key={i} className="markdown-content">
+                <div key={i} className="markdown-content min-w-0 max-w-full overflow-hidden break-words">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkMath]}
                     rehypePlugins={[rehypeKatex]}
@@ -408,18 +381,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     }
 
     return (
-      <div className="markdown-content">
+      <div className="markdown-content min-w-0 max-w-full overflow-hidden break-words">
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkMath]}
           rehypePlugins={[rehypeKatex]}
           components={{
-            p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0 whitespace-pre-wrap" {...props} />,
+            p: ({ node, ...props }: any) => <p className="mb-1.5 last:mb-0 whitespace-pre-wrap break-words" {...props} />,
             strong: ({ node, ...props }: any) => <strong className="font-bold opacity-100 overlay-text-strong" {...props} />,
             em: ({ node, ...props }: any) => <em className="italic opacity-90 overlay-text-secondary" {...props} />,
             ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-1.5 space-y-0.5" {...props} />,
             ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-1.5 space-y-0.5" {...props} />,
             li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
-            code: ({ node, ...props }: any) => <code className={`overlay-inline-code-surface rounded px-1 py-0.5 text-xs font-mono ${isLightTheme ? 'text-slate-800' : ''}`} {...props} />,
+            code: ({ node, ...props }: any) => <code className={`overlay-inline-code-surface rounded px-1 py-0.5 text-xs font-mono break-words [overflow-wrap:anywhere] ${isLightTheme ? 'text-slate-800' : ''}`} {...props} />,
             a: ({ node, ...props }: any) => <a className="underline hover:opacity-80" target="_blank" rel="noopener noreferrer" {...props} />,
           }}
         >
@@ -430,7 +403,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+    <div className="pika-chat-panel-root flex flex-col h-full min-h-0 overflow-hidden">
       <div
         ref={scrollContainerRef}
         className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-1.5 no-drag"
@@ -439,7 +412,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
             <div className={`
-              ${msg.role === 'user' ? 'max-w-[72%] px-3 py-2' : 'max-w-[92%] px-3 py-2'} text-[13px] leading-[1.45] relative group min-w-0 whitespace-pre-wrap
+              ${msg.role === 'user' ? 'max-w-[72%] px-3 py-2' : 'max-w-[92%] px-3 py-2'} text-[13px] leading-[1.45] relative group min-w-0 max-w-full overflow-hidden whitespace-pre-wrap break-words
               ${msg.role === 'user'
                 ? (isLightTheme
                   ? 'bg-blue-500/12 border border-blue-500/25 text-blue-950 rounded-[20px] rounded-tr-[4px] shadow-sm font-medium'
@@ -552,24 +525,24 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       </div>
 
       <div className={CHAT_PANEL_ACTION_BAR_CLASS}>
-        <button onClick={handleWhatToSay} className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap min-w-0 ${quickActionClass}`} style={appearance.chipStyle}>
+        <button onClick={handleWhatToSay} className={`pika-chat-action flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap min-w-0 ${quickActionClass}`} style={appearance.chipStyle}>
           <Pencil className="w-3 h-3 opacity-65" /> Guide me
         </button>
-        <button onClick={handleClarify} className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap min-w-0 ${quickActionClass}`} style={appearance.chipStyle}>
+        <button onClick={handleClarify} className={`pika-chat-action flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap min-w-0 ${quickActionClass}`} style={appearance.chipStyle}>
           <MessageSquare className="w-3 h-3 opacity-65" /> Clarify
         </button>
-        <button onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap} className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap min-w-0 ${quickActionClass}`} style={appearance.chipStyle}>
+        <button onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap} className={`pika-chat-action flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap min-w-0 ${quickActionClass}`} style={appearance.chipStyle}>
           {actionButtonMode === 'brainstorm'
             ? <><Lightbulb className="w-3 h-3 opacity-65" /> Ideas</>
             : <><RefreshCw className="w-3 h-3 opacity-65" /> Recap</>
           }
         </button>
-        <button onClick={handleFollowUpQuestions} className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap min-w-0 ${quickActionClass}`} style={appearance.chipStyle}>
+        <button onClick={handleFollowUpQuestions} className={`pika-chat-action flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap min-w-0 ${quickActionClass}`} style={appearance.chipStyle}>
           <HelpCircle className="w-3 h-3 opacity-65" /> Follow-up
         </button>
         <button
           onClick={handleAnswerNow}
-          className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press min-w-[84px] whitespace-nowrap col-span-2 min-[520px]:col-span-1 ${isManualRecording
+          className={`pika-chat-action pika-chat-answer-action flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press min-w-[84px] whitespace-nowrap col-span-2 min-[520px]:col-span-1 ${isManualRecording
             ? 'bg-state-danger-soft text-state-danger ring-1 ring-state-danger-border'
             : 'bg-[#007AFF] text-white shadow-[0_4px_14px_rgba(0,122,255,0.18)] hover:bg-[#0071E3]'
           }`}
@@ -610,7 +583,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         />
 
         <div className={CHAT_PANEL_FOOTER_CONTROLS_CLASS}>
-          <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1 max-w-[calc(100%-44px)]">
+          <div className="pika-chat-footer-left flex flex-wrap items-center gap-1.5 min-w-0 flex-1 max-w-[calc(100%-44px)]">
             <button
               onClick={(e) => {
                 if (!contentRef.current) return;
@@ -624,7 +597,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 window.electronAPI.toggleModelSelector({ x, y });
               }}
               className={`
-                flex items-center gap-2 px-2.5 py-1.5
+                pika-chat-model-button flex items-center gap-2 px-2.5 py-1.5
                 border border-border-subtle/60 rounded-lg transition-colors
                 text-xs font-medium min-w-[118px] max-w-[188px] flex-1 basis-[136px]
                 interaction-base interaction-press
@@ -680,8 +653,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   setIsMousePassthrough(newState);
                   window.electronAPI?.setOverlayMousePassthrough?.(newState);
                 }}
+                aria-label={`${mousePassthroughHint}. Click to toggle mouse passthrough.`}
+                title={`${isMousePassthrough ? 'Mouse click-through is ON' : 'Mouse click-through is OFF'} — ${mousePassthroughHint}. Click to toggle.`}
                 className={`
-                  w-8 h-8 flex items-center justify-center rounded-lg
+                  pika-chat-passthrough-button min-w-8 h-8 flex items-center justify-center gap-1.5 rounded-lg px-2
                   interaction-base interaction-press
                   ${isMousePassthrough
                     ? 'overlay-icon-surface overlay-icon-surface-hover text-state-info opacity-100'
@@ -689,7 +664,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 `}
                 style={appearance.iconStyle}
               >
-                <PointerOff className="w-3.5 h-3.5" />
+                <PointerOff className="w-3.5 h-3.5 shrink-0" />
+                <span className="pika-chat-passthrough-label whitespace-nowrap text-[10px] font-semibold leading-none">
+                  {mousePassthroughHint}
+                </span>
               </button>
             </div>
           </div>
@@ -700,7 +678,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             aria-label={canSubmitPrompt ? 'Send message to AI chat' : 'Type a message or attach screenshots before sending'}
             title={canSubmitPrompt ? 'Send to AI chat' : 'Type a message or attach screenshots first'}
             className={`
-              w-9 h-9 min-w-9 rounded-full flex items-center justify-center shrink-0 relative z-10
+              pika-chat-send-button w-9 h-9 min-w-9 rounded-full flex items-center justify-center shrink-0 relative z-10
               interaction-base interaction-press
               ${canSubmitPrompt
                 ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20 hover:bg-[#0071E3]'

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { upsertTranscriptSegment, type TranscriptDisplayMode, type TranscriptSegment } from '../lib/transcriptSegments';
+import { areTranscriptTextsSimilar, upsertTranscriptSegment, type TranscriptDisplayMode, type TranscriptSegment } from '../lib/transcriptSegments';
 
 export function useMeetingTranscript() {
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
@@ -13,6 +13,11 @@ export function useMeetingTranscript() {
     return stored !== 'false';
   });
   const speakingTimeoutRef = useRef<number | null>(null);
+  const currentInterviewerPartialRef = useRef('');
+  const currentUserPartialRef = useRef('');
+
+  useEffect(() => { currentInterviewerPartialRef.current = currentInterviewerPartial; }, [currentInterviewerPartial]);
+  useEffect(() => { currentUserPartialRef.current = currentUserPartial; }, [currentUserPartial]);
 
   useEffect(() => {
     window.electronAPI?.getTranscriptTranslationSettings?.()
@@ -70,7 +75,12 @@ export function useMeetingTranscript() {
             setTranscriptDisplayMode(transcript.displayMode);
           }
         } else {
-          setCurrentUserPartial(transcript.text);
+          if (areTranscriptTextsSimilar(transcript.text, currentInterviewerPartialRef.current)) {
+            setIsUserSpeaking(false);
+            setCurrentUserPartial('');
+          } else {
+            setCurrentUserPartial(transcript.text);
+          }
         }
         return;
       }
@@ -114,6 +124,10 @@ export function useMeetingTranscript() {
           speakingTimeoutRef.current = null;
         }, 3000);
       } else {
+        if (areTranscriptTextsSimilar(transcript.text, currentUserPartialRef.current)) {
+          setCurrentUserPartial('');
+          setIsUserSpeaking(false);
+        }
         setCurrentInterviewerPartial(transcript.text);
       }
     });

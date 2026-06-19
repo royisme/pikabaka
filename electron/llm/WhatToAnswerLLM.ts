@@ -32,6 +32,10 @@ export class WhatToAnswerLLM {
 
             let contextParts: string[] = [];
 
+            contextParts.push(`<answer_language>
+${this.llmHelper.getAiResponseLanguageInstruction()}
+</answer_language>`);
+
             if (intentResult) {
                 contextParts.push(`<intent_and_shape>
 DETECTED INTENT: ${intentResult.intent}

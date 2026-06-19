@@ -247,3 +247,12 @@ test('chat message layout stays compact in small resizable columns', (t) => {
   t.match(chatPanelSource, /ChatPanelMessageScreenshotPreview/, 'submitted screenshots render a thumbnail preview in the message');
   t.end();
 });
+
+
+test('chat code blocks are constrained and wrap inside compact panes', (t) => {
+  const chatPanelSource = readFileSync(path.join(process.cwd(), 'src/components/meeting/ChatPanel.tsx'), 'utf8');
+  t.match(chatPanelSource, /max-w-full min-w-0 rounded-xl overflow-hidden border shadow-lg/, 'code block shells are bounded to the message width');
+  t.match(chatPanelSource, /\[overflow-wrap:anywhere\]/, 'code highlighter wraps pathological long tokens');
+  t.match(chatPanelSource, /max-w-full overflow-hidden whitespace-pre-wrap break-words/, 'message bubbles cannot expand beyond the pane');
+  t.end();
+});

@@ -10,6 +10,15 @@ let _chatStreamId = 0
 let _chatCancelRequested = false
 let _chatAbortController: AbortController | null = null
 
+
+function normalizeAiResponseLanguageInput(language: unknown): string | null {
+  if (typeof language !== 'string') return null;
+  const raw = language.trim();
+  if (!raw) return null;
+  if (/^(auto|autodetect|auto-detect|automatic)$/i.test(raw)) return 'auto';
+  return raw;
+}
+
 function sanitizeStreamError(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error || 'Unknown streaming error');
   const text = raw
@@ -84,12 +93,11 @@ export function registerCoreHandlers(appState: AppState): void {
   });
 
   safeHandle("set-ai-response-language", async (_, language: string) => {
-    // Validate: must be a non-empty string
-    if (!language || typeof language !== 'string' || !language.trim()) {
-      console.warn('[IPC] set-ai-response-language: invalid or empty language received, ignoring.');
+    const sanitizedLanguage = normalizeAiResponseLanguageInput(language);
+    if (!sanitizedLanguage) {
+      console.warn('[IPC] set-ai-response-language: invalid language received, ignoring.', language);
       return { success: false, error: 'Invalid language value' };
     }
-    const sanitizedLanguage = language.trim();
     const { CredentialsManager } = require('../services/CredentialsManager');
     // Persist to disk
     CredentialsManager.getInstance().setAiResponseLanguage(sanitizedLanguage);

@@ -18,7 +18,7 @@ type Provider = 'gemini' | 'groq' | 'openai' | 'claude';
  */
 export async function fetchProviderModels(
     provider: Provider,
-    apiKey: string
+    apiKey?: string
 ): Promise<ProviderModel[]> {
     switch (provider) {
         case 'openai':
@@ -165,11 +165,18 @@ async function fetchGeminiModels(apiKey: string): Promise<ProviderModel[]> {
 
 /** Normalize base URL so OpenAI SDK and /v1/models resolve consistently. */
 export function normalizeOpenAICompatibleBaseUrl(baseUrl: string): string {
-    let u = baseUrl.trim().replace(/\/$/, '');
-    if (!u.endsWith('/v1')) {
-        u = `${u}/v1`;
+    const raw = baseUrl.trim();
+    if (!raw) return '';
+    const parsed = new URL(raw);
+    parsed.search = '';
+    parsed.hash = '';
+    let pathname = parsed.pathname.replace(/\/+$/, '');
+    pathname = pathname.replace(/\/(chat\/completions|responses|models)$/i, '');
+    if (!/\/v1$/i.test(pathname)) {
+        pathname = `${pathname}/v1`;
     }
-    return u;
+    parsed.pathname = pathname.replace(/\/{2,}/g, '/');
+    return parsed.toString().replace(/\/$/, '');
 }
 
 /**
@@ -177,12 +184,13 @@ export function normalizeOpenAICompatibleBaseUrl(baseUrl: string): string {
  */
 export async function fetchOpenAICompatibleModels(
     baseUrl: string,
-    apiKey: string
+    apiKey?: string
 ): Promise<ProviderModel[]> {
     const root = normalizeOpenAICompatibleBaseUrl(baseUrl);
     const url = `${root}/models`;
+    const headers = apiKey?.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : undefined;
     const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers,
         timeout: 20000,
     });
     const models: { id?: string }[] = response.data?.data || [];
