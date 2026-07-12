@@ -239,6 +239,7 @@ export class SonioxStreamingSTT extends EventEmitter {
                 let nonFinalText = '';
                 const finalLangCounts = new Map<string, number>();
                 const nonFinalLangCounts = new Map<string, number>();
+                let sawEndpoint = false;
 
                 for (const token of tokens) {
                     if (!token.text) continue;
@@ -250,6 +251,7 @@ export class SonioxStreamingSTT extends EventEmitter {
 
                     if (token.text === '<end>') {
                         console.log('[SonioxStreaming] Received <end> endpoint detection marker');
+                        sawEndpoint = true;
                         continue;
                     }
 
@@ -277,7 +279,16 @@ export class SonioxStreamingSTT extends EventEmitter {
                         text: currentFinalText,
                         isFinal: true,
                         confidence: 1.0,
+                        boundary: sawEndpoint || undefined,
                         ...(detectedLanguage ? { detectedLanguage } : {}),
+                    });
+                } else if (sawEndpoint) {
+                    // Boundary-only signal: <end> arrived without any new final text
+                    this.emit('transcript', {
+                        text: '',
+                        isFinal: true,
+                        confidence: 1,
+                        boundary: true,
                     });
                 }
 

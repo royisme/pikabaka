@@ -88,11 +88,14 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
 
     const partialLabel = useMemo(() => partialSpeakerLabel.trim() || 'Interviewer', [partialSpeakerLabel]);
 
+    const contentSignature = segments.reduce(
+        (acc, s) => acc + s.sourceText.length + (s.translatedText?.length ?? 0), 0);
+
     useEffect(() => {
         if (!userScrolled && bottomRef.current) {
             bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
-    }, [segments.length, partialText, userScrolled]);
+    }, [segments.length, contentSignature, partialText, userScrolled]);
 
     const handleScroll = () => {
         const el = containerRef.current;

@@ -56,6 +56,8 @@ export interface TranscriptTranslationRequest {
   detectedLanguageKey?: string;
   /** When provider is `openai-compatible`, URL + key from AI Providers (saved endpoint). */
   openAICompatible?: { baseUrl: string; apiKey: string };
+  /** Previous translated turns, oldest first, for terminology/pronoun consistency. */
+  context?: Array<{ source: string; translation: string }>;
 }
 
 // Model constant for Gemini 3 Flash
@@ -399,6 +401,7 @@ export class LLMHelper {
       sourceLanguageKey: request.sourceLanguageKey,
       targetLanguageKey: request.targetLanguageKey,
       detectedLanguageKey: request.detectedLanguageKey,
+      context: request.context,
     });
 
     if (request.provider === 'ollama') {

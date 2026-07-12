@@ -16,7 +16,7 @@ export function audioSttChannels() {
     setGroqSttModel: (model: string) => ipcRenderer.invoke("set-groq-stt-model", model),
     setSonioxApiKey: (apiKey: string) => ipcRenderer.invoke("set-soniox-api-key", apiKey),
     testSttConnection: (provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox', apiKey: string, region?: string) => ipcRenderer.invoke("test-stt-connection", provider, apiKey, region),
-    onNativeAudioTranscript: (callback: (transcript: { speaker: string; text: string; final: boolean; timestamp?: number; confidence?: number; segmentId?: string; sourceText?: string; translatedText?: string; translationState?: 'pending' | 'complete' | 'error' | 'skipped'; displayMode?: 'original' | 'translated' | 'both'; speakerLabel?: string }) => void) => {
+    onNativeAudioTranscript: (callback: (transcript: { speaker: string; text: string; final: boolean; timestamp?: number; confidence?: number; segmentId?: string; sourceText?: string; translatedText?: string; translationState?: 'pending' | 'complete' | 'error' | 'skipped'; displayMode?: 'original' | 'translated' | 'both'; speakerLabel?: string; revision?: number }) => void) => {
       const subscription = (_: any, data: any) => callback(data)
       ipcRenderer.on("native-audio-transcript", subscription)
       return () => {

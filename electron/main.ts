@@ -47,6 +47,7 @@ import {
 } from "./lib/auto-updater"
 import {
   type BufferedTranscriptTurn,
+  type FlushedTranscriptTurn,
   DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE,
   type TranscriptAssemblerProfile,
   type TranscriptAssemblerThresholds,
@@ -545,6 +546,9 @@ export class AppState {
     interviewer: null,
     user: null,
   };
+  public lastFlushedTranscriptTurns: Record<TranscriptSpeaker, FlushedTranscriptTurn | null> = { interviewer: null, user: null };
+  public transcriptSegmentRevisions: Map<string, number> = new Map();
+  public recentTranslatedTurns: Array<{ segmentId: string; source: string; translation: string }> = [];
 
   public getTranscriptAssemblerThresholds(): TranscriptAssemblerThresholds {
     return getTranscriptAssemblerThresholdsFn(this)

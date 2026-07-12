@@ -118,27 +118,37 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
 
   stt.setRecognitionLanguage(sttLanguage);
 
-  stt.on('transcript', (segment: { text: string, isFinal: boolean, confidence: number, detectedLanguage?: string }) => {
+  stt.on('transcript', (segment: { text: string, isFinal: boolean, confidence: number, detectedLanguage?: string, boundary?: boolean }) => {
     if (!state.isMeetingActive) {
       return;
     }
 
     const timestamp = Date.now();
+    const trimmed = segment.text?.trim();
 
-    state.intelligenceManager.handleTranscript({
-      speaker: speaker,
-      text: segment.text,
-      timestamp,
-      final: segment.isFinal,
-      confidence: segment.confidence
-    });
+    // Boundary-only events (empty text) must not reach intelligence handling
+    if (trimmed) {
+      state.intelligenceManager.handleTranscript({
+        speaker: speaker,
+        text: segment.text,
+        timestamp,
+        final: segment.isFinal,
+        confidence: segment.confidence
+      });
+    }
 
     const { CredentialsManager } = require('../services/CredentialsManager');
     const displayMode = CredentialsManager.getInstance().getTranscriptTranslationDisplayMode();
 
     if (segment.isFinal) {
-      bufferFinalTranscriptChunk(appState, speaker, segment.text, timestamp, segment.confidence, segment.detectedLanguage);
-    } else {
+      // Order matters: buffer the text first, then accelerate flushing on boundary
+      if (trimmed) {
+        bufferFinalTranscriptChunk(appState, speaker, segment.text, timestamp, segment.confidence, segment.detectedLanguage);
+      }
+      if (segment.boundary) {
+        handleSpeakerSpeechEnded(appState, speaker);
+      }
+    } else if (trimmed) {
       emitNativeAudioTranscript(appState, {
         speaker,
         text: segment.text,
@@ -154,7 +164,9 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
     }
 
     if (speaker === 'interviewer') {
-      state.lastInterviewerTranscriptAt = Date.now();
+      if (trimmed) {
+        state.lastInterviewerTranscriptAt = Date.now();
+      }
       state.lastAudioPipelineError = null;
     }
   });
