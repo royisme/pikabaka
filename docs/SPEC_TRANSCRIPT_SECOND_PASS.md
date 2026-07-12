@@ -1,6 +1,6 @@
 # SPEC: Transcript Second-Pass Correction (Reopen & Merge)
 
-> Status: approved design, implementation in progress (multi-agent).
+> Status: implemented on feat/transcript-second-pass (Tasks A–D complete).
 > Created: 2026-07-12. Owner: Roy.
 > This document is the single source of truth for Tasks A–D below. Interface
 > contracts here are binding; if an implementation must deviate, stop and flag
@@ -355,8 +355,11 @@ paths under tap may fail; avoid triggering flush/emit code paths):
    pure Chinese ("今天天气很好" → 6), mixed ("我用 TypeScript 写代码" →
    expect CJK chars + 1).
 3. `mergeTranscriptText(null as any, ...)`: CJK+CJK joins with no space;
-   English+English keeps single space; word-overlap dedup still works
-   ("the quick brown fox" + "brown fox jumps" → "the quick brown fox jumps").
+   English+English keeps single space; word-overlap dedup still works —
+   note the implementation requires a minimum 3-word overlap by design
+   (2-word overlaps like "in the" would misfire), e.g.
+   ("the quick brown fox jumps" + "brown fox jumps over"
+   → "the quick brown fox jumps over").
 4. `endsSentence(null as any, ...)`: "你好。" true, "你好" false.
 5. `buildTranscriptTranslationPrompt` with `context`: output contains
    "Recent conversation" block, both source/translation lines, and the source
