@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/royisme/pikabaka/compare/v2.2.0...v2.3.0) (2026-07-14)
+
+
+### Features
+
+* **transcript:** second-pass correction - reopen & merge flushed turns ([#17](https://github.com/royisme/pikabaka/issues/17)) ([7b48e22](https://github.com/royisme/pikabaka/commit/7b48e221bdc6fe7aa4b60cf6b94eea0fb97dbb21))
+
 ## [2.2.0](https://github.com/royisme/pikabaka/compare/v2.1.0...v2.2.0) (2026-05-06)
 
 
