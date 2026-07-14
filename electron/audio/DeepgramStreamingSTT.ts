@@ -164,6 +164,8 @@ export class DeepgramStreamingSTT extends EventEmitter {
             languageParam +
             `&smart_format=true` +
             `&interim_results=true` +
+            `&endpointing=800` +
+            `&utterance_end_ms=1500` +
             `&keepalive=true`;
 
         console.log(`[DeepgramStreaming] Connecting (rate=${this.sampleRate}, ch=${this.numChannels})...`);
@@ -196,6 +198,18 @@ export class DeepgramStreamingSTT extends EventEmitter {
             try {
                 const msg = JSON.parse(data.toString());
 
+                // UtteranceEnd: no transcript payload, just an utterance-boundary signal
+                // emitted utterance_end_ms after the last word (requires interim_results).
+                if (msg.type === 'UtteranceEnd') {
+                    this.emit('transcript', {
+                        text: '',
+                        isFinal: true,
+                        confidence: 1,
+                        boundary: true,
+                    });
+                    return;
+                }
+
                 // Deepgram response structure:
                 // { type: "Results", channel: { alternatives: [{ transcript, confidence }] }, is_final }
                 if (msg.type !== 'Results') return;
@@ -223,11 +237,14 @@ export class DeepgramStreamingSTT extends EventEmitter {
                     detectedLanguage = rawLang.toLowerCase().split(/[-_]/)[0] || undefined;
                 }
 
+                const isFinal = msg.is_final ?? false;
                 this.emit('transcript', {
                     text: transcript,
-                    isFinal: msg.is_final ?? false,
+                    isFinal,
                     confidence: alt?.confidence ?? 1.0,
                     detectedLanguage,
+                    // speech_final: endpointing detected end of speech after this final
+                    ...(isFinal && msg.speech_final === true ? { boundary: true } : {}),
                 });
             } catch (err) {
                 console.error('[DeepgramStreaming] Parse error:', err);

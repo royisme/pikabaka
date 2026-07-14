@@ -35,7 +35,12 @@ export function isTranscriptTranslationConfigured(
 export function buildTranscriptTranslationPrompt(
   basePrompt: string,
   sourceText: string,
-  opts?: { sourceLanguageKey?: string; targetLanguageKey?: string; detectedLanguageKey?: string }
+  opts?: {
+    sourceLanguageKey?: string;
+    targetLanguageKey?: string;
+    detectedLanguageKey?: string;
+    context?: Array<{ source: string; translation: string }>;
+  }
 ): string {
   const prompt = basePrompt.trim() || DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT;
   const source = sourceText.trim();
@@ -55,5 +60,13 @@ export function buildTranscriptTranslationPrompt(
     direction = `Translate the source text. Auto-detect the source language. If unsure of target, default to English.\n\n`;
   }
 
-  return `${direction}${prompt}\n\nSource text:\n${source}\n\nOutput requirements:\n- Return translated text only\n- No explanations\n- No markdown\n- If source already matches the target language, return the source text unchanged`;
+  let contextBlock = '';
+  if (opts?.context && opts.context.length > 0) {
+    const lines = opts.context
+      .map((turn, index) => `[${index + 1}] Source: ${turn.source}\n    Translation: ${turn.translation}`)
+      .join('\n');
+    contextBlock = `Recent conversation (context for terminology and pronoun consistency ONLY — do not translate or repeat it in your output):\n${lines}\n\n`;
+  }
+
+  return `${direction}${contextBlock}${prompt}\n\nSource text:\n${source}\n\nOutput requirements:\n- Return translated text only\n- No explanations\n- No markdown\n- If source already matches the target language, return the source text unchanged`;
 }

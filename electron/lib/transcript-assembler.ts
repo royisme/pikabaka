@@ -12,6 +12,21 @@ export interface BufferedTranscriptTurn {
   text: string;
   flushTimer: NodeJS.Timeout | null;
   detectedLanguage?: string;
+  revision: number;
+}
+
+export interface FlushedTranscriptTurn {
+  segmentId: string;
+  text: string;
+  startedAt: number;
+  lastUpdatedAt: number;   // timestamp of last merged chunk
+  flushedAt: number;       // Date.now() at flush
+  confidence: number;
+  detectedLanguage?: string;
+  revision: number;        // revision already emitted
+  endedSentence: boolean;
+  ragFed: boolean;
+  sealTimer: NodeJS.Timeout | null;
 }
 
 export type TranscriptAssemblerProfile = 'sentence_bias' | 'low_latency' | 'coherent';
@@ -26,6 +41,8 @@ export interface TranscriptAssemblerThresholds {
    *  Segments with fewer words use fragmentFlushDelayMs even if they end with punctuation. */
   minWordsBeforeSentenceFlush: number;
   maxTurnDurationMs: number;
+  /** How long (from lastUpdatedAt) a flushed non-sentence-final turn stays reopenable. */
+  reopenWindowMs: number;
 }
 
 export const DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE: TranscriptAssemblerProfile = 'sentence_bias';
@@ -39,6 +56,7 @@ const TRANSCRIPT_ASSEMBLER_THRESHOLDS: Record<TranscriptAssemblerProfile, Transc
     speechEndedFragmentFlushMs: 1100,
     minWordsBeforeSentenceFlush: 18,
     maxTurnDurationMs: 0,
+    reopenWindowMs: 6500,
   },
   low_latency: {
     maxSilenceBeforeNewTurnMs: 2200,
@@ -48,6 +66,7 @@ const TRANSCRIPT_ASSEMBLER_THRESHOLDS: Record<TranscriptAssemblerProfile, Transc
     speechEndedFragmentFlushMs: 500,
     minWordsBeforeSentenceFlush: 8,
     maxTurnDurationMs: 0,
+    reopenWindowMs: 4000,
   },
   coherent: {
     maxSilenceBeforeNewTurnMs: 6000,
@@ -57,6 +76,7 @@ const TRANSCRIPT_ASSEMBLER_THRESHOLDS: Record<TranscriptAssemblerProfile, Transc
     speechEndedFragmentFlushMs: 1500,
     minWordsBeforeSentenceFlush: 10,
     maxTurnDurationMs: 30000,
+    reopenWindowMs: 9500,
   },
 };
 
@@ -93,6 +113,51 @@ export function endsSentence(appState: AppState, text: string): boolean {
   return /[.!?。！？…]["')\]]?\s*$/.test(text.trim());
 }
 
+export function shouldReopenFlushedTurn(
+  flushed: Pick<FlushedTranscriptTurn, 'endedSentence' | 'lastUpdatedAt' | 'startedAt'>,
+  timestamp: number,
+  thresholds: TranscriptAssemblerThresholds
+): boolean {
+  if (flushed.endedSentence) return false;
+  if (thresholds.reopenWindowMs <= 0) return false;
+  if (timestamp - flushed.lastUpdatedAt > thresholds.reopenWindowMs) return false;
+  if (thresholds.maxTurnDurationMs > 0 && timestamp - flushed.startedAt > thresholds.maxTurnDurationMs) return false;
+  return true;
+}
+
+export function countTranscriptWords(appState: AppState, text: string): number {
+  void appState;
+  const cjkMatches = text.match(/[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]/g);
+  const cjkCount = cjkMatches ? cjkMatches.length : 0;
+  const remaining = text.replace(/[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]/g, ' ').trim();
+  const wordCount = remaining ? remaining.split(/\s+/).length : 0;
+  return cjkCount + wordCount;
+}
+
+export function sealFlushedTranscriptTurn(appState: AppState, speaker: TranscriptSpeaker): void {
+  const state = appState as any;
+  const flushed = state.lastFlushedTranscriptTurns[speaker] as FlushedTranscriptTurn | null;
+  if (!flushed) return;
+  if (flushed.sealTimer) {
+    clearTimeout(flushed.sealTimer);
+    flushed.sealTimer = null;
+  }
+  if (!flushed.ragFed) {
+    flushed.ragFed = true;
+    if (state.ragManager) {
+      state.ragManager.feedLiveTranscript([{
+        speaker,
+        text: flushed.text,
+        timestamp: flushed.startedAt,
+      }]);
+    }
+    if (speaker === 'interviewer') {
+      state.knowledgeOrchestrator?.feedInterviewerUtterance?.(flushed.text);
+    }
+  }
+  state.lastFlushedTranscriptTurns[speaker] = null;
+}
+
 export function mergeTranscriptText(appState: AppState, existing: string, incoming: string): string {
   const left = normalizeTranscriptText(appState, existing);
   const right = normalizeTranscriptText(appState, incoming);
@@ -113,6 +178,11 @@ export function mergeTranscriptText(appState: AppState, existing: string, incomi
     if (leftTail === rightHead) {
       return `${leftWords.join(' ')} ${rightWords.slice(overlap).join(' ')}`.trim();
     }
+  }
+
+  const CJK_EDGE = /[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯　-〿！-～]/;
+  if (CJK_EDGE.test(left.slice(-1)) && CJK_EDGE.test(right.charAt(0))) {
+    return `${left}${right}`.trim();
   }
 
   const separator = /[\s([{"'-]$/.test(left) ? '' : ' ';
@@ -156,6 +226,22 @@ export function bufferFinalTranscriptChunk(
   }
 
   if (!buffer) {
+    const lf = state.lastFlushedTranscriptTurns[speaker] as FlushedTranscriptTurn | null;
+    if (lf && shouldReopenFlushedTurn(lf, timestamp, thresholds)) {
+      if (lf.sealTimer) clearTimeout(lf.sealTimer);
+      buffer = {
+        segmentId: lf.segmentId, startedAt: lf.startedAt, lastUpdatedAt: lf.lastUpdatedAt,
+        confidence: lf.confidence, text: lf.text, flushTimer: null,
+        detectedLanguage: lf.detectedLanguage, revision: lf.revision + 1,
+      };
+      state.transcriptTurnBuffers[speaker] = buffer;
+      state.lastFlushedTranscriptTurns[speaker] = null;
+    } else if (lf) {
+      sealFlushedTranscriptTurn(appState, speaker); // superseded: feed RAG now, clear slot
+    }
+  }
+
+  if (!buffer) {
     buffer = {
       segmentId: createTranscriptSegmentId(appState, speaker, timestamp),
       startedAt: timestamp,
@@ -164,6 +250,7 @@ export function bufferFinalTranscriptChunk(
       text: normalizedText,
       flushTimer: null,
       detectedLanguage,
+      revision: 1,
     };
     state.transcriptTurnBuffers[speaker] = buffer;
   } else {
@@ -173,7 +260,7 @@ export function bufferFinalTranscriptChunk(
     if (detectedLanguage) buffer.detectedLanguage = detectedLanguage;
   }
 
-  const wordCount = buffer.text.split(/\s+/).length;
+  const wordCount = countTranscriptWords(appState, buffer.text);
   const isSentenceComplete = endsSentence(appState, buffer.text) && wordCount >= thresholds.minWordsBeforeSentenceFlush;
   const flushDelayMs = isSentenceComplete
     ? thresholds.sentenceFlushDelayMs
@@ -186,7 +273,7 @@ export function handleSpeakerSpeechEnded(appState: AppState, speaker: Transcript
   const buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   if (!buffer) return;
   const thresholds = getTranscriptAssemblerThresholds(appState);
-  const wordCount = buffer.text.split(/\s+/).length;
+  const wordCount = countTranscriptWords(appState, buffer.text);
   const isSentenceComplete = endsSentence(appState, buffer.text) && wordCount >= thresholds.minWordsBeforeSentenceFlush;
   scheduleBufferedTranscriptFlush(
     appState,
@@ -205,7 +292,10 @@ export function resetBufferedTranscriptTurns(appState: AppState): void {
       clearTimeout(buffer.flushTimer);
     }
     state.transcriptTurnBuffers[speaker] = null;
+    sealFlushedTranscriptTurn(appState, speaker);
   }
+  state.transcriptSegmentRevisions.clear();
+  state.recentTranslatedTurns.length = 0;
 }
 
 export async function flushBufferedTranscriptTurn(appState: AppState, speaker: TranscriptSpeaker): Promise<void> {
@@ -223,17 +313,43 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
 
   const timestamp = buffer.startedAt || Date.now();
   const confidence = buffer.confidence || 0;
+  const thresholds = getTranscriptAssemblerThresholds(appState);
+  const endedSentence = endsSentence(appState, text);
 
-  if (state.ragManager) {
-    state.ragManager.feedLiveTranscript([{
-      speaker,
+  state.transcriptSegmentRevisions.set(buffer.segmentId, buffer.revision);
+
+  if (endedSentence) {
+    if (state.ragManager) {
+      state.ragManager.feedLiveTranscript([{
+        speaker,
+        text,
+        timestamp,
+      }]);
+    }
+    if (speaker === 'interviewer') {
+      state.knowledgeOrchestrator?.feedInterviewerUtterance?.(text);
+    }
+    state.lastFlushedTranscriptTurns[speaker] = null;
+  } else {
+    const flushed: FlushedTranscriptTurn = {
+      segmentId: buffer.segmentId,
       text,
-      timestamp,
-    }]);
+      startedAt: buffer.startedAt,
+      lastUpdatedAt: buffer.lastUpdatedAt,
+      flushedAt: Date.now(),
+      confidence,
+      detectedLanguage: buffer.detectedLanguage,
+      revision: buffer.revision,
+      endedSentence: false,
+      ragFed: false,
+      sealTimer: null,
+    };
+    const delay = Math.max(500, thresholds.reopenWindowMs - (Date.now() - buffer.lastUpdatedAt));
+    flushed.sealTimer = setTimeout(() => sealFlushedTranscriptTurn(appState, speaker), delay);
+    state.lastFlushedTranscriptTurns[speaker] = flushed;
   }
 
   if (speaker === 'interviewer') {
-    state.knowledgeOrchestrator?.feedInterviewerUtterance?.(text);
     await emitTranscriptWithTranslation(appState, {
       speaker,
       text,
@@ -241,6 +357,7 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
       confidence,
       segmentId: buffer.segmentId,
       detectedLanguage: buffer.detectedLanguage,
+      revision: buffer.revision,
     });
     return;
   }
@@ -258,6 +375,7 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
     displayMode,
     translationState: 'skipped' as const,
     speakerLabel: 'Me',
+    revision: buffer.revision,
   });
 }
 
@@ -270,9 +388,10 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
   speakerLabel?: string;
   forceTranslate?: boolean;
   detectedLanguage?: string;
+  revision?: number;
 }): Promise<{ success: boolean; error?: string; translatedText?: string }> {
   const state = appState as any;
-  const { speaker, text, timestamp, confidence, segmentId, speakerLabel, forceTranslate = false, detectedLanguage } = params;
+  const { speaker, text, timestamp, confidence, segmentId, speakerLabel, forceTranslate = false, detectedLanguage, revision } = params;
   const { CredentialsManager } = require('../services/CredentialsManager');
   const cm = CredentialsManager.getInstance();
   const displayMode = cm.getTranscriptTranslationDisplayMode();
@@ -303,6 +422,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
     displayMode: 'original' | 'translated' | 'both';
     translationState: 'pending' | 'skipped';
     speakerLabel?: string;
+    revision?: number;
   } = {
     speaker,
     text,
@@ -315,6 +435,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
     displayMode,
     translationState: isTranslationConfigured ? 'pending' as const : 'skipped' as const,
     speakerLabel,
+    revision,
   };
 
   if (!isTranslationConfigured) {
@@ -347,6 +468,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
       translationState: 'complete' as const,
       speakerLabel,
       detectedLanguage,
+      revision,
     });
     return { success: true, translatedText: text };
   }
@@ -354,6 +476,11 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
   emitNativeAudioTranscript(appState, pendingPayload);
 
   try {
+    const recentTurns = (state.recentTranslatedTurns ?? []) as Array<{ segmentId: string; source: string; translation: string }>;
+    const context = recentTurns
+      .filter((t) => t.segmentId !== segmentId)
+      .slice(-2)
+      .map((t) => ({ source: t.source, translation: t.translation }));
     const baseReq = {
       model: effectiveTranslationModel,
       prompt: translationPrompt,
@@ -362,6 +489,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
       sourceLanguageKey,
       targetLanguageKey,
       detectedLanguageKey: detectedLanguage,
+      context: context.length > 0 ? context : undefined,
     };
     let translatedText: string;
     if (oaiCompat && !standardProviders.has(translationProvider)) {
@@ -375,6 +503,22 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
         ...baseReq,
         provider: translationProvider as 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude',
       });
+    }
+
+    if (revision !== undefined && state.transcriptSegmentRevisions.get(segmentId) !== revision) {
+      return { success: false, error: 'superseded by newer revision' };
+    }
+
+    if (translatedText) {
+      const existingIndex = recentTurns.findIndex((t) => t.segmentId === segmentId);
+      if (existingIndex >= 0) {
+        recentTurns[existingIndex] = { segmentId, source: text, translation: translatedText };
+      } else {
+        recentTurns.push({ segmentId, source: text, translation: translatedText });
+      }
+      while (recentTurns.length > 4) {
+        recentTurns.shift();
+      }
     }
 
     const translatedPayloadText =
@@ -393,10 +537,14 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
       translationState: 'complete' as const,
       speakerLabel,
       detectedLanguage,
+      revision,
     });
     return { success: true, translatedText: translatedText || undefined };
   } catch (error: any) {
     console.warn('[Main] Transcript translation failed:', error?.message || error);
+    if (revision !== undefined && state.transcriptSegmentRevisions.get(segmentId) !== revision) {
+      return { success: false, error: 'superseded by newer revision' };
+    }
     emitNativeAudioTranscript(appState, {
       speaker,
       text,
@@ -410,6 +558,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
       translationState: 'error' as const,
       speakerLabel,
       detectedLanguage,
+      revision,
     });
     return { success: false, error: error?.message || 'Transcript translation failed' };
   }

@@ -58,6 +58,7 @@ export function useMeetingTranscript() {
               timestamp: transcript.timestamp,
               translationState: transcript.translationState,
               detectedLanguage: transcript.detectedLanguage,
+              revision: transcript.revision,
             })
           );
 
@@ -92,6 +93,7 @@ export function useMeetingTranscript() {
             timestamp: transcript.timestamp,
             translationState: transcript.translationState,
             detectedLanguage: transcript.detectedLanguage,
+            revision: transcript.revision,
           })
         );
 

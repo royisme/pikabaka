@@ -409,6 +409,7 @@ export class OpenAIStreamingSTT extends EventEmitter {
                         text:       msg.text,
                         isFinal:    true,
                         confidence: 1.0,
+                        boundary:   true, // server VAD: utterance ended at this final
                     });
                 }
                 break;
