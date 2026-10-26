@@ -27,6 +27,8 @@ export function useMeetingAudio() {
   const [nativeAudioHealth, setNativeAudioHealth] = useState<NativeAudioHealth>(fallbackStatus);
   const [isConnected, setIsConnected] = useState(false);
   const [noSystemAudioSince, setNoSystemAudioSince] = useState<number | null>(null);
+  const [activeSince, setActiveSince] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const isRecordingRef = useRef(false);
   const voiceInputRef = useRef('');
   const manualTranscriptRef = useRef('');
@@ -109,31 +111,32 @@ export function useMeetingAudio() {
     nativeAudioHealth.hasRecentInterviewerTranscript,
   ]);
 
-  const sttStatus = useMemo(() => {
-    if (!nativeAudioHealth.meetingActive) {
-      return { label: 'STT idle', toneClass: 'text-text-tertiary', dotClass: 'bg-slate-500/50' };
-    }
-    if (!isConnected) {
-      return { label: 'STT disconnected', toneClass: 'text-red-400', dotClass: 'bg-red-400' };
-    }
-    if (nativeAudioHealth.hasRecentInterviewerTranscript) {
-      return { label: 'STT receiving transcript', toneClass: 'text-emerald-400', dotClass: 'bg-emerald-400 animate-pulse' };
-    }
-    if (nativeAudioHealth.hasRecentSystemAudioChunk) {
-      return { label: 'STT listening (no transcript yet)', toneClass: 'text-amber-300', dotClass: 'bg-amber-300' };
-    }
-    return { label: 'No system audio signal', toneClass: 'text-red-300', dotClass: 'bg-red-300' };
-  }, [isConnected, nativeAudioHealth]);
+  useEffect(() => {
+    setActiveSince((prev) => (nativeAudioHealth.meetingActive ? prev ?? Date.now() : null));
+  }, [nativeAudioHealth.meetingActive]);
 
-  const sttNeedsTroubleshooting = useMemo(() => {
-    if (!nativeAudioHealth.meetingActive || !isConnected) return false;
-    if (nativeAudioHealth.hasRecentSystemAudioChunk || nativeAudioHealth.hasRecentInterviewerTranscript) return false;
-    if (nativeAudioHealth.lastError) return true;
-    if (!noSystemAudioSince) return false;
-    return Date.now() - noSystemAudioSince >= 8000;
-  }, [isConnected, nativeAudioHealth, noSystemAudioSince]);
+  // The status changes with time (a slow start becomes a failure, silence becomes "no audio"), so it is
+  // re-read once a second while a meeting is active.
+  useEffect(() => {
+    if (!nativeAudioHealth.meetingActive) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [nativeAudioHealth.meetingActive]);
 
-  const showSttErrorDetail = !!nativeAudioHealth.lastError && !nativeAudioHealth.hasRecentInterviewerTranscript;
+  const audioStatusInput = useMemo(
+    () => ({
+      meetingActive: nativeAudioHealth.meetingActive,
+      isConnected,
+      hasRecentSystemAudioChunk: nativeAudioHealth.hasRecentSystemAudioChunk,
+      hasRecentInterviewerTranscript: nativeAudioHealth.hasRecentInterviewerTranscript,
+      lastError: nativeAudioHealth.lastError,
+      activeSince,
+      noSystemAudioSince,
+      now,
+    }),
+    [activeSince, isConnected, nativeAudioHealth, noSystemAudioSince, now]
+  );
 
   return {
     isManualRecording,
@@ -148,8 +151,6 @@ export function useMeetingAudio() {
     nativeAudioHealth,
     isConnected,
     noSystemAudioSince,
-    sttStatus,
-    sttNeedsTroubleshooting,
-    showSttErrorDetail,
+    audioStatusInput,
   };
 }

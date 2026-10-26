@@ -479,6 +479,16 @@ export function registerCoreHandlers(appState: AppState): void {
     appState.settingsWindowHelper.toggleWindow(x, y)
   })
 
+  // The quick settings popup has no audio section; the full settings live in the launcher window. Opening
+  // them for a section does not switch window mode, so a running meeting keeps its overlay.
+  safeHandle("open-settings-section", (_event, section: string) => {
+    const launcher = appState.getWindowHelper().getLauncherWindow()
+    if (!launcher || launcher.isDestroyed()) return { success: false }
+    launcher.webContents.send('open-settings-section', { section })
+    launcher.show()
+    return { success: true }
+  })
+
   safeHandle("close-settings-window", () => {
     appState.settingsWindowHelper.closeWindow()
   })

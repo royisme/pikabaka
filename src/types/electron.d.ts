@@ -67,6 +67,8 @@ export interface ElectronAPI {
   openPrivacySettings: (type: 'microphone' | 'screen') => Promise<{ success: boolean }>
   onSettingsVisibilityChange: (callback: (isVisible: boolean) => void) => () => void
   toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>
+  openSettingsSection: (section: string) => Promise<{ success: boolean }>
+  onOpenSettingsSection: (callback: (data: { section: string }) => void) => () => void
   closeSettingsWindow: () => Promise<void>
   toggleAdvancedSettings: () => Promise<void>
   closeAdvancedSettings: () => Promise<void>

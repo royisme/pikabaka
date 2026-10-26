@@ -2,6 +2,17 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: V3 one audio status (branch `audio-status`)
+
+Done
+- `audioStatus()` (`src/lib/audioStatus.ts`) is the one answer to "is Pika hearing the call": seven states (`off`, `starting`, `waiting`, `listening`, `live`, `no-audio`, `stopped`), each with a level, a dot, chip words (and a form of at most 12 characters), the empty-area text, and an action. A normal start shows "Starting audio…" for 10 seconds instead of a red "disconnected"; an error or a connection still down after 10 seconds is "Transcription stopped" with the real error text kept as detail; silence alone is "waiting" for 8 seconds, then "No call audio".
+- One place for the words. With rows in the transcript the header chip carries them (▲ or ✕ for warn and blocking, "Fix audio" beside it). With no rows the chip shows only its dot and the transcript area says it: a title, one help line and a filled "Fix audio". The amber box, the dashed placeholder, the separate error line and the word "STT" are gone.
+- "Fix audio" opens the full settings on the Audio tab. The old "Open audio settings" button opened the quick settings popup, which has no audio section at all, so it led nowhere. New IPC `open-settings-section` (main shows the launcher window and sends the tab; `App.tsx` opens `SettingsOverlay` on it); additive, the old call is unchanged. It does not change window mode, so a running meeting keeps its overlay.
+- `useMeetingAudio` tracks when the meeting became active and ticks once a second while it is active, so the status changes with time. The old `sttStatus`, `sttNeedsTroubleshooting` and `showSttErrorDetail` are removed.
+- Verified: both `tsc --noEmit` checks exit 0; tap 707 of 707 (38 new assertions covering every state, the 10 s and 8 s thresholds, long error text, short labels).
+- Not verified: everything visible; that "Fix audio" brings up the launcher on the Audio tab on macOS and Windows (the window handling was written from the code, not run), and that showing the launcher does not pull focus from the call; the silence-in-a-routed-call question (whether the OS capture delivers frames while nothing plays) from the spec, which needs the owner to watch the chip through 30 seconds of a quiet call.
+- Deviations from the spec: the 12-character short form of "Not listening" is "Idle" (the spec's own label was 13 characters); no "Open Pika" button for the not-listening state (no safe way to show the launcher without leaving overlay mode was found); no details popover (the real error is the help line, cut at 160 characters).
+
 ## 2026-10-26: V1 pixel floors for the two zones (branch `overlay-split-clamp`)
 
 Done

@@ -14,6 +14,7 @@ import { useMeetingTranscript } from '../hooks/useMeetingTranscript';
 import { useMeetingAudio } from '../hooks/useMeetingAudio';
 import { isNearBottom, nextScrollAction } from '../lib/answerScroll';
 import { toggleOriginal } from '../lib/transcriptDisplay';
+import { audioStatus } from '../lib/audioStatus';
 
 interface PikaInterfaceProps { onEndMeeting?: () => void; overlayOpacity?: number; }
 type ScreenshotAttachment = { path: string; preview: string };
@@ -102,6 +103,16 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isShortcutPressed, chat.actionButtonMode]);
 
+    const translateInto = transcript.translationEnabled
+        ? transcript.languageOptions.find((option) => option.value === transcript.targetLanguage)?.label
+        : undefined;
+    const audioState = useMemo(
+        () => audioStatus({ ...audio.audioStatusInput, translateInto }),
+        [audio.audioStatusInput, translateInto]
+    );
+    const fixAudio = useCallback(() => { void window.electronAPI.openSettingsSection('audio'); }, []);
+    const hasTranscriptRows = transcript.transcriptSegments.length > 0 || transcript.isInterviewerSpeaking;
+
     const transcriptRef = useRef(transcript);
     transcriptRef.current = transcript;
 
@@ -145,7 +156,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
                 {isExpanded && (
                     <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="flex flex-col items-center gap-2 w-full flex-1 min-h-0">
                         <TopPill expanded={isExpanded} onToggle={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} appearance={appearance} onLogoClick={() => window.electronAPI?.setWindowMode?.('launcher')} />
-                        <SplitterShell left={<TranscriptColumn {...transcriptProps} />} leftHeader={<TranscriptHeaderControls sttStatus={audio.sttStatus} displayMode={transcript.transcriptDisplayMode} translationEnabled={transcript.translationEnabled} translationConfigured={transcript.translationConfigured} targetLanguage={transcript.targetLanguage} languageOptions={transcript.languageOptions} onToggleTranslation={() => transcript.saveTranslationSettings({ enabled: !transcript.translationEnabled })} onChangeTargetLanguage={(targetLanguage) => transcript.saveTranslationSettings({ targetLanguage })} onToggleOriginal={() => transcript.saveTranslationSettings({ displayMode: toggleOriginal(transcript.transcriptDisplayMode) })} onSetUpTranslation={() => { void window.electronAPI.toggleSettingsWindow(); }} />} right={<ChatColumn {...chatProps} />} splitterPosition={splitterPosition} onSplitterChange={changeSplitter} onSplitterReset={resetSplitter} isExpanded={isExpanded} appearance={appearance} overlayPanelClass="overlay-text-primary" />
+                        <SplitterShell left={<TranscriptColumn {...transcriptProps} status={audioState} onFixAudio={fixAudio} />} leftHeader={<TranscriptHeaderControls status={audioState} hasRows={hasTranscriptRows} onFixAudio={fixAudio} displayMode={transcript.transcriptDisplayMode} translationEnabled={transcript.translationEnabled} translationConfigured={transcript.translationConfigured} targetLanguage={transcript.targetLanguage} languageOptions={transcript.languageOptions} onToggleTranslation={() => transcript.saveTranslationSettings({ enabled: !transcript.translationEnabled })} onChangeTargetLanguage={(targetLanguage) => transcript.saveTranslationSettings({ targetLanguage })} onToggleOriginal={() => transcript.saveTranslationSettings({ displayMode: toggleOriginal(transcript.transcriptDisplayMode) })} onSetUpTranslation={() => { void window.electronAPI.toggleSettingsWindow(); }} />} right={<ChatColumn {...chatProps} />} splitterPosition={splitterPosition} onSplitterChange={changeSplitter} onSplitterReset={resetSplitter} isExpanded={isExpanded} appearance={appearance} overlayPanelClass="overlay-text-primary" />
                     </motion.div>
                 )}
             </AnimatePresence>

@@ -74,7 +74,7 @@ Owner approved on 2026-10-26: the top bar instead of the pill and both zone head
 | --- | --- | --- | --- |
 | V1 | Answer zone never clips: pixel floors for both zones, overlay `minHeight` 400 | unit test: both zones above their floors at 350px, 250px and 1000px; owner checks at 420px with translation on | done on branch `overlay-split-clamp` |
 | V2 | Hairlines use a real border class (`border-border-subtle/NN` generates no CSS) | no `border-border-subtle/` left in the overlay files; Q12 | not started |
-| V3 | One audio status: `audioStatus()`, chip, zone line, Settings deep link; the amber box is gone | unit test covers every row of spec section 6; Q6, Q14 | not started |
+| V3 | One audio status: `audioStatus()`, chip, zone line, Settings deep link; the amber box is gone | unit test covers every row of spec section 6; Q6, Q14 | done on branch `audio-status`; owner checks the chip over a quiet call and the Fix audio deep link on macOS and Windows |
 | V4 | The primary action follows the state ("Fix audio" when there is no audio) | Q4, Q5 in all six states | not started |
 | V5 | One-line empty states | Q11 | not started |
 | V6 | Legibility floor: alpha ranges, no `backdrop-filter`, light muted 0.82, placeholder = muted, `--overlay-action` | unit test: shell alpha at the lowest slider value is at least 0.95 dark and 0.94 light; Q7, Q9 | not started |

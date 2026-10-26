@@ -147,6 +147,9 @@ interface ElectronAPI {
 
   // Settings Window
   toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>
+  // Opens the full settings, on one tab (for example 'audio'), from any window
+  openSettingsSection: (section: string) => Promise<{ success: boolean }>
+  onOpenSettingsSection: (callback: (data: { section: string }) => void) => () => void
 
   // Groq Fast Text Mode
   getGroqFastTextMode: () => Promise<{ enabled: boolean }>
@@ -827,6 +830,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Settings Window
   toggleSettingsWindow: (coords?: { x: number; y: number }) => ipcRenderer.invoke('toggle-settings-window', coords),
+  openSettingsSection: (section: string) => ipcRenderer.invoke('open-settings-section', section),
+  onOpenSettingsSection: (callback: (data: { section: string }) => void) => {
+    const subscription = (_event: Electron.IpcRendererEvent, data: { section: string }) => callback(data)
+    ipcRenderer.on('open-settings-section', subscription)
+    return () => {
+      ipcRenderer.removeListener('open-settings-section', subscription)
+    }
+  },
 
   // Groq Fast Text Mode
   getGroqFastTextMode: () => ipcRenderer.invoke('get-groq-fast-text-mode'),

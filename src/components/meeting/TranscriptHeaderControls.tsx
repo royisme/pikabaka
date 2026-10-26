@@ -1,9 +1,13 @@
 import React from 'react';
 import { Languages, Type } from 'lucide-react';
 import type { TranscriptDisplayMode } from '../../lib/transcriptSegments';
+import type { AudioStatus } from '../../lib/audioStatus';
 
 interface TranscriptHeaderControlsProps {
-    sttStatus: { label: string; dotClass: string };
+    status: AudioStatus;
+    /** True when the transcript area shows rows: then the chip carries the words; otherwise the area's own line does. */
+    hasRows: boolean;
+    onFixAudio: () => void;
     displayMode: TranscriptDisplayMode;
     translationEnabled: boolean;
     translationConfigured: boolean;
@@ -15,6 +19,13 @@ interface TranscriptHeaderControlsProps {
     onSetUpTranslation: () => void;
 }
 
+const DOT_CLASS: Record<AudioStatus['dot'], string> = {
+    neutral: 'bg-current opacity-50',
+    success: 'bg-state-success',
+    warn: 'bg-state-warning',
+    danger: 'bg-state-danger',
+};
+
 const buttonClass =
     'inline-flex h-6 items-center gap-1 rounded-full border border-border-subtle px-2 text-[11px] font-medium normal-case tracking-normal overlay-text-secondary hover:text-text-primary aria-pressed:overlay-text-primary aria-pressed:bg-white/10';
 
@@ -24,7 +35,9 @@ const buttonClass =
  * on the buttons drop out and the icons and accessible names remain.
  */
 const TranscriptHeaderControls: React.FC<TranscriptHeaderControlsProps> = ({
-    sttStatus,
+    status,
+    hasRows,
+    onFixAudio,
     displayMode,
     translationEnabled,
     translationConfigured,
@@ -36,11 +49,24 @@ const TranscriptHeaderControls: React.FC<TranscriptHeaderControlsProps> = ({
     onSetUpTranslation,
 }) => (
     <div className="no-drag ml-auto flex items-center gap-1.5">
-        <span role="status" className="inline-flex items-center gap-1.5 normal-case tracking-normal" title={sttStatus.label}>
-            <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${sttStatus.dotClass}`} />
-            <span className="hidden text-[11px] font-medium min-[480px]:inline">{sttStatus.label}</span>
-            <span className="sr-only">{sttStatus.label}</span>
+        <span role="status" className="inline-flex items-center gap-1.5 normal-case tracking-normal" title={status.chip}>
+            <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${DOT_CLASS[status.dot]}`} />
+            {hasRows ? (
+                <>
+                    {status.level === 'warn' && <span aria-hidden="true" className="text-[11px]">▲</span>}
+                    {status.level === 'blocking' && <span aria-hidden="true" className="text-[11px]">✕</span>}
+                    <span className="hidden text-[11px] font-medium min-[480px]:inline">{status.chip}</span>
+                    <span className="text-[11px] font-medium min-[480px]:hidden">{status.chipShort}</span>
+                </>
+            ) : (
+                <span className="sr-only">{status.chip}</span>
+            )}
         </span>
+        {hasRows && status.action === 'fix-audio' && (
+            <button type="button" onClick={onFixAudio} className={buttonClass}>
+                Fix audio
+            </button>
+        )}
         {translationConfigured ? (
             <>
                 <button

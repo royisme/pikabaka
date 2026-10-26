@@ -80,6 +80,12 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState('general');
 
+  // "Fix audio" in the overlay opens the full settings on one tab.
+  useEffect(() => window.electronAPI?.onOpenSettingsSection?.(({ section }) => {
+    setSettingsInitialTab(section);
+    setIsSettingsOpen(true);
+  }), []);
+
   // Overlay opacity — only meaningful when isOverlayWindow, but stored centrally
   // so it can be initialized once from localStorage and updated via IPC.
   const [overlayOpacity, setOverlayOpacity] = useState<number>(() => {
