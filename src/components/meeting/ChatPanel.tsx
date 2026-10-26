@@ -10,6 +10,7 @@ import {
   Lightbulb,
   ArrowRight,
   Zap,
+  Square,
   Image,
   X,
   Copy,
@@ -63,6 +64,10 @@ interface ChatPanelProps {
   setInputValue: React.Dispatch<React.SetStateAction<string>>;
   isProcessing: boolean;
   handleWhatToSay: () => void;
+  /** Stops the answer being produced; the primary button becomes this while one is. */
+  onStop?: () => void;
+  /** Asks again what was asked last. */
+  onRetry?: () => void;
   /** Which audio state the empty answer area should speak for. */
   audioKey?: AudioStatusKey;
   /** True when something else is the one thing to do (fix the audio): What to say stays available but quiet. */
@@ -90,6 +95,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   setInputValue,
   isProcessing,
   handleWhatToSay,
+  onStop,
+  onRetry,
   audioKey = 'off',
   primaryQuiet = false,
   handleClarify,
@@ -444,6 +451,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     <Copy className="w-3 h-3" aria-hidden="true" />
                     <span>Copy</span>
                   </button>
+                  {onRetry && (
+                    <button
+                      onClick={onRetry}
+                      className="ml-1.5 inline-flex items-center gap-1 rounded-full border overlay-hairline px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-text-primary"
+                    >
+                      <RefreshCw className="w-3 h-3" aria-hidden="true" />
+                      <span>Retry</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -502,8 +518,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       <div className="shrink-0 px-3 min-[480px]:px-4 py-2 no-drag">
         <div className="flex h-7 items-center gap-1.5 mb-1.5">
           <button
-            onClick={handleWhatToSay}
-            disabled={isProcessing}
+            onClick={isProcessing ? onStop : handleWhatToSay}
+            disabled={isProcessing && !onStop}
             className={`flex h-7 min-w-[9rem] items-center justify-center gap-1.5 px-3 rounded-full text-xs font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 disabled:cursor-wait ${
               primaryQuiet
                 ? `border overlay-hairline ${quickActionClass}`
@@ -511,7 +527,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             }`}
             style={primaryQuiet ? appearance.chipStyle : undefined}
           >
-            <Zap className="w-3 h-3 opacity-75" /> {isProcessing ? 'Answering…' : 'What to say'}
+            {isProcessing ? <Square className="w-3 h-3 fill-current opacity-75" aria-hidden="true" /> : <Zap className="w-3 h-3 opacity-75" />} {isProcessing ? 'Stop' : 'What to say'}
             {!isProcessing && shortcuts.whatToAnswer.length > 0 && <KeyBadge keys={shortcuts.whatToAnswer} onAction={!primaryQuiet} className="hidden min-[480px]:flex ml-0.5" />}
           </button>
           <button onClick={handleClarify} aria-label="Clarify" title="Clarify" className={`flex h-7 w-7 min-[480px]:w-auto items-center justify-center gap-1.5 min-[480px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>

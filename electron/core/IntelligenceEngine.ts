@@ -817,12 +817,20 @@ export class IntelligenceEngine extends EventEmitter {
     /**
      * Reset engine state (cancels any in-flight operations)
      */
-    reset(): void {
+    /**
+     * Stops whatever answer is being generated: every stream loop compares its generation id with this one
+     * at the next token and ends itself. The session history is left alone.
+     */
+    cancelGeneration(): void {
         this.activeMode = 'idle';
         this.currentGenerationId++; // Increment to break all active LLM streams
         if (this.assistCancellationToken) {
             this.assistCancellationToken.abort();
             this.assistCancellationToken = null;
         }
+    }
+
+    reset(): void {
+        this.cancelGeneration();
     }
 }

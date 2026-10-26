@@ -474,6 +474,13 @@ export function registerCoreHandlers(appState: AppState): void {
     return appState.getWindowHelper().isMainWindowMaximized();
   });
 
+  // Stop the answer being generated: the engine's streams and the chat stream both end at their next token.
+  safeHandle("cancel-generation", () => {
+    appState.getIntelligenceManager().cancelGeneration()
+    _chatStreamId++
+    return { success: true }
+  })
+
   // Settings Window
   safeHandle("toggle-settings-window", (event, { x, y } = {}) => {
     appState.settingsWindowHelper.toggleWindow(x, y)

@@ -223,6 +223,11 @@ export class IntelligenceManager extends EventEmitter {
         this.engine.reset();
     }
 
+    /** Stops the answer being generated, keeping the session. */
+    cancelGeneration(): void {
+        this.engine.cancelGeneration();
+    }
+
     reset(): void {
         this.session.reset();
         this.engine.reset();

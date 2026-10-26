@@ -2,6 +2,15 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: Stop and Retry (branch `stop-and-retry`, issue #27)
+
+Done (the main-process part of the old "stop and retry" gap in #27)
+- **Stop.** New IPC `cancel-generation`: the engine's `cancelGeneration()` (the same generation-id mechanism a new request already used, now also reachable on its own, without wiping the session) and the chat stream's id are bumped, so every stream loop ends at its next token and the underlying generator is returned. The renderer then ignores tokens already in flight (they would otherwise open a new message), leaves what was written as the answer, drops an empty placeholder and clears "processing". The primary button reads "Stop" with a square icon while an answer is produced and ends it; the Reset / Cancel shortcut (Cmd+R) now does a real stop too, where it only hid the dots before.
+- **Retry.** The chat hook remembers the last thing asked (what to say, clarify, recap, follow-up questions, brainstorm, code hint, or the typed question) and `retryLast` asks again; a failure message at the end of the list is removed first and a typed question is not echoed twice. Every latest answer, and every failure, has a visible Retry next to Copy. A typed question that had a screenshot attached has no Retry (the attachment is already gone).
+- A bug caught in review before it shipped: my own `beginProcessing` helper had replaced the `setIsProcessing(true)` inside itself and would have recursed forever; fixed (tsc does not catch that).
+- Verified: both `tsc --noEmit` checks exit 0; lint exit 0 with the warning count unchanged at 1268; tap 759 of 759. There is no test for the hook or the engine: neither can be loaded by the tap runner.
+- Not verified, and it matters: that Stop actually ends the answer in each of the seven engine paths (what to say, recap, clarify, follow-up questions, assist, brainstorm, code hint) and the chat stream; that no token slips through after Stop; that a provider request is really released (the loops call `return()` on the generator, which depends on each provider's generator honouring it, as the existing "new generation aborts the old" path already assumed); that Retry repeats exactly what was asked. This needs a real answer from a real provider, which no automated check here exercises.
+
 ## 2026-10-26: R5 early translation design note (branch `early-translation-note`, issue #33)
 
 Done

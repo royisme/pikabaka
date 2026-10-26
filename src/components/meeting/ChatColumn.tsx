@@ -25,6 +25,8 @@ interface ChatColumnProps {
     isProcessing: boolean;
     handleWhatToSay: () => void;
     primaryQuiet?: boolean;
+    onStop?: () => void;
+    onRetry?: () => void;
     audioKey?: AudioStatusKey;
     handleClarify: () => void;
     handleFollowUpQuestions: () => void;
@@ -50,6 +52,8 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
     isProcessing,
     handleWhatToSay,
     primaryQuiet,
+    onStop,
+    onRetry,
     audioKey,
     handleClarify,
     handleFollowUpQuestions,
@@ -75,6 +79,8 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
             isProcessing={isProcessing}
             handleWhatToSay={handleWhatToSay}
             primaryQuiet={primaryQuiet}
+            onStop={onStop}
+            onRetry={onRetry}
             audioKey={audioKey}
             handleClarify={handleClarify}
             handleFollowUpQuestions={handleFollowUpQuestions}
