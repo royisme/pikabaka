@@ -23,6 +23,7 @@ interface ChatColumnProps {
     setInputValue: React.Dispatch<React.SetStateAction<string>>;
     isProcessing: boolean;
     handleWhatToSay: () => void;
+    primaryQuiet?: boolean;
     handleClarify: () => void;
     handleFollowUpQuestions: () => void;
     handleRecap: () => void;
@@ -51,6 +52,7 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
     setInputValue,
     isProcessing,
     handleWhatToSay,
+    primaryQuiet,
     handleClarify,
     handleFollowUpQuestions,
     handleRecap,
@@ -79,6 +81,7 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
             setInputValue={setInputValue}
             isProcessing={isProcessing}
             handleWhatToSay={handleWhatToSay}
+            primaryQuiet={primaryQuiet}
             handleClarify={handleClarify}
             handleFollowUpQuestions={handleFollowUpQuestions}
             handleRecap={handleRecap}

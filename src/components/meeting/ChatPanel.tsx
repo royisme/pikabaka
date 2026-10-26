@@ -64,6 +64,8 @@ interface ChatPanelProps {
   setInputValue: React.Dispatch<React.SetStateAction<string>>;
   isProcessing: boolean;
   handleWhatToSay: () => void;
+  /** True when something else is the one thing to do (fix the audio): What to say stays available but quiet. */
+  primaryQuiet?: boolean;
   handleClarify: () => void;
   handleFollowUpQuestions: () => void;
   handleRecap: () => void;
@@ -92,6 +94,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   setInputValue,
   isProcessing,
   handleWhatToSay,
+  primaryQuiet = false,
   handleClarify,
   handleFollowUpQuestions,
   handleRecap,
@@ -444,16 +447,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         ))}
 
-        {isProcessing && (
-          <div className="flex justify-start">
-            <div className="px-3 py-2 flex gap-1.5">
-              <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
-        )}
-
         {knowledgeContext && knowledgeContext.matchedJDSignals.length > 0 && (
           <div className="mx-3 mb-2 p-3.5 rounded-2xl border border-white/12 bg-[rgba(10,14,28,0.82)] shadow-[0_10px_28px_rgba(0,0,0,0.18)]">
             <div className="flex items-center gap-1.5 mb-2">
@@ -506,10 +499,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       <div className="flex flex-nowrap items-center gap-1.5 px-4 pb-3 overflow-x-auto no-scrollbar pt-3.5 no-drag [&>:first-child]:ml-auto [&>:last-child]:mr-auto">
         <button
           onClick={handleWhatToSay}
-          className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 bg-[#007AFF] text-white shadow-[0_4px_14px_rgba(0,122,255,0.18)] hover:bg-[#0071E3]"
+          disabled={isProcessing}
+          className={`flex min-w-[9rem] items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 disabled:cursor-wait ${
+            primaryQuiet
+              ? `border border-border-subtle/55 ${quickActionClass}`
+              : 'bg-[#0071E3] text-white shadow-[0_4px_14px_rgba(0,113,227,0.18)] hover:bg-[#0066CC]'
+          }`}
+          style={primaryQuiet ? appearance.chipStyle : undefined}
         >
-          <Zap className="w-3 h-3 opacity-75" /> What to say
-          {shortcuts.whatToAnswer.length > 0 && <KeyBadge keys={shortcuts.whatToAnswer} className="ml-0.5 opacity-80" />}
+          <Zap className="w-3 h-3 opacity-75" /> {isProcessing ? 'Answering…' : 'What to say'}
+          {!isProcessing && shortcuts.whatToAnswer.length > 0 && <KeyBadge keys={shortcuts.whatToAnswer} className="ml-0.5 opacity-80" />}
         </button>
         <button onClick={handleClarify} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
           <MessageSquare className="w-3 h-3 opacity-65" /> Clarify
@@ -691,7 +690,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               w-7 h-7 rounded-full flex items-center justify-center
               interaction-base interaction-press
               ${inputValue.trim()
-                ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20 hover:bg-[#0071E3]'
+                ? 'bg-[#0071E3] text-white shadow-lg shadow-blue-500/20 hover:bg-[#0066CC]'
                 : 'overlay-icon-surface overlay-text-muted cursor-not-allowed'
               }
             `}

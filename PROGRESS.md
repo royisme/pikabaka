@@ -2,6 +2,15 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: V4 the primary action follows the state (branch `primary-follows-state`)
+
+Done
+- The primary button follows the state. With no transcript rows and a "Fix audio" action on screen, "Fix audio" is the one filled control and "What to say" becomes a quiet outlined chip in the same place (one filled accent, spec Q5); otherwise "What to say" is filled. While an answer is being produced it reads "Answering…", is disabled and keeps its width (`min-w-[9rem]`); there is still no Stop, because the main process cannot cancel a request (U8).
+- The three bouncing grey dots under the answer list are gone: busy now shows on the button.
+- The filled colour moved from `#007AFF` to `#0071E3` (white text 4.7:1 by calculation, the old one 4.0:1) on the primary button and Send. The `--overlay-action` token itself comes with V6.
+- Verified: both `tsc --noEmit` checks exit 0; tap passes. No new unit test: the state-to-style choice is a class condition.
+- Not verified: how the six states look; that the button's width does not change between "What to say ⌘1" and "Answering…" (the 9rem minimum is a guess from the text size).
+
 ## 2026-10-26: V3 one audio status (branch `audio-status`)
 
 Done
