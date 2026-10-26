@@ -1,5 +1,5 @@
 import t from 'tap';
-import { translationEnabledAfterEvent, upsertTranscriptSegment } from '../src/lib/transcriptSegments';
+import { isTranslationStale, translationEnabledAfterEvent, upsertTranscriptSegment } from '../src/lib/transcriptSegments';
 import { buildTranscriptTranslationPrompt, isTranscriptTranslationConfigured } from '../electron/transcript/translationExecutor';
 
 t.test('upsertTranscriptSegment appends and patches by segmentId', (t) => {
@@ -94,5 +94,28 @@ t.test('translationEnabledAfterEvent: skipped means off, any other state means o
   t.equal(translationEnabledAfterEvent(true, 'skipped'), false);
   t.equal(translationEnabledAfterEvent(true, undefined), true, 'event without a state changes nothing');
   t.equal(translationEnabledAfterEvent(false, undefined), false);
+  t.end();
+});
+
+t.test('a reopened turn keeps its old translation only as stale, until the new one lands', (t) => {
+  const first = upsertTranscriptSegment([], { final: true, text: 'See you Monday', translatedText: 'À lundi', segmentId: 's1', translationState: 'complete', revision: 1 }, 1000);
+  t.equal(first[0].translatedRevision, 1);
+  t.equal(isTranslationStale(first[0]), false, 'translation matches its revision');
+
+  const reopened = upsertTranscriptSegment(first, { final: true, text: 'See you Monday morning', segmentId: 's1', translationState: 'pending', revision: 2 }, 2000);
+  t.equal(reopened[0].translatedText, 'À lundi', 'old text is kept so the row does not jump');
+  t.equal(reopened[0].translatedRevision, 1);
+  t.equal(isTranslationStale(reopened[0]), true, 'old translation of revision 1 under revision 2 text');
+
+  const redone = upsertTranscriptSegment(reopened, { final: true, text: 'See you Monday morning', translatedText: 'À lundi matin', segmentId: 's1', translationState: 'complete', revision: 2 }, 3000);
+  t.equal(redone[0].translatedRevision, 2);
+  t.equal(isTranslationStale(redone[0]), false);
+  t.end();
+});
+
+t.test('segments without revisions are never stale', (t) => {
+  const rows = upsertTranscriptSegment([], { final: true, text: 'Hi', translatedText: 'Salut', segmentId: 's1', translationState: 'complete' });
+  t.equal(isTranslationStale(rows[0]), false);
+  t.equal(isTranslationStale({ translatedText: undefined, revision: 3, translatedRevision: undefined }), false, 'nothing to be stale');
   t.end();
 });

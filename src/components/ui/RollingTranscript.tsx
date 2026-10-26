@@ -146,7 +146,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                             ? 'text-xs leading-[17px] overlay-text-muted'
                             : parts.kind === 'awaiting'
                               ? 'text-xs leading-[17px] overlay-text-secondary'
-                              : parts.kind === 'translation' && !newest
+                              : parts.kind === 'translation' && (!newest || parts.updating)
                                 ? 'text-sm leading-5 overlay-text-secondary'
                                 : `text-sm leading-5 overlay-text-primary${newest ? ' font-medium' : ''}`;
 
@@ -165,7 +165,10 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                     onClick={() => setExpandedId(expanded ? null : seg.segmentId)}
                                     className="block w-full text-left"
                                 >
-                                    <span className={`block whitespace-pre-wrap break-words ${leadClass}`}>{parts.lead}</span>
+                                    <span className={`block whitespace-pre-wrap break-words ${leadClass}${parts.updating ? ' opacity-70' : ''}`}>
+                                        {parts.lead}
+                                        {parts.updating && <span className="ml-1 text-[11px] overlay-text-muted"> · updating</span>}
+                                    </span>
                                     {parts.sourceBelow !== null && (
                                         <span className="block text-xs leading-[17px] overlay-text-muted whitespace-pre-wrap break-words">
                                             {parts.sourceBelow}

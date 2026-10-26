@@ -10,6 +10,7 @@ t.test('both: translation leads, source beneath', async (t) => {
     lead: '我们能把电话改到周五吗？',
     sourceBelow: 'Can we move the call to Friday?',
     hasTranslation: true,
+    updating: false,
   });
 });
 
@@ -73,4 +74,30 @@ t.test('no slot when translation is off, the mode is original, or the row is own
   t.equal(rowSlot({ ...pending, ...other, translationState: 'skipped' }, ctx), null);
   const same = { sourceText: 'Sounds good', translatedText: 'Sounds good', translationState: 'complete' as const, ...other };
   t.equal(rowSlot(same, ctx), null, 'same language collapses the slot');
+});
+
+const stale = { sourceText: 'See you Monday morning', translatedText: 'À lundi', translatedRevision: 1, revision: 2 };
+
+t.test('a stale translation is shown as updating only while a new one is pending', async (t) => {
+  const parts = transcriptRowParts({ ...stale, translationState: 'pending' }, 'both', false);
+  t.equal(parts.kind, 'translation');
+  t.equal(parts.lead, 'À lundi');
+  t.equal(parts.updating, true);
+  t.same(rowSlot({ ...stale, translationState: 'pending', speaker: 'interviewer' }, ctx), { kind: 'translation' });
+});
+
+t.test('a stale translation with no request behind it is hidden, never shown as current', async (t) => {
+  for (const translationState of ['complete', 'skipped'] as const) {
+    const parts = transcriptRowParts({ ...stale, translationState }, 'both', false);
+    t.equal(parts.hasTranslation, false, translationState);
+    t.equal(parts.lead, 'See you Monday morning');
+  }
+  const failed = { ...stale, translationState: 'error' as const, speaker: 'interviewer' as const };
+  t.same(rowSlot(failed, ctx), { kind: 'failed' }, 'a failed redo shows the failure, not the old translation');
+  t.equal(transcriptRowParts(failed, 'both', false).kind, 'awaiting');
+});
+
+t.test('a current translation is not updating', async (t) => {
+  const current = { ...stale, translatedRevision: 2, translationState: 'complete' as const };
+  t.equal(transcriptRowParts(current, 'both', false).updating, false);
 });

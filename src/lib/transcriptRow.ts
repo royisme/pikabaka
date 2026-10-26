@@ -1,4 +1,4 @@
-import type { TranscriptDisplayMode, TranscriptSegment } from './transcriptSegments';
+import { isTranslationStale, type TranscriptDisplayMode, type TranscriptSegment } from './transcriptSegments';
 
 export type TranscriptRowKind =
   /** The lead line is the translation. */
@@ -14,11 +14,24 @@ export type TranscriptRowParts = {
   /** Source text shown under a translation, or null when it is hidden. */
   sourceBelow: string | null;
   hasTranslation: boolean;
+  /** The translation belongs to an earlier revision of the text and is being redone. */
+  updating: boolean;
 };
 
-export function hasUsableTranslation(segment: Pick<TranscriptSegment, 'sourceText' | 'translatedText'>): boolean {
+type TranslationFields = Pick<
+  TranscriptSegment,
+  'sourceText' | 'translatedText' | 'translationState' | 'revision' | 'translatedRevision'
+>;
+
+/**
+ * A translation worth showing: it differs from the source, and either belongs to the current
+ * revision or is an earlier one that a pending request is replacing. A stale translation with no
+ * request behind it is hidden rather than shown as if it were current.
+ */
+export function hasUsableTranslation(segment: TranslationFields): boolean {
   const translated = segment.translatedText?.trim();
-  return !!translated && translated !== segment.sourceText.trim();
+  if (!translated || translated === segment.sourceText.trim()) return false;
+  return !isTranslationStale(segment) || segment.translationState === 'pending';
 }
 
 /**
@@ -27,7 +40,7 @@ export function hasUsableTranslation(segment: Pick<TranscriptSegment, 'sourceTex
  * source behind an expand; `original` never shows the translation.
  */
 export function transcriptRowParts(
-  segment: Pick<TranscriptSegment, 'sourceText' | 'translatedText' | 'translationState'>,
+  segment: TranslationFields,
   mode: TranscriptDisplayMode,
   expanded: boolean
 ): TranscriptRowParts {
@@ -40,6 +53,7 @@ export function transcriptRowParts(
       lead: segment.sourceText,
       sourceBelow: null,
       hasTranslation,
+      updating: false,
     };
   }
   const showSource = mode === 'both' || expanded;
@@ -48,6 +62,7 @@ export function transcriptRowParts(
     lead: segment.translatedText!.trim(),
     sourceBelow: showSource ? segment.sourceText : null,
     hasTranslation,
+    updating: isTranslationStale(segment),
   };
 }
 
@@ -73,7 +88,7 @@ export const SLOW_TRANSLATION_MS = 3000;
 export function rowSlot(
   row:
     | 'live'
-    | Pick<TranscriptSegment, 'sourceText' | 'translatedText' | 'translationState' | 'receivedAt' | 'speaker'>,
+    | (TranslationFields & Pick<TranscriptSegment, 'receivedAt' | 'speaker'>),
   context: { mode: TranscriptDisplayMode; translationOn: boolean; now: number }
 ): RowSlot {
   if (context.mode === 'original') return null;

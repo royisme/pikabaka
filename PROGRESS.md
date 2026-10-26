@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: T4 revision-safe translations (branch `revision-safe-translation`, issue #37)
+
+Done
+- `translatedRevision` records which revision of the source a translation is for. `isTranslationStale` is true when they differ. `hasUsableTranslation` now shows a stale translation only while a new request is pending (muted, with an inline "· updating"); a stale translation with no request behind it is hidden, and a failed redo shows "Translation failed" rather than the old translation.
+- Verified: both `tsc --noEmit` checks exit 0; tap 443 of 443 (13 new assertions: reopened turn goes stale and recovers, never stale without revisions, hidden when complete or skipped, failed redo, current translation).
+- Not verified: how "updating" looks in the running app, and a real reopened turn from second-pass correction (tests use hand-built events; the main process was not changed).
+
 ## 2026-10-26: T3 reserved slot and line states (branch `translation-slot`, epic #38)
 
 Done

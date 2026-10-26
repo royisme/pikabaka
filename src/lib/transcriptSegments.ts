@@ -10,6 +10,8 @@ export interface TranscriptSegment {
   detectedLanguage?: string;
   revision?: number;
   speaker?: 'interviewer' | 'user';
+  /** The `revision` of the source text that `translatedText` translates. */
+  translatedRevision?: number;
   /** Renderer clock time at which the latest `pending` event arrived; drives the elapsed time of a slow translation. */
   receivedAt?: number;
 }
@@ -43,6 +45,13 @@ export function translationEnabledAfterEvent(
   return state === undefined ? current : state !== 'skipped';
 }
 
+/** A translation of an earlier revision of the text: shown only as "updating", never as current. */
+export function isTranslationStale(
+  segment: Pick<TranscriptSegment, 'translatedText' | 'revision' | 'translatedRevision'>
+): boolean {
+  return !!segment.translatedText && segment.revision !== undefined && segment.translatedRevision !== segment.revision;
+}
+
 export function upsertTranscriptSegment(
   segments: TranscriptSegment[],
   event: TranscriptEventForSegment,
@@ -74,6 +83,7 @@ export function upsertTranscriptSegment(
         detectedLanguage: event.detectedLanguage || undefined,
         revision: event.revision,
         speaker: event.speaker,
+        translatedRevision: event.translatedText?.trim() ? event.revision : undefined,
         receivedAt: translationState === 'pending' ? now : undefined,
       },
     ];
@@ -100,6 +110,9 @@ export function upsertTranscriptSegment(
     detectedLanguage: event.detectedLanguage || existing.detectedLanguage,
     revision: event.revision ?? existing.revision,
     speaker: event.speaker ?? existing.speaker,
+    translatedRevision: event.translatedText?.trim()
+      ? (event.revision ?? existing.revision)
+      : existing.translatedRevision,
     receivedAt: event.translationState === 'pending' ? now : existing.receivedAt,
   };
   return updated;
