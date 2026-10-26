@@ -531,6 +531,29 @@ export class DatabaseManager {
         return meetingRecord.upsertSegment(this.db, segment);
     }
 
+    public getRecentSegments(meetingId: string, sinceMs: number): Array<{
+        segmentId: string; revision: number | null; speaker: string; text: string; timestampMs: number;
+    }> {
+        if (!this.db) throw new Error('Database not initialized');
+        return this.db.prepare(`
+            SELECT COALESCE(segment_id, CAST(id AS TEXT)) AS segmentId, revision,
+                   speaker, content AS text, timestamp_ms AS timestampMs
+            FROM transcripts WHERE meeting_id = ? AND timestamp_ms >= ?
+            ORDER BY timestamp_ms ASC, id ASC
+        `).all(meetingId, sinceMs) as ReturnType<DatabaseManager['getRecentSegments']>;
+    }
+
+    public searchSegments(meetingId: string, query: string, limit: number): ReturnType<DatabaseManager['getRecentSegments']> {
+        if (!this.db) throw new Error('Database not initialized');
+        if (!query.trim()) return [];
+        return this.db.prepare(`
+            SELECT COALESCE(segment_id, CAST(id AS TEXT)) AS segmentId, revision,
+                   speaker, content AS text, timestamp_ms AS timestampMs
+            FROM transcripts WHERE meeting_id = ? AND instr(lower(content), lower(?)) > 0
+            ORDER BY timestamp_ms DESC, id DESC LIMIT ?
+        `).all(meetingId, query, Math.max(1, Math.min(8, Math.trunc(limit)))) as ReturnType<DatabaseManager['getRecentSegments']>;
+    }
+
     public addInteraction(meetingId: string, usage: NonNullable<Meeting['usage']>[number]): void {
         if (!this.db) {
             console.error('[DatabaseManager] DB not initialized');

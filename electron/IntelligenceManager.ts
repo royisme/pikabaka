@@ -205,8 +205,8 @@ export class IntelligenceManager extends EventEmitter {
         return this.persistence.startMeeting(metadata);
     }
 
-    async stopMeeting(): Promise<string | null> {
-        return this.persistence.stopMeeting();
+    async stopMeeting(stoppedAtMs: number = Date.now()): Promise<string | null> {
+        return this.persistence.stopMeeting(stoppedAtMs);
     }
 
     async recoverUnprocessedMeetings(): Promise<void> {

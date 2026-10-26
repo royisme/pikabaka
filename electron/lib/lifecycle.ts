@@ -4,6 +4,7 @@ import { KeybindManager } from "../services/KeybindManager"
 import { SettingsManager } from "../services/SettingsManager"
 import { OllamaManager } from "../services/OllamaManager"
 import { AppState } from "../main"
+import { reportAgentError } from '../agent/MeetingAgent'
 
 export async function initializeApp() {
   // 1. Enforce single instance — prevent duplicate dock icons from leftover processes.
@@ -157,28 +158,35 @@ export async function initializeApp() {
     }
   })
 
-  // Scrub API keys from memory on quit to minimize exposure window
+  // Electron does not await async listeners; hold quit until agent cleanup precedes key scrubbing.
+  let agentQuitPending = false;
+  let quitCleanupDone = false;
   app.on("before-quit", (event) => {
+    if (quitCleanupDone) return;
+    event.preventDefault();
+    if (agentQuitPending) return;
+    agentQuitPending = true;
     console.log("App is quitting, cleaning up resources...");
     appState.setQuitting(true);
+    void appState.getMeetingAgent().stopAll(2000).finally(() => {
+      try {
+        // Dispose the capture listeners before scrubbing credentials.
+        appState.cropperWindowHelper?.dispose();
+        OllamaManager.getInstance().stop();
 
-    // Dispose CropperWindowHelper to clean up IPC listeners and prevent memory leaks
-    // This is critical to prevent resource leaks and ensure proper cleanup
-    if (appState?.cropperWindowHelper) {
-      appState.cropperWindowHelper.dispose();
-    }
-
-    // Kill Ollama if we started it
-    OllamaManager.getInstance().stop();
-
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      CredentialsManager.getInstance().scrubMemory();
-      appState.processingHelper.getLLMHelper().scrubKeys();
-      console.log('[Main] Credentials scrubbed from memory on quit');
-    } catch (e) {
-      console.error('[Main] Failed to scrub credentials on quit:', e);
-    }
+        try {
+          const { CredentialsManager } = require('../services/CredentialsManager');
+          CredentialsManager.getInstance().scrubMemory();
+          appState.processingHelper.getLLMHelper().scrubKeys();
+          console.log('[Main] Credentials scrubbed from memory on quit');
+        } catch (e) {
+          console.error('[Main] Failed to scrub credentials on quit:', e);
+        }
+      } finally {
+        quitCleanupDone = true;
+        app.quit();
+      }
+    }).catch(error => reportAgentError(error));
   })
 
 

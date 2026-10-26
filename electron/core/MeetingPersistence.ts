@@ -49,7 +49,7 @@ export class MeetingPersistence {
      * Stops the meeting immediately, snapshots data, and triggers background processing.
      * Returns immediately so UI can switch.
      */
-    public async stopMeeting(): Promise<string | null> {
+    public async stopMeeting(stoppedAtMs: number = Date.now()): Promise<string | null> {
         console.log('[MeetingPersistence] Stopping meeting and queueing save...');
 
         // 0. Force-save any pending interim transcript
@@ -57,7 +57,7 @@ export class MeetingPersistence {
 
         // 1. Snapshot valid data BEFORE resetting
         const meetingId = this.session.getMeetingId();
-        const durationMs = Date.now() - this.session.getSessionStartTime();
+        const durationMs = stoppedAtMs - this.session.getSessionStartTime();
         if (durationMs < 1000) {
             console.log("Meeting too short, ignoring.");
             if (meetingId) DatabaseManager.getInstance().deleteMeeting(meetingId);

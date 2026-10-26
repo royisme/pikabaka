@@ -51,6 +51,7 @@ export function registerMeetingHandlers(appState: AppState): void {
   });
 
   safeHandle("delete-meeting", async (_, id: string) => {
+    await appState.getMeetingAgent().deleteStore(id);
     return DatabaseManager.getInstance().deleteMeeting(id);
   });
 
@@ -69,6 +70,7 @@ export function registerMeetingHandlers(appState: AppState): void {
   });
 
   safeHandle("flush-database", async () => {
+    await appState.getMeetingAgent().deleteAllStores();
     const result = DatabaseManager.getInstance().clearAllData();
     return { success: result };
   });

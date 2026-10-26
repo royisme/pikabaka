@@ -36,6 +36,8 @@ import { MicrophoneCapture } from "./audio/MicrophoneCapture"
 import { ThemeManager } from "./helpers/ThemeManager"
 import { RAGManager } from "./rag/RAGManager"
 import { DatabaseManager } from "./db/DatabaseManager"
+import { getMeetingAgent } from './agent/instance'
+import { type MeetingAgent, reportAgentError } from './agent/MeetingAgent'
 import { warmupIntentClassifier } from "./llm"
 import {
   setupAutoUpdater as setupAutoUpdaterFn,
@@ -157,6 +159,7 @@ export class AppState {
 
   public hasDebugged: boolean = false
   private isMeetingActive: boolean = false; // Guard for session state leaks
+  private endingMeeting: Promise<void> | undefined;
   private _isQuitting: boolean = false;
   public _verboseLogging: boolean = false;
   public _disguiseTimers: NodeJS.Timeout[] = []; // Track forceUpdate timeouts
@@ -602,6 +605,8 @@ export class AppState {
   /** The meeting the assembled transcript is written to; null between meetings. */
   private currentMeetingId: string | null = null;
 
+  public getCurrentMeetingId(): string | null { return this.currentMeetingId; }
+
   public recordTranscriptSegment(segment: { segmentId: string; revision: number; speaker: TranscriptSpeaker; text: string; timestampMs: number }): void {
     if (!this.currentMeetingId) return;
     try {
@@ -821,6 +826,7 @@ export class AppState {
   }
 
   public async startMeeting(metadata?: any): Promise<void> {
+    await this.endingMeeting;
     console.log('[Main] Starting Meeting...', metadata);
 
     if (!(await ensureMacMicrophoneAccess('meeting start'))) {
@@ -840,6 +846,9 @@ export class AppState {
     }
     // The meeting row exists before any audio, so each assembled line is saved as it happens.
     this.currentMeetingId = this.intelligenceManager.startMeeting(metadata);
+    if (this.currentMeetingId) {
+      void this.getMeetingAgent().open(this.currentMeetingId).catch(error => reportAgentError(error));
+    }
 
     // Emit session reset to clear UI state immediately
     this.getWindowHelper().getOverlayWindow()?.webContents.send('session-reset');
@@ -898,8 +907,13 @@ export class AppState {
     }, 0); // Defer to next event loop tick — ensures IPC response reaches renderer before audio init
   }
 
-  public async endMeeting(): Promise<void> {
+  public endMeeting(): Promise<void> {
+    return this.endingMeeting ??= this.finishMeeting().finally(() => { this.endingMeeting = undefined; });
+  }
+
+  private async finishMeeting(): Promise<void> {
     console.log('[Main] Ending Meeting...');
+    const stoppedAtMs = Date.now();
     this.isMeetingActive = false; // Block new data immediately
     this.broadcastMeetingState();
 
@@ -923,8 +937,15 @@ export class AppState {
     // Capture the meetingId NOW so the background IIFE uses a deterministic ID
     // rather than getRecentMeetings(1) which could return a different meeting if the
     // user starts a new session before background processing finishes.
-    const meetingId = await this.intelligenceManager.stopMeeting();
+    const agentMeetingId = this.currentMeetingId;
+    if (agentMeetingId) {
+      await this.getMeetingAgent().stop(agentMeetingId).catch(error => reportAgentError(error, agentMeetingId));
+    }
+    const meetingId = await this.intelligenceManager.stopMeeting(stoppedAtMs);
     this.currentMeetingId = null;
+    if (agentMeetingId && !meetingId) {
+      await this.getMeetingAgent().deleteStore(agentMeetingId).catch(error => reportAgentError(error, agentMeetingId));
+    }
 
     // Revert to Default Model — synchronous, no blocking I/O
     try {
@@ -1149,6 +1170,8 @@ export class AppState {
   public getThemeManager(): ThemeManager {
     return this.themeManager
   }
+
+  public getMeetingAgent(): MeetingAgent { return getMeetingAgent(); }
 
   public getRAGManager(): RAGManager | null {
     return this.ragManager;
