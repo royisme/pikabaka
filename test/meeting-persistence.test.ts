@@ -86,9 +86,9 @@ function harness(t: Test) {
     deleteMeeting: (id: string) => db.prepare('DELETE FROM meetings WHERE id = ?').run(id).changes > 0,
   };
   class FakeLLMHelper {
-    async generateMeetingSummary(_prompt: string, _context: string, kind: string) {
+    async generateMeetingSummary(prompt: string, _context: string) {
       await gate;
-      if (kind === 'title') {
+      if (prompt.startsWith('Generate a concise 3-6 word title')) {
         calls.titles++;
         return 'Generated sample title';
       }
@@ -100,7 +100,6 @@ function harness(t: Test) {
   const mocks = {
     electron: { BrowserWindow: { getAllWindows: () => [] } },
     [path.join(process.cwd(), 'electron/db/DatabaseManager.ts')]: { DatabaseManager: { getInstance: () => fake } },
-    [path.join(process.cwd(), 'electron/llm/index.ts')]: { GROQ_TITLE_PROMPT: 'title', GROQ_SUMMARY_JSON_PROMPT: 'summary' },
     [core('LLMHelper.ts')]: { LLMHelper: FakeLLMHelper },
   };
   const { SessionTracker: Tracker } = mockRequire(core('SessionTracker.ts'), mocks) as { SessionTracker: typeof SessionTracker };
