@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
+import { useQuery, useQueryClient } from 'react-query';
 import type { AgentApprovalRequest } from '../../types/electron';
 
 const TITLE: Record<AgentApprovalRequest['tool'], string> = {
@@ -13,21 +14,21 @@ const TITLE: Record<AgentApprovalRequest['tool'], string> = {
  * and it shows exactly what would happen. Allow is the one filled control while a request waits.
  */
 const ApprovalDock: React.FC = () => {
-    const [pending, setPending] = useState<AgentApprovalRequest[]>([]);
+    const queryClient = useQueryClient();
+    const { data: pending = [] } = useQuery<AgentApprovalRequest[]>(['agent-approvals'], () => window.electronAPI.agentApprovalsList());
 
-    useEffect(() => {
-        const api = window.electronAPI;
-        let alive = true;
-        api?.agentApprovalsList?.().then((list) => { if (alive) setPending(list); }).catch(() => {});
-        const off = api?.onAgentApproval?.((event) => {
-            setPending((current) =>
-                event.type === 'requested'
-                    ? [...current.filter((item) => item.id !== event.request.id), event.request]
-                    : current.filter((item) => item.id !== event.id)
-            );
-        });
-        return () => { alive = false; off?.(); };
-    }, []);
+    // The one effect: the main process pushes requests and answers, so the list follows that stream.
+    useEffect(
+        () =>
+            window.electronAPI?.onAgentApproval?.((event) => {
+                queryClient.setQueryData<AgentApprovalRequest[]>(['agent-approvals'], (current = []) =>
+                    event.type === 'requested'
+                        ? [...current.filter((item) => item.id !== event.request.id), event.request]
+                        : current.filter((item) => item.id !== event.id)
+                );
+            }),
+        [queryClient]
+    );
 
     const request = pending[0];
     if (!request) return null;

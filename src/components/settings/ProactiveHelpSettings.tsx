@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from 'react-query';
 import type { AgentGateDecision } from '../../types/electron';
 
 type Mode = 'log' | 'on' | 'off';
@@ -21,82 +22,69 @@ function percent(value?: number): string {
  * speak up, and the log of its latest decisions (no speech text is kept in it).
  */
 const ProactiveHelpSettings: React.FC = () => {
-    const [mode, setMode] = useState<Mode>('log');
-    const [model, setModel] = useState('');
-    const [baseUrl, setBaseUrl] = useState('');
-    const [apiKey, setApiKey] = useState('');
-    const [hasApiKey, setHasApiKey] = useState(false);
-    const [threshold, setThreshold] = useState(0.7);
-    const [cooldownSeconds, setCooldownSeconds] = useState(120);
-    const [status, setStatus] = useState<Status | null>(null);
-    const [log, setLog] = useState<AgentGateDecision[]>([]);
-    const [saved, setSaved] = useState(false);
-    const [error, setError] = useState('');
+    const queryClient = useQueryClient();
+    const settings = useQuery(['agent-gate-settings'], () => window.electronAPI.agentGateGetSettings());
+    const status = useQuery<Status>(['agent-gate-status'], () => window.electronAPI.agentGateStatus());
+    const log = useQuery<AgentGateDecision[]>(['agent-gate-log'], () => window.electronAPI.agentGateLog());
 
-    const refresh = useCallback(async () => {
-        const api = window.electronAPI;
-        if (!api?.agentGateStatus || !api.agentGateLog) return;
-        try {
-            const [nextStatus, nextLog] = await Promise.all([api.agentGateStatus(), api.agentGateLog()]);
-            setStatus(nextStatus);
-            setLog(nextLog);
-        } catch {
-            // The status is informational; the form still works without it.
-        }
-    }, []);
+    // What is typed is a draft over the saved settings; the key is only ever typed, never read back.
+    const [draft, setDraft] = useState<{ mode?: Mode; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }>({});
+    const saved = settings.data;
+    const mode: Mode = draft.mode ?? saved?.mode ?? 'log';
+    const model = draft.model ?? saved?.model ?? '';
+    const baseUrl = draft.baseUrl ?? saved?.baseUrl ?? '';
+    const apiKey = draft.apiKey ?? '';
+    const threshold = draft.threshold ?? saved?.threshold ?? 0.7;
+    const cooldownSeconds = draft.cooldownSeconds ?? saved?.cooldownSeconds ?? 120;
+    const hasApiKey = saved?.hasApiKey ?? false;
+    const decisions = log.data ?? [];
 
-    useEffect(() => {
-        const api = window.electronAPI;
-        if (!api?.agentGateGetSettings) return;
-        api.agentGateGetSettings()
-            .then((settings) => {
-                setMode(settings.mode);
-                setModel(settings.model);
-                setBaseUrl(settings.baseUrl);
-                setHasApiKey(settings.hasApiKey);
-                setThreshold(settings.threshold);
-                setCooldownSeconds(settings.cooldownSeconds);
-            })
-            .catch(() => {});
-        void refresh();
-    }, [refresh]);
-
-    const save = async () => {
-        setError('');
-        const result = await window.electronAPI.agentGateSetSettings({
-            mode,
-            model,
-            baseUrl,
-            threshold,
-            cooldownSeconds,
-            // An untouched key field leaves the stored key as it is.
-            ...(apiKey ? { apiKey } : {}),
-        });
-        if (!result.success) {
-            setError(result.error || 'Could not save');
-            return;
-        }
-        if (apiKey) setHasApiKey(true);
-        setApiKey('');
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-        void refresh();
+    const refreshAll = async () => {
+        await Promise.all([
+            queryClient.invalidateQueries(['agent-gate-settings']),
+            queryClient.invalidateQueries(['agent-gate-status']),
+            queryClient.invalidateQueries(['agent-gate-log']),
+        ]);
     };
 
-    const clearKey = async () => {
-        const result = await window.electronAPI.agentGateSetSettings({ apiKey: '' });
-        if (result.success) {
-            setHasApiKey(false);
-            void refresh();
+    const save = useMutation(
+        async () => {
+            const result = await window.electronAPI.agentGateSetSettings({
+                mode,
+                model,
+                baseUrl,
+                threshold,
+                cooldownSeconds,
+                // An untouched key field leaves the stored key as it is.
+                ...(apiKey ? { apiKey } : {}),
+            });
+            if (!result.success) throw new Error(result.error || 'Could not save');
+        },
+        {
+            onSuccess: async () => {
+                await refreshAll();
+                setDraft({});
+            },
         }
-    };
+    );
+
+    const clearKey = useMutation(
+        async () => {
+            const result = await window.electronAPI.agentGateSetSettings({ apiKey: '' });
+            if (!result.success) throw new Error(result.error || 'Could not remove the key');
+        },
+        { onSuccess: refreshAll }
+    );
+
+    // "Saved!" shows while the draft is empty after a successful save, so it clears itself when you edit again.
+    const showSaved = save.isSuccess && Object.keys(draft).length === 0;
 
     const statusLine =
-        status?.state === 'unavailable'
-            ? `Proactive help unavailable: ${status.reason ?? 'unknown reason'}`
-            : status?.state === 'unconfigured'
+        status.data?.state === 'unavailable'
+            ? `Proactive help unavailable: ${status.data.reason ?? 'unknown reason'}`
+            : status.data?.state === 'unconfigured'
               ? 'Not configured: set a model, a base URL and a key (a key is optional for a local address).'
-              : status?.state === 'ok'
+              : status.data?.state === 'ok'
                 ? 'Ready.'
                 : '';
 
@@ -110,7 +98,7 @@ const ProactiveHelpSettings: React.FC = () => {
             <div className="space-y-4">
                 <div className="space-y-1.5">
                     <label className="text-xs font-medium text-text-secondary block">Mode</label>
-                    <select value={mode} onChange={(e) => setMode(e.target.value as Mode)} className={input}>
+                    <select value={mode} onChange={(e) => setDraft({ ...draft, mode: e.target.value as Mode })} className={input}>
                         <option value="log">Log only</option>
                         <option value="on">Show cards</option>
                         <option value="off">Off</option>
@@ -121,11 +109,11 @@ const ProactiveHelpSettings: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                         <label className="text-xs font-medium text-text-secondary block">Decision model</label>
-                        <input type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder="Model id" className={input} />
+                        <input type="text" value={model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} placeholder="Model id" className={input} />
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-xs font-medium text-text-secondary block">Base URL</label>
-                        <input type="text" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="http://localhost:3425/v1" className={input} />
+                        <input type="text" value={baseUrl} onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })} placeholder="http://localhost:3425/v1" className={input} />
                     </div>
                 </div>
                 <p className="text-[11px] text-text-tertiary leading-snug">Requests go to the base URL followed by /systemone.</p>
@@ -136,13 +124,13 @@ const ProactiveHelpSettings: React.FC = () => {
                         <input
                             type="password"
                             value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
+                            onChange={(e) => setDraft({ ...draft, apiKey: e.target.value })}
                             placeholder={hasApiKey ? 'Saved. Type to replace.' : 'Optional for a local address'}
                             autoComplete="off"
                             className={input}
                         />
                         {hasApiKey && (
-                            <button onClick={clearKey} className="shrink-0 h-11 px-3 rounded-lg text-xs font-medium border border-border-subtle text-text-secondary hover:text-text-primary transition-colors">
+                            <button onClick={() => clearKey.mutate()} className="shrink-0 h-11 px-3 rounded-lg text-xs font-medium border border-border-subtle text-text-secondary hover:text-text-primary transition-colors">
                                 Remove
                             </button>
                         )}
@@ -158,7 +146,7 @@ const ProactiveHelpSettings: React.FC = () => {
                             max={1}
                             step={0.05}
                             value={threshold}
-                            onChange={(e) => setThreshold(Number(e.target.value))}
+                            onChange={(e) => setDraft({ ...draft, threshold: Number(e.target.value) })}
                             className="w-full"
                         />
                         <p className="text-[11px] text-text-tertiary leading-snug">Help is offered only when the model is at least this sure.</p>
@@ -170,7 +158,7 @@ const ProactiveHelpSettings: React.FC = () => {
                             min={0}
                             max={86400}
                             value={cooldownSeconds}
-                            onChange={(e) => setCooldownSeconds(Math.max(0, Number(e.target.value) || 0))}
+                            onChange={(e) => setDraft({ ...draft, cooldownSeconds: Math.max(0, Number(e.target.value) || 0) })}
                             className={input}
                         />
                         <p className="text-[11px] text-text-tertiary leading-snug">At most one card in this time.</p>
@@ -179,25 +167,26 @@ const ProactiveHelpSettings: React.FC = () => {
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <button
-                        onClick={save}
-                        className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${saved ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
+                        onClick={() => save.mutate()}
+                        disabled={save.isLoading}
+                        className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${showSaved ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
                     >
-                        {saved ? 'Saved!' : 'Save proactive help settings'}
+                        {showSaved ? 'Saved!' : 'Save proactive help settings'}
                     </button>
                     {statusLine && (
-                        <p className={`text-[11px] sm:pl-1 ${status?.state === 'unavailable' ? 'text-state-danger' : 'text-text-tertiary'}`}>{statusLine}</p>
+                        <p className={`text-[11px] sm:pl-1 ${status.data?.state === 'unavailable' ? 'text-state-danger' : 'text-text-tertiary'}`}>{statusLine}</p>
                     )}
                 </div>
-                {error && <p className="text-[11px] text-state-danger">{error}</p>}
+                {(save.error || clearKey.error) ? <p className="text-[11px] text-state-danger">{((save.error || clearKey.error) as Error).message}</p> : null}
 
                 <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                         <label className="text-xs font-medium text-text-secondary block">Latest decisions</label>
-                        <button onClick={() => void refresh()} className="text-[11px] text-text-tertiary hover:text-text-primary transition-colors">
+                        <button onClick={() => void refreshAll()} className="text-[11px] text-text-tertiary hover:text-text-primary transition-colors">
                             Refresh
                         </button>
                     </div>
-                    {log.length === 0 ? (
+                    {decisions.length === 0 ? (
                         <p className="text-[11px] text-text-tertiary">No decisions yet. They appear here during a meeting.</p>
                     ) : (
                         <div className="overflow-x-auto rounded-lg border border-border-subtle">
@@ -212,7 +201,7 @@ const ProactiveHelpSettings: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {log.map((decision) => (
+                                    {decisions.map((decision) => (
                                         <tr key={`${decision.segmentId}-${decision.revision}-${decision.time}`} className="border-t border-border-subtle">
                                             <td className="px-2 py-1.5 whitespace-nowrap">{new Date(decision.time).toLocaleTimeString()}</td>
                                             <td className="px-2 py-1.5">{percent(decision.help)}</td>

@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface ModelComboboxProps {
@@ -32,44 +32,38 @@ const ModelCombobox: React.FC<ModelComboboxProps> = ({ id, value, options, place
     const exact = options.includes(value);
     const list = exact ? options.slice(0, 200) : shown;
 
-    useLayoutEffect(() => {
-        if (!open || !fieldRef.current) return;
-        const place = () => {
-            const rect = fieldRef.current!.getBoundingClientRect();
-            const below = window.innerHeight - rect.bottom - EDGE;
-            const above = rect.top - EDGE;
-            const up = below < 140 && above > below;
-            const room = Math.max(80, Math.min(MAX_LIST_HEIGHT, up ? above : below));
-            setPlace({
-                top: up ? rect.top - 4 : rect.bottom + 4,
-                left: rect.left,
-                width: rect.width,
-                maxHeight: room,
-                up,
-            });
-        };
-        place();
-        window.addEventListener('resize', place);
-        // A scroll of any ancestor moves the field; capture it so the list follows.
-        window.addEventListener('scroll', place, true);
-        return () => {
-            window.removeEventListener('resize', place);
-            window.removeEventListener('scroll', place, true);
-        };
-    }, [open, list.length]);
+    // Where the list goes depends on the field's place in the window, so it is measured when the list opens
+    // (an event) and again whenever the window or an ancestor scrolls or resizes (the only effect here).
+    const measure = () => {
+        if (!fieldRef.current) return;
+        const rect = fieldRef.current.getBoundingClientRect();
+        const below = window.innerHeight - rect.bottom - EDGE;
+        const above = rect.top - EDGE;
+        const up = below < 140 && above > below;
+        setPlace({
+            top: up ? rect.top - 4 : rect.bottom + 4,
+            left: rect.left,
+            width: rect.width,
+            maxHeight: Math.max(80, Math.min(MAX_LIST_HEIGHT, up ? above : below)),
+            up,
+        });
+    };
+
+    const openList = () => {
+        measure();
+        setOpen(true);
+    };
 
     useEffect(() => {
         if (!open) return;
-        const close = (event: MouseEvent) => {
-            if (!fieldRef.current?.contains(event.target as Node) && !listRef.current?.contains(event.target as Node)) setOpen(false);
+        window.addEventListener('resize', measure);
+        // A scroll of any ancestor moves the field; capture it so the list follows.
+        window.addEventListener('scroll', measure, true);
+        return () => {
+            window.removeEventListener('resize', measure);
+            window.removeEventListener('scroll', measure, true);
         };
-        document.addEventListener('mousedown', close);
-        return () => document.removeEventListener('mousedown', close);
     }, [open]);
-
-    useEffect(() => {
-        if (active >= 0) listRef.current?.children[active]?.scrollIntoView({ block: 'nearest' });
-    }, [active]);
 
     const pick = (option: string) => {
         onChange(option);
@@ -80,9 +74,11 @@ const ModelCombobox: React.FC<ModelComboboxProps> = ({ id, value, options, place
     const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
-            if (!open) { setOpen(true); return; }
+            if (!open) { openList(); return; }
             if (list.length === 0) return;
-            setActive((current) => (event.key === 'ArrowDown' ? Math.min(list.length - 1, current + 1) : Math.max(0, current - 1)));
+            const next = event.key === 'ArrowDown' ? Math.min(list.length - 1, active + 1) : Math.max(0, active - 1);
+            setActive(next);
+            listRef.current?.children[next]?.scrollIntoView({ block: 'nearest' });
         } else if (event.key === 'Enter' && open && active >= 0 && list[active] !== undefined) {
             event.preventDefault();
             pick(list[active]);
@@ -108,9 +104,12 @@ const ModelCombobox: React.FC<ModelComboboxProps> = ({ id, value, options, place
                 value={value}
                 disabled={disabled}
                 placeholder={placeholder}
-                onChange={(event) => { onChange(event.target.value); setOpen(true); setActive(-1); }}
-                onFocus={() => hasList && setOpen(true)}
-                onClick={() => hasList && setOpen(true)}
+                onChange={(event) => { onChange(event.target.value); openList(); setActive(-1); }}
+                onFocus={() => hasList && openList()}
+                onClick={() => hasList && openList()}
+                // Leaving the field closes the list: no document listener is needed. A press inside the list
+                // does not take focus away from the field (see the list's onMouseDown), so scrolling it is safe.
+                onBlur={() => setOpen(false)}
                 onKeyDown={onKeyDown}
                 className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
             />
@@ -119,6 +118,7 @@ const ModelCombobox: React.FC<ModelComboboxProps> = ({ id, value, options, place
                     ref={listRef}
                     id={listId}
                     role="listbox"
+                    onMouseDown={(event) => event.preventDefault()}
                     style={{
                         position: 'fixed',
                         left: place.left,

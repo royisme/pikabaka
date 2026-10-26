@@ -108,19 +108,14 @@ export const AIProvidersSettings: React.FC = () => {
     const [preferredModels, setPreferredModels] = useState<Record<string, string>>({});
 
     // A connection changed: what depends on it (which providers have a key, the OpenAI-compatible list) is read again.
-    const [connectionsVersion, setConnectionsVersion] = useState(0);
-    useEffect(() => {
-        if (connectionsVersion === 0) return;
-        const refresh = async () => {
-            // @ts-ignore
-            const creds = await window.electronAPI?.getStoredCredentials?.();
-            if (creds) setHasStoredKey({ gemini: creds.hasGeminiKey, groq: creds.hasGroqKey, openai: creds.hasOpenaiKey, claude: creds.hasClaudeKey });
-            // @ts-ignore
-            const oaiList = await window.electronAPI?.getOpenAICompatibleProviders?.();
-            if (oaiList) setOpenaiCompatibleProviders(oaiList);
-        };
-        void refresh();
-    }, [connectionsVersion]);
+    const refreshAfterConnectionChange = async () => {
+        // @ts-ignore
+        const creds = await window.electronAPI?.getStoredCredentials?.();
+        if (creds) setHasStoredKey({ gemini: creds.hasGeminiKey, groq: creds.hasGroqKey, openai: creds.hasOpenaiKey, claude: creds.hasClaudeKey });
+        // @ts-ignore
+        const oaiList = await window.electronAPI?.getOpenAICompatibleProviders?.();
+        if (oaiList) setOpenaiCompatibleProviders(oaiList);
+    };
 
     // Load Initial Data
     useEffect(() => {
@@ -418,9 +413,9 @@ export const AIProvidersSettings: React.FC = () => {
                 </div>
             </div>
 
-            <ConnectionsSettings onChanged={() => setConnectionsVersion((v) => v + 1)} />
+            <ConnectionsSettings onChanged={() => void refreshAfterConnectionChange()} />
 
-            <ModelUsesSettings version={connectionsVersion} />
+            <ModelUsesSettings />
 
             <ProactiveHelpSettings />
 

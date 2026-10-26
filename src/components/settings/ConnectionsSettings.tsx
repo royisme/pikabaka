@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from 'react-query';
 import type { AiConnectionType, AiConnectionView } from '../../types/electron';
 
 const TYPE_LABEL: Record<AiConnectionType, string> = {
@@ -53,20 +54,17 @@ interface ConnectionsSettingsProps {
  * What a model is used for (the agent, translation, chat) is chosen apart, in "Where models are used".
  */
 const ConnectionsSettings: React.FC<ConnectionsSettingsProps> = ({ onChanged }) => {
-    const [connections, setConnections] = useState<AiConnectionView[]>([]);
+    const queryClient = useQueryClient();
+    const { data: connections = [] } = useQuery<AiConnectionView[]>(['ai-connections'], () => window.electronAPI.aiConnectionsList());
     const [draft, setDraft] = useState<Draft | null>(null);
     const [error, setError] = useState('');
     const [check, setCheck] = useState<{ state: 'idle' | 'busy' | 'ok' | 'error'; message: string }>({ state: 'idle', message: '' });
 
-    const load = useCallback(async () => {
-        try {
-            setConnections(await window.electronAPI.aiConnectionsList());
-        } catch {
-            // The list stays as it was; the form still works.
-        }
-    }, []);
-
-    useEffect(() => { void load(); }, [load]);
+    // Everything that reads the list is told through the query cache; the page is told through the callback.
+    const changed = () => {
+        void queryClient.invalidateQueries(['ai-connections']);
+        onChanged?.();
+    };
 
     const edit = (connection: AiConnectionView) => {
         setError('');
@@ -104,8 +102,7 @@ const ConnectionsSettings: React.FC<ConnectionsSettingsProps> = ({ onChanged }) 
             return;
         }
         setDraft(null);
-        await load();
-        onChanged?.();
+        changed();
     };
 
     const removeKey = async () => {
@@ -113,8 +110,7 @@ const ConnectionsSettings: React.FC<ConnectionsSettingsProps> = ({ onChanged }) 
         const result = await window.electronAPI.aiConnectionSave({ id: draft.id, name: draft.name, type: draft.type, baseUrl: draft.baseUrl, apiKey: '' });
         if (result.success) {
             setDraft({ ...draft, hasApiKey: false, apiKey: '' });
-            await load();
-            onChanged?.();
+            changed();
         }
     };
 
@@ -122,8 +118,7 @@ const ConnectionsSettings: React.FC<ConnectionsSettingsProps> = ({ onChanged }) 
         if (!draft?.id || draft.builtin) return;
         await window.electronAPI.aiConnectionDelete(draft.id);
         setDraft(null);
-        await load();
-        onChanged?.();
+        changed();
     };
 
     // Fetching the models doubles as the test: the host answered and accepted the key.

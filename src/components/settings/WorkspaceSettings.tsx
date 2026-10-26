@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
+import { useMutation, useQuery, useQueryClient } from 'react-query';
 
 /**
  * The one folder the agent's commands run under. Inside it each day gets a folder and each meeting a
@@ -6,31 +7,21 @@ import React, { useCallback, useEffect, useState } from 'react';
  * agent cannot run commands; recording and everything else keep working.
  */
 const WorkspaceSettings: React.FC = () => {
-    const [root, setRoot] = useState('');
-    const [problem, setProblem] = useState('');
+    const queryClient = useQueryClient();
+    const { data } = useQuery(['agent-workspace'], () => window.electronAPI.agentWorkspaceGet());
+    const refresh = () => queryClient.invalidateQueries(['agent-workspace']);
 
-    const load = useCallback(async () => {
-        try {
-            const state = await window.electronAPI.agentWorkspaceGet();
-            setRoot(state.root);
-            setProblem(state.error ?? '');
-        } catch {
-            // Leave the form as it is; picking a folder still works.
-        }
-    }, []);
+    const pick = useMutation(
+        async () => {
+            const result = await window.electronAPI.agentWorkspacePick();
+            if (result.error) throw new Error(result.error);
+        },
+        { onSuccess: refresh }
+    );
+    const clear = useMutation(() => window.electronAPI.agentWorkspaceClear(), { onSuccess: refresh });
 
-    useEffect(() => { void load(); }, [load]);
-
-    const pick = async () => {
-        const result = await window.electronAPI.agentWorkspacePick();
-        if (result.error) setProblem(result.error);
-        else if (!result.canceled) await load();
-    };
-
-    const clear = async () => {
-        await window.electronAPI.agentWorkspaceClear();
-        await load();
-    };
+    const root = data?.root ?? '';
+    const problem = pick.error ? (pick.error as Error).message : data?.error ?? '';
 
     return (
         <div>
@@ -43,13 +34,13 @@ const WorkspaceSettings: React.FC = () => {
                     <span className="truncate">{root || 'No folder chosen'}</span>
                 </div>
                 <button
-                    onClick={pick}
+                    onClick={() => pick.mutate()}
                     className="shrink-0 h-11 px-4 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary transition-colors"
                 >
                     {root ? 'Change' : 'Choose folder'}
                 </button>
                 {root && (
-                    <button onClick={clear} className="shrink-0 h-11 px-3 rounded-lg text-xs font-medium border border-border-subtle text-text-secondary hover:text-text-primary transition-colors">
+                    <button onClick={() => clear.mutate()} className="shrink-0 h-11 px-3 rounded-lg text-xs font-medium border border-border-subtle text-text-secondary hover:text-text-primary transition-colors">
                         Remove
                     </button>
                 )}

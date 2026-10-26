@@ -1,34 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from 'react-query';
 import ConnectionModelPicker from './ConnectionModelPicker';
 
-interface ModelUsesSettingsProps {
-    /** Bumped when a connection changed, so the picker reloads its list. */
-    version?: number;
-}
+type AgentUse = { connectionId: string; model: string; supportsImages: boolean };
 
 /**
  * The model of the in-meeting agent. Translation and speech recognition are set under Audio, where
  * the rest of the audio settings are; chat answers use the active model chosen above.
+ * The saved value is a query; what is typed is a draft over it until Save.
  */
-const ModelUsesSettings: React.FC<ModelUsesSettingsProps> = ({ version = 0 }) => {
-    const [agent, setAgent] = useState({ connectionId: '', model: '', supportsImages: false });
-    const [saved, setSaved] = useState(false);
-    const [error, setError] = useState('');
+const ModelUsesSettings: React.FC = () => {
+    const queryClient = useQueryClient();
+    const { data: saved } = useQuery<AgentUse>(['agent-model'], () => window.electronAPI.agentModelGet());
+    const [draft, setDraft] = useState<AgentUse | null>(null);
+    const agent = draft ?? saved ?? { connectionId: '', model: '', supportsImages: false };
 
-    useEffect(() => {
-        window.electronAPI.agentModelGet().then(setAgent).catch(() => {});
-    }, [version]);
-
-    const save = async () => {
-        setError('');
-        const result = await window.electronAPI.agentModelSet(agent);
-        if (!result.success) {
-            setError(result.error || 'Could not save');
-            return;
+    const save = useMutation(
+        async () => {
+            const result = await window.electronAPI.agentModelSet(agent);
+            if (!result.success) throw new Error(result.error || 'Could not save');
+        },
+        {
+            onSuccess: async () => {
+                await queryClient.invalidateQueries(['agent-model']);
+                setDraft(null);
+            },
         }
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-    };
+    );
 
     return (
         <div className="space-y-5">
@@ -40,27 +38,27 @@ const ModelUsesSettings: React.FC<ModelUsesSettingsProps> = ({ version = 0 }) =>
             </div>
             <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-3">
                 <ConnectionModelPicker
-                    key={version}
                     id="agent"
                     connectionId={agent.connectionId}
                     model={agent.model}
                     emptyLabel="Use the chat model"
-                    onChange={(next) => setAgent({ ...agent, ...next })}
+                    onChange={(next) => setDraft({ ...agent, ...next })}
                 />
                 {agent.connectionId && (
                     <label className="flex items-center gap-2 text-xs text-text-secondary">
-                        <input type="checkbox" checked={agent.supportsImages} onChange={(e) => setAgent({ ...agent, supportsImages: e.target.checked })} />
+                        <input type="checkbox" checked={agent.supportsImages} onChange={(e) => setDraft({ ...agent, supportsImages: e.target.checked })} />
                         This model reads images (lets the agent look at the screen)
                     </label>
                 )}
                 <div className="flex flex-wrap items-center gap-2">
                     <button
-                        onClick={save}
-                        className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${saved ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
+                        onClick={() => save.mutate()}
+                        disabled={save.isLoading}
+                        className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${save.isSuccess && !draft ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
                     >
-                        {saved ? 'Saved!' : 'Save'}
+                        {save.isSuccess && !draft ? 'Saved!' : 'Save'}
                     </button>
-                    {error && <p className="text-[11px] text-state-danger">{error}</p>}
+                    {save.error ? <p className="text-[11px] text-state-danger">{(save.error as Error).message}</p> : null}
                 </div>
             </div>
         </div>

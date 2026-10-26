@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from 'react-query';
 import type { AiConnectionView } from '../../types/electron';
 import ModelCombobox from './ModelCombobox';
 
@@ -18,31 +19,32 @@ interface ConnectionModelPickerProps {
 
 /**
  * A connection and an exact model id, typed or picked from what the host serves. The picker only edits
- * values; the screen that holds it has the Save button.
+ * values; the screen that holds it has the Save button. The connection list and each connection's model
+ * list are queries: the list is cached per connection, so choosing another connection never shows the
+ * previous one's models, and nothing here needs an effect.
  */
 const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, connectionId, model, emptyLabel, modelPlaceholder = 'Model id', onChange }) => {
-    const [connections, setConnections] = useState<AiConnectionView[]>([]);
-    const [options, setOptions] = useState<string[]>([]);
-    const [note, setNote] = useState<{ tone: 'info' | 'error'; text: string }>({ tone: 'info', text: '' });
+    const { data: connections = [] } = useQuery<AiConnectionView[]>(['ai-connections'], () => window.electronAPI.aiConnectionsList());
 
-    useEffect(() => {
-        window.electronAPI.aiConnectionsList().then(setConnections).catch(() => {});
-    }, []);
+    // Fetched on demand (the button), never on its own: the host is asked only when the user asks.
+    const models = useQuery(
+        ['connection-models', connectionId],
+        async () => {
+            const result = await window.electronAPI.aiConnectionModels({ id: connectionId });
+            if (!result.success) throw new Error(result.error || 'Could not fetch models');
+            return (result.models ?? []).map((m) => m.id);
+        },
+        { enabled: false, retry: false, cacheTime: 5 * 60_000 }
+    );
+    const options = models.data ?? [];
 
-    // The list belongs to the connection: a different one starts with none.
-    useEffect(() => { setOptions([]); setNote({ tone: 'info', text: '' }); }, [connectionId]);
-
-    const fetchModels = async () => {
-        if (!connectionId) return;
-        setNote({ tone: 'info', text: 'Asking the host…' });
-        const result = await window.electronAPI.aiConnectionModels({ id: connectionId });
-        if (result.success) {
-            setOptions((result.models ?? []).map((m) => m.id));
-            setNote({ tone: 'info', text: `${result.models?.length ?? 0} models listed. You can also type any model id.` });
-        } else {
-            setNote({ tone: 'error', text: result.error || 'Could not fetch models' });
-        }
-    };
+    const note = models.isFetching
+        ? { tone: 'info', text: 'Asking the host…' }
+        : models.error
+          ? { tone: 'error', text: (models.error as Error).message }
+          : models.data
+            ? { tone: 'info', text: `${models.data.length} models listed. You can also type any model id.` }
+            : null;
 
     return (
         <div className="space-y-1.5">
@@ -72,11 +74,11 @@ const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, conne
                             placeholder={modelPlaceholder}
                             disabled={connectionId === '' && emptyLabel !== undefined}
                         />
-                        <button onClick={fetchModels} disabled={!connectionId} className={smallButton}>Fetch</button>
+                        <button onClick={() => void models.refetch()} disabled={!connectionId || models.isFetching} className={smallButton}>Fetch</button>
                     </div>
                 </div>
             </div>
-            {note.text && <p className={`text-[11px] ${note.tone === 'error' ? 'text-state-danger' : 'text-text-tertiary'}`}>{note.text}</p>}
+            {note && <p className={`text-[11px] ${note.tone === 'error' ? 'text-state-danger' : 'text-text-tertiary'}`}>{note.text}</p>}
         </div>
     );
 };
