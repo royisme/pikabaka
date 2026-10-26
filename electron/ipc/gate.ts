@@ -1,13 +1,19 @@
-import { app } from "electron"
+import { app, BrowserWindow } from "electron"
 import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
 import { CredentialsManager } from "../services/CredentialsManager"
-import { getGate, refreshGate } from "../agent/instance"
+import { draftCard, getGate, refreshGate } from "../agent/instance"
 import { latestGateMeeting, readGateDecisions } from "../agent/gateLog"
 
 const MODES = ['log', 'on', 'off']
 
 export function registerGateHandlers(appState: AppState): void {
+  // Mode "on": a decision that passed becomes a card in the overlay.
+  getGate().onDecision(async (decision) => {
+    const card = await draftCard(decision)
+    if (card) BrowserWindow.getAllWindows().forEach((window) => window.webContents.send('agent-proactive', card))
+  })
+
   safeHandle("agent-gate-get-settings", async () => {
     const cm = CredentialsManager.getInstance()
     return {

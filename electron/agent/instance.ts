@@ -6,7 +6,9 @@ import { DatabaseManager } from '../db/DatabaseManager';
 import { VectorStore } from '../rag/VectorStore';
 import { MeetingAgent } from './MeetingAgent';
 import { resolveAgentModel, createGateClassify } from './models';
-import { Gate, type GateClassify } from './gate';
+import { Gate, type GateClassify, type GateDecision } from './gate';
+import { runAssist, type AssistCard } from './assist';
+import { randomUUID } from 'node:crypto';
 import { appendGateDecision } from './gateLog';
 import { reportAgentError } from './MeetingAgent';
 
@@ -78,4 +80,23 @@ export function getGate(): Gate {
     log: decision => appendGateDecision(app.getPath('userData'), decision),
   });
   return gate;
+}
+
+/** Drafts the card for a gate decision that passed (mode on); undefined when there is nothing to say. */
+export async function draftCard(decision: GateDecision): Promise<AssistCard | undefined> {
+  const state = AppState.getInstance();
+  const cm = CredentialsManager.getInstance();
+  if (!decision.kind || state.getCurrentMeetingId() !== decision.meetingId) return undefined;
+  try {
+    const resolved = await resolveAgentModel(state.processingHelper.getLLMHelper(), cm);
+    if (!resolved.ok) return undefined;
+    const lines = DatabaseManager.getInstance().getRecentSegments(decision.meetingId, Date.now() - 3 * 60_000).slice(-6)
+      .map(segment => ({ speaker: segment.speaker === 'user' ? 'You' as const : 'Them' as const, text: segment.text }));
+    const text = await runAssist(resolved.model, { kind: decision.kind, lines, language: cm.getAiResponseLanguage() }, AbortSignal.timeout(15_000));
+    if (!text || state.getCurrentMeetingId() !== decision.meetingId) return undefined;
+    return { id: randomUUID(), meetingId: decision.meetingId, segmentId: decision.segmentId, kind: decision.kind, text, time: Date.now() };
+  } catch (error) {
+    reportAgentError(error, decision.meetingId);
+    return undefined;
+  }
 }

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron"
 
 // Types for the exposed Electron API
+interface AgentProactiveCard { id: string; meetingId: string; segmentId: string; kind: string; text: string; time: number }
 interface AgentGateDecision {
   time: number; meetingId: string; segmentId: string; revision: number; model: string; threshold: number; cooldownSeconds: number
   help?: number; kind?: string; kindProbability?: number; latencyMs?: number; outcome: string
@@ -70,6 +71,7 @@ interface ElectronAPI {
   agentGateSetSettings: (settings: { mode?: 'log' | 'on' | 'off'; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }) => Promise<{ success: boolean; error?: string }>
   agentGateStatus: () => Promise<{ mode: 'log' | 'on' | 'off'; configured: boolean; state: 'ok' | 'unavailable' | 'unconfigured'; reason?: string; lastDecision?: AgentGateDecision }>
   agentGateLog: () => Promise<AgentGateDecision[]>
+  onAgentProactive: (callback: (card: AgentProactiveCard) => void) => () => void
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string }>
 
   // STT Provider Management
@@ -561,6 +563,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   agentGateSetSettings: (settings: { mode?: 'log' | 'on' | 'off'; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }) => ipcRenderer.invoke("agent-gate-set-settings", settings),
   agentGateStatus: () => ipcRenderer.invoke("agent-gate-status"),
   agentGateLog: () => ipcRenderer.invoke("agent-gate-log"),
+  onAgentProactive: (callback: (card: AgentProactiveCard) => void) => {
+    const subscription = (_: any, card: AgentProactiveCard) => callback(card)
+    ipcRenderer.on("agent-proactive", subscription)
+    return () => { ipcRenderer.removeListener("agent-proactive", subscription) }
+  },
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) =>
     ipcRenderer.invoke("translate-transcript-segment", segment),
 
