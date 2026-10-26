@@ -2,6 +2,18 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: the project installs and runs on the latest Node (branch `node-latest`)
+
+Why Node 22 had been pinned: on Node 26 `better-sqlite3@12.6.2` had no prebuilt binary and its source build failed, so `pnpm install` stopped. The pin was a workaround, not a goal. The owner asked for the latest Node, and Opus planned the change after experiments in `/tmp`; I applied it and re-ran the checks.
+
+Done
+- `package.json` / `pnpm-workspace.yaml` / workflows as in `docs/development.md` ("Node version"): `engines` `>=22.12.0`, `.node-version` 26, CI matrix 22 and 26 for `verify.yml`, build smoke on 26; `better-sqlite3` 12.11.1; `nodeLinker: hoisted`, the `caniuse-lite` and `yauzl` overrides moved into `pnpm-workspace.yaml`; `.npmrc` deleted; the unused `keytar`, `@types/keytar`, `sqlite3`, `tesseract.js` and the old `electron-rebuild` removed (no import of any of them in `electron/`, `src/`, `scripts/`, `premium/` or `test/`; the credentials code uses Electron's `safeStorage`).
+- **Found by Opus, confirmed here:** `better-sqlite3` 13.0.3 crashes Electron 33 on load (its binary is N-API 10, Electron 33 has N-API 9), which is why it is not used yet. **Also found:** with the old isolated linker the packaged app was missing sharp's platform package and `onnxruntime-node`, so the next `pnpm dist` would have shipped a broken app on any Node version; hoisted fixes it.
+- Verified on Node 26.10 after `rm -rf node_modules && pnpm install` (exit 0): Electron's dist is 242M; `pnpm run verify` exit 0 (807 tests); both builds exit 0; `fnm exec --using=22 pnpm install --frozen-lockfile` exit 0 with the regenerated lockfile; `better-sqlite3` and `sqlite-vec` and `sharp` load under Electron's own Node (`ELECTRON_RUN_AS_NODE`: Node 20.18.3, ABI 130); an unsigned `electron-builder --dir` build has `@img/sharp-darwin-arm64`, `onnxruntime-node` and the Electron-built `better_sqlite3.node` in `app.asar.unpacked`.
+- Not verified: Windows, Linux, a signed or notarized build, running the packaged app, the CI workflows on GitHub (the matrix has not run).
+
+Next, as its own step: upgrade Electron (33 is past end of support). Electron 40 or newer would let `better-sqlite3` 13 and the `yauzl` override go. The first check is to load the Rust audio module, better-sqlite3 and sharp under the new Electron as plain Node; then content protection, the stealth flags and global shortcuts on a real macOS build.
+
 ## 2026-10-26: speculative translation at the provider boundary (branch `speculative-translation`, issue #33)
 
 Done (R5, option B chosen by the owner on 2026-10-26)

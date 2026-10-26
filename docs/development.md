@@ -15,7 +15,16 @@ The scripts without `:raw` run `verify` (lint plus test) first.
 
 ## Node version
 
-Use Node 22 (`.node-version`, `engines` in `package.json`, and CI). Under Node 26 `pnpm install` cannot finish: `better-sqlite3@12.6.2` has no prebuilt binary for it, so it is compiled with node-gyp and the C++ build fails (`make failed with exit code: 2`). With fnm: `fnm install 22 && fnm use 22` (or `eval "$(fnm env --use-on-cd)"` in the shell profile so the version file is read). `.npmrc` does not set `engine-strict`: it would also apply to every dependency's `engines` field, which has not been checked on Node 22.
+Node 22.12 or newer; CI runs the oldest (22) and the newest (26), and `.node-version` is 26. `pnpm install` was verified on Node 26.10 and 22.22 (macOS arm64 only).
+
+The system Node is not the app's Node: the app runs on the Node inside Electron (Electron 33 embeds Node 20.18). The system Node runs the toolchain (pnpm, vite, tsc, tap, electron-rebuild).
+
+What made Node 26 work, and what to keep in mind:
+- `better-sqlite3` is pinned to 12.11.1. 13.x is faster to install (N-API binaries ship in the package), but its binary needs N-API 10 and crashes Electron 33 on load (found by loading it with `ELECTRON_RUN_AS_NODE`). Move to 13.x together with the Electron upgrade (Electron 40 or newer). `postinstall` rebuilds better-sqlite3 for Electron.
+- `pnpm-workspace.yaml` carries `nodeLinker: hoisted` and the overrides; pnpm 11 ignores `.npmrc`'s `node-linker` and the `pnpm` field of `package.json`. With the default isolated linker the packaged app lacked sharp's platform package and `onnxruntime-node`.
+- `yauzl` is overridden to `^3.2.0`: Electron 33's install script unzips with a yauzl that never finishes on Node 26 and leaves a 256K `dist` with no Electron binary and no error. After an install, `cat node_modules/electron/path.txt` and `du -sh node_modules/electron/dist` (about 240M) show whether it worked. Drop the override with Electron 40 or newer.
+- `keytar`, `sqlite3`, `tesseract.js` and the old `electron-rebuild` were removed: nothing imports them, and `sqlite3` was the package that pulled in `node-gyp@8.4.1`, which needs Python's `distutils` (gone in Python 3.12 and newer).
+- Not verified: Windows, Linux, a signed and notarized build.
 
 ## pnpm caveat
 

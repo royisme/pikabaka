@@ -60,7 +60,7 @@ Enhancement suggestions are tracked as GitHub issues. When you are creating an e
 
 ### Prerequisites
 
-- Node.js 22 (`.node-version`; CI uses 22). Node 24 and later have no prebuilt `better-sqlite3`, so installing there compiles it and fails
+- Node.js 22.12 or newer (`.node-version` is 26; CI runs 22 and 26)
 - Git
 - Rust (required for native audio capture compilation)
 
