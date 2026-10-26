@@ -40,7 +40,6 @@ interface ChatColumnProps {
     setIsMousePassthrough: (value: boolean) => void;
     shortcuts: ShortcutConfig;
     scrollContainerRef: React.RefObject<HTMLDivElement>;
-    messagesEndRef: React.RefObject<HTMLDivElement>;
     textInputRef: React.RefObject<HTMLInputElement>;
     contentRef: React.RefObject<HTMLDivElement>;
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -73,7 +72,6 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
     setIsMousePassthrough,
     shortcuts,
     scrollContainerRef,
-    messagesEndRef,
     textInputRef,
     contentRef,
     setMessages,
@@ -106,7 +104,6 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
             setIsMousePassthrough={setIsMousePassthrough}
             shortcuts={shortcuts}
             scrollContainerRef={scrollContainerRef}
-            messagesEndRef={messagesEndRef}
             textInputRef={textInputRef}
             contentRef={contentRef}
             setMessages={setMessages}

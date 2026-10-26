@@ -80,7 +80,6 @@ interface ChatPanelProps {
   setIsMousePassthrough: (value: boolean) => void;
   shortcuts: ShortcutConfig;
   scrollContainerRef: React.RefObject<HTMLDivElement>;
-  messagesEndRef: React.RefObject<HTMLDivElement>;
   textInputRef: React.RefObject<HTMLInputElement>;
   contentRef: React.RefObject<HTMLDivElement>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -113,7 +112,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   setIsMousePassthrough,
   shortcuts,
   scrollContainerRef,
-  messagesEndRef,
   textInputRef,
   contentRef,
   setMessages,
@@ -397,7 +395,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         style={{ scrollbarWidth: 'none' }}
       >
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
+          <div key={msg.id} data-message-id={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
             <div className={`
               ${msg.role === 'user' ? 'max-w-[72.25%] px-[13.6px] py-[10.2px]' : 'max-w-[85%] px-4 py-2.5'} text-[14px] leading-6 relative group whitespace-pre-wrap
               ${msg.role === 'user'
@@ -511,7 +509,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
           </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       <div className="flex flex-nowrap justify-center items-center gap-1.5 px-4 pb-3 overflow-x-auto no-scrollbar pt-3.5 no-drag">

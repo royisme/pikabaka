@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: U1 scroll-follow (branch `fix-scroll-follow`, issue #20)
+
+Done
+- `src/lib/answerScroll.ts`: pure rule. A message not yet shown scrolls its start into view once; later growth of the same message follows only while the reader is within 32px of the bottom. `PikaInterface` applies it to the answer list through `scrollContainerRef`; no smooth scroll per token. The unused `messagesEndRef` prop chain (`PikaInterface`, `ChatColumn`, `ChatPanel`) is removed, and message wrappers carry `data-message-id`.
+- Verified: `tsc --noEmit` exit 0 (renderer and Electron), tap 359 of 359 (13 new assertions in `test/answer-scroll.test.ts`, covering the 32px boundary, new message, same message followed or not, empty list).
+- Not verified: the behaviour in the running app (long streaming answer at 380px and 600px, scrolling up mid-stream, collapse and re-expand). The DOM wiring (scroll listener, `getBoundingClientRect` offset) has no automated test. `MeetingChatOverlay` and `GlobalChatOverlay` still scroll to the end on every message change; they are other surfaces and were not touched.
+
 ## 2026-10-26: rules, issues, queue
 
 Done

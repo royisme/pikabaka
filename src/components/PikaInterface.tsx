@@ -11,6 +11,7 @@ import { getDefaultOverlayOpacity, getOverlayAppearance } from '../lib/overlayAp
 import { useMeetingChat, type Message } from '../hooks/useMeetingChat';
 import { useMeetingTranscript } from '../hooks/useMeetingTranscript';
 import { useMeetingAudio } from '../hooks/useMeetingAudio';
+import { isNearBottom, nextScrollAction } from '../lib/answerScroll';
 
 interface PikaInterfaceProps { onEndMeeting?: () => void; overlayOpacity?: number; }
 type ScreenshotAttachment = { path: string; preview: string };
@@ -26,7 +27,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const [isUndetectable, setIsUndetectable] = useState(false);
     const [currentModel, setCurrentModel] = useState('gemini-3-flash-preview');
     const isStealthRef = useRef(false);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const textInputRef = useRef<HTMLInputElement>(null);
@@ -57,7 +57,27 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     useLayoutEffect(() => { if (!contentRef.current) return; const observer = new ResizeObserver(updateContentDimensions); observer.observe(contentRef.current); return () => observer.disconnect(); }, [updateContentDimensions]);
     useEffect(() => { requestAnimationFrame(updateContentDimensions); }, [chat.attachedContext, updateContentDimensions]);
     useEffect(() => { const timer = setTimeout(updateContentDimensions, 600); return () => clearTimeout(timer); }, [updateContentDimensions]);
-    useEffect(() => { if (isExpanded) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chat.messages, isExpanded, chat.isProcessing]);
+    const shownMessageIdRef = useRef<string | undefined>(undefined);
+    const followingRef = useRef(true);
+    useEffect(() => {
+        const list = scrollContainerRef.current;
+        if (!isExpanded || !list) return;
+        const onScroll = () => { followingRef.current = isNearBottom(list); };
+        list.addEventListener('scroll', onScroll, { passive: true });
+        return () => list.removeEventListener('scroll', onScroll);
+    }, [isExpanded]);
+    useEffect(() => {
+        const list = scrollContainerRef.current;
+        if (!isExpanded || !list) { shownMessageIdRef.current = undefined; return; }
+        const last = chat.messages[chat.messages.length - 1];
+        const action = nextScrollAction(last?.id, shownMessageIdRef.current, followingRef.current);
+        shownMessageIdRef.current = last?.id;
+        if (action === 'follow') list.scrollTop = list.scrollHeight;
+        else if (action === 'show-start') {
+            const item = Array.from(list.children).find((child) => (child as HTMLElement).dataset.messageId === last.id);
+            if (item) list.scrollTop += item.getBoundingClientRect().top - list.getBoundingClientRect().top;
+        }
+    }, [chat.messages, isExpanded, chat.isProcessing]);
 
     const handleAnswerNow = useCallback(() => chat.handleWhatToSay(), [chat.handleWhatToSay]);
 
@@ -104,7 +124,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
 
     const setMessages = useCallback((updater: React.SetStateAction<Message[]>) => { chat.setSystemMessages((prev) => (typeof updater === 'function' ? (updater as (p: Message[]) => Message[])(prev) : updater)); }, [chat.setSystemMessages]);
     const transcriptProps = { ...transcript, ...audio, appearance, isLightTheme };
-    const chatProps = { messages: chat.messages, knowledgeContext: chat.knowledgeContext, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, actionButtonMode: chat.actionButtonMode, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleWhatToSay: chat.handleWhatToSay, handleClarify: chat.handleClarify, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleBrainstorm: chat.handleBrainstorm, handleAnswerNow, handleManualSubmit: chat.handleManualSubmit, isManualRecording: audio.isManualRecording, manualTranscript: audio.manualTranscript, voiceInput: audio.voiceInput, appearance, isLightTheme, currentModel, isSettingsOpen, isMousePassthrough, setIsMousePassthrough, shortcuts, scrollContainerRef, messagesEndRef, textInputRef, contentRef, setMessages };
+    const chatProps = { messages: chat.messages, knowledgeContext: chat.knowledgeContext, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, actionButtonMode: chat.actionButtonMode, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleWhatToSay: chat.handleWhatToSay, handleClarify: chat.handleClarify, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleBrainstorm: chat.handleBrainstorm, handleAnswerNow, handleManualSubmit: chat.handleManualSubmit, isManualRecording: audio.isManualRecording, manualTranscript: audio.manualTranscript, voiceInput: audio.voiceInput, appearance, isLightTheme, currentModel, isSettingsOpen, isMousePassthrough, setIsMousePassthrough, shortcuts, scrollContainerRef, textInputRef, contentRef, setMessages };
 
     return (
         <div ref={contentRef} className={`flex flex-col items-center w-full mx-auto ${isExpanded ? 'h-screen' : 'h-fit'} min-h-0 bg-transparent p-0 rounded-[24px] font-sans gap-2 overlay-text-primary`}>
