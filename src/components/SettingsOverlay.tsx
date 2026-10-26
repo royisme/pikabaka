@@ -1,5 +1,6 @@
 import SttModelPicker, { STT_MODEL_DEFAULTS } from './settings/SttModelPicker';
 import ConnectionModelPicker from './settings/ConnectionModelPicker';
+import TranslationTest from './settings/TranslationTest';
 import WorkspaceSettings from './settings/WorkspaceSettings';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
@@ -2473,6 +2474,12 @@ Core Skills
                                                 <p className="text-[10px] text-text-tertiary">
                                                     Connections (any host, any type) are added under AI Providers. A cheap, fast model works well here.
                                                 </p>
+                                                <TranslationTest
+                                                    provider={transcriptTranslationProvider}
+                                                    model={transcriptTranslationModel}
+                                                    prompt={transcriptTranslationPrompt}
+                                                    targetLanguage={transcriptTranslationTargetLanguage}
+                                                />
                                             </div>
 
                                             <div className="space-y-1.5">

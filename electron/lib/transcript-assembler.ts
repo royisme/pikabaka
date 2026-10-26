@@ -483,14 +483,18 @@ type TranslationConfig = {
   isConfigured: boolean;
 };
 
-function resolveTranslationConfig(forceTranslate: boolean): TranslationConfig {
+/** `override` is a setting that is shown but not saved yet: the translation test runs on it. */
+function resolveTranslationConfig(
+  forceTranslate: boolean,
+  override?: { provider?: string; model?: string; prompt?: string; targetLanguage?: string }
+): TranslationConfig {
   const { CredentialsManager } = require('../services/CredentialsManager');
   const cm = CredentialsManager.getInstance();
-  const provider: string = cm.getTranscriptTranslationProvider();
+  const provider: string = override?.provider ?? cm.getTranscriptTranslationProvider();
   const standardProviders = new Set(['ollama', 'gemini', 'groq', 'openai', 'claude']);
   const oaiCompat = cm.getOpenAICompatibleProviders().find((p: { id: string }) => p.id === provider);
-  const model: string = cm.getTranscriptTranslationModel().trim() || (oaiCompat?.preferredModel?.trim() ?? '');
-  const prompt: string = cm.getTranscriptTranslationPrompt();
+  const model: string = (override?.model ?? cm.getTranscriptTranslationModel()).trim() || (oaiCompat?.preferredModel?.trim() ?? '');
+  const prompt: string = override?.prompt ?? cm.getTranscriptTranslationPrompt();
   const resolved = cm.resolveConnection(provider);
   const connection = resolved && cm.isConnectionReady(provider) ? { type: resolved.type, baseUrl: resolved.baseUrl, apiKey: resolved.apiKey } : undefined;
   const shouldTranslate = forceTranslate ? true : cm.getTranscriptTranslationEnabled();
@@ -500,7 +504,7 @@ function resolveTranslationConfig(forceTranslate: boolean): TranslationConfig {
     model,
     prompt,
     sourceLanguageKey: cm.getTranscriptTranslationSourceLanguage(),
-    targetLanguageKey: cm.getTranscriptTranslationTargetLanguage(),
+    targetLanguageKey: override?.targetLanguage ?? cm.getTranscriptTranslationTargetLanguage(),
     oaiCompat,
     connection,
     standardProviders,
@@ -783,5 +787,45 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
       revision,
     });
     return { success: false, error: reason };
+  }
+}
+
+/** The two sentences the translation test sends: invented, and in a language other than the target. */
+const TEST_SENTENCES = {
+  english: 'Could you walk me through how the billing service handles a failed payment? I want to be sure we never charge a customer twice.',
+  chinese: '我们下周把新的价格方案发给您，您看这样安排可以吗？如果需要调整，请直接告诉我。',
+};
+
+/**
+ * Translates a fixed sample with the settings as they are shown (saved or not), through the same
+ * request path a meeting uses, and reports the speed. Nothing is stored or shown in a meeting.
+ */
+export async function testTranslation(
+  appState: AppState,
+  draft: { provider: string; model: string; prompt?: string; targetLanguage: string }
+): Promise<{ success: boolean; sample: string; translatedText?: string; firstTokenMs?: number; totalMs?: number; error?: string }> {
+  const config = resolveTranslationConfig(true, draft);
+  const sample = isSameLanguage('english', config.targetLanguageKey) ? TEST_SENTENCES.chinese : TEST_SENTENCES.english;
+  if (!config.model) return { success: false, sample, error: 'Choose a translation model first.' };
+  if (!config.prompt.trim()) return { success: false, sample, error: 'The translation prompt is empty.' };
+  const startedAt = Date.now();
+  let firstTokenAt: number | null = null;
+  try {
+    const translatedText = await runTranslationRequest(appState, config, { text: sample, segmentId: 'translation-test' }, () => {
+      firstTokenAt ??= Date.now();
+    });
+    const endedAt = Date.now();
+    if (!translatedText.trim()) return { success: false, sample, totalMs: endedAt - startedAt, error: 'The model answered with no text.' };
+    return { success: true, sample, translatedText, firstTokenMs: firstTokenAt === null ? undefined : firstTokenAt - startedAt, totalMs: endedAt - startedAt };
+  } catch (error: unknown) {
+    // The sample is invented, so a provider's message is safe to show; it says why the model cannot be used.
+    const message = error instanceof Error ? error.message : String(error);
+    const status = Number((error as { status?: unknown } | null)?.status);
+    return {
+      success: false,
+      sample,
+      totalMs: Date.now() - startedAt,
+      error: `${classifyTranslationError(error)}${Number.isFinite(status) ? ` (HTTP ${status})` : ''}: ${message.replace(/\s+/g, ' ').slice(0, 240)}`,
+    };
   }
 }
