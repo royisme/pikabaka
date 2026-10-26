@@ -523,7 +523,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         if (!isOpen && isPreviewingOpacity) {
             stopPreviewingOpacity();
         }
-    }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [isOpen]);
 
     const startPreviewingOpacity = () => {
         // Bug fix #5: guard against rapid repeated calls (double pointerDown / touch events)
