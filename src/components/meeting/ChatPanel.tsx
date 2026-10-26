@@ -30,6 +30,7 @@ interface Message {
   role: 'user' | 'system' | 'interviewer';
   text: string;
   isStreaming?: boolean;
+  isError?: boolean;
   hasScreenshot?: boolean;
   screenshotPreview?: string;
   isCode?: boolean;
@@ -379,6 +380,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     );
   };
 
+  const latestAnswer = [...messages].reverse().find((m) => m.role === 'system' && !m.isStreaming && m.text);
+  const latestAnswerId = latestAnswer?.id;
+
   return (
     <div className="flex flex-col h-full">
       <div
@@ -396,7 +400,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   : 'bg-blue-500/18 border border-blue-400/30 text-blue-50 rounded-[20px] rounded-tr-[4px] shadow-sm font-medium')
                 : ''
               }
-              ${msg.role === 'system' ? 'overlay-text-primary font-normal' : ''}
+              ${msg.role === 'system' ? (msg.isError ? 'text-state-danger font-normal' : 'overlay-text-primary font-normal') : ''}
               ${msg.role === 'interviewer' ? 'overlay-text-muted italic pl-0 text-[13px]' : ''}
             `}>
               {msg.role === 'interviewer' && (
@@ -411,10 +415,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   <span>Screenshot attached</span>
                 </div>
               )}
-              {msg.role === 'system' && !msg.isStreaming && (
+              {msg.role === 'system' && !msg.isStreaming && msg.id !== latestAnswerId && (
                 <button
                   onClick={() => handleCopy(msg.text)}
-                  className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive"
+                  aria-label="Copy answer"
+                  className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive"
                   title="Copy to clipboard"
                   style={appearance.iconStyle}
                 >
@@ -422,6 +427,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 </button>
               )}
               {renderMessageText(msg)}
+              {msg.id === latestAnswerId && (
+                <div className="mt-1.5 flex justify-end">
+                  <button
+                    onClick={() => handleCopy(msg.text)}
+                    className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-text-primary"
+                  >
+                    <Copy className="w-3 h-3" aria-hidden="true" />
+                    <span>Copy</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -485,7 +501,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         )}
       </div>
 
-      <div className="flex flex-nowrap justify-center items-center gap-1.5 px-4 pb-3 overflow-x-auto no-scrollbar pt-3.5 no-drag">
+      <div className="flex flex-nowrap items-center gap-1.5 px-4 pb-3 overflow-x-auto no-scrollbar pt-3.5 no-drag [&>:first-child]:ml-auto [&>:last-child]:mr-auto">
         <button
           onClick={handleWhatToSay}
           className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 bg-[#007AFF] text-white shadow-[0_4px_14px_rgba(0,122,255,0.18)] hover:bg-[#0071E3]"
@@ -549,30 +565,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           <input
             ref={textInputRef}
             type="text"
+            aria-label="Ask a question"
+            placeholder="Ask about the call or the screen"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && handleManualSubmit()}
-            className={`w-full border focus:ring-1 rounded-xl pl-3 pr-10 py-2.5 focus:outline-none transition-all duration-200 ease-sculpted text-[13px] leading-relaxed ${inputClass}`}
+            className={`w-full border focus:ring-1 rounded-xl pl-3 pr-10 py-2.5 focus:outline-none transition-all duration-200 ease-sculpted font-sans text-[13px] leading-relaxed ${inputClass}`}
             style={appearance.inputStyle}
           />
 
           {!inputValue && (
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none text-[12px] overlay-text-muted/90 max-w-[calc(100%-56px)] overflow-hidden whitespace-nowrap text-ellipsis">
-              <span>Ask anything on screen or conversation, or</span>
-              <div className="flex items-center gap-1 opacity-80">
-                {(shortcuts.selectiveScreenshot || ['⌘', 'Shift', 'H']).map((key, i) => (
-                  <React.Fragment key={i}>
-                    {i > 0 && <span className="text-[10px]">+</span>}
-                    <kbd className="px-1.5 py-0.5 rounded border text-[10px] font-sans min-w-[20px] text-center overlay-control-surface overlay-text-secondary" style={appearance.controlStyle}>{key}</kbd>
-                  </React.Fragment>
-                ))}
-              </div>
-              <span>for selective screenshot</span>
-            </div>
-          )}
-
-          {!inputValue && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-20">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-20" aria-hidden="true">
               <span className="text-[10px]">↵</span>
             </div>
           )}
@@ -592,6 +595,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
                 window.electronAPI.toggleModelSelector({ x, y });
               }}
+              aria-label="Choose model"
               className={`
                 flex items-center gap-2 px-3 py-1.5
                 border border-border-subtle/60 rounded-lg transition-colors
@@ -620,6 +624,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
             <div className="relative">
               <button
+                aria-label="Settings"
                 onClick={(e) => {
                   if (isSettingsOpen) {
                     window.electronAPI.toggleSettingsWindow();
@@ -654,6 +659,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
             <div className="relative">
               <button
+                aria-label="Click-through"
+                aria-pressed={isMousePassthrough}
+                title="Click-through"
                 onClick={() => {
                   const newState = !isMousePassthrough;
                   setIsMousePassthrough(newState);
@@ -675,6 +683,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
           <button
             onClick={handleManualSubmit}
+            aria-label="Send"
             disabled={!inputValue.trim()}
             className={`
               w-7 h-7 rounded-full flex items-center justify-center

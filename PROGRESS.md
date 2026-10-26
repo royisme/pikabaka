@@ -2,6 +2,20 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: U8 conversation-area gaps (branch `conversation-gaps`, issue #27)
+
+Done (checklist of #27)
+- [x] Copy is visible: the latest finished answer has a "Copy" button under it; older answers keep the hover button, now also shown on keyboard focus and named ("Copy answer").
+- [x] Enter no longer submits during IME composition (done in U3). The fake placeholder is a real `placeholder`, the input uses the sans font, and it has an accessible name.
+- [x] The action row no longer clips its first chip at 380px: it scrolls from the start when it overflows and stays centred when it fits (auto margins on the first and last child).
+- [x] Stop needs a second press within 3 seconds (the button turns red and says "Press again to stop and quit").
+- [x] Model, Settings, Click-through (with `aria-pressed`) and Send have accessible names.
+- [x] Failures are `isError` messages in the danger colour, without the emoji prefix.
+- [x] `SuggestionOverlay` (no importers) is deleted; `KeyBadge` is now used by the primary button.
+- Verified: both `tsc --noEmit` checks exit 0; tap 477 of 477 (no new test: markup and styling).
+- Not done: stopping a running stream and a Retry on a failed answer (both need the main process to cancel or replay the request; `resetCancel` still only hides the dots); the 24px/32px logo that opens the dashboard mid-call. Not verified: any of this in the running app, including the 380px row, the error colour on both themes and the Stop arming.
+- The shortcut hint that was drawn inside the empty input ("⌘⇧H for selective screenshot") is gone with the fake placeholder; the shortcut still works and is listed in Settings.
+
 ## 2026-10-26: U3 one primary action (branch `one-primary-action`, issue #23)
 
 Done

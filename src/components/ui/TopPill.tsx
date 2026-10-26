@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import icon from "../../../assets/icon.png";
 import type { OverlayAppearance } from "../../lib/overlayAppearance";
@@ -17,6 +18,14 @@ export default function TopPill({
     appearance,
     onLogoClick,
 }: TopPillProps) {
+    // Stop sits next to Hide mid-call: the first press arms it, the second within 3 seconds quits.
+    const [confirmingQuit, setConfirmingQuit] = useState(false);
+    useEffect(() => {
+        if (!confirmingQuit) return;
+        const timer = window.setTimeout(() => setConfirmingQuit(false), 3000);
+        return () => window.clearTimeout(timer);
+    }, [confirmingQuit]);
+
     return (
         <div className="flex justify-center mt-2 select-none z-50">
             <div
@@ -85,16 +94,17 @@ export default function TopPill({
 
                 {/* STOP / QUIT BUTTON */}
                 <button
-                    onClick={onQuit}
-                    aria-label="Stop and quit"
+                    onClick={() => (confirmingQuit ? onQuit() : setConfirmingQuit(true))}
+                    aria-label={confirmingQuit ? "Press again to stop and quit" : "Stop and quit"}
+                    title={confirmingQuit ? "Press again to stop and quit" : "Stop and quit"}
                     className={`
             w-8 h-8
             rounded-full
             overlay-icon-surface
-            overlay-text-primary
             flex items-center justify-center
             interaction-base interaction-press
             hover:bg-state-danger-soft hover:text-state-danger
+            ${confirmingQuit ? "bg-state-danger-soft text-state-danger" : "overlay-text-primary"}
           `}
                     style={appearance.iconStyle}
                 >

@@ -10,6 +10,8 @@ export type Message = {
   role: 'user' | 'system' | 'interviewer';
   text: string;
   isStreaming?: boolean;
+  /** A failure message: shown as an error, not as an answer. */
+  isError?: boolean;
   hasScreenshot?: boolean;
   screenshotPreview?: string;
   isCode?: boolean;
@@ -144,7 +146,7 @@ export function useMeetingChat() {
       {
         id: Date.now().toString(),
         role: 'system',
-        text: `Error: ${error}`,
+        text: `Error: ${error}`, isError: true,
       },
     ]);
   }, []);
@@ -301,7 +303,7 @@ export function useMeetingChat() {
         setIsProcessing(false);
         setSystemMessages((prev) => [
           ...prev,
-          { id: Date.now().toString(), role: 'system', text: `\u274C Error (${data.mode}): ${data.error}` },
+          { id: Date.now().toString(), role: 'system', text: `Error (${data.mode}): ${data.error}`, isError: true },
         ]);
       }));
     }
@@ -319,7 +321,7 @@ export function useMeetingChat() {
         setIsProcessing(false);
         setSystemMessages((prev) => [
           ...prev,
-          { id: Date.now().toString(), role: 'system', text: `Error: ${data.error}` },
+          { id: Date.now().toString(), role: 'system', text: `Error: ${data.error}`, isError: true },
         ]);
       }));
     }
@@ -361,7 +363,7 @@ export function useMeetingChat() {
         setIsProcessing(false);
         setSystemMessages((prev) => {
           const last = prev[prev.length - 1];
-          const errMsg = { id: Date.now().toString(), role: 'system' as const, text: `❌ Error: ${error}` };
+          const errMsg = { id: Date.now().toString(), role: 'system' as const, text: `Error: ${error}`, isError: true };
           if (last && last.isStreaming && last.text === '') return prev.slice(0, -1).concat(errMsg);
           return [...prev, errMsg];
         });
@@ -404,7 +406,7 @@ export function useMeetingChat() {
         setIsProcessing(false);
         setSystemMessages((prev) => {
           const last = prev[prev.length - 1];
-          const errMsg = { id: Date.now().toString(), role: 'system' as const, text: `❌ Error: ${data.error}` };
+          const errMsg = { id: Date.now().toString(), role: 'system' as const, text: `Error: ${data.error}`, isError: true };
           if (last && last.isStreaming && last.text === '') return prev.slice(0, -1).concat(errMsg);
           return [...prev, errMsg];
         });
@@ -519,11 +521,11 @@ export function useMeetingChat() {
           return prev.slice(0, -1).concat({
             id: Date.now().toString(),
             role: 'system',
-            text: `\u274C Error starting stream: ${err}`,
+            text: `Error starting stream: ${err}`, isError: true,
             ...(last.intent ? { intent: last.intent } : {}),
           });
         }
-        return [...prev, { id: Date.now().toString(), role: 'system', text: `\u274C Error: ${err}` }];
+        return [...prev, { id: Date.now().toString(), role: 'system', text: `Error: ${err}`, isError: true }];
       });
     }
   }, [attachedContext, conversationContextRef, setAttachedContext, setIsProcessing, setSystemMessages]);
@@ -547,7 +549,7 @@ export function useMeetingChat() {
     } catch (err) {
       setSystemMessages((prev) => [
         ...prev,
-        { id: Date.now().toString(), role: 'system', text: `Error: ${err}` },
+        { id: Date.now().toString(), role: 'system', text: `Error: ${err}`, isError: true },
       ]);
     } finally {
       setIsProcessing(false);
@@ -572,7 +574,7 @@ export function useMeetingChat() {
     } catch (err) {
       setSystemMessages((prev) => [
         ...prev,
-        { id: Date.now().toString(), role: 'system', text: `Error: ${err}` },
+        { id: Date.now().toString(), role: 'system', text: `Error: ${err}`, isError: true },
       ]);
     } finally {
       setIsProcessing(false);
