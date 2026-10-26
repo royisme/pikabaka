@@ -25,6 +25,6 @@ export function initializeIpcHandlers(appState: AppState): void {
   registerTranslationHandlers(appState)
   registerMiscHandlers(appState)
   registerGateHandlers(appState)
-  registerApprovalHandlers(appState)
+  registerApprovalHandlers()
   registerAgentHandlers(appState)
 }

@@ -2,6 +2,26 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: the agent, proactive help, local commands and a whole-transcript summary (branch `meeting-agent`)
+
+The owner asked for a build to test on real calls (Mac call, Google Meet), with docs and tests after. This lands the code for tracks A1.4, A3, A4, A5 and part of A6 in one branch.
+
+Done (code; none of it has run in the app yet)
+- Per-speaker recognition language (`sttLanguageUser`), changeable from the overlay bar and Settings.
+- `electron/agent/`: pi-durable agent per meeting (store in `userData/agent/<id>.sqlite`), three-minute transcript snapshot per request, tools `search_transcript`, `recent_transcript`, `search_meetings`, `screenshot`; typed chat in the overlay goes to it when the chosen model has a key (Gemini, Groq, OpenAI, Claude), otherwise the old chat runs.
+- Proactive help: `gate.ts` judges each other-party segment with a System One classifier (configurable model, base URL, key); one request in flight, 2 s deadline, no retries; decisions go to a JSON-lines file without speech text. Mode `log` by default; `on` drafts a card with the chat model (one call, no tools).
+- Local commands: `bash`, `read`, `write`, `edit` in `<root>/<day>/<HHmm> <title>`, approval on every call (approval dock), symlink-safe paths, Pika's data folder refused, a command gets only PATH, HOME and LANG.
+- Summary: reads the whole recorded transcript, summarizes in parts and merges (the 10,000-character cut is gone).
+- Checks: electron and src `tsc` 0 errors; 958 of 958 tests; eslint 0 errors, 1265 warnings (the cap). Throwaway scripts (not kept) ran the gate (27 checks, incl. a local System One server), the local tools (18 of 19; the one failure was a wrong test path), the summary parts (10) and the packaged-style load of the ESM packages under Electron's Node.
+
+Not done or deviating from `docs/design-agent-platform.md`
+- Summary: no draft versus approved split, no citations (A6.1, A6.4).
+- Proactive card: one model call, not an assist conversation with tools; the gate log is a file, not store entries; "Ask more" fills the input.
+- Overlay: the two-zone redesign (A1.2, A3.6 rules) is not done.
+- Docs (A1.2, A1.3) and committed tests are deferred at the owner's request.
+
+Not verified: everything above in the running app; real providers, STT, the decision model, a packaged build (ESM packages from `app.asar`), the approval dock and cards on screen.
+
 ## 2026-10-26: the meeting record is written as the meeting happens (branch `incremental-record`, steps A2.1 to A2.4)
 
 Before this, a meeting was saved once at stop with `INSERT OR REPLACE`. With foreign keys on, that deleted the meeting's transcript and interaction rows first, then re-inserted the raw STT list; a crash lost the whole call.

@@ -1,11 +1,10 @@
 import { BrowserWindow, dialog } from "electron"
-import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { getApprovalBroker } from "../agent/instance"
 import { validateRoot } from "../agent/workspace"
 
-export function registerApprovalHandlers(_appState: AppState): void {
+export function registerApprovalHandlers(): void {
   const broker = getApprovalBroker()
   broker.onEvent((event) => {
     BrowserWindow.getAllWindows().forEach((window) => window.webContents.send('agent-approval', event))

@@ -588,14 +588,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
   agentGateStatus: () => ipcRenderer.invoke("agent-gate-status"),
   agentGateLog: () => ipcRenderer.invoke("agent-gate-log"),
   onAgentProactive: (callback: (card: AgentProactiveCard) => void) => {
-    const subscription = (_: any, card: AgentProactiveCard) => callback(card)
+    const subscription = (_: unknown, card: AgentProactiveCard) => callback(card)
     ipcRenderer.on("agent-proactive", subscription)
     return () => { ipcRenderer.removeListener("agent-proactive", subscription) }
   },
   agentApprovalsList: () => ipcRenderer.invoke("agent-approvals-list"),
   agentApprovalRespond: (payload: { id: string; allowed: boolean }) => ipcRenderer.invoke("agent-approval-respond", payload),
   onAgentApproval: (callback: (event: AgentApprovalEvent) => void) => {
-    const subscription = (_: any, event: AgentApprovalEvent) => callback(event)
+    const subscription = (_: unknown, event: AgentApprovalEvent) => callback(event)
     ipcRenderer.on("agent-approval", subscription)
     return () => { ipcRenderer.removeListener("agent-approval", subscription) }
   },
