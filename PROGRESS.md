@@ -2,6 +2,17 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: V9 and V7 the top bar, menu and short language label (branch `overlay-top-bar`)
+
+Done (V9 and V7 together: the bar is where the header controls live)
+- One 36px bar (`OverlayTopBar`) replaces the floating pill, both zone headers ("LIVE TRANSCRIPT", "AI CHAT") and the logo button. Left: the audio status chip (words when there are rows, otherwise only a dot with a screen-reader name; ▲ or ✕ for warn and blocking). Right: Translate, a language menu, Original, a `⋯` menu, Hide, Stop. The pill band above the panel (about 60px of bare desktop) is gone: the shell is the window, which removes the see-through band the spec flagged.
+- V7: the language control is a menu showing a short label (`→ 中文`, `→ EN`, `→ FR`; `src/lib/languageLabel.ts`) with the full names inside, so nothing is truncated. Below 480px Translate and Original, and "Fix audio" when it applies, move into the `⋯` menu; from 480px up they are buttons in the bar. The status chip uses its 12-character form below 480px.
+- The `⋯` menu (`PopoverMenu`, keyboard: Up, Down, Escape; closes on outside click and after a choice) holds Translate and Show original (with the user's shortcuts as key badges), Model (names the current model and opens the model list under the overlay), Settings, Click-through (a check when on) and Open Pika window. These replace the footer row of the answer area; their handlers moved to `PikaInterface`.
+- Stop keeps the two-press arming. `TopPill.tsx` and `TranscriptHeaderControls.tsx` are deleted. The zone tints are gone.
+- The split floors changed with the chrome: transcript zone 112px, answer zone 206px (112 of answers plus about 94 of composer); overlay `minHeight` is 360 (was 400).
+- Verified: both `tsc --noEmit` checks exit 0; tap passes (19 new assertions for the model and language labels; the split test now uses 376px, the 420px window's two zones).
+- Not verified (all of it is visual): the bar at 380, 600 and 1000px; that every item in the `⋯` menu works (model list, settings popup, click-through) and opens where expected under the overlay; that the menu is not clipped by the shell's rounded edge; that the bar can still drag the window while its buttons do not; that hiding the pill did not break the collapse/expand animation. The answer area's own footer row still exists until V8 lands (a worker is replacing it), so model, settings and click-through are temporarily in two places.
+
 ## 2026-10-26: V6 legibility floor (branch `overlay-legibility`)
 
 Done (the numeric part was written by a GPT-6.1 worker through pi, reviewed and merged by the lead)

@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import TopPill from './ui/TopPill';
 import ChatColumn from './meeting/ChatColumn';
 import SplitterShell from './meeting/SplitterShell';
 import TranscriptColumn from './meeting/TranscriptColumn';
-import TranscriptHeaderControls from './meeting/TranscriptHeaderControls';
+import OverlayTopBar from './meeting/OverlayTopBar';
 import { analytics } from '../lib/analytics/analytics.service';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
@@ -15,6 +14,7 @@ import { useMeetingAudio } from '../hooks/useMeetingAudio';
 import { isNearBottom, nextScrollAction } from '../lib/answerScroll';
 import { toggleOriginal } from '../lib/transcriptDisplay';
 import { audioStatus } from '../lib/audioStatus';
+import { modelLabel } from '../lib/modelLabel';
 
 interface PikaInterfaceProps { onEndMeeting?: () => void; overlayOpacity?: number; }
 type ScreenshotAttachment = { path: string; preview: string };
@@ -110,6 +110,22 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         () => audioStatus({ ...audio.audioStatusInput, translateInto }),
         [audio.audioStatusInput, translateInto]
     );
+    // Windows the menu opens (model list, quick settings) are placed just under the overlay, left-aligned with the menu's trigger.
+    const belowOverlay = useCallback((triggerRect: DOMRect) => {
+        const overlayRect = contentRef.current?.getBoundingClientRect();
+        if (!overlayRect) return undefined;
+        return { x: window.screenX + triggerRect.left, y: window.screenY + overlayRect.bottom + 8 };
+    }, []);
+    const openModelSelector = useCallback((triggerRect: DOMRect) => {
+        const at = belowOverlay(triggerRect);
+        if (at) window.electronAPI.toggleModelSelector(at);
+    }, [belowOverlay]);
+    const openSettings = useCallback((triggerRect: DOMRect) => {
+        if (isSettingsOpen) { void window.electronAPI.toggleSettingsWindow(); return; }
+        const at = belowOverlay(triggerRect);
+        void window.electronAPI.toggleSettingsWindow(at);
+    }, [belowOverlay, isSettingsOpen]);
+
     const fixAudio = useCallback(() => { void window.electronAPI.openSettingsSection('audio'); }, []);
     const hasTranscriptRows = transcript.transcriptSegments.length > 0 || transcript.isInterviewerSpeaking;
 
@@ -151,12 +167,21 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const chatProps = { messages: chat.messages, knowledgeContext: chat.knowledgeContext, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, actionButtonMode: chat.actionButtonMode, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleWhatToSay: chat.handleWhatToSay, primaryQuiet: audioState.action === 'fix-audio' && !hasTranscriptRows, audioKey: audioState.key, handleClarify: chat.handleClarify, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleBrainstorm: chat.handleBrainstorm, handleManualSubmit: chat.handleManualSubmit, appearance, isLightTheme, currentModel, isSettingsOpen, isMousePassthrough, setIsMousePassthrough, shortcuts, scrollContainerRef, textInputRef, contentRef, setMessages };
 
     return (
-        <div ref={contentRef} className={`flex flex-col items-center w-full mx-auto ${isExpanded ? 'h-screen' : 'h-fit'} min-h-0 bg-transparent p-0 rounded-[24px] font-sans gap-2 overlay-text-primary`}>
+        <div ref={contentRef} className={`flex flex-col items-center w-full mx-auto ${isExpanded ? 'h-screen' : 'h-fit'} min-h-0 bg-transparent p-0 rounded-[24px] font-sans overlay-text-primary`}>
             <AnimatePresence>
                 {isExpanded && (
-                    <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="flex flex-col items-center gap-2 w-full flex-1 min-h-0">
-                        <TopPill expanded={isExpanded} onToggle={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} appearance={appearance} onLogoClick={() => window.electronAPI?.setWindowMode?.('launcher')} />
-                        <SplitterShell left={<TranscriptColumn {...transcriptProps} status={audioState} onFixAudio={fixAudio} />} leftHeader={<TranscriptHeaderControls status={audioState} hasRows={hasTranscriptRows} onFixAudio={fixAudio} displayMode={transcript.transcriptDisplayMode} translationEnabled={transcript.translationEnabled} translationConfigured={transcript.translationConfigured} targetLanguage={transcript.targetLanguage} languageOptions={transcript.languageOptions} onToggleTranslation={() => transcript.saveTranslationSettings({ enabled: !transcript.translationEnabled })} onChangeTargetLanguage={(targetLanguage) => transcript.saveTranslationSettings({ targetLanguage })} onToggleOriginal={() => transcript.saveTranslationSettings({ displayMode: toggleOriginal(transcript.transcriptDisplayMode) })} onSetUpTranslation={() => { void window.electronAPI.toggleSettingsWindow(); }} />} right={<ChatColumn {...chatProps} />} splitterPosition={splitterPosition} onSplitterChange={changeSplitter} onSplitterReset={resetSplitter} isExpanded={isExpanded} appearance={appearance} overlayPanelClass="overlay-text-primary" />
+                    <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="flex flex-col w-full flex-1 min-h-0">
+                        <SplitterShell
+                            topBar={<OverlayTopBar status={audioState} hasRows={hasTranscriptRows} onFixAudio={fixAudio} displayMode={transcript.transcriptDisplayMode} translationEnabled={transcript.translationEnabled} translationConfigured={transcript.translationConfigured} targetLanguage={transcript.targetLanguage} languageOptions={transcript.languageOptions} onToggleTranslation={() => transcript.saveTranslationSettings({ enabled: !transcript.translationEnabled })} onChangeTargetLanguage={(targetLanguage) => transcript.saveTranslationSettings({ targetLanguage })} onToggleOriginal={() => transcript.saveTranslationSettings({ displayMode: toggleOriginal(transcript.transcriptDisplayMode) })} onSetUpTranslation={() => { void window.electronAPI.toggleSettingsWindow(); }} modelName={modelLabel(currentModel)} isMousePassthrough={isMousePassthrough} toggleOriginalKeys={shortcuts.toggleOriginal} toggleTranslationKeys={shortcuts.toggleTranslation} onHide={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} onOpenModelSelector={openModelSelector} onOpenSettings={openSettings} onToggleMousePassthrough={() => generalHandlersRef.current.toggleMousePassthrough()} onOpenLauncher={() => window.electronAPI?.setWindowMode?.('launcher')} />}
+                            left={<TranscriptColumn {...transcriptProps} status={audioState} onFixAudio={fixAudio} />}
+                            right={<ChatColumn {...chatProps} />}
+                            splitterPosition={splitterPosition}
+                            onSplitterChange={changeSplitter}
+                            onSplitterReset={resetSplitter}
+                            isExpanded={isExpanded}
+                            appearance={appearance}
+                            overlayPanelClass="overlay-text-primary"
+                        />
                     </motion.div>
                 )}
             </AnimatePresence>
