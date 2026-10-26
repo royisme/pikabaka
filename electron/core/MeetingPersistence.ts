@@ -2,11 +2,20 @@
 // Handles meeting lifecycle: stop, save, and recovery.
 // Extracted from IntelligenceManager to decouple DB operations from LLM orchestration.
 
+import { summarizeMeeting } from './meetingSummary';
 import { SessionTracker, TranscriptSegment } from './SessionTracker';
 import { LLMHelper } from './LLMHelper';
 import { DatabaseManager, Meeting } from '../db/DatabaseManager';
 import { GROQ_TITLE_PROMPT, GROQ_SUMMARY_JSON_PROMPT } from '../llm';
 const crypto = require('crypto');
+
+function contextFromTranscript(transcript: Array<{ speaker: string; text: string }>): string {
+    return transcript.map(t => {
+        const label = t.speaker === 'interviewer' ? 'INTERVIEWER' :
+            t.speaker === 'user' ? 'ME' : 'ASSISTANT';
+        return `[${label}]: ${t.text}`;
+    }).join('\n');
+}
 
 export class MeetingPersistence {
     private session: SessionTracker;
@@ -149,18 +158,33 @@ export class MeetingPersistence {
             if (metadata.source) source = metadata.source;
         }
 
+        // The summary reads the whole record in pika.db; the live session's context is compacted and lossy.
+        let context = data.context;
+        let lineCount = data.transcript.length;
+        if (!fullSave) {
+            try {
+                const recorded = DatabaseManager.getInstance().getMeetingDetails(meetingId)?.transcript;
+                if (recorded?.length) {
+                    context = contextFromTranscript(recorded);
+                    lineCount = recorded.length;
+                }
+            } catch (e) {
+                console.error('Could not read the recorded transcript', (e as Error).message);
+            }
+        }
+
         try {
             // Generate Title (only if not set by calendar)
             if (!metadata || !metadata.title) {
                 const titlePrompt = `Generate a concise 3-6 word title for this meeting context. Output ONLY the title text. Do not use quotes or conversational filler.`;
                 const groqTitlePrompt = GROQ_TITLE_PROMPT;
 
-                const generatedTitle = await this.llmHelper.generateMeetingSummary(titlePrompt, data.context.substring(0, 5000), groqTitlePrompt);
+                const generatedTitle = await this.llmHelper.generateMeetingSummary(titlePrompt, context.substring(0, 5000), groqTitlePrompt);
                 if (generatedTitle) title = generatedTitle.replace(/["*]/g, '').trim();
             }
 
             // Generate Structured Summary
-            if (data.transcript.length > 2) {
+            if (lineCount > 2) {
                 const summaryPrompt = `You are a silent meeting summarizer. Convert this conversation into concise internal meeting notes.
     
     RULES:
@@ -181,17 +205,10 @@ export class MeetingPersistence {
       "actionItems": ["specific next steps, assigned tasks, or implied follow-ups. If absolutely none found, return empty array"]
     }`;
 
-                const groqSummaryPrompt = GROQ_SUMMARY_JSON_PROMPT;
-
-                const generatedSummary = await this.llmHelper.generateMeetingSummary(summaryPrompt, data.context.substring(0, 10000), groqSummaryPrompt);
-
-                if (generatedSummary) {
-                    const jsonMatch = generatedSummary.match(/```json\n([\s\S]*?)\n```/) || [null, generatedSummary];
-                    const jsonStr = (jsonMatch[1] || generatedSummary).trim();
-                    try {
-                        summaryData = JSON.parse(jsonStr);
-                    } catch { console.error('Failed to parse summary JSON'); }
-                }
+                const generate = (prompt: string, context: string) => this.llmHelper.generateMeetingSummary(prompt, context, prompt === summaryPrompt ? GROQ_SUMMARY_JSON_PROMPT : prompt);
+                const summary = await summarizeMeeting(context, generate, summaryPrompt);
+                if (summary) summaryData = summary;
+                else console.error('Failed to produce a meeting summary');
             } else {
                 console.log("Transcript too short for summary generation.");
             }
@@ -269,11 +286,7 @@ export class MeetingPersistence {
 
                 console.log(`[MeetingPersistence] Recovering meeting ${m.id}...`);
 
-                const context = details.transcript?.map(t => {
-                    const label = t.speaker === 'interviewer' ? 'INTERVIEWER' :
-                        t.speaker === 'user' ? 'ME' : 'ASSISTANT';
-                    return `[${label}]: ${t.text}`;
-                }).join('\n') || "";
+                const context = contextFromTranscript(details.transcript ?? []);
 
                 const parts = (details.duration || '0:00').split(':');
                 // EC-07 fix: guard against malformed duration strings (e.g. corrupted DB row)
