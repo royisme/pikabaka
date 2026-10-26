@@ -3,6 +3,7 @@ import ChatPanel from './ChatPanel';
 import type { ShortcutConfig } from '../../hooks/useShortcuts';
 import type { Message } from '../../hooks/useMeetingChat';
 import type { getOverlayAppearance } from '../../lib/overlayAppearance';
+import type { AudioStatusKey } from '../../lib/audioStatus';
 
 type KnowledgeContext = {
     matchedJDSignals: Array<{ requirement: string; relevance: number }>;
@@ -24,6 +25,7 @@ interface ChatColumnProps {
     isProcessing: boolean;
     handleWhatToSay: () => void;
     primaryQuiet?: boolean;
+    audioKey?: AudioStatusKey;
     handleClarify: () => void;
     handleFollowUpQuestions: () => void;
     handleRecap: () => void;
@@ -53,6 +55,7 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
     isProcessing,
     handleWhatToSay,
     primaryQuiet,
+    audioKey,
     handleClarify,
     handleFollowUpQuestions,
     handleRecap,
@@ -82,6 +85,7 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
             isProcessing={isProcessing}
             handleWhatToSay={handleWhatToSay}
             primaryQuiet={primaryQuiet}
+            audioKey={audioKey}
             handleClarify={handleClarify}
             handleFollowUpQuestions={handleFollowUpQuestions}
             handleRecap={handleRecap}

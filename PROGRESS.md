@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: V5 one-line empty states (branch `empty-states`)
+
+Done
+- The empty answer area is one line of 12px muted text (no box, no icon) that says what the area will do in the current audio state: "Ask about your screen now, or wait for the call." before audio, "What to say needs their words first. Type a question to ask anyway." with no audio, "When they ask something, press ⌘1 for what to say." while listening, "Press ⌘1 after a question for what to say." while live, and "You can still type a question or attach a screenshot ⌘⇧H." when transcription stopped. The shortcuts are `KeyBadge`s from the user's own shortcut settings, never typed into the copy (`src/lib/answerEmpty.ts`, tested). The transcript area's empty lines came with V3.
+- Verified: both `tsc --noEmit` checks exit 0; tap passes (3 new tests: every state has a hint of at most 80 characters with no hard-coded key names, which hints name a shortcut, the no-audio wording).
+- Not verified: how the line looks at 380px and whether the key badge sits well in the sentence; that the line disappears at the right moment when the first answer streams in (it hides once there is any message or an answer is being produced).
+
 ## 2026-10-26: V4 the primary action follows the state (branch `primary-follows-state`)
 
 Done

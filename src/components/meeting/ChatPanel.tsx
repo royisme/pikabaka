@@ -1,6 +1,8 @@
 import React from 'react';
 import type { ShortcutConfig } from '../../hooks/useShortcuts';
 import { KeyBadge } from '../ui/KeyBadge';
+import { answerEmptyHint } from '../../lib/answerEmpty';
+import type { AudioStatusKey } from '../../lib/audioStatus';
 import {
   MessageSquare,
   RefreshCw,
@@ -64,6 +66,8 @@ interface ChatPanelProps {
   setInputValue: React.Dispatch<React.SetStateAction<string>>;
   isProcessing: boolean;
   handleWhatToSay: () => void;
+  /** Which audio state the empty answer area should speak for. */
+  audioKey?: AudioStatusKey;
   /** True when something else is the one thing to do (fix the audio): What to say stays available but quiet. */
   primaryQuiet?: boolean;
   handleClarify: () => void;
@@ -94,6 +98,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   setInputValue,
   isProcessing,
   handleWhatToSay,
+  audioKey = 'off',
   primaryQuiet = false,
   handleClarify,
   handleFollowUpQuestions,
@@ -395,6 +400,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         className="flex-1 overflow-y-auto px-4 py-3.5 space-y-2.5 no-drag"
         style={{ scrollbarWidth: 'none' }}
       >
+        {messages.length === 0 && !isProcessing && (() => {
+          const hint = answerEmptyHint(audioKey);
+          const keys = hint.key ? shortcuts[hint.key] : [];
+          return (
+            <p className="flex flex-wrap items-center gap-x-1 pt-1 text-xs leading-[17px] overlay-text-muted">
+              <span>{hint.before}</span>
+              {keys.length > 0 && <KeyBadge keys={keys} />}
+              {hint.after && <span>{hint.after}</span>}
+            </p>
+          );
+        })()}
+
         {messages.map((msg) => (
           <div key={msg.id} data-message-id={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
             <div className={`
