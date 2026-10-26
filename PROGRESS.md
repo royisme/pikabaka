@@ -2,6 +2,19 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: translation speed and whole sentences, summaries on their own model (branch `ai-connections`)
+
+Owner tests on real calls: translation was slow, and rows were cut in the middle of sentences.
+
+Done (code; the rows and the speed have not been checked in a real call)
+- Slow translation: a real log showed 7.2 s to the first text and 0.2 s for the rest, so the model was thinking. The four Gemini translation calls now ask for the lowest thinking level (Gemini 3 and newer: MINIMAL, then LOW when the host answers 400; 2.5 Flash: a zero budget). The Audio panel has a "Test translation" button that sends an invented sentence through the settings as shown and reports the first-text and total time; on the owner's model it answered in 0.8 s.
+- Rows: a flush shows the turn up to its last finished sentence and carries the unfinished sentence on as the next turn, so a row never ends mid-sentence and a half sentence is not translated. A turn without a finished sentence is held while interim words keep arriving (at most 20 s), silence is counted from the last words heard, the live line shows final words that are not in a row yet, and the early translation covers only finished sentences. `minWordsBeforeSentenceFlush` is gone. Still open: a wrong period in the middle of a sentence and speech with no punctuation still give a fragment row.
+- Meeting summaries and titles use the summary row's model on any connection (the quick-answers model unless one is set apart); the Groq-first chain and its prompts are gone. `chat-model-*` and `summary-model-*` channels read and write the two rows.
+- Four React effect clean-ups (meeting chat hook, launcher and overlay windows, overlay, settings) were reviewed and merged. Visible change to check: the screenshot crop hint now centres on its real width.
+- The owner decided the calendar feature goes (A7.1 in `TASKS.md`); not started.
+
+Not done: the AI Providers page redesign (rows for quick answers and summaries, removing Fast Response Mode, cURL providers and the old default-model plumbing) is with a worker on branch `ai-settings`. Not verified: any of this in a real call.
+
 ## 2026-10-26: connections apart from what a model is used for (branch `ai-connections`)
 
 Owner feedback: the AI settings mixed providers with jobs, and OpenAI and Claude had no host field; Pika must not be tied to a provider.
