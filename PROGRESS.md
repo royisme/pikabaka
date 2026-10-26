@@ -2,6 +2,16 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: S2 real lint and CI (branch `lint-and-ci`, issue #35)
+
+Done (S2, issue #35; the owner approved the new dev dependency)
+- `eslint` 9.25.1 is now a declared devDependency (it was only a peer in the lockfile and was not installed, so `pnpm run lint` could not run). Added with `pnpm add -D eslint@9.25.1 --ignore-scripts` under Node 22.
+- Lint has a real rule set: the `@typescript-eslint` plugin's recommended flat config (it also brings the parser). The code base breaks ten of those rules 1268 times (no-explicit-any 878, no-unused-vars 171, no-require-imports 106, ban-ts-comment 99, others 14); those rules warn, and the `lint` script has `--max-warnings 1268`, so the count can only go down. Every other recommended rule is an error. No source file was changed.
+- New `typecheck` script (renderer, then Electron); `verify` is typecheck, lint, test. New `.github/workflows/verify.yml` runs typecheck, lint and test on pull requests (macOS runner, same install as the build smoke).
+- `pnpm-lock.yaml` is committed with this change. Its diff also carries the drift from the plain `pnpm install` run earlier (jiti 2.7.0, `@electron/rebuild` 4.2.1, 8 packages dropped); I did not separate the two. `pnpm install --frozen-lockfile --ignore-scripts` succeeds with it.
+- Verified: `pnpm run lint` exit 0 with 0 errors and 1268 warnings; `tsc` both exit 0; tap 755 of 755.
+- Not verified: the new workflow has not run on GitHub. A pull request with a type error, and one with a new error-level lint finding, should fail it; that check is the step's acceptance and is still to do. The macOS runner may not be able to run every test.
+
 ## 2026-10-26: V11 DESIGN.md and overlay rules (branch `overlay-rules`)
 
 Done

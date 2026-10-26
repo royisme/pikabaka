@@ -27,21 +27,21 @@ node node_modules/typescript/bin/tsc -p electron/tsconfig.json --noEmit
 node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.ts"
 ```
 
-`eslint` is not declared in `package.json`; the lockfile resolves it only as a peer of `@typescript-eslint/*`, and it is not installed in that checkout. So `pnpm run lint` could not run there, and `verify` (and every script that runs it first: `build`, `electron:dev`, `app:build`) depends on a peer that may be missing (issue #35).
-
 `pnpm run dev` starts Vite only (the renderer in a browser, without `window.electronAPI`). The app is `pnpm start` (`app:dev`).
 
 ## Checks
 
 | Check | Command | Notes |
 | --- | --- | --- |
-| Typecheck, renderer | `tsc --noEmit` | exit 0 on 2026-10-26 |
-| Typecheck, Electron | `tsc -p electron/tsconfig.json --noEmit` | exit 0 on 2026-10-26 |
-| Unit and integration tests | tap over `test/**/*.test.ts` | 346 of 346 passed on 2026-10-26 |
-| Lint | `pnpm run lint` (`eslint src electron test --no-inline-config`) | `rules` is empty, so this only checks that files parse; issue #35 |
-| Build smoke | `pnpm run build:web:raw` and `build:electron:raw` | what CI runs |
+| Typecheck | `pnpm run typecheck` (renderer, then Electron) | both exit 0 |
+| Lint | `pnpm run lint` | ESLint 9 with the plugin's recommended TypeScript set; 1268 existing findings are warnings and the script caps them with `--max-warnings 1268`, so the number may go down and never up. Lower the cap in `package.json` when you fix some. Every other recommended rule is an error |
+| Unit and integration tests | `pnpm run test` (tap over `test/**/*.test.ts`) | 755 passed on 2026-10-26 |
+| Everything | `pnpm run verify` | typecheck, lint, test; the build scripts without `:raw` run it first |
+| Build smoke | `pnpm run build:web:raw` and `build:electron:raw` | what `build-smoke.yml` runs |
 
-CI (`.github/workflows/build-smoke.yml`) runs only the two `:raw` builds on pull requests. It does not run lint or tests (issue #35). Treat the table above as the local gate until that issue lands.
+CI runs two workflows on pull requests: `verify.yml` (typecheck, lint, tests) and `build-smoke.yml` (the two builds). Neither was exercised on GitHub from this checkout: the files are checked in, and a first run will show whether the macOS runner can run the tests.
+
+Under an agent's shell, run the tools without pnpm when `node_modules` may be out of step (see "pnpm caveat"): `node node_modules/typescript/bin/tsc --noEmit`, `node node_modules/eslint/bin/eslint.js src electron test --no-inline-config --max-warnings 1268`, `node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.ts"`.
 
 ## UI changes
 
