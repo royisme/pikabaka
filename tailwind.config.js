@@ -111,8 +111,8 @@ module.exports = {
         label: '0.1em',
       },
       boxShadow: {
-        ambient: '0 20px 40px rgba(168, 200, 255, 0.08)',
-        float: '0 24px 40px rgba(168, 200, 255, 0.08)',
+        ambient: '0 20px 40px rgba(125, 211, 252, 0.08)',
+        float: '0 24px 40px rgba(125, 211, 252, 0.08)',
       },
       backgroundImage: {
         'cta-gradient': 'linear-gradient(135deg, var(--primary), var(--primary-container))',

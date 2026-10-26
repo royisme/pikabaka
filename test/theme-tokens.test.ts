@@ -20,7 +20,14 @@ const isColor = (value: string) => /^(#|rgba?\()/.test(value);
 
 // Colours that read the same on both themes, so the dark value is also the light value.
 const SHARED = new Set([
-  '--overlay-action', // the one filled action, Apple blue on either panel
+  // The brand colours are the same on both themes; the semantic tokens that use them are checked below.
+  '--brand-blue',
+  '--brand-action',
+  '--brand-sky',
+  '--brand-cream',
+  '--brand-slate',
+  '--brand-ink',
+  '--accent-spark', // a graphic only (the "done" star), never text
   '--state-success-border',
   '--state-warning-border',
   '--state-danger-border',

@@ -18,9 +18,25 @@ One panel that is the window (no transparent margin around it), from top to bott
 | Chips and controls | `overlay-chip-*`, `overlay-control-*`, `overlay-icon-*`, `overlay-input-*` |
 | Text | `overlay-text-primary`, `overlay-text-secondary`, `overlay-text-muted` (placeholder equals muted); `overlay-text-strong` for emphasis |
 | Dividers | `overlay-hairline` (it sets `--overlay-border-soft`); `border-border-subtle/NN` generates no CSS and must not be used |
-| The one filled control | `--overlay-action` (`#0071E3`, white text on it): the primary action, Send, Fix audio. At most one is filled on screen |
+| The one filled control | `--overlay-action` (the brand action blue `#2563EB`, white text on it, 5.17:1): the primary action, Send, Allow, Fix audio. At most one is filled on screen |
+| The two areas | `--overlay-zone-them` (the other party's words: cool and deep) and `--overlay-zone-pika` (Pika's conversation: cream `#fff8e7` in light, a lifted navy in dark), each under its own header, split by `--overlay-zone-line` |
 | Menu and popover surface | `--overlay-menu-bg` (opaque; white on light). Never `bg-bg-elevated` inside the overlay |
 | State | `state-success`, `state-warning`, `state-danger` for a dot, icon or border; the words stay in `overlay-text-primary` |
+
+### Brand colours
+
+The identity board gives four colours, and `src/index.css` holds them as `--brand-*` (plus `--brand-action` and `--brand-ink`). Components never use them directly; the semantic tokens refer to them, and each pairing below was checked for contrast.
+
+| Brand colour | Role |
+| --- | --- |
+| Blue `#3b82f6` | Identity: icon, logo, focus ring, large graphics. It is 3.68:1 with white text, so it never carries small text or a white label. |
+| Action blue `#2563eb` | The same hue one step deeper: the filled control and the light theme's `primary` (5.17:1 with white). |
+| Sky `#7dd3fc` | Dark theme's `primary`, links and the "listening" and "translating" movement. |
+| Cream `#fff8e7` | Pika's body: the ground where Pika speaks (light theme). |
+| Slate `#94a3b8` | Dark theme's tertiary text. On white it is 2.56:1, so in the light theme it is for icons and lines only. |
+| Spark `#f5b301` (`--accent-spark`) | The "done" star: a graphic, never text or a button. |
+
+Success, warning and danger keep their own greens, ambers and reds; the brand has none of them. The mascot illustrations belong to the launcher, empty states and meeting details; the overlay is a tool surface and carries none.
 
 ### Two token families, one rule
 
@@ -28,9 +44,9 @@ The overlay uses `overlay-*`. The launcher, the settings pages, the meeting deta
 
 | | Dark | Light |
 | --- | --- | --- |
-| Canvas, sidebar, card and menu | `#0d0d1c`, `#111127`, `#1b1b40` | `#f2f4f9`, `#fafbfd`, `#ffffff` (cards and menus are lifted by shadow, not by fill) |
-| Accent (`primary`) and text on it | `#a8c8ff`, `#0b1530` | `#0a60c9`, `#ffffff` |
-| Text, secondary, tertiary | near white, down to 4.5:1 on the cards | slate 900, slate 800, slate 600, all 4.5:1 or more on the canvas |
+| Canvas, sidebar, card and menu | `#0b1120`, `#0f172a`, `#162033` (the hue of the logo's dark card) | `#f3f6fc`, `#fafbfe`, `#ffffff` (cards and menus are lifted by shadow, not by fill) |
+| Accent (`primary`) and text on it | `#7dd3fc` (brand sky), `#0b1120` | `#2563eb` (brand action blue), `#ffffff` |
+| Text, secondary, tertiary | near white, then slate 300, then brand slate `#94a3b8` (6.4:1 on the cards) | slate 900, slate 800, slate 600, all 4.5:1 or more on the canvas |
 | `state-*` words (`text-state-*-strong`) | bright green, amber, red | deep green, amber, red (`#166534`, `#92400e`, `#991b1b`), 4.5:1 or more on white |
 
 Fills that carry text get a pair: pale fill with dark text in dark, deep fill with white text in light, both through `primary` and `on-primary`. `text-white` on a `primary` fill is a bug (1.7:1 in dark).
