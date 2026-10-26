@@ -27,11 +27,7 @@ interface ChatColumnProps {
     handleFollowUpQuestions: () => void;
     handleRecap: () => void;
     handleBrainstorm: () => void;
-    handleAnswerNow: () => void;
     handleManualSubmit: () => void;
-    isManualRecording: boolean;
-    manualTranscript: string;
-    voiceInput: string;
     appearance: ReturnType<typeof getOverlayAppearance>;
     isLightTheme: boolean;
     currentModel: string;
@@ -59,11 +55,7 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
     handleFollowUpQuestions,
     handleRecap,
     handleBrainstorm,
-    handleAnswerNow,
     handleManualSubmit,
-    isManualRecording,
-    manualTranscript,
-    voiceInput,
     appearance,
     isLightTheme,
     currentModel,
@@ -91,11 +83,7 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
             handleFollowUpQuestions={handleFollowUpQuestions}
             handleRecap={handleRecap}
             handleBrainstorm={handleBrainstorm}
-            handleAnswerNow={handleAnswerNow}
             handleManualSubmit={handleManualSubmit}
-            isManualRecording={isManualRecording}
-            manualTranscript={manualTranscript}
-            voiceInput={voiceInput}
             appearance={appearance}
             isLightTheme={isLightTheme}
             currentModel={currentModel}

@@ -1,7 +1,7 @@
 import React from 'react';
 import type { ShortcutConfig } from '../../hooks/useShortcuts';
+import { KeyBadge } from '../ui/KeyBadge';
 import {
-  Pencil,
   MessageSquare,
   RefreshCw,
   HelpCircle,
@@ -67,11 +67,7 @@ interface ChatPanelProps {
   handleFollowUpQuestions: () => void;
   handleRecap: () => void;
   handleBrainstorm: () => void;
-  handleAnswerNow: () => void;
   handleManualSubmit: () => void;
-  isManualRecording: boolean;
-  manualTranscript: string;
-  voiceInput: string;
   appearance: any;
   isLightTheme: boolean;
   currentModel: string;
@@ -99,11 +95,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   handleFollowUpQuestions,
   handleRecap,
   handleBrainstorm,
-  handleAnswerNow,
   handleManualSubmit,
-  isManualRecording,
-  manualTranscript,
-  voiceInput,
   appearance,
   isLightTheme,
   currentModel,
@@ -434,24 +426,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         ))}
 
-        {isManualRecording && (
-          <div className="flex flex-col items-end gap-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {(manualTranscript || voiceInput) && (
-              <div className="max-w-[85%] px-3.5 py-2.5 bg-state-success-soft border border-state-success-border rounded-[18px] rounded-tr-[4px]">
-                <span className="text-[13px] text-state-success">
-                  {voiceInput}{voiceInput && manualTranscript ? ' ' : ''}{manualTranscript}
-                </span>
-              </div>
-            )}
-            <div className="px-3 py-2 flex gap-1.5 items-center">
-              <div className="w-2 h-2 bg-state-success rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-state-success rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-state-success rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              <span className="text-[10px] text-state-success ml-1">Listening...</span>
-            </div>
-          </div>
-        )}
-
         {isProcessing && (
           <div className="flex justify-start">
             <div className="px-3 py-2 flex gap-1.5">
@@ -512,8 +486,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       </div>
 
       <div className="flex flex-nowrap justify-center items-center gap-1.5 px-4 pb-3 overflow-x-auto no-scrollbar pt-3.5 no-drag">
-        <button onClick={handleWhatToSay} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-          <Pencil className="w-3 h-3 opacity-65" /> Guide me
+        <button
+          onClick={handleWhatToSay}
+          className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 bg-[#007AFF] text-white shadow-[0_4px_14px_rgba(0,122,255,0.18)] hover:bg-[#0071E3]"
+        >
+          <Zap className="w-3 h-3 opacity-75" /> What to say
+          {shortcuts.whatToAnswer.length > 0 && <KeyBadge keys={shortcuts.whatToAnswer} className="ml-0.5 opacity-80" />}
         </button>
         <button onClick={handleClarify} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
           <MessageSquare className="w-3 h-3 opacity-65" /> Clarify
@@ -526,22 +504,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         </button>
         <button onClick={handleFollowUpQuestions} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
           <HelpCircle className="w-3 h-3 opacity-65" /> Follow-up
-        </button>
-        <button
-          onClick={handleAnswerNow}
-          className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press min-w-[84px] whitespace-nowrap shrink-0 ${isManualRecording
-            ? 'bg-state-danger-soft text-state-danger ring-1 ring-state-danger-border'
-            : 'bg-[#007AFF] text-white shadow-[0_4px_14px_rgba(0,122,255,0.18)] hover:bg-[#0071E3]'
-          }`}
-        >
-          {isManualRecording ? (
-            <>
-              <div className="w-1.5 h-1.5 rounded-full bg-state-danger animate-pulse" />
-              Stop
-            </>
-          ) : (
-            <><Zap className="w-3 h-3 opacity-75" /> Answer</>
-          )}
         </button>
       </div>
 
@@ -579,7 +541,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 </div>
               ))}
             </div>
-            <span className="text-[10px] overlay-text-muted">Ask a question or click Answer</span>
+            <span className="text-[10px] overlay-text-muted">Type a question and press Enter, or use What to say</span>
           </div>
         )}
 
@@ -589,7 +551,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
+            onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && handleManualSubmit()}
             className={`w-full border focus:ring-1 rounded-xl pl-3 pr-10 py-2.5 focus:outline-none transition-all duration-200 ease-sculpted text-[13px] leading-relaxed ${inputClass}`}
             style={appearance.inputStyle}
           />

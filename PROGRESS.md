@@ -2,6 +2,16 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: U3 one primary action (branch `one-primary-action`, issue #23)
+
+Done
+- "Guide me" and "Answer" were the same action. There is now one primary button, "What to say", in the primary colour with its shortcut shown (`KeyBadge`, the first real use of that component). Clarify, Recap/Ideas and Follow-up stay as secondary chips.
+- The dead push-to-talk UI is gone: the "Stop" and "Listening…" branches and the `isManualRecording`, `manualTranscript`, `voiceInput` and `handleAnswerNow` props through `PikaInterface`, `ChatColumn` and `ChatPanel`.
+- Typed text goes with Enter (as before); Enter no longer submits while an IME is composing. The hint under attached screenshots now says "Type a question and press Enter, or use What to say" instead of the wrong "click Answer".
+- Verified: both `tsc --noEmit` checks exit 0; tap 477 of 477 (no new test: the change is markup and prop removal, with no logic to assert).
+- Not verified: the layout at 380px (the primary button with its key badge is wider than the old chips; the row still scrolls horizontally and is not fixed until U8); the IME guard with a real Chinese or Japanese input method.
+- Left in place: the `chat:answer` shortcut (Cmd+5) still exists and still runs what-to-say, so two shortcuts do the same thing; and `useMeetingAudio` still keeps the unused manual-recording state. Both are worth deleting in a separate step with the owner's say-so, since they touch the shortcut table and the audio hook.
+
 ## 2026-10-26: T7 global translation shortcuts (branch `translation-shortcuts`, epic #38)
 
 Done
