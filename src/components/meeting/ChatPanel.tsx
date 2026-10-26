@@ -10,9 +10,6 @@ import {
   Lightbulb,
   ArrowRight,
   Zap,
-  ChevronDown,
-  SlidersHorizontal,
-  PointerOff,
   Image,
   X,
   Copy,
@@ -77,14 +74,9 @@ interface ChatPanelProps {
   handleManualSubmit: () => void;
   appearance: any;
   isLightTheme: boolean;
-  currentModel: string;
-  isSettingsOpen: boolean;
-  isMousePassthrough: boolean;
-  setIsMousePassthrough: (value: boolean) => void;
   shortcuts: ShortcutConfig;
   scrollContainerRef: React.RefObject<HTMLDivElement>;
   textInputRef: React.RefObject<HTMLInputElement>;
-  contentRef: React.RefObject<HTMLDivElement>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 }
 
@@ -107,14 +99,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   handleManualSubmit,
   appearance,
   isLightTheme,
-  currentModel,
-  isSettingsOpen,
-  isMousePassthrough,
-  setIsMousePassthrough,
   shortcuts,
   scrollContainerRef,
   textInputRef,
-  contentRef,
   setMessages,
 }) => {
   const codeTheme = isLightTheme ? oneLight : vscDarkPlus;
@@ -125,7 +112,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const codeHeaderTextClass = 'overlay-text-muted';
   const quickActionClass = 'overlay-chip-surface overlay-text-interactive hover:overlay-text-primary';
   const inputClass = `${isLightTheme ? 'focus:ring-black/10' : 'focus:ring-white/10'} overlay-input-surface overlay-input-text`;
-  const controlSurfaceClass = 'overlay-control-surface overlay-text-interactive';
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text).catch(console.error);
@@ -513,35 +499,34 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         )}
       </div>
 
-      <div className="flex flex-nowrap items-center gap-1.5 px-4 pb-3 overflow-x-auto no-scrollbar pt-3.5 no-drag [&>:first-child]:ml-auto [&>:last-child]:mr-auto">
-        <button
-          onClick={handleWhatToSay}
-          disabled={isProcessing}
-          className={`flex min-w-[9rem] items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 disabled:cursor-wait ${
-            primaryQuiet
-              ? `border overlay-hairline ${quickActionClass}`
-              : 'bg-[var(--overlay-action)] text-white shadow-[0_4px_14px_rgba(0,113,227,0.18)] hover:brightness-95'
-          }`}
-          style={primaryQuiet ? appearance.chipStyle : undefined}
-        >
-          <Zap className="w-3 h-3 opacity-75" /> {isProcessing ? 'Answering…' : 'What to say'}
-          {!isProcessing && shortcuts.whatToAnswer.length > 0 && <KeyBadge keys={shortcuts.whatToAnswer} onAction={!primaryQuiet} className="ml-0.5" />}
-        </button>
-        <button onClick={handleClarify} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-          <MessageSquare className="w-3 h-3 opacity-65" /> Clarify
-        </button>
-        <button onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-          {actionButtonMode === 'brainstorm'
-            ? <><Lightbulb className="w-3 h-3 opacity-65" /> Ideas</>
-            : <><RefreshCw className="w-3 h-3 opacity-65" /> Recap</>
-          }
-        </button>
-        <button onClick={handleFollowUpQuestions} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-          <HelpCircle className="w-3 h-3 opacity-65" /> Follow-up
-        </button>
-      </div>
-
-      <div className="p-3 pt-0 no-drag">
+      <div className="shrink-0 px-3 min-[480px]:px-4 py-2 no-drag">
+        <div className="flex h-7 items-center gap-1.5 mb-1.5">
+          <button
+            onClick={handleWhatToSay}
+            disabled={isProcessing}
+            className={`flex h-7 min-w-[9rem] items-center justify-center gap-1.5 px-3 rounded-full text-xs font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 disabled:cursor-wait ${
+              primaryQuiet
+                ? `border overlay-hairline ${quickActionClass}`
+                : 'bg-[var(--overlay-action)] text-white shadow-[0_4px_14px_rgba(0,113,227,0.18)] hover:brightness-95'
+            }`}
+            style={primaryQuiet ? appearance.chipStyle : undefined}
+          >
+            <Zap className="w-3 h-3 opacity-75" /> {isProcessing ? 'Answering…' : 'What to say'}
+            {!isProcessing && shortcuts.whatToAnswer.length > 0 && <KeyBadge keys={shortcuts.whatToAnswer} onAction={!primaryQuiet} className="hidden min-[480px]:flex ml-0.5" />}
+          </button>
+          <button onClick={handleClarify} aria-label="Clarify" title="Clarify" className={`flex h-7 w-7 min-[480px]:w-auto items-center justify-center gap-1.5 min-[480px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+            <MessageSquare className="w-3 h-3 opacity-65" /> <span className="hidden min-[480px]:inline">Clarify</span>
+          </button>
+          <button onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap} aria-label={actionButtonMode === 'brainstorm' ? 'Ideas' : 'Recap'} title={actionButtonMode === 'brainstorm' ? 'Ideas' : 'Recap'} className={`flex h-7 w-7 min-[480px]:w-auto items-center justify-center gap-1.5 min-[480px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+            {actionButtonMode === 'brainstorm'
+              ? <><Lightbulb className="w-3 h-3 opacity-65" /> <span className="hidden min-[480px]:inline">Ideas</span></>
+              : <><RefreshCw className="w-3 h-3 opacity-65" /> <span className="hidden min-[480px]:inline">Recap</span></>
+            }
+          </button>
+          <button onClick={handleFollowUpQuestions} aria-label="Follow-up" title="Follow-up" className={`flex h-7 w-7 min-[480px]:w-auto items-center justify-center gap-1.5 min-[480px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+            <HelpCircle className="w-3 h-3 opacity-65" /> <span className="hidden min-[480px]:inline">Follow-up</span>
+          </button>
+        </div>
         {attachedContext.length > 0 && (
           <div className={`mb-2 rounded-lg p-2 transition-all duration-200 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
             <div className="flex items-center justify-between mb-1.5">
@@ -579,7 +564,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         )}
 
-        <div className="relative group">
+        <div className="relative h-9 group">
           <input
             ref={textInputRef}
             type="text"
@@ -588,126 +573,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && handleManualSubmit()}
-            className={`w-full border focus:ring-1 rounded-xl pl-3 pr-10 py-2.5 focus:outline-none transition-all duration-200 ease-sculpted font-sans text-[13px] leading-relaxed ${inputClass}`}
+            className={`h-9 w-full border overlay-hairline focus:ring-1 rounded-xl pl-3 pr-10 focus:outline-none transition-all duration-200 ease-sculpted font-sans text-sm ${inputClass}`}
             style={appearance.inputStyle}
           />
-
-          {!inputValue && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-20" aria-hidden="true">
-              <span className="text-[10px]">↵</span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between mt-3 px-0.5">
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={(e) => {
-                if (!contentRef.current) return;
-                const contentRect = contentRef.current.getBoundingClientRect();
-                const buttonRect = e.currentTarget.getBoundingClientRect();
-                const GAP = 8;
-
-                const x = window.screenX + buttonRect.left;
-                const y = window.screenY + contentRect.bottom + GAP;
-
-                window.electronAPI.toggleModelSelector({ x, y });
-              }}
-              aria-label="Choose model"
-              className={`
-                flex items-center gap-2 px-3 py-1.5
-                border overlay-hairline rounded-lg transition-colors
-                text-xs font-medium w-[140px]
-                interaction-base interaction-press
-                ${controlSurfaceClass}
-              `}
-              style={appearance.controlStyle}
-            >
-              <span className="truncate min-w-0 flex-1">
-                {(() => {
-                  const m = currentModel;
-                  if (m.startsWith('ollama-')) return m.replace('ollama-', '');
-                  if (m === 'gemini-3.1-flash-lite-preview') return 'Gemini 3.1 Flash';
-                  if (m === 'gemini-3.1-pro-preview') return 'Gemini 3.1 Pro';
-                  if (m === 'llama-3.3-70b-versatile') return 'Groq Llama 3.3';
-                  if (m === 'gpt-5.4') return 'GPT 5.4';
-                  if (m === 'claude-sonnet-4-6') return 'Sonnet 4.6';
-                  return m;
-                })()}
-              </span>
-              <ChevronDown size={14} className="shrink-0 transition-transform" />
-            </button>
-
-            <div className="w-px h-3 mx-1" style={appearance.dividerStyle} />
-
-            <div className="relative">
-              <button
-                aria-label="Settings"
-                onClick={(e) => {
-                  if (isSettingsOpen) {
-                    window.electronAPI.toggleSettingsWindow();
-                    return;
-                  }
-
-                  if (!contentRef.current) return;
-
-                  const contentRect = contentRef.current.getBoundingClientRect();
-                  const buttonRect = e.currentTarget.getBoundingClientRect();
-                  const GAP = 8;
-
-                  const x = window.screenX + buttonRect.left;
-                  const y = window.screenY + contentRect.bottom + GAP;
-
-                  window.electronAPI.toggleSettingsWindow({ x, y });
-                }}
-                className={`
-                  w-7 h-7 flex items-center justify-center rounded-lg
-                  interaction-base interaction-press
-                  ${isSettingsOpen
-                    ? 'overlay-icon-surface overlay-icon-surface-hover overlay-text-primary'
-                    : 'overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive'}
-                `}
-                style={appearance.iconStyle}
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="w-px h-3 mx-1" style={appearance.dividerStyle} />
-
-            <div className="relative">
-              <button
-                aria-label="Click-through"
-                aria-pressed={isMousePassthrough}
-                title="Click-through"
-                onClick={() => {
-                  const newState = !isMousePassthrough;
-                  setIsMousePassthrough(newState);
-                  window.electronAPI?.setOverlayMousePassthrough?.(newState);
-                }}
-                className={`
-                  w-7 h-7 flex items-center justify-center rounded-lg
-                  interaction-base interaction-press
-                  ${isMousePassthrough
-                    ? 'overlay-icon-surface overlay-icon-surface-hover text-state-info opacity-100'
-                    : 'overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive'}
-                `}
-                style={appearance.iconStyle}
-              >
-                <PointerOff className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
 
           <button
             onClick={handleManualSubmit}
             aria-label="Send"
             disabled={!inputValue.trim()}
             className={`
-              w-7 h-7 rounded-full flex items-center justify-center
+              absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center
               interaction-base interaction-press
               ${inputValue.trim()
-                ? 'bg-[var(--overlay-action)] text-white shadow-lg shadow-blue-500/20 hover:brightness-95'
+                ? 'bg-[var(--overlay-action)] text-white shadow-lg hover:brightness-95'
                 : 'overlay-icon-surface overlay-text-muted cursor-not-allowed'
               }
             `}

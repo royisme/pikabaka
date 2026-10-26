@@ -33,14 +33,9 @@ interface ChatColumnProps {
     handleManualSubmit: () => void;
     appearance: ReturnType<typeof getOverlayAppearance>;
     isLightTheme: boolean;
-    currentModel: string;
-    isSettingsOpen: boolean;
-    isMousePassthrough: boolean;
-    setIsMousePassthrough: (value: boolean) => void;
     shortcuts: ShortcutConfig;
     scrollContainerRef: React.RefObject<HTMLDivElement>;
     textInputRef: React.RefObject<HTMLInputElement>;
-    contentRef: React.RefObject<HTMLDivElement>;
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 }
 
@@ -63,14 +58,9 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
     handleManualSubmit,
     appearance,
     isLightTheme,
-    currentModel,
-    isSettingsOpen,
-    isMousePassthrough,
-    setIsMousePassthrough,
     shortcuts,
     scrollContainerRef,
     textInputRef,
-    contentRef,
     setMessages,
 }) => {
     return (
@@ -93,14 +83,9 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
             handleManualSubmit={handleManualSubmit}
             appearance={appearance}
             isLightTheme={isLightTheme}
-            currentModel={currentModel}
-            isSettingsOpen={isSettingsOpen}
-            isMousePassthrough={isMousePassthrough}
-            setIsMousePassthrough={setIsMousePassthrough}
             shortcuts={shortcuts}
             scrollContainerRef={scrollContainerRef}
             textInputRef={textInputRef}
-            contentRef={contentRef}
             setMessages={setMessages}
         />
     );
