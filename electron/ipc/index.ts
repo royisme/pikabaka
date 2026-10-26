@@ -12,6 +12,7 @@ import { registerMiscHandlers } from "./misc"
 import { registerGateHandlers } from "./gate"
 import { registerApprovalHandlers } from "./approval"
 import { registerConnectionHandlers } from "./connections"
+import { registerAnswerStyleHandlers } from "./answerStyle"
 import { registerAgentHandlers } from "./agent"
 
 export function initializeIpcHandlers(appState: AppState): void {
@@ -28,5 +29,6 @@ export function initializeIpcHandlers(appState: AppState): void {
   registerGateHandlers(appState)
   registerApprovalHandlers()
   registerConnectionHandlers(appState)
+  registerAnswerStyleHandlers()
   registerAgentHandlers(appState)
 }

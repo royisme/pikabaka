@@ -1,4 +1,5 @@
 import { answerLanguageInstruction } from '../llm/answerLanguage';
+import { speakingStyleInstruction } from '../llm/speakingStyle';
 import type { AgentModel } from './models';
 import type { GateKind, GateLine } from './gate';
 
@@ -32,7 +33,7 @@ const SYSTEM = [
 
 export async function runAssist(
   model: AgentModel,
-  input: { kind: GateKind; lines: GateLine[]; language: string; spokenLanguageKey: string },
+  input: { kind: GateKind; lines: GateLine[]; language: string; spokenLanguageKey: string; style: string },
   signal: AbortSignal,
 ): Promise<string | undefined> {
   const goal = GOALS[input.kind];
@@ -44,7 +45,7 @@ export async function runAssist(
     systemPrompt: SYSTEM,
     messages: [{
       role: 'user',
-      content: `${goal}\n${answerLanguageInstruction(input.language, input.spokenLanguageKey)?.header ?? `Answer in ${input.language}.`}\nTranscript (newest last):\n${transcript}`,
+      content: `${goal}\n${answerLanguageInstruction(input.language, input.spokenLanguageKey)?.header ?? `Answer in ${input.language}.`}\n${speakingStyleInstruction(input.style).header}\nTranscript (newest last):\n${transcript}`,
       timestamp: Date.now(),
     }],
   }, { signal, timeoutMs: 15_000, maxRetries: 0, maxTokens: 320 });

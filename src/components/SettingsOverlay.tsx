@@ -1,6 +1,7 @@
 import SttModelPicker, { STT_MODEL_DEFAULTS } from './settings/SttModelPicker';
 import ConnectionModelPicker from './settings/ConnectionModelPicker';
 import TranslationTest from './settings/TranslationTest';
+import AnswerStyleSettings from './settings/AnswerStyleSettings';
 import WorkspaceSettings from './settings/WorkspaceSettings';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
@@ -1611,6 +1612,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         )}
                                                     </div>
                                                 </div>
+
+                                                <AnswerStyleSettings />
 
                                                 {/* Version */}
                                                 <div className="flex items-start justify-between gap-4 px-4 py-3">

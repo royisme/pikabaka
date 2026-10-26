@@ -141,6 +141,8 @@ interface ElectronAPI {
   setAiResponseLanguage: (language: string) => Promise<{ success: boolean; error?: string }>
   getSttLanguage: (speaker?: 'interviewer' | 'user') => Promise<string>
   getAiResponseLanguage: () => Promise<string>
+  getAnswerStyle: () => Promise<string>
+  setAnswerStyle: (style: string) => Promise<{ success: boolean; error?: string }>
   getNativeAudioStatus: () => Promise<{
     connected: boolean;
     meetingActive: boolean;
@@ -698,6 +700,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setAiResponseLanguage: (language: string) => ipcRenderer.invoke("set-ai-response-language", language),
   getSttLanguage: (speaker?: 'interviewer' | 'user') => ipcRenderer.invoke("get-stt-language", speaker),
   getAiResponseLanguage: () => ipcRenderer.invoke("get-ai-response-language"),
+  getAnswerStyle: () => ipcRenderer.invoke("get-answer-style"),
+  setAnswerStyle: (style: string) => ipcRenderer.invoke("set-answer-style", style),
 
   // Intelligence Mode IPC
   generateAssist: () => ipcRenderer.invoke("generate-assist"),

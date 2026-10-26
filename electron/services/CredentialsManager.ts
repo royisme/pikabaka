@@ -61,6 +61,8 @@ export interface StoredCredentials {
     sttLanguage?: string;
     sttLanguageUser?: string;
     aiResponseLanguage?: string;
+    /** How answers sound (a manner of speaking, free text). Unset means the default style. */
+    answerStyle?: string;
     transcriptTranslationEnabled?: boolean;
     /** `ollama` | `gemini` | `groq` | `openai` | `claude` | OpenAI-compatible provider id from AI Providers */
     transcriptTranslationProvider?: string;
@@ -265,6 +267,15 @@ export class CredentialsManager {
         if (settings.cooldownSeconds !== undefined) this.credentials.agentGateCooldownSeconds = settings.cooldownSeconds;
         this.saveCredentials();
         console.log('[CredentialsManager] Proactive help settings updated');
+    }
+
+    public getAnswerStyle(): string {
+        return this.credentials.answerStyle || '';
+    }
+
+    public setAnswerStyle(style: string): void {
+        this.credentials.answerStyle = style.trim().slice(0, 200) || undefined;
+        this.saveCredentials();
     }
 
     public getAiResponseLanguage(): string {

@@ -20,6 +20,7 @@ import { createProviderRateLimiters, RateLimiter } from '../services/RateLimiter
 import { buildTranscriptTranslationPrompt } from '../transcript/translationExecutor';
 import { classifyTranslationError } from '../transcript/translationError';
 import { answerLanguageInstruction } from '../llm/answerLanguage';
+import { speakingStyleInstruction } from '../llm/speakingStyle';
 import { anthropicDeltas, geminiDeltas, ollamaDeltas, openAIDeltas, streamText } from '../transcript/translationStream';
 
 type ThinkingSetting = { thinkingConfig: { thinkingLevel?: ThinkingLevel; thinkingBudget?: number } };
@@ -1177,8 +1178,10 @@ ANSWER DIRECTLY:`;
    *   3. Closing reminder at the bottom (double-lock)
    */
   private injectLanguageInstruction(systemPrompt: string): string {
-    const instruction = answerLanguageInstruction(this.aiResponseLanguage, CredentialsManager.getInstance().getSttLanguageUser());
-    return instruction ? `${instruction.header}${systemPrompt}${instruction.footer}` : systemPrompt;
+    const cm = CredentialsManager.getInstance();
+    const language = answerLanguageInstruction(this.aiResponseLanguage, cm.getSttLanguageUser());
+    const style = speakingStyleInstruction(cm.getAnswerStyle());
+    return `${language?.header ?? ''}${style.header}${systemPrompt}${style.footer}${language?.footer ?? ''}`;
   }
 
   private emitKnowledgeContextUpdate(knowledgeResult: any): void {
