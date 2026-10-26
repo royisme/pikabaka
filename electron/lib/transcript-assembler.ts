@@ -300,10 +300,18 @@ export function handleSpeakerSpeechEnded(appState: AppState, speaker: Transcript
   if (speaker === 'interviewer') startSpeculativeTranslation(appState, buffer);
 }
 
+/** Writes one assembled turn to the meeting record. The write is synchronous, before any translation is awaited. */
+function recordTranscriptTurn(appState: AppState, speaker: TranscriptSpeaker, turn: Pick<BufferedTranscriptTurn, 'segmentId' | 'revision' | 'startedAt'>, text: string): void {
+  appState.recordTranscriptSegment({ segmentId: turn.segmentId, revision: turn.revision, speaker, text, timestampMs: turn.startedAt });
+}
+
 export function resetBufferedTranscriptTurns(appState: AppState): void {
   const state = appState as any;
   for (const speaker of Object.keys(state.transcriptTurnBuffers) as TranscriptSpeaker[]) {
     const buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
+    // A turn still being assembled is written as it stands, so stopping or reconfiguring audio loses nothing.
+    const pendingText = buffer ? normalizeTranscriptText(appState, buffer.text) : '';
+    if (buffer && pendingText) recordTranscriptTurn(appState, speaker, buffer, pendingText);
     if (buffer?.flushTimer) {
       clearTimeout(buffer.flushTimer);
     }
@@ -335,6 +343,7 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
   const endedSentence = endsSentence(appState, text);
 
   state.transcriptSegmentRevisions.set(buffer.segmentId, buffer.revision);
+  recordTranscriptTurn(appState, speaker, buffer, text);
 
   if (endedSentence) {
     if (state.ragManager) {

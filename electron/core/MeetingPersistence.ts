@@ -18,6 +18,25 @@ export class MeetingPersistence {
     }
 
     /**
+     * Creates the meeting's identity and its row before capture starts, so every assembled
+     * transcript line can be written to the record as it happens. Returns the meeting id.
+     */
+    public startMeeting(metadata?: { title?: string; calendarEventId?: string; source?: 'manual' | 'calendar' } | null): string {
+        const meetingId = crypto.randomUUID();
+        const startTime = Date.now();
+        this.session.startSession(meetingId, startTime);
+        DatabaseManager.getInstance().createMeeting({
+            id: meetingId,
+            title: metadata?.title || 'Untitled Session',
+            startTimeMs: startTime,
+            createdAt: new Date(startTime).toISOString(),
+            calendarEventId: metadata?.calendarEventId ?? null,
+            source: metadata?.source ?? 'manual',
+        });
+        return meetingId;
+    }
+
+    /**
      * Stops the meeting immediately, snapshots data, and triggers background processing.
      * Returns immediately so UI can switch.
      */
@@ -48,9 +67,10 @@ export class MeetingPersistence {
         const metadataSnapshot = this.session.getMeetingMetadata();
 
         // 2. Reset state immediately so new meeting can start or UI is clean
+        const recordedMeetingId = this.session.getMeetingId();
         this.session.reset();
 
-        const meetingId = crypto.randomUUID();
+        const meetingId = recordedMeetingId ?? crypto.randomUUID();
         this.processAndSaveMeeting(snapshot, meetingId, metadataSnapshot).catch(err => {
             console.error('[MeetingPersistence] Background processing failed:', err);
         });

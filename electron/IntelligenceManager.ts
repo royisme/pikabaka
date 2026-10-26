@@ -201,6 +201,10 @@ export class IntelligenceManager extends EventEmitter {
     // Meeting Lifecycle (delegates to persistence)
     // ============================================
 
+    startMeeting(metadata?: any): string {
+        return this.persistence.startMeeting(metadata);
+    }
+
     async stopMeeting(): Promise<string | null> {
         return this.persistence.stopMeeting();
     }

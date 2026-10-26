@@ -56,6 +56,8 @@ export class SessionTracker {
     private fullTranscript: TranscriptSegment[] = [];
     private fullUsage: any[] = []; // UsageInteraction
     private sessionStartTime: number = Date.now();
+    // The meeting this session records into; set when the meeting starts, cleared by reset().
+    private meetingId: string | null = null;
 
     // Rolling summarization: epoch summaries preserve early context when arrays are compacted
     private static readonly MAX_EPOCH_SUMMARIES = 5;
@@ -429,6 +431,16 @@ export class SessionTracker {
         return this.sessionStartTime;
     }
 
+    getMeetingId(): string | null {
+        return this.meetingId;
+    }
+
+    /** Starts a new session: a new meeting id and the real start time, not the time of the last reset. */
+    startSession(meetingId: string, startTime: number): void {
+        this.meetingId = meetingId;
+        this.sessionStartTime = startTime;
+    }
+
     // ============================================
     // Usage Tracking
     // ============================================
@@ -485,6 +497,7 @@ export class SessionTracker {
         this.fullUsage = [];
         this.transcriptEpochSummaries = [];
         this.sessionStartTime = Date.now();
+        this.meetingId = null;
         this.lastAssistantMessage = null;
         this.assistantResponseHistory = [];
         this.lastInterimInterviewer = null;

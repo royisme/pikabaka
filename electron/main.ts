@@ -599,6 +599,18 @@ export class AppState {
     resetBufferedTranscriptTurnsFn(this)
   }
 
+  /** The meeting the assembled transcript is written to; null between meetings. */
+  private currentMeetingId: string | null = null;
+
+  public recordTranscriptSegment(segment: { segmentId: string; revision: number; speaker: TranscriptSpeaker; text: string; timestampMs: number }): void {
+    if (!this.currentMeetingId) return;
+    try {
+      DatabaseManager.getInstance().upsertSegment({ meetingId: this.currentMeetingId, ...segment });
+    } catch (err) {
+      console.error('[Main] Failed to record a transcript segment:', (err as Error).message);
+    }
+  }
+
   public async flushBufferedTranscriptTurn(speaker: TranscriptSpeaker): Promise<void> {
     await flushBufferedTranscriptTurnFn(this, speaker)
   }
@@ -826,6 +838,13 @@ export class AppState {
     if (metadata) {
       this.intelligenceManager.setMeetingMetadata(metadata);
     }
+    // The meeting row exists before any audio, so each assembled line is saved as it happens.
+    try {
+      this.currentMeetingId = this.intelligenceManager.startMeeting(metadata);
+    } catch (err) {
+      this.currentMeetingId = null;
+      console.error('[Main] Could not create the meeting record:', (err as Error).message);
+    }
 
     // Emit session reset to clear UI state immediately
     this.getWindowHelper().getOverlayWindow()?.webContents.send('session-reset');
@@ -910,6 +929,7 @@ export class AppState {
     // rather than getRecentMeetings(1) which could return a different meeting if the
     // user starts a new session before background processing finishes.
     const meetingId = await this.intelligenceManager.stopMeeting();
+    this.currentMeetingId = null;
 
     // Revert to Default Model — synchronous, no blocking I/O
     try {
