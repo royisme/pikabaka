@@ -1,6 +1,6 @@
 # Design spec: live translation in the transcript zone
 
-Status: proposal for the owner. Scope: the transcript zone of the overlay (`SplitterShell` top zone) when transcript translation is on. Related: #24, #28, #29-#34, TASKS U6 and R1-R5.
+Status: approved by the owner on 2026-10-26, including all six recommendations in section 11 as written and the rule amendment in section 3. Scope: the transcript zone of the overlay (`SplitterShell` top zone) when transcript translation is on. Related: #24, #28, #29-#34, TASKS U6 and R1-R5.
 
 ## 1. Point of view
 

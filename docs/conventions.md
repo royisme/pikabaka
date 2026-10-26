@@ -17,7 +17,7 @@ Documentation, code comments, commit messages, issues and PR text are in English
 The overlay is read for one to three seconds mid-call. These rules come from the 2026-10-26 critique (issues #20 to #28).
 
 **Hierarchy**
-- The answer is the most prominent thing on the surface. The transcript supports it; chrome (buttons, chips, footer) is quieter than both.
+- The answer is the most prominent thing on the surface. The transcript supports it; chrome (buttons, chips, footer) is quieter than both. Exception (owner, 2026-10-26): when translation is on and no answer is streaming or pinned, the newest translated line is the most prominent text, because on a call the translation is what must be read (`docs/design-live-translation-ui.md`).
 - One primary action, labelled for what it does, with its shortcut shown. Secondary actions are visibly secondary and collapse at narrow widths.
 - The live line (the current partial transcript) is never dimmer than finished lines.
 - Do not show text the user did not write as if they had. System prompts and quick-action text are not chat bubbles.

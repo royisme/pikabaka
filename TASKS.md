@@ -61,8 +61,8 @@ Design: `docs/design-live-translation-ui.md`. The owner wants to use Pika on a p
 | T4 | Revision-safe translations (`translatedRevision`) | reopened turn marks the old translation updating, never current | #37 | not started |
 | T5 | Zone header controls and status dot (on/off, target language, original toggle) | settings persist through the existing `set-transcript-translation-settings` channel; "Set up translation" opens Settings | #38 | not started; owner checks at 380px |
 | T6 | Announcer and keyboard (`aria-live` off on the list, one announcement per complete translation, End resumes follow) | VoiceOver reads each complete translation once and no partials | #38 | not started |
-| T7 | Global toggle shortcuts | `Cmd+Alt+O` and `Cmd+Alt+T` work while the overlay is unfocused; Windows defaults chosen on a real keyboard | #38 | **owner approval first** (new keybind ids) |
-| T8 | Error reason on the translation event | the slot shows "timeout" or "auth"; logs carry no text | #38 | **owner approval first** (additive IPC payload change) |
+| T7 | Global toggle shortcuts | `Cmd+Alt+O` and `Cmd+Alt+T` work while the overlay is unfocused; Windows defaults chosen on a real keyboard | #38 | owner approved 2026-10-26 (new keybind ids) |
+| T8 | Error reason on the translation event | the slot shows "timeout" or "auth"; logs carry no text | #38 | owner approved 2026-10-26 (additive IPC payload change) |
 | T9 | Streaming tokens in the slot | first token appears within the time measured on #29; a superseded revision writes nothing | #38 | blocked on R1 and R2 |
 | T10 | Committed and preview rendering | reducer test: committed only appends, preview is replaced; owner checks committed text never moves | #38 | blocked on R3 |
 
@@ -74,4 +74,4 @@ Design: `docs/design-live-translation-ui.md`. The owner wants to use Pika on a p
 - Visual acceptance after each U step: overlay at 380 and 600px, light and dark, a streaming answer, a live transcript.
 - Windows: issue #15 says no Windows build has been released. Any step that touches window behaviour is checked on macOS only until that changes, and says so.
 - Real STT and LLM provider checks for R2 and R3 (the agent mocks providers).
-- Live translation spec (T): answer the six open questions in section 11 of `docs/design-live-translation-ui.md` (zone position and size, own-speech translation, 14px check on a real call, global shortcuts, request cost in `original` mode, error reason on the event). The spec also amends the rule "the answer is the most prominent thing": when translation is on and no answer is showing, the newest translation leads. `docs/conventions.md` is not changed until you agree.
+- Live translation spec (T): approved 2026-10-26 with all six recommendations as written (transcript above the answer and 55% when translating; own speech not translated; ship 14px and check on a real call; `Cmd+Alt+O` and `Cmd+Alt+T` on macOS, `Ctrl+Shift+F9/F10` on Windows to be confirmed on a real keyboard; requests keep running in `original` mode; optional error reason on the event). The Overlay UI rule in `docs/conventions.md` is amended accordingly.
