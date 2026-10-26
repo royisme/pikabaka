@@ -2,6 +2,20 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: connections apart from what a model is used for (branch `ai-connections`)
+
+Owner feedback: the AI settings mixed providers with jobs, and OpenAI and Claude had no host field; Pika must not be tied to a provider.
+
+Done (code; not run in the app)
+- A connection is a type (`openai`, `anthropic`, `gemini`, `ollama`), a host and a key (`electron/services/aiConnections.ts`, `CredentialsManager`). The built-in OpenAI, Claude, Gemini, Groq and Ollama take a host override; custom connections (the old OpenAI-compatible list, now with a `type`) can be any type. Existing keys and endpoints show up as they were: no migration.
+- The agent has its own model: a connection and an exact model id, registered with pi-ai as typed. The earlier prefix guess that swapped in a default model is gone; with nothing chosen, the agent uses the chat model's exact id.
+- Translation is called through the connection's type and host (`LLMHelper`), and the chat clients of the built-in providers honour the host override.
+- "Fetch models" asks the host and returns its list unfiltered (the old OpenAI fetch kept only a few families).
+- Settings, AI page: Connections list and form (Test and fetch models), "Where models are used" (Agent, Translation), the proactive-help decision model below. The translation provider and model fields left the Audio tab; the key and provider cards and the OpenAI-compatible form are gone.
+- Checks: tsc 0 errors on both sides; 958 of 958 tests; eslint 1251 warnings (cap 1265). Throwaway scripts ran the agent model against fake OpenAI-type, Anthropic-type and Ollama-type hosts (exact model id and key on the wire, no ambient key, 10 of 11; the one miss was the SDK's `?beta=true`), and model fetching against fake hosts for all four types (10 of 10).
+
+Not done: the summary and title jobs still use the chat model (no row of their own); speech recognition keeps its own services under Audio; cURL custom providers are unchanged. Not verified: the new settings screens on screen, a real host of each type.
+
 ## 2026-10-26: the agent, proactive help, local commands and a whole-transcript summary (branch `meeting-agent`)
 
 The owner asked for a build to test on real calls (Mac call, Google Meet), with docs and tests after. This lands the code for tracks A1.4, A3, A4, A5 and part of A6 in one branch.
