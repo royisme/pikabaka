@@ -1,6 +1,6 @@
 # Design note: translating before the turn flushes (R5, issue #33)
 
-Status: proposal, for the owner's decision. Evidence is from a read-only audit of the STT providers and the assembler (2026-10-26); items marked "unconfirmed" were not shown by the code.
+Status: the owner chose option B on 2026-10-26 and it is built (`electron/transcript/speculativeTranslation.ts`, wired in `transcript-assembler.ts`); the expected gain is smaller than this note first suggested, see "What B saves" at the end. Evidence is from a read-only audit of the STT providers and the assembler (2026-10-26); items marked "unconfirmed" were not shown by the code.
 
 ## The question
 
@@ -44,3 +44,9 @@ Do C now and let R1 collect numbers over a few real calls. If the log shows the 
 1. Agree with "C now, B if the logs justify it, not A"? (Recommended: yes.)
 2. If B is built, may it send extra requests for turns that are later reopened? Cost: one short request each. (Recommended: yes, capped to one speculative request per turn.)
 3. Should the two remaining gaps be fixed with B (manual retranslate sends the revision; the context cache keeps one entry per segment and revision)? (Recommended: yes, small.)
+
+## What B saves (added after building it)
+
+Reading `handleSpeakerSpeechEnded` closely, a provider boundary already shortens the flush: `speechEndedSentenceFlushMs` (120 to 400 ms by profile) when the turn ends a sentence of enough words, otherwise `speechEndedFragmentFlushMs` (500 to 1100 ms). So for the providers that send a boundary (Deepgram, Soniox, OpenAI) B can save at most that remaining wait, and only when no more words arrive; for providers with no boundary (Google, ElevenLabs, the REST ones) it saves nothing, because nothing signals the end early. The 700 to 5000 ms delays in section "The question" apply to those providers, not to the ones B helps. The `[Translation] timing` log now prints `speculative=true` and a flush gap measured from the speculative start, so a few real calls will show whether it is worth keeping.
+
+The decisions: (1) B built, not A. (2) Extra requests for turns that are later changed: allowed, capped at one speculative request per turn (segment and revision), turns of fewer than three words are skipped. (3) The manual-retranslate gap is fixed (it now sends the turn's revision). The context cache is not changed: overwriting the entry of a reopened segment is what later translations should see, so it is not a bug.

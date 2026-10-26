@@ -2,6 +2,16 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: speculative translation at the provider boundary (branch `speculative-translation`, issue #33)
+
+Done (R5, option B chosen by the owner on 2026-10-26)
+- At the speech provider's end-of-utterance signal (`handleSpeakerSpeechEnded`, interviewer only, translation configured, turn not already in the target language, at least three words) a translation request starts at once and runs silently: nothing reaches the screen. When the turn flushes a moment later with exactly the same text, the flush claims that request: it emits `pending`, replays the text so far, and follows the rest of the stream. If the text changed (more words, a merge) the flush makes an ordinary request and the speculative one is dropped. A turn gets at most one speculative request (segment and revision).
+- The request code is now two helpers (`resolveTranslationConfig`, `runTranslationRequest`) that both paths share; `SpeculativeTranslations` (`electron/transcript/speculativeTranslation.ts`) is the tested registry. The timing log line carries `speculative=true|false`, and its flush gap is measured from the speculative start.
+- Manual retranslate now sends the turn's current revision, so a reopen can supersede it. The context cache is left as it is (overwriting a reopened segment's entry is what later translations should see).
+- **What it saves is smaller than the design note suggested.** A provider boundary already shortens the flush to 120 to 400 ms (a finished sentence) or 500 to 1100 ms (a fragment), so B saves at most that, and only for providers that send a boundary (Deepgram, Soniox, OpenAI); Google, ElevenLabs and the REST providers send none and gain nothing. The design note now says so.
+- Verified: both `tsc --noEmit` checks exit 0; lint exit 0 (1265 warnings); tap passes (21 new assertions on the registry: replay, follow after finish, mismatch drops, same text once, rejection handling, age and size caps). The assembler itself cannot be loaded by the tap runner, so the wiring (the boundary hook, the claim at flush, the revision guard with a claimed request) is checked by reading and by the type checker only.
+- Not verified: with a real provider and a real call: that the claim happens (look for `speculative=true` in the timing log), that no duplicate request is sent when it does, and how many speculative requests are thrown away.
+
 ## 2026-10-26: the install ping is removed (branch `remove-install-ping`)
 
 Done

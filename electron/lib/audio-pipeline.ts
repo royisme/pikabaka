@@ -350,6 +350,8 @@ export async function translateTranscriptSegment(appState: AppState, segment: {
     segmentId: segment.segmentId,
     speakerLabel: segment.speakerLabel,
     forceTranslate: true,
+    // The turn's current revision: without it a later reopen could not supersede this request.
+    revision: appState.transcriptSegmentRevisions.get(segment.segmentId),
   });
 }
 

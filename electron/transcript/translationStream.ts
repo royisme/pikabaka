@@ -84,6 +84,8 @@ export type TranslationTiming = {
   sourceChars: number;
   outputChars: number;
   streamed: boolean;
+  /** The request was started at the provider's end-of-utterance signal, before the turn flushed. */
+  speculative: boolean;
   outcome: 'complete' | 'error';
 };
 
@@ -100,6 +102,7 @@ export function formatTranslationTiming(timing: TranslationTiming): string {
     field('sourceChars', timing.sourceChars),
     field('outputChars', timing.outputChars),
     field('streamed', timing.streamed),
+    field('speculative', timing.speculative),
     field('outcome', timing.outcome),
   ].join(' ');
 }

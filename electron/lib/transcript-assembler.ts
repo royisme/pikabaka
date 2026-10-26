@@ -1,5 +1,6 @@
 import { classifyTranslationError } from "../transcript/translationError";
 import { formatTranslationTiming } from "../transcript/translationStream";
+import { SpeculativeTranslations } from "../transcript/speculativeTranslation";
 import type { AppState } from "../main"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { isTranscriptTranslationConfigured, isSameLanguage } from "../transcript/translationExecutor"
@@ -295,6 +296,8 @@ export function handleSpeakerSpeechEnded(appState: AppState, speaker: Transcript
       ? thresholds.speechEndedSentenceFlushMs
       : thresholds.speechEndedFragmentFlushMs
   );
+  // Only the other party is translated. Start the request now, ahead of the flush that is scheduled above.
+  if (speaker === 'interviewer') startSpeculativeTranslation(appState, buffer);
 }
 
 export function resetBufferedTranscriptTurns(appState: AppState): void {
@@ -309,6 +312,8 @@ export function resetBufferedTranscriptTurns(appState: AppState): void {
   }
   state.transcriptSegmentRevisions.clear();
   state.recentTranslatedTurns.length = 0;
+  speculativeTranslations.clear();
+  speculatedTurns.clear();
 }
 
 export async function flushBufferedTranscriptTurn(appState: AppState, speaker: TranscriptSpeaker): Promise<void> {
@@ -393,6 +398,118 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
   });
 }
 
+/**
+ * Translations started at the speech provider's end-of-utterance signal, before the turn flushes, so
+ * the request is already running when the flush asks for it. See `startSpeculativeTranslation`.
+ */
+const speculativeTranslations = new SpeculativeTranslations();
+
+type TranslationConfig = {
+  displayMode: 'original' | 'translated' | 'both';
+  provider: string;
+  model: string;
+  prompt: string;
+  sourceLanguageKey: string;
+  targetLanguageKey: string;
+  oaiCompat?: { id: string; baseUrl: string; apiKey: string; preferredModel?: string };
+  standardProviders: Set<string>;
+  isConfigured: boolean;
+};
+
+function resolveTranslationConfig(forceTranslate: boolean): TranslationConfig {
+  const { CredentialsManager } = require('../services/CredentialsManager');
+  const cm = CredentialsManager.getInstance();
+  const provider: string = cm.getTranscriptTranslationProvider();
+  const standardProviders = new Set(['ollama', 'gemini', 'groq', 'openai', 'claude']);
+  const oaiCompat = cm.getOpenAICompatibleProviders().find((p: { id: string }) => p.id === provider);
+  const model: string = cm.getTranscriptTranslationModel().trim() || (oaiCompat?.preferredModel?.trim() ?? '');
+  const prompt: string = cm.getTranscriptTranslationPrompt();
+  const shouldTranslate = forceTranslate ? true : cm.getTranscriptTranslationEnabled();
+  return {
+    displayMode: cm.getTranscriptTranslationDisplayMode(),
+    provider,
+    model,
+    prompt,
+    sourceLanguageKey: cm.getTranscriptTranslationSourceLanguage(),
+    targetLanguageKey: cm.getTranscriptTranslationTargetLanguage(),
+    oaiCompat,
+    standardProviders,
+    isConfigured:
+      isTranscriptTranslationConfigured(shouldTranslate, model, prompt) &&
+      (standardProviders.has(provider) ? true : !!oaiCompat),
+  };
+}
+
+/** The text is already in the language it would be translated into. */
+function isSameAsTarget(config: TranslationConfig, detectedLanguage?: string): boolean {
+  const effectiveSource =
+    detectedLanguage || (config.sourceLanguageKey && config.sourceLanguageKey !== 'auto' ? config.sourceLanguageKey : undefined);
+  return !!effectiveSource && isSameLanguage(effectiveSource, config.targetLanguageKey);
+}
+
+/** One translation request for a turn, with the two previous translated turns as context. */
+function runTranslationRequest(
+  appState: AppState,
+  config: TranslationConfig,
+  turn: { text: string; segmentId: string; detectedLanguage?: string },
+  onProgress: (textSoFar: string) => void
+): Promise<string> {
+  const state = appState as any;
+  const recentTurns = (state.recentTranslatedTurns ?? []) as Array<{ segmentId: string; source: string; translation: string }>;
+  const context = recentTurns
+    .filter((t) => t.segmentId !== turn.segmentId)
+    .slice(-2)
+    .map((t) => ({ source: t.source, translation: t.translation }));
+  const baseReq = {
+    model: config.model,
+    prompt: config.prompt,
+    sourceText: turn.text,
+    ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434",
+    sourceLanguageKey: config.sourceLanguageKey,
+    targetLanguageKey: config.targetLanguageKey,
+    detectedLanguageKey: turn.detectedLanguage,
+    context: context.length > 0 ? context : undefined,
+  };
+  const llm = state.processingHelper.getLLMHelper();
+  if (config.oaiCompat && !config.standardProviders.has(config.provider)) {
+    return llm.translateTranscriptText({
+      ...baseReq,
+      provider: 'openai-compatible',
+      openAICompatible: { baseUrl: config.oaiCompat.baseUrl, apiKey: config.oaiCompat.apiKey },
+    }, onProgress);
+  }
+  return llm.translateTranscriptText({
+    ...baseReq,
+    provider: config.provider as 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude',
+  }, onProgress);
+}
+
+/** A turn this short is not worth a request that may be thrown away. */
+const MIN_WORDS_TO_SPECULATE = 3;
+
+/** Turns (segment and revision) that already had a speculative request: a turn gets at most one. */
+const speculatedTurns = new Set<string>();
+
+/**
+ * Called when the speech provider says the utterance ended. The turn flushes a moment later; the
+ * translation is started now so that, when the text has not changed by then, the flush finds it
+ * already running. If more words arrive or the turn is merged, the flush makes its own request
+ * and this one is discarded (the revision guard also drops anything for a superseded revision).
+ */
+function startSpeculativeTranslation(appState: AppState, buffer: BufferedTranscriptTurn): void {
+  const text = normalizeTranscriptText(appState, buffer.text);
+  if (countTranscriptWords(appState, text) < MIN_WORDS_TO_SPECULATE) return;
+  const config = resolveTranslationConfig(false);
+  if (!config.isConfigured || isSameAsTarget(config, buffer.detectedLanguage)) return;
+  const turnKey = `${buffer.segmentId}:${buffer.revision}`;
+  if (speculatedTurns.has(turnKey)) return;
+  speculatedTurns.add(turnKey);
+  if (speculatedTurns.size > 64) speculatedTurns.delete(speculatedTurns.values().next().value as string);
+  speculativeTranslations.start(buffer.segmentId, text, (onProgress) =>
+    runTranslationRequest(appState, config, { text, segmentId: buffer.segmentId, detectedLanguage: buffer.detectedLanguage }, onProgress)
+  );
+}
+
 export async function emitTranscriptWithTranslation(appState: AppState, params: {
   speaker: TranscriptSpeaker;
   text: string;
@@ -408,23 +525,9 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
 }): Promise<{ success: boolean; error?: string; translatedText?: string }> {
   const state = appState as any;
   const { speaker, text, timestamp, confidence, segmentId, speakerLabel, forceTranslate = false, detectedLanguage, revision, lastSpeechAt } = params;
-  const { CredentialsManager } = require('../services/CredentialsManager');
-  const cm = CredentialsManager.getInstance();
-  const displayMode = cm.getTranscriptTranslationDisplayMode();
-  const translationEnabled = cm.getTranscriptTranslationEnabled();
-  const translationModelRaw = cm.getTranscriptTranslationModel();
-  const translationProvider = cm.getTranscriptTranslationProvider();
-  const translationPrompt = cm.getTranscriptTranslationPrompt();
-  const standardProviders = new Set(['ollama', 'gemini', 'groq', 'openai', 'claude']);
-  const oaiCompat = cm.getOpenAICompatibleProviders().find(
-    (p: { id: string }) => p.id === translationProvider
-  );
-  const effectiveTranslationModel =
-    translationModelRaw.trim() || (oaiCompat?.preferredModel?.trim() ?? '');
-  const shouldTranslate = forceTranslate ? true : translationEnabled;
-  const isTranslationConfigured =
-    isTranscriptTranslationConfigured(shouldTranslate, effectiveTranslationModel, translationPrompt) &&
-    (standardProviders.has(translationProvider) ? true : !!oaiCompat);
+  const config = resolveTranslationConfig(forceTranslate);
+  const { displayMode, provider: translationProvider, model: effectiveTranslationModel } = config;
+  const isTranslationConfigured = config.isConfigured;
 
   const pendingPayload: {
     speaker: TranscriptSpeaker;
@@ -466,10 +569,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
       : { success: true };
   }
 
-  const targetLanguageKey = cm.getTranscriptTranslationTargetLanguage();
-  const sourceLanguageKey = cm.getTranscriptTranslationSourceLanguage();
-  const effectiveSource = detectedLanguage || (sourceLanguageKey && sourceLanguageKey !== 'auto' ? sourceLanguageKey : undefined);
-  if (effectiveSource && isSameLanguage(effectiveSource, targetLanguageKey)) {
+  if (isSameAsTarget(config, detectedLanguage)) {
     const translatedPayloadText = displayMode === 'translated' ? text : text;
     emitNativeAudioTranscript(appState, {
       speaker,
@@ -492,8 +592,9 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
   emitNativeAudioTranscript(appState, pendingPayload);
 
   // Timing is logged as numbers only, never text. firstTokenAt stays null until text arrives.
-  const requestStartedAt = Date.now();
+  let requestStartedAt = Date.now();
   let firstTokenAt: number | null = null;
+  let speculative = false;
   const logTiming = (outcome: 'complete' | 'error', outputChars: number) => {
     const endedAt = Date.now();
     console.log(formatTranslationTiming({
@@ -505,6 +606,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
       sourceChars: text.length,
       outputChars,
       streamed: firstTokenAt !== null,
+      speculative,
       outcome,
     }));
   };
@@ -532,33 +634,16 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
 
   try {
     const recentTurns = (state.recentTranslatedTurns ?? []) as Array<{ segmentId: string; source: string; translation: string }>;
-    const context = recentTurns
-      .filter((t) => t.segmentId !== segmentId)
-      .slice(-2)
-      .map((t) => ({ source: t.source, translation: t.translation }));
-    const baseReq = {
-      model: effectiveTranslationModel,
-      prompt: translationPrompt,
-      sourceText: text,
-      ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434",
-      sourceLanguageKey,
-      targetLanguageKey,
-      detectedLanguageKey: detectedLanguage,
-      context: context.length > 0 ? context : undefined,
-    };
-    let translatedText: string;
-    if (oaiCompat && !standardProviders.has(translationProvider)) {
-      translatedText = await state.processingHelper.getLLMHelper().translateTranscriptText({
-        ...baseReq,
-        provider: 'openai-compatible',
-        openAICompatible: { baseUrl: oaiCompat.baseUrl, apiKey: oaiCompat.apiKey },
-      }, onProgress);
-    } else {
-      translatedText = await state.processingHelper.getLLMHelper().translateTranscriptText({
-        ...baseReq,
-        provider: translationProvider as 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude',
-      }, onProgress);
+    // A request started at the provider's end-of-utterance signal may already be running for exactly this text.
+    const claimed = forceTranslate ? null : speculativeTranslations.claim(segmentId, text);
+    if (claimed) {
+      speculative = true;
+      requestStartedAt = claimed.startedAt;
+      firstTokenAt = claimed.firstTextAt;
     }
+    const translatedText = claimed
+      ? await claimed.follow(onProgress)
+      : await runTranslationRequest(appState, config, { text, segmentId, detectedLanguage }, onProgress);
 
     logTiming('complete', translatedText.length);
 

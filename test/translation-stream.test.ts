@@ -76,6 +76,6 @@ t.test('a failing stream rejects and keeps what was reported', async (t) => {
 });
 
 t.test('the timing line carries numbers and names, never text', async (t) => {
-  const line = formatTranslationTiming({ provider: 'openai', model: 'gpt-x', flushGapMs: 1200, firstTokenMs: null, totalMs: 900, sourceChars: 40, outputChars: 0, streamed: true, outcome: 'error' });
-  t.equal(line, '[Translation] timing provider=openai model=gpt-x flushGapMs=1200 firstTokenMs=n/a totalMs=900 sourceChars=40 outputChars=0 streamed=true outcome=error');
+  const line = formatTranslationTiming({ provider: 'openai', model: 'gpt-x', flushGapMs: 1200, firstTokenMs: null, totalMs: 900, sourceChars: 40, outputChars: 0, streamed: true, speculative: false, outcome: 'error' });
+  t.equal(line, '[Translation] timing provider=openai model=gpt-x flushGapMs=1200 firstTokenMs=n/a totalMs=900 sourceChars=40 outputChars=0 streamed=true speculative=false outcome=error');
 });
