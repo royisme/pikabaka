@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: S4 docs hygiene (branch `docs-hygiene`)
+
+Done
+- `docs/UI_DESIGN_AUDIT.md` starts with a pointer saying it is superseded and why; its old claims about `focus-visible`, reduced motion and semantic colours were wrong.
+- `CONTRIBUTING.md` says `pnpm install` and `pnpm start` (it said `npm`); `README.md` already used pnpm.
+- `docs/HANDOFF.md` is git-ignored for live session state; the existing `docs/HANDOFF_*.md` records stay.
+- Not done (S3): `PRODUCT.md` and `DESIGN.md`; they need the owner's input on audience and claims.
+
 ## 2026-10-26: U5 answer rendering, first part (branch `answer-render`, issue #25)
 
 Done (the live overlay part of #25)

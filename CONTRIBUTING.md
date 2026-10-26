@@ -68,9 +68,9 @@ Enhancement suggestions are tracked as GitHub issues. When you are creating an e
 
 1. Fork the repo and create your branch from `main`.
 2. Clone your fork locally: `git clone https://github.com/YOUR_USERNAME/pika.git`
-3. Install dependencies: `npm install`
+3. Install dependencies: `pnpm install`
 4. Set up your `.env` file (refer to the README for template).
-5. Start the development server: `npm start`
+5. Start the development server: `pnpm start`
 
 If you've added code that should be tested, add tests.
 If you've changed APIs, update the documentation.
