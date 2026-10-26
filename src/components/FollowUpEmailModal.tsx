@@ -17,7 +17,6 @@ interface Meeting {
         text: string;
         timestamp: number;
     }>;
-    calendarEventId?: string;
 }
 
 interface FollowUpEmailModalProps {
@@ -29,7 +28,6 @@ interface FollowUpEmailModalProps {
 const FollowUpEmailModal: React.FC<FollowUpEmailModalProps> = ({ isOpen, onClose, meeting }) => {
     const [recipientEmail, setRecipientEmail] = useState('');
     const [senderName, setSenderName] = useState('');
-    const [recipientName, setRecipientName] = useState('');
 
     // Subject & Body
     const [subject, setSubject] = useState('');
@@ -56,21 +54,9 @@ const FollowUpEmailModal: React.FC<FollowUpEmailModalProps> = ({ isOpen, onClose
 
         // 3. Load Recipient (Async)
         let loadedRecipientEmail = '';
-        let loadedRecipientName = '';
 
         try {
-            // Try Calendar
-            if (meeting.calendarEventId) {
-                // @ts-ignore
-                const attendees = await window.electronAPI?.invoke('get-calendar-attendees', meeting.calendarEventId);
-                if (attendees && attendees.length > 0) {
-                    loadedRecipientEmail = attendees[0].email;
-                    if (attendees[0].name) loadedRecipientName = attendees[0].name.split(' ')[0];
-                }
-            }
-
-            // Fallback: Transcript
-            if (!loadedRecipientEmail && meeting.transcript) {
+            if (meeting.transcript) {
                 // @ts-ignore
                 const extracted = await window.electronAPI?.invoke('extract-emails-from-transcript', meeting.transcript);
                 if (extracted && extracted.length > 0) {
@@ -82,15 +68,14 @@ const FollowUpEmailModal: React.FC<FollowUpEmailModalProps> = ({ isOpen, onClose
         }
 
         if (loadedRecipientEmail) setRecipientEmail(loadedRecipientEmail);
-        if (loadedRecipientName) setRecipientName(loadedRecipientName);
 
         // 4. Generate Content automatically if not done
         if (!emailBody && !isGenerating) {
-            generateEmail(loadedRecipientName, storedName || '');
+            generateEmail(storedName || '');
         }
     };
 
-    const generateEmail = async (rName?: string, sName?: string) => {
+    const generateEmail = async (sName?: string) => {
         setIsGenerating(true);
         try {
             const input = {
@@ -99,7 +84,6 @@ const FollowUpEmailModal: React.FC<FollowUpEmailModalProps> = ({ isOpen, onClose
                 summary: meeting.detailedSummary?.overview || meeting.summary,
                 action_items: meeting.detailedSummary?.actionItems || [],
                 key_points: meeting.detailedSummary?.keyPoints || [],
-                recipient_name: rName || recipientName,
                 sender_name: sName || senderName,
                 tone: 'neutral' as const // Default to neutral for auto-gen
             };

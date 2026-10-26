@@ -29,7 +29,7 @@ Channel groups: window control, LLM switching and keys, audio and STT control, s
 
 ## Services
 
-`electron/services/`: `CredentialsManager` (key storage and settings, including the transcript translation settings), `KeybindManager`, `OllamaManager`, `CalendarManager`.
+`electron/services/`: `CredentialsManager` (key storage and settings, including the transcript translation settings), `KeybindManager`, `OllamaManager`.
 
 ## Overlay and conversation UI (renderer)
 
@@ -56,6 +56,12 @@ Channel groups: window control, LLM switching and keys, audio and STT control, s
 4. The renderer receives `translationState` of `pending`, `complete`, `skipped` or `error` through `emitNativeAudioTranscript`.
 
 Consequence: a translated line appears after the flush delay plus one full LLM round trip, with no partial text. This is read from code; latency has not been measured (issue #29).
+
+## Meeting record
+
+Meetings start manually from the launcher. `MeetingPersistence` creates the row before capture, assembled transcript turns and usage are written incrementally, and stop or startup recovery completes the row without rewriting its children. Recovery preserves the stored start time and any provided title. New databases have no event-link or meeting-origin columns; existing unused nullable columns are left untouched and ignored by row mappings. No schema migration removes them.
+
+The follow-up email modal keeps transcript-based recipient lookup and manual entry; it has no external attendee lookup.
 
 ## Tests
 

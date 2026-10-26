@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: calendar feature removed (branch `drop-calendar`, A7.1)
+
+- Removed the service, OAuth/token code, reminders, six IPC handlers, both preload surfaces/types, connection button, launcher events/preparation UI and follow-up attendee suggestions. Meeting-list refresh, manual start, transcript email lookup and the email modal remain. No calendar-only credential lived in `CredentialsManager`; STT credentials stay unchanged.
+- Removed event/origin metadata from the session, record writers and row mappings, initial schema and old add-column statements. No migration or column drop was added: existing unused nullable columns/values remain; fresh databases omit them. Removed the demo guide's notification-start instruction.
+- Recovery tests now assert preserved start time, provided title, transcript rows and interactions. A new record-writer test checks that unowned nullable columns and values are untouched. Focused meeting tests: 146 assertions pass. A temporary real-`DatabaseManager` smoke run: 27 checks pass for fresh schema, existing v1 upgrade, preserved old values, ignored old fields, writes and listing.
+- Checks: renderer tsc 0, Electron tsc 0, tap 1 only for the known missing DOCX fixture, lint 0. Warnings: 1122 to 1099 overall, touched source files 255 to 232; no touched file increases. `grep -rni calendar electron src test` has no hits. No uncertain deletion, dependency change, install or pnpm script. No package became unused (`axios` still serves STT and model discovery).
+- Owner: start from the launcher, stop, check listing, force-quit/relaunch to exercise recovery, open an old meeting and the follow-up email modal; confirm calendar UI/reminders are absent. No app, real device, provider or packaged build was run. The modal's existing generic `invoke` calls are unchanged; the live preload exposes typed email methods instead, so their runtime behavior remains a pre-existing issue outside this removal.
+
 ## 2026-10-26: translation speed and whole sentences, summaries on their own model (branch `ai-connections`)
 
 Owner tests on real calls: translation was slow, and rows were cut in the middle of sentences.

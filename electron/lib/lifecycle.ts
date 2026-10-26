@@ -98,31 +98,6 @@ export async function initializeApp() {
     console.log(`[Diagnostic]   Window ${i}: id=${win.id} title="${win.getTitle()}" visible=${win.isVisible()} skipTaskbar=${(win as any).skipTaskbar ?? 'unknown'}`);
   });
 
-  // Initialize CalendarManager
-  try {
-    const { CalendarManager } = require('../services/CalendarManager');
-    const calMgr = CalendarManager.getInstance();
-    calMgr.init();
-
-    calMgr.on('start-meeting-requested', (event: any) => {
-      console.log('[Main] Start meeting requested from calendar notification', event);
-      appState.centerAndShowWindow();
-      appState.startMeeting({
-        title: event.title,
-        calendarEventId: event.id,
-        source: 'calendar'
-      });
-    });
-
-    calMgr.on('open-requested', () => {
-      appState.centerAndShowWindow();
-    });
-
-    console.log('[Main] CalendarManager initialized');
-  } catch (e) {
-    console.error('[Main] Failed to initialize CalendarManager:', e);
-  }
-
   // Recover unprocessed meetings (persistence check)
   appState.getIntelligenceManager().recoverUnprocessedMeetings().catch(err => {
     console.error('[Main] Failed to recover unprocessed meetings:', err);

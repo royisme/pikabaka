@@ -48,8 +48,6 @@ export class SessionTracker {
     // Meeting metadata
     private currentMeetingMetadata: {
         title?: string;
-        calendarEventId?: string;
-        source?: 'manual' | 'calendar';
     } | null = null;
 
     // Full Session Tracking (Persisted)

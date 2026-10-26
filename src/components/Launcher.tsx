@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
-import { AlertCircle, ArrowRight, Briefcase, Calendar, CheckCircle, DownloadCloud, Ghost, Link as LinkIcon, RefreshCw, Zap } from 'lucide-react';
+import { AlertCircle, Briefcase, CheckCircle, DownloadCloud, Ghost, RefreshCw } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import MeetingDetails from './MeetingDetails';
 import GlobalChatOverlay from './GlobalChatOverlay';
@@ -19,7 +19,6 @@ export interface Meeting {
     usage?: Array<{ type: 'assist' | 'followup' | 'chat' | 'followup_questions'; timestamp: number; question?: string; answer?: string; items?: string[] }>;
     participants?: unknown[]; participantCount?: number; active?: boolean; time?: string;
 }
-type CalendarEvent = { id: string; title: string; startTime: string; endTime: string; link?: string; source: 'google' };
 interface LauncherProps {
     onStartMeeting: () => void;
     onOpenSettings: (tab?: string) => void;
@@ -51,18 +50,10 @@ const Launcher: React.FC<LauncherProps> = ({
         ['meeting-active'],
         async () => (await window.electronAPI?.getMeetingActive?.()) ?? false
     );
-    const { data: upcomingEvents = [], refetch: refetchEvents } = useQuery<CalendarEvent[]>(
-        ['upcoming-events'],
-        () => window.electronAPI?.getUpcomingEvents?.() ?? [],
-        { refetchInterval: 60000 }
-    );
 
     const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
     const [forwardMeeting, setForwardMeeting] = useState<Meeting | null>(null);
-    const [isPrepared, setIsPrepared] = useState(false);
-    const [preparedEvent, setPreparedEvent] = useState<CalendarEvent | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [showNotification, setShowNotification] = useState(false);
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
     const [menuEntered, setMenuEntered] = useState(false);
     const [isGlobalChatOpen, setIsGlobalChatOpen] = useState(false);
@@ -89,14 +80,7 @@ const Launcher: React.FC<LauncherProps> = ({
     const handleRefresh = async () => {
         setIsRefreshing(true);
         try {
-            if (window.electronAPI?.calendarRefresh) {
-                setShowNotification(true);
-                await window.electronAPI.calendarRefresh();
-                await Promise.all([refetchEvents(), refetchMeetings()]);
-                setTimeout(() => setShowNotification(false), 3000);
-            } else {
-                console.warn('electronAPI.calendarRefresh not found');
-            }
+            await refetchMeetings();
         } catch (e) {
             console.error('Refresh failed in handleRefresh:', e);
         } finally {
@@ -148,32 +132,10 @@ const Launcher: React.FC<LauncherProps> = ({
     if (!window.electronAPI) {
         return <div className="p-10 text-white">Error: Electron API not initialized. Check preload script.</div>;
     }
-    const nextMeeting = upcomingEvents.find(e => {
-        const diff = new Date(e.startTime).getTime() - Date.now();
-        return diff > -5 * 60000 && diff < 60 * 60000;
-    });
-    const showUpcomingHero = Boolean((isPrepared && preparedEvent) || nextMeeting);
     const toggleDetectable = () => {
         const nextDetectable = !isDetectable;
         queryClient.setQueryData(['undetectable'], !nextDetectable);
         window.electronAPI?.setUndetectable?.(!nextDetectable);
-    };
-    const handleStartPreparedMeeting = async () => {
-        if (!preparedEvent) return;
-        try {
-            await window.electronAPI.startMeeting({
-                title: preparedEvent.title,
-                calendarEventId: preparedEvent.id,
-                source: 'calendar',
-                audio: {
-                    inputDeviceId: localStorage.getItem('preferredInputDeviceId'),
-                    outputDeviceId: localStorage.getItem('preferredOutputDeviceId'),
-                },
-            });
-            setIsPrepared(false);
-        } catch (e) {
-            console.error('Failed to start prepared meeting', e);
-        }
     };
     const handleOpenMeeting = async (meeting: Meeting) => {
         setForwardMeeting(null);
@@ -254,7 +216,7 @@ const Launcher: React.FC<LauncherProps> = ({
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-4">
                                             <h1 className="font-celeb-light text-3xl font-medium tracking-wide text-text-primary">My Pika</h1>
-                                            <button onClick={handleRefresh} disabled={isRefreshing} className={`rounded-full p-2 text-text-secondary transition-colors hover:bg-bg-input hover:text-text-primary ${isRefreshing ? 'animate-spin text-state-info' : ''}`} title="Refresh State" aria-label="Refresh calendar and meetings">
+                                            <button onClick={handleRefresh} disabled={isRefreshing} className={`rounded-full p-2 text-text-secondary transition-colors hover:bg-bg-input hover:text-text-primary ${isRefreshing ? 'animate-spin text-state-info' : ''}`} title="Refresh State" aria-label="Refresh meetings">
                                                 <RefreshCw size={18} />
                                             </button>
                                             <div className="flex min-w-36 items-center gap-3 rounded-full border border-border-muted bg-bg-elevated px-3 py-1.5">
@@ -289,35 +251,6 @@ const Launcher: React.FC<LauncherProps> = ({
                                             {isMeetingActive ? 'Meeting ongoing' : 'Start Pika'}
                                         </motion.button>
                                     </div>
-                                    {showUpcomingHero && (
-                                        <div className="rounded-2xl border border-border-subtle bg-bg-elevated p-5 shadow-sm">
-                                            {isPrepared && preparedEvent ? (
-                                                <div className="flex items-center justify-between gap-4">
-                                                    <div>
-                                                        <span className="mb-2 inline-flex rounded-full border border-state-success/30 bg-state-success-soft px-3 py-1 text-xs font-bold text-state-success">READY TO JOIN</span>
-                                                        <h2 className="text-2xl font-bold text-text-primary">{preparedEvent.title}</h2>
-                                                        <p className="mt-2 flex items-center gap-2 text-xs text-text-secondary"><Calendar size={12} />{new Date(preparedEvent.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {new Date(preparedEvent.endTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}{preparedEvent.link && ' • Link Ready'}</p>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <button type="button" onClick={handleStartPreparedMeeting} className="flex items-center gap-2 rounded-xl bg-state-success px-5 py-3 text-sm font-semibold text-white transition-transform active:scale-95">Start Meeting <ArrowRight size={16} /></button>
-                                                        <button type="button" onClick={() => setIsPrepared(false)} className="rounded-xl px-4 py-3 text-xs font-medium text-text-tertiary transition-colors hover:text-text-primary">Cancel</button>
-                                                    </div>
-                                                </div>
-                                            ) : nextMeeting ? (
-                                                <div className="space-y-4">
-                                                    <div>
-                                                        <div className="mb-2 flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-state-success" /><span className="text-xs font-bold uppercase tracking-wide text-state-success">Up Next</span><span className="text-xs text-text-tertiary">Starts in {Math.max(0, Math.ceil((new Date(nextMeeting.startTime).getTime() - Date.now()) / 60000))} min</span></div>
-                                                        <h2 className="line-clamp-2 text-xl font-bold text-text-primary">{nextMeeting.title}</h2>
-                                                        <div className="mt-2 flex items-center gap-2 text-xs text-text-secondary"><Calendar size={12} /><span>{new Date(nextMeeting.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - {new Date(nextMeeting.endTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>{nextMeeting.link && <><span className="opacity-50">|</span><LinkIcon size={12} /><span>Meeting Link Found</span></>}</div>
-                                                    </div>
-                                                    <div className="flex items-center gap-3 border-t border-border-subtle pt-4">
-                                                        <button type="button" onClick={() => { setPreparedEvent(nextMeeting); setIsPrepared(true); }} className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-border-muted bg-bg-item-surface px-4 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-bg-item-active"><Zap size={13} className="text-state-warning" />Prepare</button>
-                                                        <button type="button" onClick={onStartMeeting} className="rounded-lg px-4 py-2 text-xs font-medium text-text-secondary transition-colors hover:bg-bg-input hover:text-text-primary">Start now</button>
-                                                    </div>
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                    )}
                                 </div>
                             </section>
                             {profileData?.hasActiveJD && profileData.activeJD && (
@@ -337,14 +270,6 @@ const Launcher: React.FC<LauncherProps> = ({
                     )}
                 </AnimatePresence>
             </div>
-            <AnimatePresence>
-                {showNotification && (
-                    <motion.div initial={{ x: 300, opacity: 0, scale: 0.95 }} animate={{ x: 0, opacity: 1, scale: 1 }} exit={{ x: 300, opacity: 0, scale: 0.95 }} className="fixed bottom-10 right-10 z-modal flex items-center gap-4 rounded-2xl border border-border-subtle bg-bg-elevated/90 py-3 pl-4 pr-6 shadow-xl backdrop-blur-xl">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle bg-state-info-soft"><RefreshCw size={15} className="animate-spin text-state-info" /></div>
-                        <div className="flex flex-col gap-1"><span className="text-sm font-semibold text-text-primary">Refreshed</span><span className="text-xs text-text-tertiary">Synced with calendar</span></div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
             <GlobalChatOverlay isOpen={isGlobalChatOpen} onClose={() => { updateGlobalChatOpen(false); setSubmittedGlobalQuery(''); }} initialQuery={submittedGlobalQuery} />
         </div>
     );

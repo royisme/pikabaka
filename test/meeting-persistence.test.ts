@@ -11,7 +11,7 @@ const summary = { overview: 'Invented release planning.', keyPoints: ['Review th
 const startTime = 1700000000000;
 type MeetingRow = {
   id: string; title: string; start_time: number; duration_ms: number; summary_json: string | null;
-  created_at: string; calendar_event_id: string | null; source: 'manual' | 'calendar'; is_processed: number;
+  created_at: string; is_processed: number;
 };
 
 function harness(t: Test) {
@@ -20,7 +20,7 @@ function harness(t: Test) {
   db.exec(`
     CREATE TABLE meetings (
       id TEXT PRIMARY KEY, title TEXT, start_time INTEGER, duration_ms INTEGER, summary_json TEXT,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP, calendar_event_id TEXT, source TEXT, is_processed INTEGER DEFAULT 1
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP, is_processed INTEGER DEFAULT 1
     );
     CREATE TABLE transcripts (
       id INTEGER PRIMARY KEY AUTOINCREMENT, meeting_id TEXT, speaker TEXT, content TEXT, timestamp_ms INTEGER,
@@ -59,10 +59,10 @@ function harness(t: Test) {
       calls.fullSaves++;
       db.transaction(() => {
         db.prepare(`INSERT OR REPLACE INTO meetings
-          (id, title, start_time, duration_ms, summary_json, created_at, calendar_event_id, source, is_processed)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          (id, title, start_time, duration_ms, summary_json, created_at, is_processed)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`)
           .run(m.id, m.title, start, duration, JSON.stringify({ legacySummary: m.summary, detailedSummary: m.detailedSummary }),
-            m.date, m.calendarEventId ?? null, m.source ?? 'manual', m.isProcessed ? 1 : 0);
+            m.date, m.isProcessed ? 1 : 0);
         for (const s of m.transcript ?? []) {
           db.prepare('INSERT INTO transcripts (meeting_id, speaker, content, timestamp_ms) VALUES (?, ?, ?, ?)')
             .run(m.id, s.speaker, s.text, s.timestamp);
@@ -77,7 +77,7 @@ function harness(t: Test) {
       return {
         id, title: row.title, date: row.created_at, startTimeMs: row.start_time,
         duration: `${Math.floor(row.duration_ms / 60000)}:${Math.floor(row.duration_ms % 60000 / 1000).toString().padStart(2, '0')}`,
-        summary: '', calendarEventId: row.calendar_event_id ?? undefined, source: row.source,
+        summary: '',
         transcript: db.prepare('SELECT speaker, content AS text, timestamp_ms AS timestamp FROM transcripts WHERE meeting_id = ? ORDER BY timestamp_ms').all(id) as NonNullable<Meeting['transcript']>,
         usage: [],
       };
@@ -168,10 +168,10 @@ t.test('a meeting under one second deletes its row and children', async t => {
   t.equal(h.calls.fullSaves, 0);
 });
 
-for (const title of ['Untitled Session', 'Processing...', 'Calendar sample review']) {
-  t.test(`recovery preserves committed records and calendar metadata (${title})`, async t => {
+for (const title of ['Untitled Session', 'Processing...', 'Sample review']) {
+  t.test(`recovery preserves committed records, start time and a provided title (${title})`, async t => {
     const h = harness(t);
-    h.fake.createMeeting({ id: 'crashed', title, startTimeMs: startTime, createdAt: '2020-01-01T00:00:00.000Z', calendarEventId: 'sample-event', source: 'calendar' });
+    h.fake.createMeeting({ id: 'crashed', title, startTimeMs: startTime, createdAt: '2020-01-01T00:00:00.000Z' });
     h.seed('crashed');
     h.fake.addInteraction('crashed', { type: 'chat', timestamp: startTime, answer: 'Sample answer.' });
     const original = h.rows()[0];
@@ -183,8 +183,7 @@ for (const title of ['Untitled Session', 'Processing...', 'Calendar sample revie
     t.equal(completed.length, 1);
     t.match(completed[0], {
       is_processed: 1, duration_ms: 4500, start_time: original.start_time, created_at: original.created_at,
-      calendar_event_id: 'sample-event', source: 'calendar',
-      title: title === 'Calendar sample review' ? title : 'Generated sample title',
+      title: title === 'Sample review' ? title : 'Generated sample title',
     });
     t.same(JSON.parse(completed[0].summary_json!), { legacySummary: 'See detailed summary', detailedSummary: summary });
     t.same(h.transcripts(), transcripts);
@@ -195,7 +194,7 @@ for (const title of ['Untitled Session', 'Processing...', 'Calendar sample revie
     t.same(h.transcripts(), transcripts);
     t.same(h.interactions(), interactions);
     t.same(h.calls, calls, 'second recovery does not call the LLM or writer');
-    t.equal(h.calls.titles, title === 'Calendar sample review' ? 0 : 1);
+    t.equal(h.calls.titles, title === 'Sample review' ? 0 : 1);
     t.equal(h.calls.fullSaves, 0);
   });
 }

@@ -17,14 +17,12 @@ export function createMeeting(db: Database.Database, m: {
     title: string;
     startTimeMs: number;
     createdAt: string;
-    calendarEventId?: string | null;
-    source?: 'manual' | 'calendar';
 }): void {
     db.prepare(`
         INSERT OR IGNORE INTO meetings
-            (id, title, start_time, duration_ms, summary_json, created_at, calendar_event_id, source, is_processed)
-        VALUES (?, ?, ?, 0, NULL, ?, ?, ?, 0)
-    `).run(m.id, m.title, m.startTimeMs, m.createdAt, m.calendarEventId ?? null, m.source ?? 'manual');
+            (id, title, start_time, duration_ms, summary_json, created_at, is_processed)
+        VALUES (?, ?, ?, 0, NULL, ?, 0)
+    `).run(m.id, m.title, m.startTimeMs, m.createdAt);
 }
 
 export function upsertSegment(db: Database.Database, s: {
@@ -75,16 +73,12 @@ export function completeMeeting(db: Database.Database, id: string, c: {
     durationMs: number;
     summaryJson?: string | null;
     isProcessed: boolean;
-    calendarEventId?: string | null;
-    source?: 'manual' | 'calendar';
 }): boolean {
     const fields = Object.entries({
         title: c.title,
         duration_ms: c.durationMs,
         summary_json: c.summaryJson,
-        is_processed: c.isProcessed ? 1 : 0,
-        calendar_event_id: c.calendarEventId,
-        source: c.source
+        is_processed: c.isProcessed ? 1 : 0
     }).filter(([, value]) => value !== undefined);
     const result = db.prepare(`
         UPDATE meetings SET ${fields.map(([column]) => `${column} = ?`).join(', ')} WHERE id = ?

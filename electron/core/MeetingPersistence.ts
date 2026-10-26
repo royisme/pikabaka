@@ -34,7 +34,7 @@ export class MeetingPersistence {
      * transcript line can be written to the record as it happens. Returns the meeting id, or null
      * when the row could not be created (the meeting is then saved whole at stop, as before).
      */
-    public startMeeting(metadata?: { title?: string; calendarEventId?: string; source?: 'manual' | 'calendar' } | null): string | null {
+    public startMeeting(metadata?: { title?: string } | null): string | null {
         const startTime = Date.now();
         let meetingId: string | null = crypto.randomUUID();
         try {
@@ -43,8 +43,6 @@ export class MeetingPersistence {
                 title: metadata?.title || 'Untitled Session',
                 startTimeMs: startTime,
                 createdAt: new Date(startTime).toISOString(),
-                calendarEventId: metadata?.calendarEventId ?? null,
-                source: metadata?.source ?? 'manual',
             });
         } catch (err) {
             console.error('[MeetingPersistence] Could not create the meeting record:', (err as Error).message);
@@ -82,8 +80,7 @@ export class MeetingPersistence {
             context: this.session.getFullSessionContext()
         };
 
-        // BUG-04 fix: snapshot metadata BEFORE reset() clears it so the
-        // background processAndSaveMeeting worker receives the calendar info.
+        // Snapshot the title before resetting the session.
         const metadataSnapshot = this.session.getMeetingMetadata();
 
         // 2. Reset state immediately so new meeting can start or UI is clean
@@ -141,22 +138,13 @@ export class MeetingPersistence {
     private async processAndSaveMeeting(
         data: { transcript: TranscriptSegment[], usage: any[], startTime: number, durationMs: number, context: string },
         meetingId: string,
-        // BUG-04 fix: accept metadata snapshot so calendar info is not lost after session.reset()
-        metadata?: { title?: string; calendarEventId?: string; source?: 'manual' | 'calendar' } | null,
+        metadata?: { title?: string } | null,
         fullSave = false
     ): Promise<void> {
         let title = "Untitled Session";
         let summaryData: { actionItems: string[], keyPoints: string[] } = { actionItems: [], keyPoints: [] };
 
-        // Use passed-in metadata snapshot (NOT this.session.getMeetingMetadata() which is already cleared)
-        let calendarEventId: string | undefined;
-        let source: 'manual' | 'calendar' = 'manual';
-
-        if (metadata) {
-            if (metadata.title) title = metadata.title;
-            if (metadata.calendarEventId) calendarEventId = metadata.calendarEventId;
-            if (metadata.source) source = metadata.source;
-        }
+        if (metadata?.title) title = metadata.title;
 
         // The summary reads the whole record in pika.db; the live session's context is compacted and lossy.
         let context = data.context;
@@ -174,7 +162,7 @@ export class MeetingPersistence {
         }
 
         try {
-            // Generate Title (only if not set by calendar)
+            // Generate a title only when none was provided.
             if (!metadata || !metadata.title) {
                 const titlePrompt = `Generate a concise 3-6 word title for this meeting context. Output ONLY the title text. Do not use quotes or conversational filler.`;
                 const generatedTitle = await this.llmHelper.generateMeetingSummary(titlePrompt, context.substring(0, 5000));
@@ -228,8 +216,6 @@ export class MeetingPersistence {
                 detailedSummary: summaryData,
                 transcript: data.transcript,
                 usage: data.usage,
-                calendarEventId: calendarEventId,
-                source: source,
                 isProcessed: true
             };
 
@@ -244,9 +230,7 @@ export class MeetingPersistence {
                         legacySummary: meetingData.summary,
                         detailedSummary: summaryData
                     }),
-                    isProcessed: true,
-                    calendarEventId,
-                    source
+                    isProcessed: true
                 });
             }
 
@@ -308,9 +292,7 @@ export class MeetingPersistence {
                 };
 
                 await this.processAndSaveMeeting(snapshot, m.id, {
-                    title: ['Untitled Session', 'Processing...'].includes(details.title) ? undefined : details.title,
-                    calendarEventId: details.calendarEventId,
-                    source: details.source
+                    title: ['Untitled Session', 'Processing...'].includes(details.title) ? undefined : details.title
                 });
                 console.log(`[MeetingPersistence] Recovered meeting ${m.id}`);
 

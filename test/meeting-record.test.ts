@@ -20,8 +20,6 @@ function openDatabase() {
       duration_ms INTEGER,
       summary_json TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      calendar_event_id TEXT,
-      source TEXT,
       is_processed INTEGER DEFAULT 1
     );
 
@@ -129,14 +127,14 @@ t.test('creating a meeting twice preserves the initial row and its children', (t
   createMeeting(db, meeting);
   const expected = {
     id: meeting.id, title: meeting.title, start_time: 1000, duration_ms: 0, summary_json: null,
-    created_at: meeting.createdAt, calendar_event_id: null, source: 'manual', is_processed: 0,
+    created_at: meeting.createdAt, is_processed: 0,
   };
   t.same(db.prepare('SELECT * FROM meetings').get(), expected);
   upsertSegment(db, segment);
   addInteraction(db, meeting.id, { type: 'chat', timestamp: 1300, answer: 'An invented response.' });
   const transcripts = db.prepare('SELECT * FROM transcripts').all();
   const interactions = db.prepare('SELECT * FROM ai_interactions').all();
-  createMeeting(db, { ...meeting, title: 'Do not overwrite', startTimeMs: 9000, calendarEventId: 'event-two', source: 'calendar' });
+  createMeeting(db, { ...meeting, title: 'Do not overwrite', startTimeMs: 9000 });
   t.same(db.prepare('SELECT * FROM meetings').all(), [expected]);
   t.same(db.prepare('SELECT * FROM transcripts').all(), transcripts);
   t.same(db.prepare('SELECT * FROM ai_interactions').all(), interactions);
@@ -147,7 +145,7 @@ t.test('completion is repeatable, updates only given fields and never rewrites c
   const db = openDatabase();
   t.teardown(() => db.close());
   migrateRecordColumns(db);
-  createMeeting(db, { ...meeting, calendarEventId: 'event-one', source: 'calendar' });
+  createMeeting(db, meeting);
   upsertSegment(db, segment);
   upsertSegment(db, { ...segment, segmentId: 'segment-two' });
   addInteraction(db, meeting.id, { type: 'assist', timestamp: 1500, question: 'Invented question?', answer: 'Invented answer.' });
@@ -160,29 +158,53 @@ t.test('completion is repeatable, updates only given fields and never rewrites c
   t.same(completed, {
     id: meeting.id, title: 'Finished sample', start_time: 1000, duration_ms: 5000,
     summary_json: completion.summaryJson, created_at: meeting.createdAt,
-    calendar_event_id: 'event-one', source: 'calendar', is_processed: 1,
+    is_processed: 1,
   });
   t.equal(completeMeeting(db, meeting.id, completion), true);
   t.same(db.prepare('SELECT * FROM meetings').all(), [completed], 'repeated completion changes no stored values');
   t.same(db.prepare('SELECT * FROM transcripts').all(), transcripts);
   t.same(db.prepare('SELECT * FROM ai_interactions').all(), interactions);
   t.equal(completeMeeting(db, meeting.id, {
-    title: '', durationMs: 6000, summaryJson: null, isProcessed: false, calendarEventId: null, source: 'manual',
+    title: '', durationMs: 6000, summaryJson: null, isProcessed: false,
   }), true);
   t.match(db.prepare('SELECT * FROM meetings').get(), {
-    title: '', duration_ms: 6000, summary_json: null, is_processed: 0, calendar_event_id: null, source: 'manual',
+    title: '', duration_ms: 6000, summary_json: null, is_processed: 0,
   }, 'explicit empty and null values clear fields');
   t.equal(completeMeeting(db, meeting.id, {
     title: undefined, durationMs: 7000, summaryJson: undefined, isProcessed: true,
-    calendarEventId: undefined, source: undefined,
   }), true);
   t.match(db.prepare('SELECT * FROM meetings').get(), {
-    title: '', duration_ms: 7000, summary_json: null, is_processed: 1, calendar_event_id: null, source: 'manual',
+    title: '', duration_ms: 7000, summary_json: null, is_processed: 1,
   }, 'undefined fields stay unchanged');
   t.equal(completeMeeting(db, 'unknown', completion), false);
   t.equal(db.prepare('SELECT count(*) FROM meetings').pluck().get(), 1, 'unknown id is not inserted');
   t.same(db.prepare('SELECT * FROM transcripts').all(), transcripts);
   t.same(db.prepare('SELECT * FROM ai_interactions').all(), interactions);
+  t.end();
+});
+
+t.test('record writers leave unowned nullable columns and existing values untouched', (t) => {
+  const db = openDatabase();
+  t.teardown(() => db.close());
+  db.exec('ALTER TABLE meetings ADD COLUMN unused_event_id TEXT');
+  db.exec('ALTER TABLE meetings ADD COLUMN unused_origin TEXT');
+  const schema = db.pragma('table_info(meetings)');
+  createMeeting(db, meeting);
+  db.prepare('UPDATE meetings SET unused_event_id = ?, unused_origin = ? WHERE id = ?')
+    .run('sample-event', 'sample-origin', meeting.id);
+  createMeeting(db, { ...meeting, title: 'Do not overwrite' });
+  for (let i = 0; i < 2; i++) {
+    completeMeeting(db, meeting.id, { durationMs: 5000, isProcessed: true });
+    t.match(db.prepare('SELECT * FROM meetings WHERE id = ?').get(meeting.id), {
+      title: meeting.title, start_time: meeting.startTimeMs, created_at: meeting.createdAt,
+      unused_event_id: 'sample-event', unused_origin: 'sample-origin',
+    });
+  }
+  createMeeting(db, { ...meeting, id: 'meeting-two' });
+  t.match(db.prepare('SELECT * FROM meetings WHERE id = ?').get('meeting-two'), {
+    unused_event_id: null, unused_origin: null,
+  });
+  t.same(db.pragma('table_info(meetings)'), schema, 'no column is changed or removed');
   t.end();
 });
 

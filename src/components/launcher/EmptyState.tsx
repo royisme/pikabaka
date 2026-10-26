@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalendarPlus, SearchX } from 'lucide-react';
+import { Video, SearchX } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface EmptyStateProps {
@@ -9,7 +9,7 @@ interface EmptyStateProps {
 
 const EmptyState: React.FC<EmptyStateProps> = ({ type, onStartMeeting }) => {
     const isInitialEmpty = type === 'empty';
-    const Icon = isInitialEmpty ? CalendarPlus : SearchX;
+    const Icon = isInitialEmpty ? Video : SearchX;
 
     return (
         <motion.div
