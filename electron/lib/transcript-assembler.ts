@@ -1,6 +1,7 @@
 import { classifyTranslationError } from "../transcript/translationError";
 import { formatTranslationTiming } from "../transcript/translationStream";
 import { splitAtLastSentence } from "../transcript/sentences";
+import { ParagraphQueue } from "../transcript/paragraphs";
 import { SpeculativeTranslations } from "../transcript/speculativeTranslation";
 import type { AppState } from "../main"
 import { CredentialsManager } from "../services/CredentialsManager"
@@ -355,6 +356,9 @@ export function resetBufferedTranscriptTurns(appState: AppState): void {
   state.recentTranslatedTurns.length = 0;
   speculativeTranslations.clear();
   speculatedTurns.clear();
+  paragraphQueue.clear();
+  if (paragraphTimer) clearTimeout(paragraphTimer);
+  paragraphTimer = null;
 }
 
 /**
@@ -433,6 +437,7 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
   }
 
   if (speaker === 'interviewer') {
+    noteParagraphRow(appState, buffer.segmentId, buffer.revision, text);
     await emitTranscriptWithTranslation(appState, {
       speaker,
       text,
@@ -525,11 +530,11 @@ function isSameAsTarget(config: TranslationConfig, detectedLanguage?: string): b
 function runTranslationRequest(
   appState: AppState,
   config: TranslationConfig,
-  turn: { text: string; segmentId: string; detectedLanguage?: string },
+  turn: { text: string; segmentId: string; detectedLanguage?: string; noContext?: boolean },
   onProgress: (textSoFar: string) => void
 ): Promise<string> {
   const state = appState as any;
-  const recentTurns = (state.recentTranslatedTurns ?? []) as Array<{ segmentId: string; source: string; translation: string }>;
+  const recentTurns = turn.noContext ? [] : ((state.recentTranslatedTurns ?? []) as Array<{ segmentId: string; source: string; translation: string }>);
   const context = recentTurns
     .filter((t) => t.segmentId !== turn.segmentId)
     .slice(-2)
@@ -827,5 +832,67 @@ export async function testTranslation(
       totalMs: Date.now() - startedAt,
       error: `${classifyTranslationError(error)}${Number.isFinite(status) ? ` (HTTP ${status})` : ''}: ${message.replace(/\s+/g, ' ').slice(0, 240)}`,
     };
+  }
+}
+
+const paragraphQueue = new ParagraphQueue();
+let paragraphTimer: NodeJS.Timeout | null = null;
+const PARAGRAPH_CHECK_MS = 15_000;
+
+function noteParagraphRow(appState: AppState, segmentId: string, revision: number, text: string): void {
+  paragraphQueue.note(segmentId, revision, text, Date.now());
+  if (paragraphTimer) return;
+  paragraphTimer = setTimeout(() => {
+    paragraphTimer = null;
+    void joinParagraph(appState);
+  }, PARAGRAPH_CHECK_MS);
+}
+
+/**
+ * The second pass. Sentences translated one by one miss what came before them, so the rows of the
+ * last minute are joined into one paragraph and translated again as a whole. The paragraph then
+ * replaces those rows on screen; the meeting record keeps the sentences as they were said.
+ */
+async function joinParagraph(appState: AppState): Promise<void> {
+  const state = appState as any;
+  const rows = paragraphQueue.takeDue(Date.now());
+  if (paragraphQueue.size() > 0) {
+    paragraphTimer = setTimeout(() => {
+      paragraphTimer = null;
+      void joinParagraph(appState);
+    }, PARAGRAPH_CHECK_MS);
+  }
+  if (!rows) return;
+  const config = resolveTranslationConfig(false);
+  if (!config.isConfigured || isSameAsTarget(config)) return;
+  const sourceText = rows.map((row) => row.text).join(' ');
+  const segmentId = `para_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const startedAt = Date.now();
+  try {
+    const translatedText = (await runTranslationRequest(appState, config, { text: sourceText, segmentId, noContext: true }, () => undefined)).trim();
+    console.log(formatTranslationTiming({
+      provider: config.provider, model: config.model, flushGapMs: null, firstTokenMs: null, totalMs: Date.now() - startedAt,
+      sourceChars: sourceText.length, outputChars: translatedText.length, streamed: false, speculative: false, outcome: 'complete',
+    }));
+    // A row that was reopened while this ran now says something else: leave the sentences as they are.
+    if (!translatedText || rows.some((row) => isSupersededRevision(state.transcriptSegmentRevisions, row.segmentId, row.revision))) return;
+    const displayMode = CredentialsManager.getInstance().getTranscriptTranslationDisplayMode();
+    emitNativeAudioTranscript(appState, {
+      speaker: 'interviewer',
+      text: displayMode === 'translated' ? translatedText : sourceText,
+      sourceText,
+      translatedText,
+      segmentId,
+      replaces: rows.map((row) => row.segmentId),
+      timestamp: Date.now(),
+      final: true,
+      confidence: 1,
+      displayMode,
+      translationState: 'complete' as const,
+      revision: 1,
+    });
+  } catch (error: unknown) {
+    // The sentences stay as they are, each with its own translation.
+    console.warn('[Main] Paragraph translation failed:', classifyTranslationError(error));
   }
 }

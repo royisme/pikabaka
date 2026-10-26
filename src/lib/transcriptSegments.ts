@@ -32,6 +32,8 @@ export interface TranscriptEventForSegment {
   detectedLanguage?: string;
   revision?: number;
   translationError?: TranscriptSegment['translationError'];
+  /** A paragraph that takes the place of these rows: they leave the transcript and it appears where the first of them was. */
+  replaces?: string[];
 }
 
 function defaultSpeakerLabelForEvent(event: TranscriptEventForSegment): string {
@@ -84,23 +86,31 @@ export function upsertTranscriptSegment(
 
   const index = segments.findIndex((item) => item.segmentId === event.segmentId);
   if (index === -1) {
-    return [
-      ...segments,
-      {
-        segmentId: event.segmentId,
-        sourceText,
-        translatedText: event.translatedText?.trim() || undefined,
-        timestamp: event.timestamp ?? Date.now(),
-        speakerLabel,
-        translationState,
-        detectedLanguage: event.detectedLanguage || undefined,
-        revision: event.revision,
-        speaker: event.speaker,
-        translationError: translationState === 'error' ? event.translationError : undefined,
-        translatedRevision: event.translatedText?.trim() ? event.revision : undefined,
-        receivedAt: translationState === 'pending' ? now : undefined,
-      },
-    ];
+    const replaced = event.replaces?.length ? segments.filter((item) => event.replaces!.includes(item.segmentId)) : [];
+    // A paragraph for rows that are no longer there (the transcript was cleared) is dropped.
+    if (event.replaces?.length && replaced.length === 0) return segments;
+    const paragraph: TranscriptSegment = {
+      segmentId: event.segmentId,
+      sourceText,
+      translatedText: event.translatedText?.trim() || undefined,
+      timestamp: event.timestamp ?? Date.now(),
+      speakerLabel,
+      translationState,
+      detectedLanguage: event.detectedLanguage || undefined,
+      revision: event.revision,
+      speaker: event.speaker,
+      translationError: translationState === 'error' ? event.translationError : undefined,
+      translatedRevision: event.translatedText?.trim() ? event.revision : undefined,
+      receivedAt: translationState === 'pending' ? now : undefined,
+    };
+    if (replaced.length === 0) return [...segments, paragraph];
+    // The paragraph keeps the place and the time of the first row it replaces.
+    const result: TranscriptSegment[] = [];
+    for (const item of segments) {
+      if (item.segmentId === replaced[0].segmentId) result.push({ ...paragraph, timestamp: item.timestamp });
+      else if (!event.replaces!.includes(item.segmentId)) result.push(item);
+    }
+    return result;
   }
 
   const updated = [...segments];

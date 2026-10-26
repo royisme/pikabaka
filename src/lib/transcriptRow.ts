@@ -13,6 +13,8 @@ export type TranscriptRowParts = {
   lead: string;
   /** Source text shown under a translation, or null when it is hidden. */
   sourceBelow: string | null;
+  /** The translation shown under the source text (mode `both`), or null when the translation leads or is absent. */
+  translationBelow: string | null;
   hasTranslation: boolean;
   /** The translation belongs to an earlier revision of the text and is being redone. */
   updating: boolean;
@@ -35,8 +37,9 @@ export function hasUsableTranslation(segment: TranslationFields): boolean {
 }
 
 /**
- * What a transcript row shows for a display mode. The translation leads: on a call it is the
- * text to read, and the source is there to check names and numbers. `translated` keeps the
+ * What a transcript row shows for a display mode. In `both` the source text leads, larger, and the
+ * translation sits under it, smaller, so switching translation off never changes how the words
+ * that were said are shown (owner, 2026-10-26). `translated` shows the translation alone, with the
  * source behind an expand; `original` never shows the translation.
  */
 export function transcriptRowParts(
@@ -53,15 +56,26 @@ export function transcriptRowParts(
       kind: waiting ? 'awaiting' : 'source',
       lead: segment.sourceText,
       sourceBelow: null,
+      translationBelow: null,
       hasTranslation,
       updating: false,
     };
   }
-  const showSource = mode === 'both' || expanded;
+  if (mode === 'both') {
+    return {
+      kind: 'source',
+      lead: segment.sourceText,
+      sourceBelow: null,
+      translationBelow: segment.translatedText!.trim(),
+      hasTranslation,
+      updating: isTranslationStale(segment),
+    };
+  }
   return {
     kind: 'translation',
     lead: segment.translatedText!.trim(),
-    sourceBelow: showSource ? segment.sourceText : null,
+    sourceBelow: expanded ? segment.sourceText : null,
+    translationBelow: null,
     hasTranslation,
     updating: isTranslationStale(segment),
   };

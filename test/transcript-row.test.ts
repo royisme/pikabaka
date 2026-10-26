@@ -5,11 +5,12 @@ import { toggleOriginal } from '../src/lib/transcriptDisplay';
 const translated = { sourceText: 'Can we move the call to Friday?', translatedText: '我们能把电话改到周五吗？', translationState: 'complete' as const };
 const pending = { sourceText: 'Can we move the call to Friday?', translatedText: undefined, translationState: 'pending' as const };
 
-t.test('both: translation leads, source beneath', async (t) => {
+t.test('both: the source leads, the translation sits beneath it', async (t) => {
   t.same(transcriptRowParts(translated, 'both', false), {
-    kind: 'translation',
-    lead: '我们能把电话改到周五吗？',
-    sourceBelow: 'Can we move the call to Friday?',
+    kind: 'source',
+    lead: 'Can we move the call to Friday?',
+    sourceBelow: null,
+    translationBelow: '我们能把电话改到周五吗？',
     hasTranslation: true,
     updating: false,
   });
@@ -81,8 +82,8 @@ const stale = { sourceText: 'See you Monday morning', translatedText: 'À lundi'
 
 t.test('a stale translation is shown as updating only while a new one is pending', async (t) => {
   const parts = transcriptRowParts({ ...stale, translationState: 'pending' }, 'both', false);
-  t.equal(parts.kind, 'translation');
-  t.equal(parts.lead, 'À lundi');
+  t.equal(parts.kind, 'source');
+  t.equal(parts.translationBelow, 'À lundi');
   t.equal(parts.updating, true);
   t.same(rowSlot({ ...stale, translationState: 'pending', speaker: 'interviewer' }, ctx), { kind: 'translation' });
 });
@@ -119,11 +120,11 @@ t.test('a failure names its reason in a few words', async (t) => {
   t.equal(failureReasonText(undefined), '');
 });
 
-t.test('a streaming translation shows the text so far as the lead, and waits like pending before any text', async (t) => {
+t.test('a streaming translation shows the text so far under the source, and waits like pending before any text', async (t) => {
   const streaming = { sourceText: 'Can we move the call to Friday?', translatedText: '我们能把电话', translationState: 'streaming' as const, revision: 1, translatedRevision: 1, speaker: 'interviewer' as const };
   const parts = transcriptRowParts(streaming, 'both', false);
-  t.equal(parts.kind, 'translation');
-  t.equal(parts.lead, '我们能把电话');
+  t.equal(parts.kind, 'source');
+  t.equal(parts.translationBelow, '我们能把电话');
   t.same(rowSlot(streaming, ctx), { kind: 'translation' }, 'the text fills the slot');
   const noText = { ...streaming, translatedText: undefined };
   t.equal(transcriptRowParts(noText, 'both', false).kind, 'awaiting');

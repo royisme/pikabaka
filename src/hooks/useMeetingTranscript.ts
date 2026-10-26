@@ -167,6 +167,7 @@ export function useMeetingTranscript() {
           translationError: transcript.translationError,
           detectedLanguage: transcript.detectedLanguage,
           revision: transcript.revision,
+          replaces: transcript.replaces,
         })
       );
 

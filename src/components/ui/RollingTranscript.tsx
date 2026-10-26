@@ -193,10 +193,16 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                     onClick={() => setExpandedId(expanded ? null : seg.segmentId)}
                                     className="block w-full text-left"
                                 >
-                                    <span className={`block whitespace-pre-wrap break-words ${leadClass}${parts.updating ? ' opacity-70' : ''}`}>
+                                    <span className={`block whitespace-pre-wrap break-words ${leadClass}${parts.updating && parts.translationBelow === null ? ' opacity-70' : ''}`}>
                                         {parts.lead}
-                                        {parts.updating && <span className="ml-1 text-[11px] overlay-text-muted"> · updating</span>}
+                                        {parts.updating && parts.translationBelow === null && <span className="ml-1 text-[11px] overlay-text-muted"> · updating</span>}
                                     </span>
+                                    {parts.translationBelow !== null && (
+                                        <span className={`block text-xs leading-[17px] overlay-text-secondary whitespace-pre-wrap break-words${parts.updating ? ' opacity-70' : ''}`}>
+                                            {parts.translationBelow}
+                                            {parts.updating && <span className="ml-1 text-[11px] overlay-text-muted"> · updating</span>}
+                                        </span>
+                                    )}
                                     {parts.sourceBelow !== null && (
                                         <span className="block text-xs leading-[17px] overlay-text-muted whitespace-pre-wrap break-words">
                                             {parts.sourceBelow}
