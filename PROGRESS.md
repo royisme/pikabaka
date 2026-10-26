@@ -2,6 +2,15 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: V1 pixel floors for the two zones (branch `overlay-split-clamp`)
+
+Done
+- `docs/design-overlay-v2.md` (Opus) is the spec; `TASKS.md` section V holds the steps. Two corrections to my own earlier notes: the answer zone's footer was clipped at 420px with the 55% split (the "there is room at 420px" note under U7 was wrong), and in dark theme the text showing through the panel is only 1.1 to 1.25:1; the visible noise comes from the transparent band, a broken hairline class and empty zones.
+- `src/lib/splitClamp.ts`: the split is the user's wish in percent; what is drawn is that wish held inside pixel floors (transcript zone 100px, answer zone 215px, both including their own chrome). `SplitterShell` measures the zones with a `ResizeObserver` and passes the bounds to the splitter, which stops at them. Overlay `minHeight` is 400 (it was 1).
+- Verified: both `tsc --noEmit` checks exit 0; tap 669 of 669 (17 new assertions for 350px, 250px, 1000px and an unknown height).
+- Not verified in the running app: that the footer no longer clips at 420px; the floors (100 and 215) come from the spec's measurement of the current chrome and go down when V8 and V9 remove chrome. At 420px with translation on the transcript zone is now about 135px, not the 55% default.
+- Note: `pnpm-lock.yaml` has uncommitted changes that are not mine (a plain `pnpm install` seems to have been run); they are left out of every commit.
+
 ## 2026-10-26: `pnpm run dev` fails on Node 26 (branch `node-version-pin`)
 
 Found

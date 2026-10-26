@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Mic, MessageSquare } from 'lucide-react';
 import ResizableSplitter from '../ui/ResizableSplitter';
 import type { getOverlayAppearance } from '../../lib/overlayAppearance';
+import { clampSplit, splitBounds } from '../../lib/splitClamp';
 
 interface SplitterShellProps {
     left: React.ReactNode;
@@ -33,21 +34,37 @@ const SplitterShell: React.FC<SplitterShellProps> = ({
     appearance,
     overlayPanelClass,
 }) => {
+    // The split is the user's wish in percent; what is drawn is that wish held inside the pixel floors of the two zones.
+    const zonesRef = useRef<HTMLDivElement>(null);
+    const [zonesHeight, setZonesHeight] = useState(0);
+    useLayoutEffect(() => {
+        const element = zonesRef.current;
+        if (!element) return;
+        const observer = new ResizeObserver(() => setZonesHeight(element.clientHeight));
+        observer.observe(element);
+        setZonesHeight(element.clientHeight);
+        return () => observer.disconnect();
+    }, []);
+    const bounds = splitBounds(zonesHeight);
+    const drawnPosition = clampSplit(zonesHeight, splitterPosition);
+
     return (
         <div
             className={`relative w-full flex-1 min-h-0 border rounded-[24px] overflow-hidden flex flex-col draggable-area overlay-shell-surface ${overlayPanelClass}`}
             style={appearance.shellStyle}
         >
-            <div className="flex-1 min-h-0 flex flex-col">
+            <div ref={zonesRef} className="flex-1 min-h-0 flex flex-col">
                 <section
                     className="min-w-0 min-h-0 overflow-hidden flex flex-col bg-white/[0.02]"
-                    style={{ height: `${splitterPosition}%` }}
+                    style={{ height: `${drawnPosition}%` }}
                 >
                     <ZoneHeader icon={<Mic className="w-2.5 h-2.5" />} label="Live Transcript">{leftHeader}</ZoneHeader>
                     <div className="flex-1 min-h-0 overflow-hidden flex flex-col">{left}</div>
                 </section>
                 <ResizableSplitter
-                    position={splitterPosition}
+                    position={drawnPosition}
+                    min={bounds.min}
+                    max={bounds.max}
                     onPositionChange={onSplitterChange}
                     onReset={onSplitterReset}
                     orientation="horizontal"

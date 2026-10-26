@@ -66,6 +66,25 @@ Design: `docs/design-live-translation-ui.md`. The owner wants to use Pika on a p
 | T9 | Streaming tokens in the slot | first token appears within the time measured on #29; a superseded revision writes nothing | #38 | done on branch `translation-streaming` with R2 |
 | T10 | Committed and preview rendering | reducer test: committed only appends, preview is replaced; owner checks committed text never moves | #38 | blocked on R5: only early translation produces a preview |
 
+## V. Overlay v2, the minimum bar (`docs/design-overlay-v2.md`)
+
+Owner approved on 2026-10-26: the top bar instead of the pill and both zone headers (V9); the panel opacity ranges 0.95-0.985 dark and 0.94-0.985 light (V6); a Settings deep link for "Fix audio" (V3); and V1 to V10. Acceptance is the spec's Q1 to Q14. V1 finishes U7, V4 amends U3, V8 amends U8, V9 is U4's layout and supersedes the rest of U6, V10 replaces U9, V11 is S3 (the DESIGN half), V12 is U10.
+
+| # | Step | Acceptance | State |
+| --- | --- | --- | --- |
+| V1 | Answer zone never clips: pixel floors for both zones, overlay `minHeight` 400 | unit test: both zones above their floors at 350px, 250px and 1000px; owner checks at 420px with translation on | done on branch `overlay-split-clamp` |
+| V2 | Hairlines use a real border class (`border-border-subtle/NN` generates no CSS) | no `border-border-subtle/` left in the overlay files; Q12 | not started |
+| V3 | One audio status: `audioStatus()`, chip, zone line, Settings deep link; the amber box is gone | unit test covers every row of spec section 6; Q6, Q14 | not started |
+| V4 | The primary action follows the state ("Fix audio" when there is no audio) | Q4, Q5 in all six states | not started |
+| V5 | One-line empty states | Q11 | not started |
+| V6 | Legibility floor: alpha ranges, no `backdrop-filter`, light muted 0.82, placeholder = muted, `--overlay-action` | unit test: shell alpha at the lowest slider value is at least 0.95 dark and 0.94 light; Q7, Q9 | not started |
+| V7 | Header controls as specified: short language label, overflow menu below 480px | Q2 at 380 and 600 | not started |
+| V8 | Two-row composer | composer at most 86px; every action reachable at 380 without scrolling | not started |
+| V9 | Top bar replaces the pill and both zone headers | Q3 (chrome at most 140px at 420px), Q8 | not started |
+| V10 | Four-size type scale (11, 12, 14, 16) | Q10 grep finds nothing | not started |
+| V11 | Overlay rules and `DESIGN.md` tokens | rules quote Q3, Q6, Q7 | not started |
+| V12 | Critique re-run on Q1 to Q14 | every check ticked or filed | after V10 |
+
 ## Owner
 
 - Decided 2026-10-26: new branches use the relire naming (no slash, at most three words; existing branches keep their names); docs, issues and PR text are in English; `AGENTS.md` and `CLAUDE.md` stay git-ignored. Persisted shapes are released contracts because 2.2.0 has shipped.

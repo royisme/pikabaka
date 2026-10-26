@@ -208,7 +208,8 @@ export class WindowHelper {
       width: overlayDefaultWidth,
       height: 1,
       minWidth: 380,
-      minHeight: 1,
+      // Both zones need their own controls: below this the answer zone's input and footer would clip.
+      minHeight: 400,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
