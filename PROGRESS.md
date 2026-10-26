@@ -2,6 +2,20 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: the meeting record is written as the meeting happens (branch `incremental-record`, steps A2.1 to A2.4)
+
+Before this, a meeting was saved once at stop with `INSERT OR REPLACE`. With foreign keys on, that deleted the meeting's transcript and interaction rows first, then re-inserted the raw STT list; a crash lost the whole call.
+
+Done
+- `electron/db/meetingRecord.ts` (new): `createMeeting`, `upsertSegment` (newer revision replaces, older or equal is ignored), `addInteraction`, `completeMeeting` (UPDATE only), and the `segment_id`, `revision` columns with a unique index (migration v11).
+- The meeting row exists from start (`MeetingPersistence.startMeeting`); the transcript assembler writes each assembled line before translation, and `resetBufferedTranscriptTurns` writes the pending turns at stop.
+- Stop, a meeting under one second (row deleted) and startup recovery complete the row in place; recovery skips the active meeting and takes the duration from the last segment. If the row is missing the old full save still runs, so a meeting is never lost.
+- `SessionTracker` writes each usage entry when it happens through `setUsageRecorder`.
+- Logs on these paths no longer print transcript text, questions, answers or JSON-parse errors.
+- Checks: electron and src `tsc` 0 errors; 958 of 958 tests; eslint 0 errors, 1265 warnings (the cap, 3 over before).
+
+Not verified: A2.5, the owner's check in the running app (force-quit mid-call and relaunch: the transcript is there up to the kill, the first sentence of a long call is kept, every line appears once). Tests use a fake database over in-memory SQLite and a mocked LLM; no real STT or provider ran. A final STT partial that never became a final is not in the record.
+
 ## 2026-10-26: agent platform design, review and task track (branch `agent-platform`)
 
 The owner set the direction: live translation, a complete meeting record and an agent base, with Jev deciding when to offer help (`docs/design-agent-platform.md`). Before this, the overlay, live translation and Electron 44 stack was merged into local `main` (`abfd517`, not pushed; 812 tests, both builds exit 0).
