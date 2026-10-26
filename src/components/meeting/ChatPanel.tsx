@@ -520,12 +520,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           className={`flex min-w-[9rem] items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 disabled:cursor-wait ${
             primaryQuiet
               ? `border overlay-hairline ${quickActionClass}`
-              : 'bg-[#0071E3] text-white shadow-[0_4px_14px_rgba(0,113,227,0.18)] hover:bg-[#0066CC]'
+              : 'bg-[var(--overlay-action)] text-white shadow-[0_4px_14px_rgba(0,113,227,0.18)] hover:brightness-95'
           }`}
           style={primaryQuiet ? appearance.chipStyle : undefined}
         >
           <Zap className="w-3 h-3 opacity-75" /> {isProcessing ? 'Answering…' : 'What to say'}
-          {!isProcessing && shortcuts.whatToAnswer.length > 0 && <KeyBadge keys={shortcuts.whatToAnswer} className="ml-0.5 opacity-80" />}
+          {!isProcessing && shortcuts.whatToAnswer.length > 0 && <KeyBadge keys={shortcuts.whatToAnswer} onAction={!primaryQuiet} className="ml-0.5" />}
         </button>
         <button onClick={handleClarify} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
           <MessageSquare className="w-3 h-3 opacity-65" /> Clarify
@@ -707,7 +707,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               w-7 h-7 rounded-full flex items-center justify-center
               interaction-base interaction-press
               ${inputValue.trim()
-                ? 'bg-[#0071E3] text-white shadow-lg shadow-blue-500/20 hover:bg-[#0066CC]'
+                ? 'bg-[var(--overlay-action)] text-white shadow-lg shadow-blue-500/20 hover:brightness-95'
                 : 'overlay-icon-surface overlay-text-muted cursor-not-allowed'
               }
             `}

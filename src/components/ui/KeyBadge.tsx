@@ -4,6 +4,8 @@ interface KeyBadgeProps {
     keys: string[];
     className?: string;
     size?: 'sm' | 'md';
+    /** The badge sits on the filled action colour: use light-on-dark values that keep 4.5:1. */
+    onAction?: boolean;
 }
 
 const MODIFIERS_MAC = new Set(['⌘', '⌥', '⇧', '⌃']);
@@ -13,7 +15,7 @@ function isModifier(key: string): boolean {
     return MODIFIERS_MAC.has(key) || MODIFIERS_WIN.has(key);
 }
 
-export const KeyBadge: React.FC<KeyBadgeProps> = ({ keys, className = '', size = 'sm' }) => {
+export const KeyBadge: React.FC<KeyBadgeProps> = ({ keys, className = '', size = 'sm', onAction = false }) => {
     const textSize = size === 'sm' ? 'text-[11px]' : 'text-xs';
     const padModifier = size === 'sm' ? 'px-2 py-1' : 'px-2.5 py-1.5';
     const padKey = size === 'sm' ? 'px-1.5 py-1' : 'px-2 py-1.5';
@@ -33,12 +35,11 @@ export const KeyBadge: React.FC<KeyBadgeProps> = ({ keys, className = '', size =
                             transition-colors duration-150
                             ${textSize}
                             ${mod ? padModifier : padKey}
-                            ${mod
-                                ? isTextModifier
-                                    ? 'bg-white/15 text-white/90 min-w-[28px] shadow-[0_1px_2px_rgba(0,0,0,0.3)]'
-                                    : 'bg-white/10 text-white/80'
-                                : 'bg-white/8 text-white/60'
+                            ${onAction
+                                ? 'bg-white/20 text-white'
+                                : 'overlay-control-surface overlay-text-secondary'
                             }
+                            ${mod && isTextModifier ? 'min-w-[28px]' : ''}
                         `}
                     >
                         {key}

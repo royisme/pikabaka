@@ -61,7 +61,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                                         <button
                                             type="button"
                                             onClick={onFixAudio}
-                                            className="mt-2 inline-flex h-7 items-center rounded-full bg-[#0071E3] px-3.5 text-xs font-semibold text-white hover:bg-[#0066CC]"
+                                            className="mt-2 inline-flex h-7 items-center rounded-full bg-[var(--overlay-action)] px-3.5 text-xs font-semibold text-white hover:brightness-95"
                                         >
                                             Fix audio
                                         </button>

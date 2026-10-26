@@ -2,6 +2,17 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: V6 legibility floor (branch `overlay-legibility`)
+
+Done (the numeric part was written by a GPT-6.1 worker through pi, reviewed and merged by the lead)
+- Panel opacity: the user's slider (stored range 0.35 to 1, unchanged) now maps linearly onto a shell alpha of 0.95 to 0.985 in dark theme and 0.94 to 0.985 in light (was 0.92 to 0.975 and 0.74 to 0.975), so the lowest setting is the floor and nothing below it is possible. The stored setting is not changed.
+- `backdrop-filter` is removed from the shell and pill (it cannot blur what is behind a transparent window), together with its unused `--overlay-shell-blur` and `--overlay-pill-blur` tokens.
+- Light theme muted text is 0.82 (was 0.74); the placeholder token equals muted text in both themes; `--overlay-action` (`#0071E3`) is the one fill token for the primary action and now drives the primary button, Send and Fix audio, with hover as `brightness-95`.
+- `KeyBadge` used `bg-white/8` (a class that generates nothing) and white text at 0.6, unreadable on the light theme; it now uses the overlay control surface and secondary text, or white on white/20 when it sits on the filled action colour (`onAction`).
+- Verified: both `tsc --noEmit` checks exit 0; tap 736 of 736 (10 new assertions for the alpha floor, ceiling, midpoint and clamping, both themes). The worker's own report said exactly one tap failure (a missing git-ignored `.docx` fixture); in this checkout all tests pass.
+- Not verified: the contrast ratios (the spec's numbers are calculated from the token values, and nobody sampled pixels); how the panel looks at the lowest slider value over a busy page; the light theme at all.
+- The pill still has its own alpha (it goes with V9).
+
 ## 2026-10-26: V5 one-line empty states (branch `empty-states`)
 
 Done
