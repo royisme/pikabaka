@@ -1,8 +1,11 @@
 import SttModelPicker, { STT_MODEL_DEFAULTS } from './settings/SttModelPicker';
 import ConnectionModelPicker from './settings/ConnectionModelPicker';
 import WorkspaceSettings from './settings/WorkspaceSettings';
-import React, { useState, useEffect, useMemo } from 'react';
-import { useQueryClient } from 'react-query';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useQuery, useQueryClient } from 'react-query';
+import { useWindowEvent } from '../hooks/useWindowEvent';
+import { useMainEvent } from '../hooks/useMainEvent';
+import { useLocalStorageValue } from '../hooks/useLocalStorageValue';
 import packageJson from '../../package.json';
 import {
     X, Mic, Speaker, Monitor, Keyboard, BookOpen, Upload,
@@ -10,7 +13,7 @@ import {
     RotateCcw, Eye, Layout, MessageSquare,
     ChevronDown, ChevronUp, ChevronRight, Check, BadgeCheck, Power, Palette, Ghost, Sun, Moon, RefreshCw, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink, Trash2,
     Pencil, MapPin, HelpCircle, Zap, SlidersHorizontal, PointerOff,
-    AlertCircle, Loader2, Shield
+    AlertCircle, Shield
 } from 'lucide-react';
 import { AboutSection } from './AboutSection';
 import { AIProvidersSettings } from './settings/AIProvidersSettings';
@@ -162,15 +165,15 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, icon, value, options
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+    useWindowEvent(
+        'mousedown',
+        (event) => {
+            if (isOpen && containerRef.current && !containerRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+        },
+        'document'
+    );
 
     const selectedLabel = options.find(o => o.deviceId === value)?.label || placeholder;
 
@@ -240,15 +243,15 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+    useWindowEvent(
+        'mousedown',
+        (event) => {
+            if (isOpen && containerRef.current && !containerRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+        },
+        'document'
+    );
 
     const selected = options.find(o => o.id === value);
 
@@ -363,24 +366,16 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [activeTab, setActiveTab] = useState(initialTab);
     const [showMoreShortcuts, setShowMoreShortcuts] = useState<boolean>(false);
 
-    // Sync active tab when modal opens
-    useEffect(() => {
-        if (isOpen && initialTab) {
-            setActiveTab(initialTab);
-        }
-    }, [isOpen, initialTab]);
-    
+    // Sync active tab when modal opens or initialTab prop changes
+    const [prevOpenState, setPrevOpenState] = useState({ isOpen, initialTab });
+    if (isOpen && (!prevOpenState.isOpen || initialTab !== prevOpenState.initialTab)) {
+        setPrevOpenState({ isOpen, initialTab });
+        setActiveTab(initialTab);
+    } else if (!isOpen && prevOpenState.isOpen) {
+        setPrevOpenState({ isOpen, initialTab });
+    }
+
     const { shortcuts, updateShortcut, resetShortcuts } = useShortcuts();
-    const [isUndetectable, setIsUndetectable] = useState(false);
-    const [isMousePassthrough, setIsMousePassthrough] = useState(false);
-    const [disguiseMode, setDisguiseMode] = useState<'terminal' | 'settings' | 'activity' | 'none'>('none');
-    const [openOnLogin, setOpenOnLogin] = useState(false);
-    const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
-    const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
-    const [isAiLangDropdownOpen, setIsAiLangDropdownOpen] = useState(false);
-    const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'uptodate' | 'error'>('idle');
-    const themeDropdownRef = React.useRef<HTMLDivElement>(null);
-    const aiLangDropdownRef = React.useRef<HTMLDivElement>(null);
 
     // Profile Engine State
     const queryClient = useQueryClient();
@@ -390,72 +385,83 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const { isEnabled: knowledgeMode, toggle: toggleKnowledge } = useKnowledgeMode();
     const profileUploading = uploadResume.isLoading;
     const profileError = uploadResume.error instanceof Error ? uploadResume.error.message : '';
-    const [verboseLogging, setVerboseLogging] = useState(false);
-    const [permissionStatus, setPermissionStatus] = useState<{ microphone: string; screen: string } | null>(null);
 
-    // Close dropdown when clicking outside
-    // Sync with global state changes
-    useEffect(() => {
-        if (isOpen) {
-            // Fetch true initial state from main process
-            window.electronAPI?.getUndetectable?.().then(setIsUndetectable).catch(() => { });
-            window.electronAPI?.getOverlayMousePassthrough?.().then(setIsMousePassthrough).catch(() => { });
-            window.electronAPI?.getDisguise?.().then(setDisguiseMode).catch(() => { });
-            window.electronAPI?.getVerboseLogging?.().then(setVerboseLogging).catch(() => { });
-            window.electronAPI?.getPermissionStatus?.().then(setPermissionStatus).catch(() => { });
-        }
-    }, [isOpen]);
+    // General Settings (queries + main event subscriptions)
+    const { data: isUndetectable = false } = useQuery<boolean>(
+        ['undetectable'],
+        () => window.electronAPI?.getUndetectable?.() ?? Promise.resolve(false),
+        { enabled: isOpen && !!window.electronAPI?.getUndetectable }
+    );
+    useMainEvent(window.electronAPI?.onUndetectableChanged, (newState: boolean) => {
+        queryClient.setQueryData(['undetectable'], newState);
+    });
 
-    useEffect(() => {
-        if (window.electronAPI?.onUndetectableChanged) {
-            const unsubscribe = window.electronAPI.onUndetectableChanged((newState: boolean) => {
-                setIsUndetectable(newState);
-            });
-            return () => unsubscribe();
-        }
-    }, []);
+    const { data: isMousePassthrough = false } = useQuery<boolean>(
+        ['overlay-mouse-passthrough'],
+        () => window.electronAPI?.getOverlayMousePassthrough?.() ?? Promise.resolve(false),
+        { enabled: isOpen && !!window.electronAPI?.getOverlayMousePassthrough }
+    );
+    useMainEvent(window.electronAPI?.onOverlayMousePassthroughChanged, (enabled: boolean) => {
+        queryClient.setQueryData(['overlay-mouse-passthrough'], enabled);
+    });
 
-    useEffect(() => {
-        if (window.electronAPI?.onDisguiseChanged) {
-            const unsubscribe = window.electronAPI.onDisguiseChanged((newMode: any) => {
-                setDisguiseMode(newMode);
-            });
-            return () => unsubscribe();
-        }
-    }, []);
+    const { data: disguiseMode = 'none' } = useQuery<'terminal' | 'settings' | 'activity' | 'none'>(
+        ['settings', 'disguise'],
+        () => window.electronAPI?.getDisguise?.() ?? Promise.resolve('none'),
+        { enabled: isOpen && !!window.electronAPI?.getDisguise }
+    );
+    useMainEvent(window.electronAPI?.onDisguiseChanged, (newMode: any) => {
+        queryClient.setQueryData(['settings', 'disguise'], newMode);
+    });
 
-    useEffect(() => {
-        if (window.electronAPI?.onOverlayMousePassthroughChanged) {
-            const unsubscribe = window.electronAPI.onOverlayMousePassthroughChanged((enabled: boolean) => {
-                setIsMousePassthrough(enabled);
-            });
-            return () => unsubscribe();
-        }
-    }, []);
+    const { data: openOnLogin = false } = useQuery<boolean>(
+        ['settings', 'open-at-login'],
+        () => window.electronAPI?.getOpenAtLogin?.() ?? Promise.resolve(false),
+        { enabled: isOpen && !!window.electronAPI?.getOpenAtLogin }
+    );
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (themeDropdownRef.current && !themeDropdownRef.current.contains(event.target as Node)) {
+    const { data: themeMode = 'system' } = useQuery<'system' | 'light' | 'dark'>(
+        ['settings', 'theme-mode'],
+        async () => {
+            const res = await window.electronAPI?.getThemeMode?.();
+            return (res?.mode as 'system' | 'light' | 'dark') ?? 'system';
+        },
+        { enabled: isOpen && !!window.electronAPI?.getThemeMode }
+    );
+
+    const { data: verboseLogging = false } = useQuery<boolean>(
+        ['settings', 'verbose-logging'],
+        () => window.electronAPI?.getVerboseLogging?.() ?? Promise.resolve(false),
+        { enabled: isOpen && !!window.electronAPI?.getVerboseLogging }
+    );
+
+    const { data: permissionStatus = null } = useQuery<{ microphone: string; screen: string } | null>(
+        ['settings', 'permission-status'],
+        () => window.electronAPI?.getPermissionStatus?.() ?? Promise.resolve(null),
+        { enabled: isOpen && !!window.electronAPI?.getPermissionStatus }
+    );
+
+    const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
+    const [isAiLangDropdownOpen, setIsAiLangDropdownOpen] = useState(false);
+    const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'uptodate' | 'error'>('idle');
+    const themeDropdownRef = useRef<HTMLDivElement>(null);
+    const aiLangDropdownRef = useRef<HTMLDivElement>(null);
+
+    useWindowEvent(
+        'mousedown',
+        (event) => {
+            if (isThemeDropdownOpen && themeDropdownRef.current && !themeDropdownRef.current.contains(event.target as Node)) {
                 setIsThemeDropdownOpen(false);
             }
-            if (aiLangDropdownRef.current && !aiLangDropdownRef.current.contains(event.target as Node)) {
+            if (isAiLangDropdownOpen && aiLangDropdownRef.current && !aiLangDropdownRef.current.contains(event.target as Node)) {
                 setIsAiLangDropdownOpen(false);
             }
-        };
+        },
+        'document'
+    );
 
-        if (isThemeDropdownOpen || isAiLangDropdownOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isThemeDropdownOpen, isAiLangDropdownOpen]);
-
-    const [showTranscript, setShowTranscript] = useState(() => {
-        const stored = localStorage.getItem('pika_interviewer_transcript');
-        return stored !== 'false';
-    });
+    const [storedTranscript, setStoredTranscript] = useLocalStorageValue('pika_interviewer_transcript');
+    const showTranscript = storedTranscript !== 'false';
 
     // Recognition Language
     const [recognitionLanguage, setRecognitionLanguage] = useState('');
@@ -476,24 +482,28 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         return isUserSet ? clampOverlayOpacity(parsed) : getDefaultOverlayOpacity();
     });
 
-    // When the theme changes and the user hasn't saved a custom value, reset to theme-aware default
-    const resolvedTheme = useResolvedTheme();
-    useEffect(() => {
-        const stored = localStorage.getItem('pika_overlay_opacity');
-        const parsed = stored ? parseFloat(stored) : NaN;
-        const isUserSet = Number.isFinite(parsed) && parsed !== getDefaultOverlayOpacity();
-        if (!isUserSet) {
-            setOverlayOpacity(getDefaultOverlayOpacity());
-        }
-    }, [resolvedTheme]);
-
-
     // Live preview state — true while the user is holding down the slider
     const [isPreviewingOpacity, setIsPreviewingOpacity] = useState(false);
     const [previewOverlayOpacity, setPreviewOverlayOpacity] = useState(overlayOpacity);
 
     // Ref to hold the latest opacity value without triggering renders during drag
-    const latestOpacityRef = React.useRef(overlayOpacity);
+    const latestOpacityRef = useRef(overlayOpacity);
+
+    // When the theme changes and the user hasn't saved a custom value, reset to theme-aware default
+    const resolvedTheme = useResolvedTheme();
+    const [prevTheme, setPrevTheme] = useState(resolvedTheme);
+    if (resolvedTheme !== prevTheme) {
+        setPrevTheme(resolvedTheme);
+        const stored = localStorage.getItem('pika_overlay_opacity');
+        const parsed = stored ? parseFloat(stored) : NaN;
+        const isUserSet = Number.isFinite(parsed) && parsed !== getDefaultOverlayOpacity();
+        if (!isUserSet) {
+            const next = getDefaultOverlayOpacity();
+            setOverlayOpacity(next);
+            latestOpacityRef.current = next;
+            setPreviewOverlayOpacity(next);
+        }
+    }
 
     const handleOpacityChange = (val: number) => {
         // DOM-direct updates for 0-lag 60fps drag (bypasses React reconciliation)
@@ -506,13 +516,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         // (safe to do at 60fps, does not trigger React renders)
         window.electronAPI?.setOverlayOpacity?.(val);
     };
-
-    // Bug fix #3: keep latestOpacityRef in sync when overlayOpacity changes outside of a drag
-    // (e.g. on first mount, or if another part of code updates it)
-    useEffect(() => {
-        latestOpacityRef.current = overlayOpacity;
-        setPreviewOverlayOpacity(overlayOpacity);
-    }, [overlayOpacity]);
 
     // Bug fix #3 (close-during-drag): if the overlay closes while the user is still dragging,
     // restore all DOM state so nothing is left in a broken state.
@@ -755,32 +758,53 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     };
 
 
-    // Sync transcript setting
-    useEffect(() => {
-        const handleStorage = () => {
-            const stored = localStorage.getItem('pika_interviewer_transcript');
-            setShowTranscript(stored !== 'false');
-        };
-        window.addEventListener('storage', handleStorage);
-        return () => window.removeEventListener('storage', handleStorage);
-    }, []);
-
     // Theme Handlers
     const handleSetTheme = async (mode: 'system' | 'light' | 'dark') => {
-        setThemeMode(mode);
+        queryClient.setQueryData(['settings', 'theme-mode'], mode);
         if (window.electronAPI?.setThemeMode) {
             await window.electronAPI.setThemeMode(mode);
         }
     };
 
     // Audio Settings
-    const [inputDevices, setInputDevices] = useState<MediaDeviceInfo[]>([]);
-    const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
-    const [selectedInput, setSelectedInput] = useState('');
-    const [selectedOutput, setSelectedOutput] = useState('');
+    const { data: devices } = useQuery(
+        ['settings', 'devices'],
+        async () => {
+            const [inputs, outputs] = await Promise.all([
+                // @ts-ignore
+                window.electronAPI?.getInputDevices() || Promise.resolve([]),
+                // @ts-ignore
+                window.electronAPI?.getOutputDevices() || Promise.resolve([])
+            ]);
+            const formatDevices = (devs: any[]) =>
+                devs.map((d: any) => ({
+                    deviceId: d.id,
+                    label: d.name,
+                    kind: 'audioinput' as MediaDeviceKind,
+                    groupId: '',
+                    toJSON: () => d,
+                }));
+            return {
+                inputs: formatDevices(inputs),
+                outputs: formatDevices(outputs),
+            };
+        },
+        { enabled: isOpen && !!window.electronAPI?.getInputDevices }
+    );
+    const inputDevices = devices?.inputs ?? [];
+    const outputDevices = devices?.outputs ?? [];
+    const [preferredInputId, setPreferredInputId] = useLocalStorageValue('preferredInputDeviceId');
+    const [preferredOutputId, setPreferredOutputId] = useLocalStorageValue('preferredOutputDeviceId');
+    const selectedInput = (preferredInputId && inputDevices.some((d) => d.deviceId === preferredInputId))
+        ? preferredInputId
+        : (inputDevices[0]?.deviceId ?? '');
+    const selectedOutput = (preferredOutputId && outputDevices.some((d) => d.deviceId === preferredOutputId))
+        ? preferredOutputId
+        : (outputDevices[0]?.deviceId ?? '');
     const [micLevel, setMicLevel] = useState(0);
     const [inputDeviceNotFound, setInputDeviceNotFound] = useState(false);
-    const [useExperimentalSck, setUseExperimentalSck] = useState(false);
+    const [storedSck, setStoredSck] = useLocalStorageValue('useExperimentalSckBackend');
+    const useExperimentalSck = storedSck === 'true';
 
     // STT Provider settings
     const [sttProvider, setSttProvider] = useState<'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'>('google');
@@ -817,17 +841,15 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [translationSettingsSaved, setTranslationSettingsSaved] = useState(false);
 
     // Close STT dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (sttDropdownRef.current && !sttDropdownRef.current.contains(event.target as Node)) {
+    useWindowEvent(
+        'mousedown',
+        (event) => {
+            if (isSttDropdownOpen && sttDropdownRef.current && !sttDropdownRef.current.contains(event.target as Node)) {
                 setIsSttDropdownOpen(false);
             }
-        };
-        if (isSttDropdownOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isSttDropdownOpen]);
+        },
+        'document'
+    );
 
     // Load STT settings on mount
     useEffect(() => {
@@ -1178,71 +1200,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         return () => unsubs.forEach(unsub => unsub());
     }, [isOpen, onClose]);
 
-
-
-    useEffect(() => {
-        if (isOpen) {
-            // Load detectable status
-            if (window.electronAPI?.getUndetectable) {
-                window.electronAPI.getUndetectable().then(setIsUndetectable);
-            }
-            if (window.electronAPI?.getOpenAtLogin) {
-                window.electronAPI.getOpenAtLogin().then(setOpenOnLogin);
-            }
-            if (window.electronAPI?.getThemeMode) {
-                window.electronAPI.getThemeMode().then(({ mode }) => setThemeMode(mode));
-            }
-
-            // Load settings
-            const loadDevices = async () => {
-                try {
-                    const [inputs, outputs] = await Promise.all([
-                        // @ts-ignore
-                        window.electronAPI?.getInputDevices() || Promise.resolve([]),
-                        // @ts-ignore
-                        window.electronAPI?.getOutputDevices() || Promise.resolve([])
-                    ]);
-
-                    // Map to shape compatible with CustomSelect (which expects MediaDeviceInfo-like objects)
-                    const formatDevices = (devs: any[]) => devs.map(d => ({
-                        deviceId: d.id,
-                        label: d.name,
-                        kind: 'audioinput' as MediaDeviceKind,
-                        groupId: '',
-                        toJSON: () => d
-                    }));
-
-                    setInputDevices(formatDevices(inputs));
-                    setOutputDevices(formatDevices(outputs));
-
-                    // Load saved preferences
-                    const savedInput = localStorage.getItem('preferredInputDeviceId');
-                    const savedOutput = localStorage.getItem('preferredOutputDeviceId');
-
-                    if (savedInput && inputs.find((d: any) => d.id === savedInput)) {
-                        setSelectedInput(savedInput);
-                    } else if (inputs.length > 0 && !selectedInput) {
-                        setSelectedInput(inputs[0].id);
-                    }
-
-                    if (savedOutput && outputs.find((d: any) => d.id === savedOutput)) {
-                        setSelectedOutput(savedOutput);
-                    } else if (outputs.length > 0 && !selectedOutput) {
-                        setSelectedOutput(outputs[0].id);
-                    }
-                } catch (e) {
-                    console.error("Error loading native devices:", e);
-                }
-            };
-            loadDevices();
-
-            // Load Experimental SCK pref
-            const savedSck = localStorage.getItem('useExperimentalSckBackend') === 'true';
-            setUseExperimentalSck(savedSck);
-
-        }
-    }, [isOpen, selectedInput, selectedOutput]); // Re-run if isOpen changes, or if selected devices are cleared
-
     // Use the native mic test path so device IDs stay consistent with the meeting runtime.
     useEffect(() => {
         if (isOpen && activeTab === 'audio') {
@@ -1253,8 +1210,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             window.electronAPI?.startAudioTest(selectedInput || undefined).then((result) => {
                 if (result?.warning) {
                     setInputDeviceNotFound(true);
-                    setSelectedInput('');
-                    localStorage.removeItem('preferredInputDeviceId');
+                    setPreferredInputId(null);
                 } else {
                     setInputDeviceNotFound(false);
                 }
@@ -1276,7 +1232,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 console.error("Error stopping native microphone test:", error);
             });
         }
-    }, [isOpen, activeTab, selectedInput]);
+    }, [isOpen, activeTab, selectedInput, setPreferredInputId]);
 
     return (
         <AnimatePresence>
@@ -1411,7 +1367,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             <div
                                                 onClick={() => {
                                                     const newState = !isUndetectable;
-                                                    setIsUndetectable(newState);
+                                                    queryClient.setQueryData(['undetectable'], newState);
                                                     window.electronAPI?.setUndetectable(newState);
                                                     // Analytics: Undetectable Mode Toggle
                                                 }}
@@ -1435,7 +1391,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             <div
                                                 onClick={() => {
                                                     const newState = !isMousePassthrough;
-                                                    setIsMousePassthrough(newState);
+                                                    queryClient.setQueryData(['overlay-mouse-passthrough'], newState);
                                                     window.electronAPI?.setOverlayMousePassthrough(newState);
                                                 }}
                                                 className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer ${isMousePassthrough ? 'bg-state-info' : 'bg-bg-toggle-switch border border-border-muted'}`}
@@ -1505,7 +1461,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     <div
                                                         onClick={() => {
                                                             const newState = !openOnLogin;
-                                                            setOpenOnLogin(newState);
+                                                            queryClient.setQueryData(['settings', 'open-at-login'], newState);
                                                             window.electronAPI?.setOpenAtLogin(newState);
                                                         }}
                                                         className={`w-11 h-6 rounded-full relative transition-colors ${openOnLogin ? 'bg-accent-primary' : 'bg-bg-toggle-switch border border-border-muted'}`}
@@ -1528,7 +1484,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     <div
                                                         onClick={() => {
                                                             const newState = !verboseLogging;
-                                                            setVerboseLogging(newState);
+                                                            queryClient.setQueryData(['settings', 'verbose-logging'], newState);
                                                             window.electronAPI?.setVerboseLogging?.(newState);
                                                         }}
                                                         className={`w-11 h-6 rounded-full relative transition-colors ${verboseLogging ? 'bg-state-warning' : 'bg-bg-toggle-switch border border-border-muted'}`}
@@ -1550,10 +1506,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     </div>
                                                     <div
                                                         onClick={() => {
-                                                            const newState = !showTranscript;
-                                                            setShowTranscript(newState);
-                                                            localStorage.setItem('pika_interviewer_transcript', String(newState));
-                                                            window.dispatchEvent(new Event('storage'));
+                                                            setStoredTranscript(showTranscript ? 'false' : 'true');
                                                         }}
                                                         className={`w-11 h-6 rounded-full relative transition-colors ${showTranscript ? 'bg-accent-primary' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                                     >
@@ -1804,8 +1757,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     disabled={isUndetectable}
                                                     onClick={() => {
                                                         if (isUndetectable) return;
-                                                        // @ts-ignore
-                                                        setDisguiseMode(option.id);
+                                                        queryClient.setQueryData(['settings', 'disguise'], option.id);
                                                         // @ts-ignore
                                                         window.electronAPI?.setDisguise(option.id);
                                                         // Analytics
@@ -2571,9 +2523,8 @@ Core Skills
                                                 value={selectedInput}
                                                 options={inputDevices}
                                                 onChange={(id) => {
-                                                    setSelectedInput(id);
                                                     setInputDeviceNotFound(false);
-                                                    localStorage.setItem('preferredInputDeviceId', id);
+                                                    setPreferredInputId(id);
                                                 }}
                                                 placeholder="Default Microphone"
                                             />
@@ -2603,8 +2554,7 @@ Core Skills
                                                 value={selectedOutput}
                                                 options={outputDevices}
                                                 onChange={(id) => {
-                                                    setSelectedOutput(id);
-                                                    localStorage.setItem('preferredOutputDeviceId', id);
+                                                    setPreferredOutputId(id);
                                                 }}
                                                 placeholder="Default Speakers"
                                             />
@@ -2677,9 +2627,7 @@ Core Skills
                                                     </div>
                                                     <div
                                                         onClick={() => {
-                                                            const newState = !useExperimentalSck;
-                                                            setUseExperimentalSck(newState);
-                                                            window.localStorage.setItem('useExperimentalSckBackend', newState ? 'true' : 'false');
+                                                            setStoredSck(useExperimentalSck ? 'false' : 'true');
                                                         }}
                                                         className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${useExperimentalSck ? 'bg-state-warning' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                                     >
