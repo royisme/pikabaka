@@ -14,12 +14,16 @@
   "license": "ISC",
   "author": "",
   "keywords": [],
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "clean": "rimraf dist dist-electron",
     "dev": "vite",
-    "lint": "eslint src electron test --no-inline-config",
+    "typecheck": "tsc --noEmit && tsc -p electron/tsconfig.json --noEmit",
+    "lint": "eslint src electron test --no-inline-config --max-warnings 1265",
     "test": "tap --node-arg=--import=tsx \"test/**/*.test.ts\"",
-    "verify": "pnpm run lint && pnpm run test",
+    "verify": "pnpm run typecheck && pnpm run lint && pnpm run test",
     "build:web:raw": "pnpm run clean && tsc && vite build",
     "build": "pnpm run verify && pnpm run build:web:raw",
     "build:electron:raw": "tsc -p electron/tsconfig.json",
@@ -27,7 +31,7 @@
     "build:native:raw": "node scripts/build-native.js",
     "build:native": "pnpm run verify && pnpm run build:native:raw",
     "preview": "vite preview",
-    "postinstall": "cross-env SHARP_IGNORE_GLOBAL_LIBVIPS=1 pnpm rebuild sharp && electron-rebuild -f -w better-sqlite3,sqlite-vec && node scripts/download-models.js && node scripts/ensure-sqlite-vec.js",
+    "postinstall": "cross-env SHARP_IGNORE_GLOBAL_LIBVIPS=1 pnpm rebuild sharp && node scripts/download-models.js && node scripts/ensure-sqlite-vec.js",
     "electron:dev": "pnpm run verify && pnpm run build:electron:raw && cross-env NODE_ENV=development electron .",
     "electron:build": "pnpm run verify && pnpm run build:electron:raw && cross-env NODE_ENV=production electron .",
     "app:dev": "concurrently \"pnpm run dev -- --port 5180 --strictPort\" \"wait-on http://localhost:5180 && pnpm run build:electron:raw && cross-env NODE_ENV=development electron .\"",
@@ -105,8 +109,7 @@
         {
           "target": "nsis",
           "arch": [
-            "x64",
-            "ia32"
+            "x64"
           ]
         },
         {
@@ -146,21 +149,14 @@
     },
     "publish": null
   },
-  "pnpm": {
-    "overrides": {
-      "caniuse-lite": "1.0.30001781"
-    }
-  },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",
-    "@electron/rebuild": "^4.0.3",
     "@napi-rs/cli": "^3.5.1",
     "@tapjs/mock": "4.4.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/color": "^4.2.0",
     "@types/diff": "^6.0.0",
-    "@types/electron": "^1.4.38",
-    "@types/node": "^22.9.0",
+    "@types/node": "^24.0.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/react-syntax-highlighter": "^15.5.13",
@@ -174,10 +170,9 @@
     "concurrently": "^9.1.0",
     "cross-env": "^7.0.3",
     "dotenv": "^17.3.1",
-    "electron": "^33.2.0",
+    "electron": "44.9.3",
     "electron-builder": "^26.8.2",
-    "electron-is-dev": "^3.0.1",
-    "electron-rebuild": "^3.2.9",
+    "eslint": "9.25.1",
     "postcss": "^8.4.49",
     "rimraf": "^6.0.1",
     "tailwindcss": "^3.4.15",
@@ -206,13 +201,12 @@
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-toast": "^1.2.2",
     "@tavily/core": "^0.7.2",
-    "@types/keytar": "^4.4.0",
     "@types/react-window": "^2.0.0",
     "@types/three": "^0.182.0",
     "@xenova/transformers": "^2.17.2",
     "ai": "^6.0.153",
     "axios": "^1.7.7",
-    "better-sqlite3": "12.6.2",
+    "better-sqlite3": "13.0.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "diff": "^7.0.0",
@@ -223,7 +217,6 @@
     "groq-sdk": "^0.37.0",
     "jspdf": "^4.0.0",
     "katex": "^0.16.27",
-    "keytar": "^7.9.0",
     "lucide-react": "^0.460.0",
     "mammoth": "^1.11.0",
     "openai": "^6.22.0",
@@ -242,10 +235,8 @@
     "screenshot-desktop": "^1.15.0",
     "sharp": "^0.33.5",
     "sqlite-vec": "^0.1.7",
-    "sqlite3": "^5.1.7",
     "tailwind-merge": "^2.5.4",
     "tap": "^21.5.0",
-    "tesseract.js": "^5.0.5",
     "three": "^0.182.0",
     "tree-kill": "^1.2.2",
     "uuid": "^11.0.3",

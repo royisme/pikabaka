@@ -3,13 +3,18 @@ import { safeHandle } from "./safeHandle"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { DatabaseManager } from "../db/DatabaseManager"
 
+// Abort controllers of the RAG answers being streamed; module-level so a Stop from anywhere can end them.
+const activeRAGQueries = new Map<string, AbortController>();
+
+export function cancelActiveRagQueries(): void {
+  for (const controller of activeRAGQueries.values()) controller.abort();
+}
+
 export function registerRagHandlers(appState: AppState): void {
   // ==========================================
   // RAG (Retrieval-Augmented Generation) Handlers
   // ==========================================
 
-  // Store active query abort controllers for cancellation
-  const activeRAGQueries = new Map<string, AbortController>();
   // Store active chat stream abort controllers
   const activeChatStreams = new Map<string, AbortController>();
 

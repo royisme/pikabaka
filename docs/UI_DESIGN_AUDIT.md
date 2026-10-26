@@ -1,3 +1,5 @@
+> **Superseded (2026-10-26).** This audit was a static scan and is out of date: a global `:focus-visible` rule (`src/index.css`), a `prefers-reduced-motion` rule and semantic state colours (`state-success`, `state-danger`, ...) now exist, and it does not cover the conversation area. Current problems are tracked as GitHub issues (#20 to #38); the rules for new work are in `docs/conventions.md`, "Overlay UI". Its z-index, radius, spacing and font-family findings were not re-checked.
+
 # Pika UI/UX 设计审计报告
 
 > 范围: `src/components/**`, `src/index.css`, `tailwind.config.js`

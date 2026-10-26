@@ -1,16 +1,17 @@
 import React from 'react';
 import type { ShortcutConfig } from '../../hooks/useShortcuts';
+import { KeyBadge } from '../ui/KeyBadge';
+import { answerEmptyHint } from '../../lib/answerEmpty';
+import { splitLead } from '../../lib/answerLead';
+import type { AudioStatusKey } from '../../lib/audioStatus';
 import {
-  Pencil,
   MessageSquare,
   RefreshCw,
   HelpCircle,
   Lightbulb,
   ArrowRight,
   Zap,
-  ChevronDown,
-  SlidersHorizontal,
-  PointerOff,
+  Square,
   Image,
   X,
   Copy,
@@ -30,6 +31,9 @@ interface Message {
   role: 'user' | 'system' | 'interviewer';
   text: string;
   isStreaming?: boolean;
+  isError?: boolean;
+  /** What the other party said last, for the "Re:" line of a what-to-say answer. */
+  replyTo?: string;
   hasScreenshot?: boolean;
   screenshotPreview?: string;
   isCode?: boolean;
@@ -63,26 +67,26 @@ interface ChatPanelProps {
   setInputValue: React.Dispatch<React.SetStateAction<string>>;
   isProcessing: boolean;
   handleWhatToSay: () => void;
+  /** Stops the answer being produced; the primary button becomes this while one is. */
+  onStop?: () => void;
+  /** Asks again what was asked last. */
+  onRetry?: () => void;
+  /** Which audio state the empty answer area should speak for. */
+  audioKey?: AudioStatusKey;
+  /** The transcript has lines: an empty answer area must not say the other party's words are missing. */
+  hasTranscriptRows?: boolean;
+  /** True when something else is the one thing to do (fix the audio): What to say stays available but quiet. */
+  primaryQuiet?: boolean;
   handleClarify: () => void;
   handleFollowUpQuestions: () => void;
   handleRecap: () => void;
   handleBrainstorm: () => void;
-  handleAnswerNow: () => void;
   handleManualSubmit: () => void;
-  isManualRecording: boolean;
-  manualTranscript: string;
-  voiceInput: string;
   appearance: any;
   isLightTheme: boolean;
-  currentModel: string;
-  isSettingsOpen: boolean;
-  isMousePassthrough: boolean;
-  setIsMousePassthrough: (value: boolean) => void;
   shortcuts: ShortcutConfig;
   scrollContainerRef: React.RefObject<HTMLDivElement>;
-  messagesEndRef: React.RefObject<HTMLDivElement>;
   textInputRef: React.RefObject<HTMLInputElement>;
-  contentRef: React.RefObject<HTMLDivElement>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 }
 
@@ -96,26 +100,21 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   setInputValue,
   isProcessing,
   handleWhatToSay,
+  onStop,
+  onRetry,
+  audioKey = 'off',
+  hasTranscriptRows = false,
+  primaryQuiet = false,
   handleClarify,
   handleFollowUpQuestions,
   handleRecap,
   handleBrainstorm,
-  handleAnswerNow,
   handleManualSubmit,
-  isManualRecording,
-  manualTranscript,
-  voiceInput,
   appearance,
   isLightTheme,
-  currentModel,
-  isSettingsOpen,
-  isMousePassthrough,
-  setIsMousePassthrough,
   shortcuts,
   scrollContainerRef,
-  messagesEndRef,
   textInputRef,
-  contentRef,
   setMessages,
 }) => {
   const codeTheme = isLightTheme ? oneLight : vscDarkPlus;
@@ -124,13 +123,69 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const codeBlockClass = 'overlay-code-block-surface';
   const codeHeaderClass = 'overlay-code-header-surface';
   const codeHeaderTextClass = 'overlay-text-muted';
-  const quickActionClass = 'overlay-chip-surface overlay-text-interactive hover:overlay-text-primary';
+  const quickActionClass = 'overlay-chip-surface overlay-text-interactive hover:text-[var(--overlay-text-primary)]';
   const inputClass = `${isLightTheme ? 'focus:ring-black/10' : 'focus:ring-white/10'} overlay-input-surface overlay-input-text`;
-  const controlSurfaceClass = 'overlay-control-surface overlay-text-interactive';
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text).catch(console.error);
   };
+
+  // One code block for every answer layout, with its own Copy: copying the snippet is what the reader wants mid-call.
+  const renderCodeBlock = (key: React.Key, lang: string, code: string) => (
+    <div key={key} className={`my-3 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
+      <div className={`flex items-center justify-between px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
+        <span className={`text-[11px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
+          {!lang || lang === 'text' ? 'code' : lang}
+        </span>
+        <button
+          type="button"
+          onClick={() => handleCopy(code)}
+          aria-label="Copy code"
+          className="inline-flex items-center gap-1 text-[11px] overlay-text-secondary hover:text-[var(--overlay-text-primary)]"
+        >
+          <Copy className="w-3 h-3" aria-hidden="true" />
+          <span>Copy</span>
+        </button>
+      </div>
+      <div className="bg-transparent">
+        <SyntaxHighlighter
+          language={lang}
+          style={codeTheme}
+          customStyle={{
+            margin: 0,
+            borderRadius: 0,
+            fontSize: '13px',
+            lineHeight: '1.6',
+            background: 'transparent',
+            padding: '16px',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
+          }}
+          wrapLongLines={true}
+          showLineNumbers={code.split('\n').length > 6}
+          lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1.2em', color: codeLineNumberColor, textAlign: 'right', fontSize: '11px' }}
+        >
+          {code}
+        </SyntaxHighlighter>
+      </div>
+    </div>
+  );
+
+  const renderSayMarkdown = (text: string) => (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm, remarkMath]}
+      rehypePlugins={[rehypeKatex]}
+      components={{
+        p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
+        strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-emerald-700' : 'text-state-success'}`} {...props} />,
+        em: ({ node, ...props }: any) => <em className={`italic ${isLightTheme ? 'text-emerald-700/80' : 'text-emerald-200/80'}`} {...props} />,
+        ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
+        ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
+        li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
+      }}
+    >
+      {text}
+    </ReactMarkdown>
+  );
 
   const renderMessageText = (msg: Message) => {
     if (msg.isNegotiationCoaching && msg.negotiationCoachingData) {
@@ -149,7 +204,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       );
     }
 
-    if (msg.isCode || (msg.role === 'system' && msg.text.includes('```'))) {
+    // An answer with its own layout below (what to say, recap, ...) keeps it even when it contains a code fence.
+    const hasOwnLayout = msg.intent === 'shorten' || msg.intent === 'recap' || msg.intent === 'follow_up_questions' || msg.intent === 'what_to_answer';
+    if (msg.isCode || (msg.role === 'system' && !hasOwnLayout && msg.text.includes('```'))) {
       const parts = msg.text.split(/(```[\s\S]*?```)/g);
       return (
         <div className={`rounded-lg p-3 my-1 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
@@ -157,42 +214,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <Code className="w-3.5 h-3.5" />
             <span>Code Solution</span>
           </div>
-          <div className={`space-y-2 text-[13px] leading-relaxed ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
+          <div className={`space-y-2 text-sm leading-relaxed ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             {parts.map((part, i) => {
               if (part.startsWith('```')) {
                 const match = part.match(/```(\w+)?\n?([\s\S]*?)```/);
                 if (match) {
-                  const lang = match[1] || 'python';
+                  const lang = match[1] || 'text';
                   const code = match[2].trim();
-                  return (
-                    <div key={i} className={`my-3 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
-                      <div className={`px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
-                        <span className={`text-[10px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
-                          {lang || 'CODE'}
-                        </span>
-                      </div>
-                      <div className="bg-transparent">
-                        <SyntaxHighlighter
-                          language={lang}
-                          style={codeTheme}
-                          customStyle={{
-                            margin: 0,
-                            borderRadius: 0,
-                            fontSize: '13px',
-                            lineHeight: '1.6',
-                            background: 'transparent',
-                            padding: '16px',
-                            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
-                          }}
-                          wrapLongLines={true}
-                          showLineNumbers={true}
-                          lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1.2em', color: codeLineNumberColor, textAlign: 'right', fontSize: '11px' }}
-                        >
-                          {code}
-                        </SyntaxHighlighter>
-                      </div>
-                    </div>
-                  );
+                  return renderCodeBlock(i, lang, code);
                 }
               }
               return (
@@ -232,7 +261,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <MessageSquare className="w-3.5 h-3.5" />
             <span>Shortened</span>
           </div>
-          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
+          <div className={`text-sm leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
               p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-cyan-800' : 'text-cyan-100'}`} {...props} />,
@@ -253,7 +282,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Recap</span>
           </div>
-          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
+          <div className={`text-sm leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
               p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-indigo-800' : 'text-indigo-100'}`} {...props} />,
@@ -274,7 +303,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <HelpCircle className="w-3.5 h-3.5" />
             <span>Follow-Up Questions</span>
           </div>
-          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
+          <div className={`text-sm leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
               p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-amber-800' : 'text-[#FFF9C4]'}`} {...props} />,
@@ -292,17 +321,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       const parts = msg.text.split(/(```[\s\S]*?(?:```|$))/g);
 
       return (
-        <div className={`rounded-lg p-3 my-1 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
-          <div className="flex items-center gap-2 mb-2 text-state-success font-medium text-[11px] tracking-[0.02em]">
-            <span>Say this</span>
+        <div>
+          <div className="mb-1 flex items-center gap-1.5 text-[11px] leading-4 overlay-text-muted">
+            <span className="shrink-0 font-medium text-state-success-strong">Say this</span>
+            {msg.replyTo && <span className="min-w-0 truncate" title={msg.replyTo}>· Re: {msg.replyTo}</span>}
           </div>
-          <div className="text-[14px] leading-relaxed overlay-text-primary">
+          <div className="text-sm leading-relaxed overlay-text-primary">
             {parts.map((part, i) => {
               if (part.startsWith('```')) {
                 const match = part.match(/```(\w*)\s+([\s\S]*?)(?:```|$)/);
 
                 if (match || part.startsWith('```')) {
-                  const lang = (match && match[1]) ? match[1] : 'python';
+                  const lang = (match && match[1]) ? match[1] : 'text';
                   let code = '';
 
                   if (match && match[2]) {
@@ -311,55 +341,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     code = part.replace(/^```\w*\s*/, '').replace(/```$/, '').trim();
                   }
 
-                  return (
-                    <div key={i} className={`my-3 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
-                      <div className={`px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
-                        <span className={`text-[10px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
-                          {lang || 'CODE'}
-                        </span>
-                      </div>
-
-                      <div className="bg-transparent">
-                        <SyntaxHighlighter
-                          language={lang}
-                          style={codeTheme}
-                          customStyle={{
-                            margin: 0,
-                            borderRadius: 0,
-                            fontSize: '13px',
-                            lineHeight: '1.6',
-                            background: 'transparent',
-                            padding: '16px',
-                            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
-                          }}
-                          wrapLongLines={true}
-                          showLineNumbers={true}
-                          lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1.2em', color: codeLineNumberColor, textAlign: 'right', fontSize: '11px' }}
-                        >
-                          {code}
-                        </SyntaxHighlighter>
-                      </div>
-                    </div>
-                  );
+                  return renderCodeBlock(i, lang, code);
                 }
               }
+              // The first sentence is what to say: larger than the explanation after it.
+              const { lead, rest } = i === 0 ? splitLead(part) : { lead: '', rest: part };
               return (
-                <div key={i} className="markdown-content">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkMath]}
-                    rehypePlugins={[rehypeKatex]}
-                    components={{
-                      p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
-                      strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-emerald-700' : 'text-state-success'}`} {...props} />,
-                      em: ({ node, ...props }: any) => <em className={`italic ${isLightTheme ? 'text-emerald-700/80' : 'text-emerald-200/80'}`} {...props} />,
-                      ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
-                      ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
-                      li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
-                    }}
-                  >
-                    {part}
-                  </ReactMarkdown>
-                </div>
+                <React.Fragment key={i}>
+                  {lead && (
+                    <div className="markdown-content text-base font-medium leading-6 mb-2">{renderSayMarkdown(lead)}</div>
+                  )}
+                  {rest && <div className="markdown-content">{renderSayMarkdown(rest)}</div>}
+                </React.Fragment>
               );
             })}
           </div>
@@ -389,42 +382,58 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     );
   };
 
+  const latestAnswer = [...messages].reverse().find((m) => m.role === 'system' && !m.isStreaming && m.text);
+  const latestAnswerId = latestAnswer?.id;
+
   return (
     <div className="flex flex-col h-full">
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-3.5 space-y-2.5 no-drag"
+        className="flex-1 overflow-y-auto px-4 pt-2 pb-0 space-y-2.5 no-drag"
         style={{ scrollbarWidth: 'none' }}
       >
+        {messages.length === 0 && !isProcessing && (() => {
+          const hint = answerEmptyHint(audioKey, hasTranscriptRows);
+          const keys = hint.key ? shortcuts[hint.key] : [];
+          return (
+            <p className="flex flex-wrap items-center gap-x-1 pt-1 text-xs leading-[17px] overlay-text-muted">
+              <span>{hint.before}</span>
+              {keys.length > 0 && <KeyBadge keys={keys} />}
+              {hint.after && <span>{hint.after}</span>}
+            </p>
+          );
+        })()}
+
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
+          <div key={msg.id} data-message-id={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
             <div className={`
-              ${msg.role === 'user' ? 'max-w-[72.25%] px-[13.6px] py-[10.2px]' : 'max-w-[85%] px-4 py-2.5'} text-[14px] leading-6 relative group whitespace-pre-wrap
+              ${msg.role === 'user' ? 'max-w-[min(72.25%,680px)] px-[13.6px] py-[10.2px]' : msg.intent === 'what_to_answer' ? 'w-full max-w-[680px] px-0 py-1' : 'max-w-[min(85%,680px)] px-4 py-2.5'} text-[14px] leading-6 relative group whitespace-pre-wrap
               ${msg.role === 'user'
                 ? (isLightTheme
                   ? 'bg-blue-500/12 border border-blue-500/25 text-blue-950 rounded-[20px] rounded-tr-[4px] shadow-sm font-medium'
                   : 'bg-blue-500/18 border border-blue-400/30 text-blue-50 rounded-[20px] rounded-tr-[4px] shadow-sm font-medium')
                 : ''
               }
-              ${msg.role === 'system' ? 'overlay-text-primary font-normal' : ''}
-              ${msg.role === 'interviewer' ? 'overlay-text-muted italic pl-0 text-[13px]' : ''}
+              ${msg.role === 'system' ? (msg.isError ? 'text-state-danger-strong font-normal' : 'overlay-text-primary font-normal') : ''}
+              ${msg.role === 'interviewer' ? 'overlay-text-muted italic pl-0 text-sm' : ''}
             `}>
               {msg.role === 'interviewer' && (
-                <div className="flex items-center gap-1.5 mb-1 text-[10px] font-medium tracking-[0.08em] overlay-text-muted/90">
+                <div className="flex items-center gap-1.5 mb-1 text-[11px] font-medium tracking-[0.08em] overlay-text-muted">
                   Interviewer
                   {msg.isStreaming && <span className="w-1 h-1 bg-state-success rounded-full animate-pulse" />}
                 </div>
               )}
               {msg.role === 'user' && msg.hasScreenshot && (
-                <div className={`flex items-center gap-1 text-[10px] opacity-70 mb-1 border-b pb-1 ${isLightTheme ? 'border-black/10' : 'border-white/10'}`}>
+                <div className={`flex items-center gap-1 text-[11px] opacity-70 mb-1 border-b pb-1 ${isLightTheme ? 'border-black/10' : 'border-white/10'}`}>
                   <Image className="w-2.5 h-2.5" />
                   <span>Screenshot attached</span>
                 </div>
               )}
-              {msg.role === 'system' && !msg.isStreaming && (
+              {msg.role === 'system' && !msg.isStreaming && msg.id !== latestAnswerId && (
                 <button
                   onClick={() => handleCopy(msg.text)}
-                  className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive"
+                  aria-label="Copy answer"
+                  className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive"
                   title="Copy to clipboard"
                   style={appearance.iconStyle}
                 >
@@ -432,48 +441,40 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 </button>
               )}
               {renderMessageText(msg)}
+              {msg.id === latestAnswerId && (
+                <div className="mt-1.5 flex justify-end">
+                  <button
+                    onClick={() => handleCopy(msg.text)}
+                    className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-[var(--overlay-text-primary)]"
+                  >
+                    <Copy className="w-3 h-3" aria-hidden="true" />
+                    <span>Copy</span>
+                  </button>
+                  {onRetry && (
+                    <button
+                      onClick={onRetry}
+                      className="ml-1.5 inline-flex items-center gap-1 rounded-full border overlay-hairline px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-[var(--overlay-text-primary)]"
+                    >
+                      <RefreshCw className="w-3 h-3" aria-hidden="true" />
+                      <span>Retry</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ))}
 
-        {isManualRecording && (
-          <div className="flex flex-col items-end gap-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {(manualTranscript || voiceInput) && (
-              <div className="max-w-[85%] px-3.5 py-2.5 bg-state-success-soft border border-state-success-border rounded-[18px] rounded-tr-[4px]">
-                <span className="text-[13px] text-state-success">
-                  {voiceInput}{voiceInput && manualTranscript ? ' ' : ''}{manualTranscript}
-                </span>
-              </div>
-            )}
-            <div className="px-3 py-2 flex gap-1.5 items-center">
-              <div className="w-2 h-2 bg-state-success rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-state-success rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-state-success rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              <span className="text-[10px] text-state-success ml-1">Listening...</span>
-            </div>
-          </div>
-        )}
-
-        {isProcessing && (
-          <div className="flex justify-start">
-            <div className="px-3 py-2 flex gap-1.5">
-              <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
-        )}
-
         {knowledgeContext && knowledgeContext.matchedJDSignals.length > 0 && (
           <div className="mx-3 mb-2 p-3.5 rounded-2xl border border-white/12 bg-[rgba(10,14,28,0.82)] shadow-[0_10px_28px_rgba(0,0,0,0.18)]">
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-[10px] font-semibold text-blue-100/90 tracking-[0.08em]">Role focus</span>
+              <span className="text-[11px] font-semibold text-blue-100/90 tracking-[0.08em]">Role focus</span>
             </div>
             <div className="space-y-1.5">
               {knowledgeContext.matchedJDSignals.slice(0, 5).map((sig, i) => (
                 <div key={i} className="flex items-center gap-2.5">
                   <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-300" />
-                  <span className="text-[11.5px] text-white/88 leading-relaxed">{sig.requirement}</span>
+                  <span className="text-xs text-white/88 leading-relaxed">{sig.requirement}</span>
                   <div className="ml-auto w-8 h-1.5 rounded-full bg-white/10 overflow-hidden shrink-0">
                     <div className="h-full rounded-full bg-blue-300" style={{ width: `${Math.round(sig.relevance * 100)}%` }} />
                   </div>
@@ -487,10 +488,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           <div className="mx-3 mb-3 p-3.5 rounded-2xl border border-white/12 bg-[rgba(10,14,28,0.88)] shadow-[0_10px_28px_rgba(0,0,0,0.2)]">
             {knowledgeContext.mustHitKeywords.length > 0 && (
               <div className="mb-3">
-                <span className="text-[10px] font-semibold text-blue-100/90 tracking-[0.08em]">Language to weave in</span>
+                <span className="text-[11px] font-semibold text-blue-100/90 tracking-[0.08em]">Language to weave in</span>
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                   {knowledgeContext.mustHitKeywords.slice(0, 8).map((kw, i) => (
-                    <span key={i} className="text-[10.5px] font-medium text-blue-50 px-2 py-1 rounded-md bg-blue-400/16 border border-blue-300/20">
+                    <span key={i} className="text-xs font-medium text-blue-50 px-2 py-1 rounded-md bg-blue-400/16 border border-blue-300/20">
                       {kw}
                     </span>
                   ))}
@@ -499,7 +500,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
             {knowledgeContext.resumeEvidence.length > 0 && (
               <div>
-                <span className="text-[10px] font-semibold text-state-success tracking-[0.08em]">Good examples to mention</span>
+                <span className="text-[11px] font-semibold text-state-success tracking-[0.08em]">Good examples to mention</span>
                 <div className="space-y-1.5 mt-1.5">
                   {knowledgeContext.resumeEvidence.slice(0, 3).map((ev, i) => (
                     <div key={i} className="text-[11px] leading-relaxed text-white/80">
@@ -511,221 +512,90 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
           </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
-      <div className="flex flex-nowrap justify-center items-center gap-1.5 px-4 pb-3 overflow-x-auto no-scrollbar pt-3.5 no-drag">
-        <button onClick={handleWhatToSay} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-          <Pencil className="w-3 h-3 opacity-65" /> Guide me
-        </button>
-        <button onClick={handleClarify} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-          <MessageSquare className="w-3 h-3 opacity-65" /> Clarify
-        </button>
-        <button onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-          {actionButtonMode === 'brainstorm'
-            ? <><Lightbulb className="w-3 h-3 opacity-65" /> Ideas</>
-            : <><RefreshCw className="w-3 h-3 opacity-65" /> Recap</>
-          }
-        </button>
-        <button onClick={handleFollowUpQuestions} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-          <HelpCircle className="w-3 h-3 opacity-65" /> Follow-up
-        </button>
-        <button
-          onClick={handleAnswerNow}
-          className={`flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press min-w-[84px] whitespace-nowrap shrink-0 ${isManualRecording
-            ? 'bg-state-danger-soft text-state-danger ring-1 ring-state-danger-border'
-            : 'bg-[#007AFF] text-white shadow-[0_4px_14px_rgba(0,122,255,0.18)] hover:bg-[#0071E3]'
-          }`}
-        >
-          {isManualRecording ? (
-            <>
-              <div className="w-1.5 h-1.5 rounded-full bg-state-danger animate-pulse" />
-              Stop
-            </>
-          ) : (
-            <><Zap className="w-3 h-3 opacity-75" /> Answer</>
-          )}
-        </button>
-      </div>
-
-      <div className="p-3 pt-0 no-drag">
+      <div className="shrink-0 px-3 min-[480px]:px-4 py-2 no-drag">
+        <div className="flex h-7 items-center gap-1.5 mb-1.5">
+          <button
+            onClick={isProcessing ? onStop : handleWhatToSay}
+            disabled={isProcessing && !onStop}
+            className={`flex h-7 min-w-[9rem] items-center justify-center gap-1.5 px-3 rounded-full text-xs font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 disabled:cursor-wait ${
+              primaryQuiet
+                ? `border overlay-hairline ${quickActionClass}`
+                : 'bg-[var(--overlay-action)] text-white shadow-[0_4px_14px_rgba(0,113,227,0.18)] hover:brightness-95'
+            }`}
+            style={primaryQuiet ? appearance.chipStyle : undefined}
+          >
+            {isProcessing ? <Square className="w-3 h-3 fill-current opacity-75" aria-hidden="true" /> : <Zap className="w-3 h-3 opacity-75" />} {isProcessing ? 'Stop' : 'What to say'}
+            {!isProcessing && shortcuts.whatToAnswer.length > 0 && <KeyBadge keys={shortcuts.whatToAnswer} onAction={!primaryQuiet} className="hidden min-[480px]:flex ml-0.5" />}
+          </button>
+          <button onClick={handleClarify} aria-label="Clarify" title="Clarify" className={`flex h-7 w-7 min-[480px]:w-auto items-center justify-center gap-1.5 min-[480px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+            <MessageSquare className="w-3 h-3 opacity-65" /> <span className="hidden min-[480px]:inline">Clarify</span>
+          </button>
+          <button onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap} aria-label={actionButtonMode === 'brainstorm' ? 'Ideas' : 'Recap'} title={actionButtonMode === 'brainstorm' ? 'Ideas' : 'Recap'} className={`flex h-7 w-7 min-[480px]:w-auto items-center justify-center gap-1.5 min-[480px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+            {actionButtonMode === 'brainstorm'
+              ? <><Lightbulb className="w-3 h-3 opacity-65" /> <span className="hidden min-[480px]:inline">Ideas</span></>
+              : <><RefreshCw className="w-3 h-3 opacity-65" /> <span className="hidden min-[480px]:inline">Recap</span></>
+            }
+          </button>
+          <button onClick={handleFollowUpQuestions} aria-label="Follow-up" title="Follow-up" className={`flex h-7 w-7 min-[480px]:w-auto items-center justify-center gap-1.5 min-[480px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+            <HelpCircle className="w-3 h-3 opacity-65" /> <span className="hidden min-[480px]:inline">Follow-up</span>
+          </button>
+        </div>
         {attachedContext.length > 0 && (
-          <div className={`mb-2 rounded-lg p-2 transition-all duration-200 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-medium overlay-text-primary">
-                {attachedContext.length} screenshot{attachedContext.length > 1 ? 's' : ''} attached
-              </span>
+          <div className="mb-1.5 flex h-7 items-center gap-1.5 overflow-hidden" role="group" aria-label={`${attachedContext.length} screenshot${attachedContext.length > 1 ? 's' : ''} attached`}>
+            {attachedContext.map((ctx, idx) => (
+              <div key={ctx.path} className="relative group/thumb shrink-0">
+                <img
+                  src={ctx.preview}
+                  alt={`Screenshot ${idx + 1}`}
+                  className={`h-6 w-auto rounded border ${isLightTheme ? 'border-black/15' : 'border-white/20'}`}
+                />
+                <button
+                  onClick={() => setAttachedContext(prev => prev.filter((_, i) => i !== idx))}
+                  className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-state-danger opacity-0 transition-opacity group-hover/thumb:opacity-100 focus-visible:opacity-100"
+                  aria-label={`Remove screenshot ${idx + 1}`}
+                  title="Remove"
+                >
+                  <X className="w-2.5 h-2.5 text-white" />
+                </button>
+              </div>
+            ))}
+            {attachedContext.length > 1 && (
               <button
                 onClick={() => setAttachedContext([])}
-                className="p-1 rounded-full transition-colors overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive"
-                title="Remove all"
-                style={appearance.iconStyle}
+                className="shrink-0 rounded-full border overlay-hairline px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-[var(--overlay-text-primary)]"
               >
-                <X className="w-3.5 h-3.5" />
+                Clear
               </button>
-            </div>
-            <div className="flex gap-1.5 overflow-x-auto max-w-full pb-1">
-              {attachedContext.map((ctx, idx) => (
-                <div key={ctx.path} className="relative group/thumb flex-shrink-0">
-                  <img
-                    src={ctx.preview}
-                    alt={`Screenshot ${idx + 1}`}
-                    className={`h-10 w-auto rounded border ${isLightTheme ? 'border-black/15' : 'border-white/20'}`}
-                  />
-                  <button
-                    onClick={() => setAttachedContext(prev => prev.filter((_, i) => i !== idx))}
-                    className="absolute -top-1 -right-1 w-4 h-4 bg-state-danger hover:bg-state-danger rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-                    title="Remove"
-                  >
-                    <X className="w-2.5 h-2.5 text-white" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <span className="text-[10px] overlay-text-muted">Ask a question or click Answer</span>
+            )}
           </div>
         )}
 
-        <div className="relative group">
+        <div className="relative h-9 group">
           <input
             ref={textInputRef}
             type="text"
+            aria-label="Ask a question"
+            placeholder="Ask about the call or the screen"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
-            className={`w-full border focus:ring-1 rounded-xl pl-3 pr-10 py-2.5 focus:outline-none transition-all duration-200 ease-sculpted text-[13px] leading-relaxed ${inputClass}`}
+            onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && handleManualSubmit()}
+            className={`h-9 w-full border overlay-hairline focus:ring-1 rounded-xl pl-3 pr-10 focus:outline-none transition-all duration-200 ease-sculpted font-sans text-sm ${inputClass}`}
             style={appearance.inputStyle}
           />
 
-          {!inputValue && (
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none text-[12px] overlay-text-muted/90 max-w-[calc(100%-56px)] overflow-hidden whitespace-nowrap text-ellipsis">
-              <span>Ask anything on screen or conversation, or</span>
-              <div className="flex items-center gap-1 opacity-80">
-                {(shortcuts.selectiveScreenshot || ['⌘', 'Shift', 'H']).map((key, i) => (
-                  <React.Fragment key={i}>
-                    {i > 0 && <span className="text-[10px]">+</span>}
-                    <kbd className="px-1.5 py-0.5 rounded border text-[10px] font-sans min-w-[20px] text-center overlay-control-surface overlay-text-secondary" style={appearance.controlStyle}>{key}</kbd>
-                  </React.Fragment>
-                ))}
-              </div>
-              <span>for selective screenshot</span>
-            </div>
-          )}
-
-          {!inputValue && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none opacity-20">
-              <span className="text-[10px]">↵</span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between mt-3 px-0.5">
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={(e) => {
-                if (!contentRef.current) return;
-                const contentRect = contentRef.current.getBoundingClientRect();
-                const buttonRect = e.currentTarget.getBoundingClientRect();
-                const GAP = 8;
-
-                const x = window.screenX + buttonRect.left;
-                const y = window.screenY + contentRect.bottom + GAP;
-
-                window.electronAPI.toggleModelSelector({ x, y });
-              }}
-              className={`
-                flex items-center gap-2 px-3 py-1.5
-                border border-border-subtle/60 rounded-lg transition-colors
-                text-xs font-medium w-[140px]
-                interaction-base interaction-press
-                ${controlSurfaceClass}
-              `}
-              style={appearance.controlStyle}
-            >
-              <span className="truncate min-w-0 flex-1">
-                {(() => {
-                  const m = currentModel;
-                  if (m.startsWith('ollama-')) return m.replace('ollama-', '');
-                  if (m === 'gemini-3.1-flash-lite-preview') return 'Gemini 3.1 Flash';
-                  if (m === 'gemini-3.1-pro-preview') return 'Gemini 3.1 Pro';
-                  if (m === 'llama-3.3-70b-versatile') return 'Groq Llama 3.3';
-                  if (m === 'gpt-5.4') return 'GPT 5.4';
-                  if (m === 'claude-sonnet-4-6') return 'Sonnet 4.6';
-                  return m;
-                })()}
-              </span>
-              <ChevronDown size={14} className="shrink-0 transition-transform" />
-            </button>
-
-            <div className="w-px h-3 mx-1" style={appearance.dividerStyle} />
-
-            <div className="relative">
-              <button
-                onClick={(e) => {
-                  if (isSettingsOpen) {
-                    window.electronAPI.toggleSettingsWindow();
-                    return;
-                  }
-
-                  if (!contentRef.current) return;
-
-                  const contentRect = contentRef.current.getBoundingClientRect();
-                  const buttonRect = e.currentTarget.getBoundingClientRect();
-                  const GAP = 8;
-
-                  const x = window.screenX + buttonRect.left;
-                  const y = window.screenY + contentRect.bottom + GAP;
-
-                  window.electronAPI.toggleSettingsWindow({ x, y });
-                }}
-                className={`
-                  w-7 h-7 flex items-center justify-center rounded-lg
-                  interaction-base interaction-press
-                  ${isSettingsOpen
-                    ? 'overlay-icon-surface overlay-icon-surface-hover overlay-text-primary'
-                    : 'overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive'}
-                `}
-                style={appearance.iconStyle}
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="w-px h-3 mx-1" style={appearance.dividerStyle} />
-
-            <div className="relative">
-              <button
-                onClick={() => {
-                  const newState = !isMousePassthrough;
-                  setIsMousePassthrough(newState);
-                  window.electronAPI?.setOverlayMousePassthrough?.(newState);
-                }}
-                className={`
-                  w-7 h-7 flex items-center justify-center rounded-lg
-                  interaction-base interaction-press
-                  ${isMousePassthrough
-                    ? 'overlay-icon-surface overlay-icon-surface-hover text-state-info opacity-100'
-                    : 'overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive'}
-                `}
-                style={appearance.iconStyle}
-              >
-                <PointerOff className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-
           <button
             onClick={handleManualSubmit}
+            aria-label="Send"
             disabled={!inputValue.trim()}
             className={`
-              w-7 h-7 rounded-full flex items-center justify-center
+              absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center
               interaction-base interaction-press
-              ${inputValue.trim()
-                ? 'bg-[#007AFF] text-white shadow-lg shadow-blue-500/20 hover:bg-[#0071E3]'
-                : 'overlay-icon-surface overlay-text-muted cursor-not-allowed'
-              }
+              overlay-icon-surface
+              ${inputValue.trim() ? 'overlay-text-primary' : 'overlay-text-muted cursor-not-allowed'}
             `}
-            style={inputValue.trim() ? undefined : appearance.iconStyle}
+            style={appearance.iconStyle}
           >
             <ArrowRight className="w-3.5 h-3.5" />
           </button>

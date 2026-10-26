@@ -65,11 +65,6 @@ export async function initializeApp() {
   // NOTE: CredentialsManager.init() and loadStoredCredentials() are already called
   // above before this block — do NOT call them again here to avoid double key-load.
 
-  // Anonymous install ping - one-time, non-blocking
-  // See electron/services/InstallPingManager.ts for privacy details
-  const { sendAnonymousInstallPing } = require('../services/InstallPingManager');
-  sendAnonymousInstallPing();
-
   // Load stored Google Service Account path (for Speech-to-Text)
   const storedServiceAccountPath = CredentialsManager.getInstance().getGoogleServiceAccountPath();
   if (storedServiceAccountPath) {

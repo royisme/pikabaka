@@ -9,7 +9,6 @@ import {
     Pencil, MapPin, HelpCircle, Zap, SlidersHorizontal, PointerOff,
     AlertCircle, Loader2, Shield
 } from 'lucide-react';
-import { analytics } from '../lib/analytics/analytics.service';
 import { AboutSection } from './AboutSection';
 import { AIProvidersSettings } from './settings/AIProvidersSettings';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -264,7 +263,7 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
     };
 
     const getIconStyle = (color?: string, isSelectedItem: boolean = false) => {
-        if (isSelectedItem) return 'bg-accent-primary text-white shadow-sm';
+        if (isSelectedItem) return 'bg-accent-primary text-on-primary shadow-sm';
         // For unselected items in list or trigger
         switch (color) {
             case 'blue': return 'bg-state-info-soft text-blue-600';
@@ -1391,7 +1390,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                         {/* Sidebar */}
                         <div className="w-64 bg-bg-sidebar flex flex-col border-r border-border-subtle">
                             <div className="p-6">
-                                <h2 className="font-semibold text-gray-400 text-xs uppercase tracking-wider mb-2">Settings</h2>
+                                <h2 className="font-semibold text-text-tertiary text-xs uppercase tracking-wider mb-2">Settings</h2>
                                 <nav className="space-y-1">
                                     <button
                                         onClick={() => setActiveTab('general')}
@@ -1486,7 +1485,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     setIsUndetectable(newState);
                                                     window.electronAPI?.setUndetectable(newState);
                                                     // Analytics: Undetectable Mode Toggle
-                                                    analytics.trackModeSelected(newState ? 'undetectable' : 'overlay');
                                                 }}
                                                 className={`w-11 h-6 rounded-full relative transition-colors ${isUndetectable ? 'bg-accent-primary' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                             >
@@ -1760,7 +1758,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         }}
                                                         disabled={updateStatus === 'checking'}
                                                         className={`px-5 py-2 rounded-lg text-[13px] font-bold transition-all flex items-center gap-2 shrink-0 ${updateStatus === 'checking' ? 'bg-bg-input text-text-tertiary cursor-wait' :
-                                                            updateStatus === 'available' ? 'bg-accent-primary text-white hover:bg-accent-secondary shadow-lg shadow-blue-500/20' :
+                                                            updateStatus === 'available' ? 'bg-accent-primary text-on-primary hover:bg-accent-secondary shadow-lg shadow-blue-500/20' :
                                                                 updateStatus === 'uptodate' ? 'bg-state-success-soft text-state-success border border-state-success-border' :
                                                                     updateStatus === 'error' ? 'bg-state-danger-soft text-state-danger border border-state-danger-border' :
                                                                         'bg-bg-component hover:bg-bg-input text-text-primary'
@@ -1882,10 +1880,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         // @ts-ignore
                                                         window.electronAPI?.setDisguise(option.id);
                                                         // Analytics
-                                                        analytics.trackModeSelected(`disguise_${option.id}`);
                                                     }}
                                                     className={`p-3 rounded-lg border text-left flex items-center gap-3 transition-all ${disguiseMode === option.id
-                                                        ? 'bg-accent-primary border-accent-primary text-white shadow-lg shadow-blue-500/20'
+                                                        ? 'bg-accent-primary border-accent-primary text-on-primary shadow-lg shadow-blue-500/20'
                                                         : 'bg-bg-input border-border-subtle text-text-secondary hover:text-text-primary hover:bg-bg-subtle-hover'
                                                         } ${isUndetectable ? 'cursor-not-allowed' : ''}`}
                                                 >
@@ -2095,6 +2092,8 @@ Core Skills
                                             { id: 'captureAndProcess', label: 'Capture screen and ask AI' },
                                             { id: 'processScreenshots', label: 'Process current screenshots' },
                                             { id: 'resetCancel', label: 'Reset or cancel' },
+                                            { id: 'toggleTranslation', label: 'Turn translation on or off' },
+                                            { id: 'toggleOriginal', label: 'Show or hide the original text' },
                                         ].map((item) => (
                                             <div key={item.id} className="flex items-center justify-between py-2 border-b border-border-subtle/50 last:border-b-0">
                                                 <span className="text-sm text-text-secondary">{item.label}</span>

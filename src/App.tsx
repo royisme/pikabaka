@@ -11,7 +11,6 @@ import { AnimatePresence, motion } from "framer-motion"
 import UpdateBanner from "./components/UpdateBanner"
 import { AlertCircle } from "lucide-react"
 import { clampOverlayOpacity, getDefaultOverlayOpacity } from "./lib/overlayAppearance"
-import { analytics } from "./lib/analytics/analytics.service"
 import { ErrorBoundary } from "./components/ErrorBoundary"
 
 const queryClient = new QueryClient()
@@ -48,37 +47,16 @@ const App: React.FC = () => {
     }
   }, [isOverlayWindow]);
 
-  useEffect(() => {
-    analytics.initAnalytics();
-
-    if (isLauncherWindow || isDefault) {
-      analytics.trackAppOpen();
-    }
-
-    if (isOverlayWindow) {
-      analytics.trackAssistantStart();
-    }
-
-    // Cleanup / Session End
-    const handleUnload = () => {
-      if (isOverlayWindow) {
-        analytics.trackAssistantStop();
-      }
-      if (isLauncherWindow || isDefault) {
-        analytics.trackAppClose();
-      }
-    };
-
-    window.addEventListener('beforeunload', handleUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleUnload);
-    };
-  }, [isLauncherWindow, isOverlayWindow, isDefault]);
-
   // State
   const [showStartup, setShowStartup] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState('general');
+
+  // "Fix audio" in the overlay opens the full settings on one tab.
+  useEffect(() => window.electronAPI?.onOpenSettingsSection?.(({ section }) => {
+    setSettingsInitialTab(section);
+    setIsSettingsOpen(true);
+  }), []);
 
   // Overlay opacity — only meaningful when isOverlayWindow, but stored centrally
   // so it can be initialized once from localStorage and updated via IPC.
@@ -185,7 +163,6 @@ const App: React.FC = () => {
         audio: { inputDeviceId, outputDeviceId }
       });
       if (result.success) {
-        analytics.trackMeetingStarted();
         // Switch to Overlay Mode via IPC
         // The main process handles window switching, but we can reinforce it or just trust main.
         // Actually, main process startMeeting triggers nothing UI-wise unless we tell it to switch window
@@ -202,7 +179,6 @@ const App: React.FC = () => {
 
   const handleEndMeeting = async () => {
     console.log("[App.tsx] handleEndMeeting triggered");
-    analytics.trackMeetingEnded();
     try {
       await window.electronAPI.endMeeting();
       console.log("[App.tsx] endMeeting IPC completed");

@@ -3,12 +3,18 @@ import { BrowserWindow, screen, app, Menu } from "electron"
 import { AppState } from "../main"
 import { KeybindManager } from "../services/KeybindManager"
 import path from "node:path"
+import fs from "node:fs"
 
 const isEnvDev = process.env.NODE_ENV === "development"
 const isPackaged = app.isPackaged;
 const inAppBundle = process.execPath.includes('.app/') || process.execPath.includes('.app\\');
 
 console.log(`[WindowHelper] isEnvDev: ${isEnvDev}, isPackaged: ${isPackaged}, inAppBundle: ${inAppBundle}`);
+
+// Tall enough for the pill, both zones and the input; the old 216px left the answer list with no height.
+const DEFAULT_OVERLAY_HEIGHT = 420
+// A resize below this is not remembered: it is a dragged-to-nothing window, not a chosen size.
+const MIN_SAVED_OVERLAY_HEIGHT = 200
 
 // Force production mode if running as packaged app or inside app bundle
 const isDev = isEnvDev && !isPackaged;
@@ -145,8 +151,8 @@ export class WindowHelper {
         if (mode === 'none') {
           if (isMac) {
             return app.isPackaged
-              ? path.join(process.resourcesPath, "assets", "pika.icns")
-              : path.resolve(app.getAppPath(), "assets/pika.icns");
+              ? path.join(process.resourcesPath, "assets", "icon.png")
+              : path.resolve(app.getAppPath(), "assets/icon.png");
           } else if (isWin) {
             return app.isPackaged
               ? path.join(process.resourcesPath, "assets/icons/win/icon.ico")
@@ -202,7 +208,8 @@ export class WindowHelper {
       width: overlayDefaultWidth,
       height: 1,
       minWidth: 380,
-      minHeight: 1,
+      // 36px bar + 2px border + the two zones' floors (112 and 212, the splitter is inside the second): below this a zone would clip.
+      minHeight: 362,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -301,6 +308,8 @@ export class WindowHelper {
     // Listen for overlay close (e.g. Cmd+W). Never truly destroy it — either
     // hide it (during a meeting) or switch back to launcher (between meetings).
     if (this.overlayWindow) {
+      this.overlayWindow.on('resized', () => this.scheduleSaveOverlayHeight());
+
       this.overlayWindow.on('system-context-menu', (e, point) => {
         e.preventDefault();
         if (!this.appState.getUndetectable()) {
@@ -438,6 +447,37 @@ export class WindowHelper {
     }
   }
 
+  // --- Overlay height ---
+
+  private overlayHeightFile(): string {
+    return path.join(app.getPath('userData'), 'overlay-size.json')
+  }
+
+  private readSavedOverlayHeight(): number | null {
+    try {
+      const height = Number(JSON.parse(fs.readFileSync(this.overlayHeightFile(), 'utf-8'))?.height)
+      return Number.isFinite(height) && height >= MIN_SAVED_OVERLAY_HEIGHT ? Math.round(height) : null
+    } catch {
+      return null
+    }
+  }
+
+  private saveOverlayHeightTimer: NodeJS.Timeout | null = null
+
+  /** The user's resize is remembered across launches; a drag fires many events, so write once it settles. */
+  private scheduleSaveOverlayHeight(): void {
+    if (this.saveOverlayHeightTimer) clearTimeout(this.saveOverlayHeightTimer)
+    this.saveOverlayHeightTimer = setTimeout(() => {
+      const height = this.overlayWindow && !this.overlayWindow.isDestroyed() ? this.overlayWindow.getBounds().height : 0
+      if (height < MIN_SAVED_OVERLAY_HEIGHT) return
+      try {
+        fs.writeFileSync(this.overlayHeightFile(), JSON.stringify({ height }))
+      } catch (error) {
+        console.warn('[WindowHelper] Could not save the overlay height:', error)
+      }
+    }, 500)
+  }
+
   // --- Swapping Logic ---
 
   public switchToOverlay(inactive?: boolean): void {
@@ -454,8 +494,9 @@ export class WindowHelper {
       // For now, center it nicely
       const primaryDisplay = screen.getPrimaryDisplay()
       const workArea = primaryDisplay.workArea;
-      const currentBounds = this.overlayWindow.getBounds();
-      const targetHeight = Math.max(currentBounds.height, 216);
+      // Open at the height the user last chose, or a size that has room for an answer. The window's current height is not
+      // used: hiding the overlay collapses the window to its minimum, which would then be mistaken for a choice.
+      const targetHeight = Math.min(workArea.height, this.readSavedOverlayHeight() ?? DEFAULT_OVERLAY_HEIGHT);
       const overlayWidth = Math.min(600, Math.floor(screen.getPrimaryDisplay().workAreaSize.width * 0.9));
       const overlayX = Math.floor(workArea.x + (workArea.width - overlayWidth) / 2)
       const overlayY = Math.floor(workArea.y + (workArea.height - targetHeight) / 2)
@@ -494,12 +535,11 @@ export class WindowHelper {
     }
   }
 
-  public switchToLauncher(inactive?: boolean): void {
-    console.log(`[WindowHelper] Switching to LAUNCHER (inactive: ${!!inactive})`);
-    this.currentWindowMode = 'launcher';
-    KeybindManager.getInstance().setMode('launcher'); // Adapted from public PR #123 — verify premium interaction
-
-    // Show Launcher FIRST
+  /**
+   * Shows the launcher with the same stealth handling every time: on Windows it appears at zero
+   * opacity until content protection is applied, so no frame can leak into a screen share.
+   */
+  private showLauncherWindow(inactive?: boolean): void {
     if (this.launcherWindow && !this.launcherWindow.isDestroyed()) {
       if (process.platform === 'win32' && this.contentProtection) {
         // Opacity Shield: Show at 0 opacity first
@@ -521,6 +561,20 @@ export class WindowHelper {
       }
       this.isWindowVisible = true;
     }
+  }
+
+  /** Shows the launcher next to a running meeting overlay (to reach the full settings) without changing the window mode. */
+  public showLauncherAlongside(): void {
+    this.showLauncherWindow(false);
+  }
+
+  public switchToLauncher(inactive?: boolean): void {
+    console.log(`[WindowHelper] Switching to LAUNCHER (inactive: ${!!inactive})`);
+    this.currentWindowMode = 'launcher';
+    KeybindManager.getInstance().setMode('launcher'); // Adapted from public PR #123 — verify premium interaction
+
+    // Show Launcher FIRST
+    this.showLauncherWindow(inactive);
 
     // Hide Overlay SECOND
     if (this.overlayWindow && !this.overlayWindow.isDestroyed()) {

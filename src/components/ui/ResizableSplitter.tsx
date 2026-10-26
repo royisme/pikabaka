@@ -3,13 +3,17 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 interface ResizableSplitterProps {
   position: number;
   onPositionChange: (position: number) => void;
+  /** Double-click restores the default split. */
+  onReset?: () => void;
   min?: number;
   max?: number;
   orientation?: 'vertical' | 'horizontal';
 }
 
 const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
+  position,
   onPositionChange,
+  onReset,
   min = 20,
   max = 80,
   orientation = 'vertical',
@@ -24,13 +28,19 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
     void window.electronAPI?.getOverlayMousePassthrough?.().then((val: boolean) => {
       passthroughCacheRef.current = val;
     });
-    const interval = window.setInterval(() => {
-      void window.electronAPI?.getOverlayMousePassthrough?.().then((val: boolean) => {
-        passthroughCacheRef.current = val;
-      });
-    }, 1000);
-    return () => window.clearInterval(interval);
+    return window.electronAPI?.onOverlayMousePassthroughChanged?.((val: boolean) => {
+      passthroughCacheRef.current = val;
+    });
   }, []);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const step = e.shiftKey ? 10 : 2;
+    const back = orientation === 'horizontal' ? 'ArrowUp' : 'ArrowLeft';
+    const forward = orientation === 'horizontal' ? 'ArrowDown' : 'ArrowRight';
+    if (e.key !== back && e.key !== forward) return;
+    e.preventDefault();
+    onPositionChange(Math.min(max, Math.max(min, position + (e.key === forward ? step : -step))));
+  }, [max, min, onPositionChange, orientation, position]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -75,7 +85,16 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
     <div
       ref={splitterRef}
       onMouseDown={handleMouseDown}
-      className={`relative flex-shrink-0 group ${isHorizontal ? 'h-1.5 cursor-row-resize' : 'w-1.5 cursor-col-resize'} ${isDragging ? 'z-50' : ''}`}
+      onDoubleClick={onReset}
+      onKeyDown={handleKeyDown}
+      role="separator"
+      tabIndex={0}
+      aria-orientation={orientation === 'horizontal' ? 'horizontal' : 'vertical'}
+      aria-valuenow={Math.round(position)}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-label="Resize transcript and answer"
+      className={`no-drag relative flex-shrink-0 group ${isHorizontal ? 'h-1.5 cursor-row-resize' : 'w-1.5 cursor-col-resize'} ${isDragging ? 'z-50' : ''}`}
     >
       <div
         className={`absolute transition-colors ${
@@ -85,7 +104,7 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
         } ${
           isDragging
             ? 'bg-accent-primary shadow-[0_0_6px_rgba(59,130,246,0.5)]'
-            : 'bg-border-subtle group-hover:bg-accent-primary/60'
+            : 'bg-[var(--overlay-border-soft)] group-hover:bg-[var(--overlay-border)]'
         }`}
       />
     </div>

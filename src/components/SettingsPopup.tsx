@@ -95,8 +95,7 @@ const SettingsPopup = () => {
             isFirstRender.current = false;
             // Ensure backend is synced on mount (even if no change)
             try {
-                // @ts-ignore
-                window.electronAPI?.invoke('set-groq-fast-text-mode', useGroqFastText);
+                window.electronAPI?.setGroqFastTextMode(useGroqFastText);
             } catch (e) {
                 console.error(e);
             }
@@ -106,8 +105,7 @@ const SettingsPopup = () => {
         // Apply Groq Text Mode
         localStorage.setItem('pika_groq_fast_text', String(useGroqFastText));
         try {
-            // @ts-ignore - electronAPI not typed in this file yet
-            window.electronAPI?.invoke('set-groq-fast-text-mode', useGroqFastText);
+            window.electronAPI?.setGroqFastTextMode(useGroqFastText);
         } catch (e) {
             console.error(e);
         }
@@ -329,10 +327,10 @@ const SettingsPopup = () => {
                         <MessageSquare className={`w-3.5 h-3.5 transition-colors ${iconInactiveClass}`} />
                         <span className={`text-[12px] transition-colors ${labelInactiveClass}`}>Show or hide Pika</span>
                     </div>
-                    <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1">
                         {/* Dynamic Keys for Toggle Visibility */}
                         {(shortcuts.toggleVisibility || ['⌘', 'B']).map((key, index) => (
-                            <div key={index} className={`px-1.5 py-0.5 rounded border text-[10px] font-medium min-w-[20px] text-center ${shortcutKeyClass}`}>
+                            <div key={index} className={`px-1.5 py-0.5 rounded border text-[11px] font-medium min-w-[20px] text-center ${shortcutKeyClass}`}>
                                 {key}
                             </div>
                         ))}
@@ -345,10 +343,10 @@ const SettingsPopup = () => {
                         <Camera className={`w-3.5 h-3.5 transition-colors ${iconInactiveClass}`} />
                         <span className={`text-[12px] transition-colors ${labelInactiveClass}`}>Take screenshot</span>
                     </div>
-                    <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1">
                         {/* Dynamic Keys for Take Screenshot */}
                         {(shortcuts.takeScreenshot || ['⌘', 'H']).map((key, index) => (
-                            <div key={index} className={`px-1.5 py-0.5 rounded border text-[10px] font-medium min-w-[20px] text-center ${shortcutKeyClass}`}>
+                            <div key={index} className={`px-1.5 py-0.5 rounded border text-[11px] font-medium min-w-[20px] text-center ${shortcutKeyClass}`}>
                                 {key}
                             </div>
                         ))}

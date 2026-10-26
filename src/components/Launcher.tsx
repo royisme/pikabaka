@@ -6,7 +6,6 @@ import GlobalChatOverlay from './GlobalChatOverlay';
 import LauncherHeader from './launcher/LauncherHeader';
 import MeetingHistorySection from './launcher/MeetingHistorySection';
 import { generateMeetingPDF } from '../utils/pdfGenerator';
-import { analytics } from '../lib/analytics/analytics.service';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useProfileData } from '../hooks/useProfileData';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
@@ -58,7 +57,6 @@ const Launcher: React.FC<LauncherProps> = ({
     };
     const handleRefresh = async () => {
         setIsRefreshing(true);
-        analytics.trackCommandExecuted('refresh_calendar');
         try {
             if (window.electronAPI?.calendarRefresh) {
                 setShowNotification(true);
@@ -142,11 +140,9 @@ const Launcher: React.FC<LauncherProps> = ({
         const newState = !isDetectable;
         setIsDetectable(newState);
         window.electronAPI?.setUndetectable(!newState);
-        analytics.trackModeSelected(newState ? 'launcher' : 'undetectable');
     };
     const handleStartPreparedMeeting = async () => {
         if (!preparedEvent) return;
-        analytics.trackCommandExecuted('start_prepared_meeting');
         try {
             await window.electronAPI.startMeeting({
                 title: preparedEvent.title,
@@ -165,7 +161,6 @@ const Launcher: React.FC<LauncherProps> = ({
     const handleOpenMeeting = async (meeting: Meeting) => {
         setForwardMeeting(null);
         console.log('[Launcher] Opening meeting:', meeting.id);
-        analytics.trackCommandExecuted('open_meeting_details');
         try {
             const fullMeeting = await window.electronAPI?.getMeetingDetails?.(meeting.id);
             if (fullMeeting) {
@@ -179,7 +174,6 @@ const Launcher: React.FC<LauncherProps> = ({
     };
     const handleExportMeeting = async (meeting: Meeting) => {
         setActiveMenuId(null);
-        analytics.trackPdfExported();
         try {
             const fullMeeting = await window.electronAPI?.getMeetingDetails?.(meeting.id);
             generateMeetingPDF(fullMeeting || meeting);
@@ -213,12 +207,10 @@ const Launcher: React.FC<LauncherProps> = ({
                 onForward={handleForward}
                 onOpenSettings={() => onOpenSettings()}
                 onAIQuery={(query) => {
-                    analytics.trackCommandExecuted('ai_query_search');
                     setSubmittedGlobalQuery(query);
                     setIsGlobalChatOpen(true);
                 }}
                 onLiteralSearch={(query) => {
-                    analytics.trackCommandExecuted('literal_search');
                     setSubmittedGlobalQuery(query);
                     setIsGlobalChatOpen(true);
                 }}
@@ -226,7 +218,6 @@ const Launcher: React.FC<LauncherProps> = ({
                     const meeting = meetings.find(m => m.id === meetingId);
                     if (meeting) {
                         handleOpenMeeting(meeting);
-                        analytics.trackCommandExecuted('open_meeting_from_search');
                     }
                 }}
             />
@@ -271,13 +262,11 @@ const Launcher: React.FC<LauncherProps> = ({
                                         <motion.button aria-keyshortcuts="Meta+1" onClick={() => {
                                             if (isMeetingActive) {
                                                 window.electronAPI?.setWindowMode?.('overlay', true);
-                                                analytics.trackCommandExecuted('resume_meeting_from_launcher');
                                             } else {
                                                 onStartMeeting();
-                                                analytics.trackCommandExecuted('start_pika_cta');
                                             }
-                                        }} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className={`flex shrink-0 items-center justify-center gap-3 rounded-full px-6 py-3 font-celeb text-xl font-medium text-white shadow-lg ${isMeetingActive ? 'bg-state-success' : 'bg-state-info'}`}>
-                                            {isMeetingActive && <span className="h-2.5 w-2.5 rounded-full bg-white shadow-sm" />}
+                                        }} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className={`flex shrink-0 items-center justify-center gap-3 rounded-full px-6 py-3 font-celeb text-xl font-medium text-on-primary shadow-lg ${isMeetingActive ? 'bg-secondary' : 'bg-primary'}`}>
+                                            {isMeetingActive && <span className="h-2.5 w-2.5 rounded-full bg-on-primary shadow-sm" />}
                                             {isMeetingActive ? 'Meeting ongoing' : 'Start Pika'}
                                         </motion.button>
                                     </div>

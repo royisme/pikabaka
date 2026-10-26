@@ -67,6 +67,8 @@ export interface ElectronAPI {
   openPrivacySettings: (type: 'microphone' | 'screen') => Promise<{ success: boolean }>
   onSettingsVisibilityChange: (callback: (isVisible: boolean) => void) => () => void
   toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>
+  openSettingsSection: (section: string) => Promise<{ success: boolean }>
+  onOpenSettingsSection: (callback: (data: { section: string }) => void) => () => void
   closeSettingsWindow: () => Promise<void>
   toggleAdvancedSettings: () => Promise<void>
   closeAdvancedSettings: () => Promise<void>
@@ -106,7 +108,7 @@ export interface ElectronAPI {
   testSttConnection: (provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox', apiKey: string, region?: string) => Promise<{ success: boolean; error?: string }>
 
   // Native Audio Service Events
-  onNativeAudioTranscript: (callback: (transcript: { speaker: string; text: string; final: boolean; timestamp?: number; confidence?: number; segmentId?: string; sourceText?: string; translatedText?: string; translationState?: 'pending' | 'complete' | 'error' | 'skipped'; displayMode?: 'original' | 'translated' | 'both'; speakerLabel?: string; detectedLanguage?: string; revision?: number }) => void) => () => void
+  onNativeAudioTranscript: (callback: (transcript: { speaker: string; text: string; final: boolean; timestamp?: number; confidence?: number; segmentId?: string; sourceText?: string; translatedText?: string; translationState?: 'pending' | 'streaming' | 'complete' | 'error' | 'skipped'; translationError?: 'timeout' | 'auth' | 'rate-limit' | 'network' | 'other'; displayMode?: 'original' | 'translated' | 'both'; speakerLabel?: string; detectedLanguage?: string; revision?: number }) => void) => () => void
   onNativeAudioSuggestion: (callback: (suggestion: { context: string; lastQuestion: string; confidence: number }) => void) => () => void
   onNativeAudioConnected: (callback: () => void) => () => void
   onNativeAudioDisconnected: (callback: () => void) => () => void
@@ -183,6 +185,7 @@ export interface ElectronAPI {
 
   // Streaming listeners
   streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean }) => Promise<void>
+  cancelGeneration: () => Promise<{ success: boolean }>
   onGeminiStreamToken: (callback: (token: string) => void) => () => void
   onGeminiStreamDone: (callback: () => void) => () => void
   onGeminiStreamError: (callback: (error: string) => void) => () => void;

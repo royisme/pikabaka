@@ -1,6 +1,7 @@
 import { app } from "electron"
 import { safeHandle, broadcastOpenAICompatibleProvidersChanged } from "./safeHandle"
 import { AppState } from "../main"
+import { cancelActiveRagQueries } from "./rag"
 import { DatabaseManager } from "../db/DatabaseManager"
 import * as path from "path"
 import { RECOGNITION_LANGUAGES, AI_RESPONSE_LANGUAGES } from "../config/languages"
@@ -474,9 +475,27 @@ export function registerCoreHandlers(appState: AppState): void {
     return appState.getWindowHelper().isMainWindowMaximized();
   });
 
+  // Stop the answer being generated: the engine's streams and the chat stream both end at their next token.
+  safeHandle("cancel-generation", () => {
+    appState.getIntelligenceManager().cancelGeneration()
+    cancelActiveRagQueries()
+    _chatStreamId++
+    return { success: true }
+  })
+
   // Settings Window
   safeHandle("toggle-settings-window", (event, { x, y } = {}) => {
     appState.settingsWindowHelper.toggleWindow(x, y)
+  })
+
+  // The quick settings popup has no audio section; the full settings live in the launcher window. Opening
+  // them for a section does not switch window mode, so a running meeting keeps its overlay.
+  safeHandle("open-settings-section", (_event, section: string) => {
+    const launcher = appState.getWindowHelper().getLauncherWindow()
+    if (!launcher || launcher.isDestroyed()) return { success: false }
+    launcher.webContents.send('open-settings-section', { section })
+    appState.getWindowHelper().showLauncherAlongside()
+    return { success: true }
   })
 
   safeHandle("close-settings-window", () => {
@@ -521,7 +540,6 @@ export function registerCoreHandlers(appState: AppState): void {
   safeHandle("set-open-at-login", async (_, openAtLogin: boolean) => {
     app.setLoginItemSettings({
       openAtLogin,
-      openAsHidden: false,
       path: app.getPath('exe') // Explicitly point to executable for production reliability
     });
     return { success: true };

@@ -29,6 +29,9 @@ export interface ShortcutConfig {
     resetCancel: string[];
     takeScreenshot: string[];
     selectiveScreenshot: string[];
+    // Live translation
+    toggleTranslation: string[];
+    toggleOriginal: string[];
 }
 
 function buildDefaultShortcuts(): ShortcutConfig {
@@ -57,7 +60,9 @@ function buildDefaultShortcuts(): ShortcutConfig {
         captureAndProcess: [mod, shift, 'Enter'],
         resetCancel: [mod, 'R'],
         takeScreenshot: [mod, 'H'],
-        selectiveScreenshot: [mod, shift, 'H']
+        selectiveScreenshot: [mod, shift, 'H'],
+        toggleTranslation: isMac ? [mod, '⌥', 'T'] : ['Ctrl', shift, 'F9'],
+        toggleOriginal: isMac ? [mod, '⌥', 'O'] : ['Ctrl', shift, 'F10']
     };
 }
 
@@ -84,7 +89,9 @@ export const DEFAULT_SHORTCUTS: ShortcutConfig = {
     captureAndProcess: ['⌘', '⇧', 'Enter'],
     resetCancel: ['⌘', 'R'],
     takeScreenshot: ['⌘', 'H'],
-    selectiveScreenshot: ['⌘', '⇧', 'H']
+    selectiveScreenshot: ['⌘', '⇧', 'H'],
+    toggleTranslation: ['⌘', '⌥', 'T'],
+    toggleOriginal: ['⌘', '⌥', 'O']
 };
 
 export const useShortcuts = () => {
@@ -127,6 +134,9 @@ export const useShortcuts = () => {
                 else if (kb.id === 'general:reset-cancel') newShortcuts.resetCancel = keys;
                 else if (kb.id === 'general:take-screenshot') newShortcuts.takeScreenshot = keys;
                 else if (kb.id === 'general:selective-screenshot') newShortcuts.selectiveScreenshot = keys;
+                // Live translation
+                else if (kb.id === 'translation:toggle') newShortcuts.toggleTranslation = keys;
+                else if (kb.id === 'translation:toggle-original') newShortcuts.toggleOriginal = keys;
             });
 
             return newShortcuts;
@@ -189,6 +199,9 @@ export const useShortcuts = () => {
             case 'resetCancel': backendId = 'general:reset-cancel'; break;
             case 'takeScreenshot': backendId = 'general:take-screenshot'; break;
             case 'selectiveScreenshot': backendId = 'general:selective-screenshot'; break;
+            // Live translation
+            case 'toggleTranslation': backendId = 'translation:toggle'; break;
+            case 'toggleOriginal': backendId = 'translation:toggle-original'; break;
             default: break;
         }
 

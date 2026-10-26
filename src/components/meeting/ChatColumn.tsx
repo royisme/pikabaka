@@ -3,6 +3,7 @@ import ChatPanel from './ChatPanel';
 import type { ShortcutConfig } from '../../hooks/useShortcuts';
 import type { Message } from '../../hooks/useMeetingChat';
 import type { getOverlayAppearance } from '../../lib/overlayAppearance';
+import type { AudioStatusKey } from '../../lib/audioStatus';
 
 type KnowledgeContext = {
     matchedJDSignals: Array<{ requirement: string; relevance: number }>;
@@ -23,26 +24,21 @@ interface ChatColumnProps {
     setInputValue: React.Dispatch<React.SetStateAction<string>>;
     isProcessing: boolean;
     handleWhatToSay: () => void;
+    primaryQuiet?: boolean;
+    onStop?: () => void;
+    onRetry?: () => void;
+    audioKey?: AudioStatusKey;
+    hasTranscriptRows?: boolean;
     handleClarify: () => void;
     handleFollowUpQuestions: () => void;
     handleRecap: () => void;
     handleBrainstorm: () => void;
-    handleAnswerNow: () => void;
     handleManualSubmit: () => void;
-    isManualRecording: boolean;
-    manualTranscript: string;
-    voiceInput: string;
     appearance: ReturnType<typeof getOverlayAppearance>;
     isLightTheme: boolean;
-    currentModel: string;
-    isSettingsOpen: boolean;
-    isMousePassthrough: boolean;
-    setIsMousePassthrough: (value: boolean) => void;
     shortcuts: ShortcutConfig;
     scrollContainerRef: React.RefObject<HTMLDivElement>;
-    messagesEndRef: React.RefObject<HTMLDivElement>;
     textInputRef: React.RefObject<HTMLInputElement>;
-    contentRef: React.RefObject<HTMLDivElement>;
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 }
 
@@ -56,26 +52,21 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
     setInputValue,
     isProcessing,
     handleWhatToSay,
+    primaryQuiet,
+    onStop,
+    onRetry,
+    audioKey,
+    hasTranscriptRows,
     handleClarify,
     handleFollowUpQuestions,
     handleRecap,
     handleBrainstorm,
-    handleAnswerNow,
     handleManualSubmit,
-    isManualRecording,
-    manualTranscript,
-    voiceInput,
     appearance,
     isLightTheme,
-    currentModel,
-    isSettingsOpen,
-    isMousePassthrough,
-    setIsMousePassthrough,
     shortcuts,
     scrollContainerRef,
-    messagesEndRef,
     textInputRef,
-    contentRef,
     setMessages,
 }) => {
     return (
@@ -89,26 +80,21 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
             setInputValue={setInputValue}
             isProcessing={isProcessing}
             handleWhatToSay={handleWhatToSay}
+            primaryQuiet={primaryQuiet}
+            onStop={onStop}
+            onRetry={onRetry}
+            audioKey={audioKey}
+            hasTranscriptRows={hasTranscriptRows}
             handleClarify={handleClarify}
             handleFollowUpQuestions={handleFollowUpQuestions}
             handleRecap={handleRecap}
             handleBrainstorm={handleBrainstorm}
-            handleAnswerNow={handleAnswerNow}
             handleManualSubmit={handleManualSubmit}
-            isManualRecording={isManualRecording}
-            manualTranscript={manualTranscript}
-            voiceInput={voiceInput}
             appearance={appearance}
             isLightTheme={isLightTheme}
-            currentModel={currentModel}
-            isSettingsOpen={isSettingsOpen}
-            isMousePassthrough={isMousePassthrough}
-            setIsMousePassthrough={setIsMousePassthrough}
             shortcuts={shortcuts}
             scrollContainerRef={scrollContainerRef}
-            messagesEndRef={messagesEndRef}
             textInputRef={textInputRef}
-            contentRef={contentRef}
             setMessages={setMessages}
         />
     );

@@ -20,15 +20,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
           cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Use the :raw scripts directly to skip `pnpm run verify` (lint + test).
-      # Lint/test infra is not part of the smoke contract; we only verify
-      # the renderer + electron main process compile cleanly.
+      # Use the :raw scripts directly to skip `pnpm run verify`. Typecheck, lint and
+      # tests run in verify.yml; this job only checks that the renderer and the
+      # electron main process build and that the entrypoint exists.
       - name: Build renderer
         run: pnpm run build:web:raw
 
