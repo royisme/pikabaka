@@ -113,6 +113,7 @@ export interface ElectronAPI {
   aiConnectionSave: (input: { id?: string; name?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; id?: string; error?: string }>
   aiConnectionDelete: (id: string) => Promise<{ success: boolean }>
   aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
+  agentTest: (draft: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; reply?: string; toolCalls?: boolean | null; totalMs?: number; error?: string }>
   agentModelGet: () => Promise<{ connectionId: string; model: string; supportsImages: boolean }>
   agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; error?: string }>
   chatModelGet: () => Promise<{ connectionId: string; model: string }>

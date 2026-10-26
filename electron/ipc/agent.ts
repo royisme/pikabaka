@@ -2,6 +2,8 @@ import { BrowserWindow } from 'electron';
 import type { AppState } from '../main';
 import { safeHandle } from './safeHandle';
 import { reportAgentError, type ThreadLine } from '../agent/MeetingAgent';
+import { testAgentModel } from '../agent/agentTest';
+import { CredentialsManager } from '../services/CredentialsManager';
 
 export function registerAgentHandlers(appState: AppState): void {
   const agent = appState.getMeetingAgent();
@@ -12,6 +14,18 @@ export function registerAgentHandlers(appState: AppState): void {
         win.webContents.send('agent-event', event);
       }
     }
+  });
+
+  // Runs the agent's model on two invented questions, for the settings as shown (saved or not).
+  safeHandle('agent-test', async (_event, draft: { connectionId: string; model: string; supportsImages?: boolean }) => {
+    const cm = CredentialsManager.getInstance();
+    const chosen = typeof draft?.connectionId === 'string' && draft.connectionId && typeof draft.model === 'string' && draft.model.trim()
+      ? { connection: cm.resolveConnection(draft.connectionId), model: draft.model.trim() }
+      : (() => { const resolved = cm.resolveModelUse('agent'); return 'error' in resolved ? { error: resolved.error } : resolved; })();
+    if ('error' in chosen) return { success: false, error: chosen.error };
+    if (!chosen.connection) return { success: false, error: 'That connection does not exist.' };
+    if (!chosen.connection.apiKey && !cm.isConnectionReady(chosen.connection.id)) return { success: false, error: `No API key is saved for ${chosen.connection.name}.` };
+    return testAgentModel(chosen.connection, chosen.model, draft?.supportsImages === true);
   });
 
   safeHandle('agent-status', async () => {

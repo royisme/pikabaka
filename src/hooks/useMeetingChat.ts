@@ -5,6 +5,13 @@ import { useQuery, useQueryClient } from 'react-query';
 import { electronChatFetch } from '../lib/electronChatFetch';
 import { userEchoMessage } from '../lib/userEcho';
 import { useMainEvent } from './useMainEvent';
+import { failureReasonText } from '../lib/transcriptRow';
+
+/** " (check the API key)" and the like for a failed agent run; empty when the reason is unknown. */
+function agentFailureWords(errorClass: string): string {
+  const words = failureReasonText(errorClass as Parameters<typeof failureReasonText>[0]);
+  return words ? ` (${words})` : '';
+}
 
 /** What the user asked last, so a failed or unwanted answer can be asked again. */
 type LastAction =
@@ -546,7 +553,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
                 {
                   id: Date.now().toString(),
                   role: 'system',
-                  text: 'The agent could not answer. Try again.',
+                  text: `The agent could not answer${agentFailureWords(event.errorClass)}. Try again, or test the agent model in Settings, AI Providers.`,
                   isError: true,
                 },
               ];

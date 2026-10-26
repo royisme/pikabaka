@@ -7,6 +7,7 @@ import type { AgentRuntime } from './loader';
 import type { AgentModel, ModelConfigSource } from './models';
 import type { MeetingToolDeps } from './tools/meetingTools';
 import { loadAgentRuntime } from './loader';
+import { classifyTranslationError } from '../transcript/translationError';
 import { meetingContext, MEETING_INSTRUCTIONS } from './context';
 import { createMeetingTools } from './tools/meetingTools';
 import { createLocalTools, type LocalToolDeps } from './tools/localTools';
@@ -24,6 +25,12 @@ export type MeetingAgentEvent = { meetingId: string } & (
   | { type: 'run_failed'; errorClass: string }
 );
 export interface ThreadLine { id: string; role: 'user' | 'assistant' | 'tool'; text: string }
+
+/** Why a run failed, in words that carry no text: a class (auth, rate-limit, timeout, network, other) and an HTTP status when the message names one. */
+function failureOf(message: string | undefined): { reason: string; status?: number } {
+  const status = Number(message?.match(/\b([45]\d\d)\b/)?.[1]);
+  return { reason: classifyTranslationError(message ?? ''), status: Number.isFinite(status) ? status : undefined };
+}
 
 export function reportAgentError(error: unknown, meetingId?: string): void {
   const name = error instanceof Error ? error.constructor.name : '';
@@ -165,7 +172,10 @@ export class MeetingAgent {
         beforeRequest: meetingContext(meetingId, this.deps.recentSegments, runtime),
         onYield: async (_answer, _api, context) => { await finishRun(context); return undefined; },
         afterResponse: async (message, _api, context) => {
-          if (message.stopReason === 'error' || message.stopReason === 'aborted') await finishRun(context);
+          if (message.stopReason === 'error' || message.stopReason === 'aborted') {
+            if (message.stopReason === 'error') console.warn('[MeetingAgent] model request failed', { meetingId, ...failureOf(message.errorMessage) });
+            await finishRun(context);
+          }
         },
       })],
     }));
@@ -222,9 +232,15 @@ export class MeetingAgent {
   private forward(meetingId: string, event: AgentEvent): void {
     if (event.type === 'run_start') this.emit({ meetingId, type: 'run_started' });
     if (event.type === 'run_end') this.emit({ meetingId, type: 'run_settled' });
-    if (event.type === 'task_failed') this.emit({ meetingId, type: 'run_failed', errorClass: 'AgentRunError' });
+    if (event.type === 'task_failed') {
+      const failure = failureOf(event.message);
+      console.warn('[MeetingAgent] run failed', { meetingId, kind: event.kind, ...failure });
+      this.emit({ meetingId, type: 'run_failed', errorClass: failure.reason });
+    }
     if (event.type === 'submission' && event.record.status === 'unanswered' && event.record.reason !== 'aborted') {
-      this.emit({ meetingId, type: 'run_failed', errorClass: 'AgentRunError' });
+      const failure = failureOf(String(event.record.reason ?? ''));
+      console.warn('[MeetingAgent] question not answered', { meetingId, ...failure });
+      this.emit({ meetingId, type: 'run_failed', errorClass: failure.reason });
     }
     if (event.type === 'tool_execution_start' || event.type === 'tool_execution_end') {
       this.emit({ meetingId, type: event.type === 'tool_execution_start' ? 'tool_started' : 'tool_finished', toolName: event.toolName });
