@@ -27,20 +27,29 @@ import { classifyTranslationError } from '../transcript/translationError';
 import { anthropicDeltas, geminiDeltas, ollamaDeltas, openAIDeltas, streamText } from '../transcript/translationStream';
 const execAsync = promisify(exec);
 
-/** Model ids the host answered 400 to while a thinking setting was sent: typed by the user, so they may not take it. */
-const modelsRejectingThinking = new Set<string>();
+type ThinkingSetting = { thinkingConfig: { thinkingLevel?: ThinkingLevel; thinkingBudget?: number } };
+
+/** How many thinking settings the host has refused for a model id (typed by the user, so it may not take them). */
+const refusedThinkingSettings = new Map<string, number>();
 
 /**
  * Translation is a rewrite, not a puzzle: a Gemini model that thinks first answers 5 to 8 seconds late.
- * Gemini 3 takes a thinking level (Pro cannot go below low); 2.5 Flash takes a zero budget.
- * Any other model id is left as it is.
+ * Gemini 3 and newer take a thinking level, tried from the lowest (MINIMAL, then LOW; Pro starts at LOW);
+ * 2.5 Flash takes a zero budget. Each setting the host answers 400 to is skipped for that model next time,
+ * and once none is left the request goes out as it was. Any other model id is left as it is.
  */
-function translationThinking(model: string): { thinkingConfig: { thinkingLevel?: ThinkingLevel; thinkingBudget?: number } } | undefined {
-  if (modelsRejectingThinking.has(model)) return undefined;
+function thinkingSettings(model: string): ThinkingSetting[] {
   const id = model.toLowerCase();
-  if (id.includes('gemini-3')) return { thinkingConfig: { thinkingLevel: id.includes('pro') ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL } };
-  if (id.includes('gemini-2.5-flash')) return { thinkingConfig: { thinkingBudget: 0 } };
-  return undefined;
+  if (/gemini-(?:[3-9]|\d{2})/.test(id)) {
+    const levels = id.includes('pro') ? [ThinkingLevel.LOW] : [ThinkingLevel.MINIMAL, ThinkingLevel.LOW];
+    return levels.map((thinkingLevel) => ({ thinkingConfig: { thinkingLevel } }));
+  }
+  if (id.includes('gemini-2.5-flash')) return [{ thinkingConfig: { thinkingBudget: 0 } }];
+  return [];
+}
+
+function translationThinking(model: string): ThinkingSetting | undefined {
+  return thinkingSettings(model)[refusedThinkingSettings.get(model) ?? 0];
 }
 
 function isOpenAICompatibleProvider(
@@ -694,13 +703,13 @@ export class LLMHelper {
     try {
       return await this.translateOnce(request, onProgress);
     } catch (error) {
-      // A 400 that came while a thinking setting was sent: ask again without it, and do not send it to this model again.
+      // A 400 while a thinking setting was sent: ask again with the next setting, or none when none is left.
       const status = Number((error as { status?: unknown } | null)?.status);
       const model = request.model?.trim() ?? '';
       if (status !== 400 || !translationThinking(model)) throw error;
-      modelsRejectingThinking.add(model);
-      console.warn('[LLMHelper] The host rejected the thinking setting; translating without it');
-      return this.translateOnce(request, onProgress);
+      refusedThinkingSettings.set(model, (refusedThinkingSettings.get(model) ?? 0) + 1);
+      console.warn('[LLMHelper] The host rejected a thinking setting; trying the next one');
+      return this.translateTranscriptText(request, onProgress);
     }
   }
 
