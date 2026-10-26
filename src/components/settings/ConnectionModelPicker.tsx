@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { AiConnectionView } from '../../types/electron';
+import ModelCombobox from './ModelCombobox';
 
 const field = 'w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors';
 const smallButton = 'h-11 px-3 shrink-0 rounded-lg text-xs font-medium border border-border-subtle text-text-secondary hover:text-text-primary disabled:opacity-40 transition-colors';
@@ -63,19 +64,14 @@ const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, conne
                 <div className="space-y-1.5">
                     <label htmlFor={`${id}-model`} className="text-xs font-medium text-text-secondary block">Model</label>
                     <div className="flex items-center gap-2">
-                        <input
+                        <ModelCombobox
                             id={`${id}-model`}
-                            type="text"
-                            list={`${id}-models`}
                             value={model}
-                            onChange={(e) => onChange({ connectionId, model: e.target.value })}
+                            options={options}
+                            onChange={(next) => onChange({ connectionId, model: next })}
                             placeholder={modelPlaceholder}
                             disabled={connectionId === '' && emptyLabel !== undefined}
-                            className={field}
                         />
-                        <datalist id={`${id}-models`}>
-                            {options.map((option) => <option key={option} value={option} />)}
-                        </datalist>
                         <button onClick={fetchModels} disabled={!connectionId} className={smallButton}>Fetch</button>
                     </div>
                 </div>

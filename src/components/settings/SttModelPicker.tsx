@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import ModelCombobox from './ModelCombobox';
 
 export const STT_MODEL_DEFAULTS: Record<string, string> = {
     deepgram: 'nova-3',
@@ -37,17 +38,12 @@ const SttModelPicker: React.FC<SttModelPickerProps> = ({ provider, model, apiKey
     return (
         <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-                <input
-                    type="text"
-                    list={`stt-models-${provider}`}
+                <ModelCombobox
                     value={model}
-                    onChange={(e) => onChange(e.target.value)}
+                    options={options}
+                    onChange={onChange}
                     placeholder={`Default: ${STT_MODEL_DEFAULTS[provider] ?? ''}`}
-                    className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
                 />
-                <datalist id={`stt-models-${provider}`}>
-                    {options.map((option) => <option key={option} value={option} />)}
-                </datalist>
                 <button
                     onClick={fetchModels}
                     className="h-11 px-3 shrink-0 rounded-lg text-xs font-medium border border-border-subtle text-text-secondary hover:text-text-primary transition-colors"
