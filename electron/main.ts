@@ -1112,12 +1112,17 @@ export class AppState {
     }
   }
 
-  public setRecognitionLanguage(key: string): void {
-    console.log(`[AppState] Setting recognition language to: ${key}`);
+  // Each speaker has its own recognition language; only that speaker's stream restarts.
+  public setRecognitionLanguage(key: string, speaker: 'interviewer' | 'user' = 'interviewer'): void {
+    console.log(`[AppState] Setting ${speaker} recognition language to: ${key}`);
     const { CredentialsManager } = require('./services/CredentialsManager');
+    if (speaker === 'user') {
+      CredentialsManager.getInstance().setSttLanguageUser(key);
+      this.googleSTT_User?.setRecognitionLanguage(key);
+      return;
+    }
     CredentialsManager.getInstance().setSttLanguage(key);
     this.googleSTT?.setRecognitionLanguage(key);
-    this.googleSTT_User?.setRecognitionLanguage(key);
     this.processingHelper.getLLMHelper().setSttLanguage(key);
   }
 

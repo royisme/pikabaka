@@ -80,9 +80,11 @@ export function registerCoreHandlers(appState: AppState): void {
     return { success: true };
   });
 
-  safeHandle("get-stt-language", async () => {
+  safeHandle("get-stt-language", async (_, speaker?: 'interviewer' | 'user') => {
     const { CredentialsManager } = require('../services/CredentialsManager');
-    return CredentialsManager.getInstance().getSttLanguage();
+    return speaker === 'user'
+      ? CredentialsManager.getInstance().getSttLanguageUser()
+      : CredentialsManager.getInstance().getSttLanguage();
   });
 
   safeHandle("get-ai-response-language", async () => {

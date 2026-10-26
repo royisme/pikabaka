@@ -118,10 +118,10 @@ export interface ElectronAPI {
   generateSuggestion: (context: string, lastQuestion: string) => Promise<{ suggestion: string }>
   getInputDevices: () => Promise<Array<{ id: string; name: string }>>
   getOutputDevices: () => Promise<Array<{ id: string; name: string }>>
-  setRecognitionLanguage: (key: string) => Promise<{ success: boolean; error?: string }>
+  setRecognitionLanguage: (key: string, speaker?: 'interviewer' | 'user') => Promise<{ success: boolean; error?: string }>
   getAiResponseLanguages: () => Promise<Array<{ label: string; code: string }>>
   setAiResponseLanguage: (language: string) => Promise<{ success: boolean; error?: string }>
-  getSttLanguage: () => Promise<string>
+  getSttLanguage: (speaker?: 'interviewer' | 'user') => Promise<string>
   getAiResponseLanguage: () => Promise<string>
 
   getNativeAudioStatus: () => Promise<{

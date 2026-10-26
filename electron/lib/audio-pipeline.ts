@@ -49,7 +49,9 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
   const state = appState as any;
   const { CredentialsManager } = require('../services/CredentialsManager');
   const sttProvider = CredentialsManager.getInstance().getSttProvider();
-  const sttLanguage = CredentialsManager.getInstance().getSttLanguage();
+  const sttLanguage = speaker === 'user'
+    ? CredentialsManager.getInstance().getSttLanguageUser()
+    : CredentialsManager.getInstance().getSttLanguage();
 
   let stt: STTProvider;
 

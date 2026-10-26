@@ -53,6 +53,7 @@ export interface StoredCredentials {
     ibmWatsonRegion?: string;
     sonioxApiKey?: string;
     sttLanguage?: string;
+    sttLanguageUser?: string;
     aiResponseLanguage?: string;
     transcriptTranslationEnabled?: boolean;
     /** `ollama` | `gemini` | `groq` | `openai` | `claude` | OpenAI-compatible provider id from AI Providers */
@@ -173,8 +174,14 @@ export class CredentialsManager {
         return this.credentials.tavilyApiKey;
     }
 
+    // The language of the other party's audio. Before per-speaker languages this was the only one.
     public getSttLanguage(): string {
         return this.credentials.sttLanguage || 'english-us';
+    }
+
+    // The language the user speaks; follows the other party's language until set on its own.
+    public getSttLanguageUser(): string {
+        return this.credentials.sttLanguageUser || this.getSttLanguage();
     }
 
     public getAiResponseLanguage(): string {
@@ -336,6 +343,12 @@ export class CredentialsManager {
         this.credentials.sttLanguage = language;
         this.saveCredentials();
         console.log(`[CredentialsManager] STT Language set to: ${language}`);
+    }
+
+    public setSttLanguageUser(language: string): void {
+        this.credentials.sttLanguageUser = language;
+        this.saveCredentials();
+        console.log(`[CredentialsManager] STT Language (user) set to: ${language}`);
     }
 
     public setAiResponseLanguage(language: string): void {

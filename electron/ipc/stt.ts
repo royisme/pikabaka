@@ -564,8 +564,8 @@ export function registerSttHandlers(appState: AppState): void {
     return { success: true };
   });
 
-  safeHandle("set-recognition-language", async (_, key: string) => {
-    appState.setRecognitionLanguage(key);
+  safeHandle("set-recognition-language", async (_, key: string, speaker?: 'interviewer' | 'user') => {
+    appState.setRecognitionLanguage(key, speaker === 'user' ? 'user' : 'interviewer');
     return { success: true };
   });
 }
