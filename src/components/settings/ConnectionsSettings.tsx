@@ -2,38 +2,39 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
 import type { AiConnectionType, AiConnectionView } from '../../types/electron';
 
-const TYPE_LABEL: Record<AiConnectionType, string> = {
+type SettingsConnectionType = Exclude<AiConnectionType, 'ollama'>;
+
+const TYPE_LABEL: Record<SettingsConnectionType, string> = {
     openai: 'OpenAI-compatible',
     anthropic: 'Anthropic',
     gemini: 'Gemini',
-    ollama: 'Ollama',
 };
 
-const TYPE_HINT: Record<AiConnectionType, string> = {
+const TYPE_HINT: Record<SettingsConnectionType, string> = {
     openai: 'OpenAI, Groq, OpenRouter, DeepSeek, a gateway of your own: anything that serves /chat/completions and /models.',
     anthropic: 'Claude, or a service that speaks the Anthropic Messages API.',
     gemini: 'Google Gemini, or a service that speaks the Gemini API.',
-    ollama: 'A local or remote Ollama server.',
 };
 
-const HOST_PLACEHOLDER: Record<AiConnectionType, string> = {
+const HOST_PLACEHOLDER: Record<SettingsConnectionType, string> = {
     openai: 'https://api.example.com/v1',
     anthropic: 'https://api.anthropic.com',
     gemini: 'https://generativelanguage.googleapis.com',
-    ollama: 'http://localhost:11434',
 };
 
 // Presets only fill in the form; a connection is always just a type, a host and a key.
-const PRESETS: Array<{ label: string; name: string; type: AiConnectionType; baseUrl: string }> = [
+const PRESETS: Array<{ label: string; name: string; type: SettingsConnectionType; baseUrl: string }> = [
     { label: 'OpenRouter', name: 'OpenRouter', type: 'openai', baseUrl: 'https://openrouter.ai/api/v1' },
     { label: 'DeepSeek', name: 'DeepSeek', type: 'openai', baseUrl: 'https://api.deepseek.com/v1' },
     { label: 'Together', name: 'Together AI', type: 'openai', baseUrl: 'https://api.together.xyz/v1' },
+    { label: 'Ollama (local)', name: 'Ollama (local)', type: 'openai', baseUrl: 'http://localhost:11434/v1' },
+    { label: 'LM Studio', name: 'LM Studio', type: 'openai', baseUrl: 'http://localhost:1234/v1' },
 ];
 
 interface Draft {
     id?: string;
     name: string;
-    type: AiConnectionType;
+    type: SettingsConnectionType;
     baseUrl: string;
     apiKey: string;
     builtin: boolean;
@@ -72,7 +73,7 @@ const ConnectionsSettings: React.FC<ConnectionsSettingsProps> = ({ onChanged }) 
         setDraft({
             id: connection.id,
             name: connection.name,
-            type: connection.type,
+            type: connection.type as SettingsConnectionType,
             baseUrl: connection.customBaseUrl || !connection.builtin ? connection.baseUrl : '',
             apiKey: '',
             builtin: connection.builtin,
@@ -80,7 +81,7 @@ const ConnectionsSettings: React.FC<ConnectionsSettingsProps> = ({ onChanged }) 
         });
     };
 
-    const add = (preset?: { name: string; type: AiConnectionType; baseUrl: string }) => {
+    const add = (preset?: { name: string; type: SettingsConnectionType; baseUrl: string }) => {
         setError('');
         setCheck({ state: 'idle', message: '' });
         setDraft({ name: preset?.name ?? '', type: preset?.type ?? 'openai', baseUrl: preset?.baseUrl ?? '', apiKey: '', builtin: false, hasApiKey: false });
@@ -148,17 +149,17 @@ const ConnectionsSettings: React.FC<ConnectionsSettingsProps> = ({ onChanged }) 
             </div>
 
             <div className="space-y-2">
-                {connections.map((connection) => (
+                {connections.filter((connection) => connection.type !== 'ollama').map((connection) => (
                     <div key={connection.id} className="bg-bg-item-surface rounded-xl px-4 py-3 border border-border-subtle flex items-center gap-3">
                         <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-text-primary truncate">{connection.name}</span>
-                                <span className="text-[11px] text-text-tertiary shrink-0">{TYPE_LABEL[connection.type]}</span>
+                                <span className="text-[11px] text-text-tertiary shrink-0">{TYPE_LABEL[connection.type as SettingsConnectionType]}</span>
                             </div>
                             <p className="text-[11px] text-text-tertiary font-mono truncate">{connection.baseUrl}</p>
                         </div>
                         <span className={`text-[11px] shrink-0 ${connection.hasApiKey ? 'text-state-success' : 'text-text-tertiary'}`}>
-                            {connection.hasApiKey ? 'Key saved' : connection.type === 'ollama' ? 'No key needed' : 'No key'}
+                            {connection.hasApiKey ? 'Key saved' : 'No key'}
                         </span>
                         <button onClick={() => edit(connection)} className={smallButton}>Edit</button>
                     </div>
@@ -167,7 +168,7 @@ const ConnectionsSettings: React.FC<ConnectionsSettingsProps> = ({ onChanged }) 
 
             {!draft && (
                 <div className="flex flex-wrap items-center gap-2">
-                    {(Object.keys(TYPE_LABEL) as AiConnectionType[]).map((type) => (
+                    {(Object.keys(TYPE_LABEL) as SettingsConnectionType[]).map((type) => (
                         <button key={type} onClick={() => add({ name: '', type, baseUrl: '' })} className={smallButton}>
                             + {TYPE_LABEL[type]}
                         </button>
@@ -191,8 +192,8 @@ const ConnectionsSettings: React.FC<ConnectionsSettingsProps> = ({ onChanged }) 
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-xs font-medium text-text-secondary block">Type</label>
-                                <select value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value as AiConnectionType })} className={field}>
-                                    {(Object.keys(TYPE_LABEL) as AiConnectionType[]).map((type) => (
+                                <select value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value as SettingsConnectionType })} className={field}>
+                                    {(Object.keys(TYPE_LABEL) as SettingsConnectionType[]).map((type) => (
                                         <option key={type} value={type}>{TYPE_LABEL[type]}</option>
                                     ))}
                                 </select>
@@ -213,22 +214,20 @@ const ConnectionsSettings: React.FC<ConnectionsSettingsProps> = ({ onChanged }) 
                         {draft.type === 'openai' && <p className="text-[11px] text-text-tertiary">Include the version path your host uses, usually /v1. A bare host gets /v1 added.</p>}
                     </div>
 
-                    {draft.type !== 'ollama' && (
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-text-secondary block">API key</label>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="password"
-                                    value={draft.apiKey}
-                                    onChange={(e) => setDraft({ ...draft, apiKey: e.target.value })}
-                                    placeholder={draft.hasApiKey ? 'Saved. Type to replace.' : 'Optional for a local address'}
-                                    autoComplete="off"
-                                    className={field}
-                                />
-                                {draft.hasApiKey && <button onClick={removeKey} className={`${smallButton} shrink-0 h-11`}>Remove key</button>}
-                            </div>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-text-secondary block">API key</label>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="password"
+                                value={draft.apiKey}
+                                onChange={(e) => setDraft({ ...draft, apiKey: e.target.value })}
+                                placeholder={draft.hasApiKey ? 'Saved. Type to replace.' : 'Optional for a local address'}
+                                autoComplete="off"
+                                className={field}
+                            />
+                            {draft.hasApiKey && <button onClick={removeKey} className={`${smallButton} shrink-0 h-11`}>Remove key</button>}
                         </div>
-                    )}
+                    </div>
 
                     <div className="flex flex-wrap items-center gap-2">
                         <button onClick={save} className="px-4 py-2 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary transition-colors">Save</button>

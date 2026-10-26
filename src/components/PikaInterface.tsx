@@ -17,7 +17,6 @@ import { useMeetingAudio } from '../hooks/useMeetingAudio';
 import { isNearBottom, nextScrollAction } from '../lib/answerScroll';
 import { toggleOriginal } from '../lib/transcriptDisplay';
 import { audioStatus } from '../lib/audioStatus';
-import { modelLabel } from '../lib/modelLabel';
 import { latestOtherPartyText } from '../lib/answerLead';
 import { useMainEvent } from '../hooks/useMainEvent';
 import { useWindowEvent } from '../hooks/useWindowEvent';
@@ -33,7 +32,10 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const isLightTheme = useResolvedTheme() === 'light';
     const [isExpanded, setIsExpanded] = useState(true);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [currentModel, setCurrentModel] = useState('gemini-3-flash-preview');
+    const { data: chatModel } = useQuery(['chat-model'], () => window.electronAPI.chatModelGet());
+    const { data: connections = [] } = useQuery(['ai-connections'], () => window.electronAPI.aiConnectionsList());
+    const connection = connections.find((c) => c.id === chatModel?.connectionId);
+    const modelName = connection && chatModel?.model ? `${connection.name}: ${chatModel.model}` : 'Choose a model';
     const isStealthRef = useRef(false);
     const contentRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -69,19 +71,9 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         setStoredSplitter(null);
     }, [setStoredSplitter]);
 
-    // Model: reads default model on mount and syncs runtime model to main process
-    useEffect(() => {
-        window.electronAPI?.getDefaultModel?.()
-            .then((result: { model: string }) => {
-                if (result?.model) {
-                    setCurrentModel(result.model);
-                    window.electronAPI.setModel(result.model).catch(() => {});
-                }
-            })
-            .catch((err: unknown) => console.error('Failed to fetch default model:', err));
-    }, []);
-    useMainEvent(window.electronAPI?.onModelChanged, (modelId: string) => {
-        setCurrentModel((prev) => (prev === modelId ? prev : modelId));
+    useMainEvent(window.electronAPI?.onModelChanged, () => {
+        void queryClient.invalidateQueries(['chat-model']);
+        void queryClient.invalidateQueries(['ai-connections']);
     });
 
     // Undetectable state: read via query, stream via useMainEvent
@@ -279,7 +271,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
                 {isExpanded && (
                     <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="flex flex-col w-full flex-1 min-h-0">
                         <SplitterShell
-                            topBar={<OverlayTopBar status={audioState} hasRows={statusInBar} onFixAudio={fixAudio} displayMode={transcript.transcriptDisplayMode} translationEnabled={transcript.translationEnabled} translationConfigured={transcript.translationConfigured} theirLanguage={transcript.theirLanguage} myLanguage={transcript.myLanguage} targetLanguage={transcript.targetLanguage} languageOptions={transcript.languageOptions} onToggleTranslation={() => transcript.saveTranslationSettings({ enabled: !transcript.translationEnabled })} onChangeSpokenLanguage={transcript.changeSpokenLanguage} onChangeTargetLanguage={(targetLanguage) => transcript.saveTranslationSettings({ targetLanguage })} onToggleOriginal={() => transcript.saveTranslationSettings({ displayMode: toggleOriginal(transcript.transcriptDisplayMode) })} onSetUpTranslation={() => { void window.electronAPI.toggleSettingsWindow(); }} modelName={modelLabel(currentModel)} isMousePassthrough={isMousePassthrough} toggleOriginalKeys={shortcuts.toggleOriginal} toggleTranslationKeys={shortcuts.toggleTranslation} onHide={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} onOpenModelSelector={openModelSelector} onOpenSettings={openSettings} onToggleMousePassthrough={() => generalHandlersRef.current.toggleMousePassthrough()} onOpenLauncher={() => window.electronAPI?.setWindowMode?.('launcher')} />}
+                            topBar={<OverlayTopBar status={audioState} hasRows={statusInBar} onFixAudio={fixAudio} displayMode={transcript.transcriptDisplayMode} translationEnabled={transcript.translationEnabled} translationConfigured={transcript.translationConfigured} theirLanguage={transcript.theirLanguage} myLanguage={transcript.myLanguage} targetLanguage={transcript.targetLanguage} languageOptions={transcript.languageOptions} onToggleTranslation={() => transcript.saveTranslationSettings({ enabled: !transcript.translationEnabled })} onChangeSpokenLanguage={transcript.changeSpokenLanguage} onChangeTargetLanguage={(targetLanguage) => transcript.saveTranslationSettings({ targetLanguage })} onToggleOriginal={() => transcript.saveTranslationSettings({ displayMode: toggleOriginal(transcript.transcriptDisplayMode) })} onSetUpTranslation={() => { void window.electronAPI.toggleSettingsWindow(); }} modelName={modelName} isMousePassthrough={isMousePassthrough} toggleOriginalKeys={shortcuts.toggleOriginal} toggleTranslationKeys={shortcuts.toggleTranslation} onHide={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} onOpenModelSelector={openModelSelector} onOpenSettings={openSettings} onToggleMousePassthrough={() => generalHandlersRef.current.toggleMousePassthrough()} onOpenLauncher={() => window.electronAPI?.setWindowMode?.('launcher')} />}
                             left={<TranscriptColumn {...transcriptProps} status={audioState} onFixAudio={fixAudio} />}
                             right={<div className="relative flex-1 min-h-0 min-w-0 flex flex-col"><ApprovalDock /><div className="flex-1 min-h-0 min-w-0 flex flex-col"><ChatColumn {...chatProps} /></div>{proactiveCard && <ProactiveCard card={proactiveCard} onDismiss={() => setProactiveCard(null)} onAskMore={() => askAboutCard(proactiveCard)} />}</div>}
                             splitterPosition={splitterPosition}

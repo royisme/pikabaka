@@ -2,65 +2,74 @@ import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
 import ConnectionModelPicker from './ConnectionModelPicker';
 
-type AgentUse = { connectionId: string; model: string; supportsImages: boolean };
+type ModelUse = { connectionId: string; model: string; supportsImages?: boolean };
+type Job = 'chat' | 'summary' | 'agent';
 
-/**
- * The model of the in-meeting agent. Translation and speech recognition are set under Audio, where
- * the rest of the audio settings are; chat answers use the active model chosen above.
- * The saved value is a query; what is typed is a draft over it until Save.
- */
-const ModelUsesSettings: React.FC = () => {
+const labels = { chat: 'Quick answers', summary: 'Summaries', agent: 'Agent' };
+const descriptions = {
+    chat: 'Answers in the overlay. The top-bar model selector switches this model.',
+    summary: 'Meeting summaries and titles.',
+    agent: 'The assistant you talk to during a meeting: it reads the transcript and can run commands you approve.',
+};
+
+/** The saved value is a query; what is typed is a draft over it until Save. */
+const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
     const queryClient = useQueryClient();
-    const { data: saved } = useQuery<AgentUse>(['agent-model'], () => window.electronAPI.agentModelGet());
-    const [draft, setDraft] = useState<AgentUse | null>(null);
-    const agent = draft ?? saved ?? { connectionId: '', model: '', supportsImages: false };
+    const { data: saved, error } = useQuery<ModelUse>([`${job}-model`], () => {
+        if (job === 'chat') return window.electronAPI.chatModelGet();
+        if (job === 'summary') return window.electronAPI.summaryModelGet();
+        return window.electronAPI.agentModelGet();
+    });
+    const [draft, setDraft] = useState<ModelUse | null>(null);
+    const value = draft ?? saved ?? { connectionId: '', model: '', supportsImages: false };
 
     const save = useMutation(
-        async () => {
-            const result = await window.electronAPI.agentModelSet(agent);
+        async (use: ModelUse) => {
+            const result = await (job === 'chat' ? window.electronAPI.chatModelSet(use)
+                : job === 'summary' ? window.electronAPI.summaryModelSet(use)
+                : window.electronAPI.agentModelSet(use));
             if (!result.success) throw new Error(result.error || 'Could not save');
         },
         {
             onSuccess: async () => {
-                await queryClient.invalidateQueries(['agent-model']);
+                await queryClient.invalidateQueries([`${job}-model`]);
                 setDraft(null);
             },
         }
     );
 
     return (
-        <div className="space-y-5">
+        <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-3">
             <div>
-                <h3 className="text-sm font-bold text-text-primary mb-1">Agent model</h3>
-                <p className="text-xs text-text-secondary mb-2">
-                    The assistant you talk to during a meeting: it reads the transcript and can run commands you approve. It can use a different model from chat. Translation and speech recognition are set under Audio.
-                </p>
+                <h4 className="text-sm font-bold text-text-primary mb-1">{labels[job]}</h4>
+                <p className="text-xs text-text-secondary">{descriptions[job]}</p>
             </div>
-            <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-3">
+            <fieldset disabled={save.isLoading} className="space-y-3 min-w-0">
                 <ConnectionModelPicker
-                    id="agent"
-                    connectionId={agent.connectionId}
-                    model={agent.model}
-                    emptyLabel="Use the chat model"
-                    onChange={(next) => setDraft({ ...agent, ...next })}
+                    id={job}
+                    connectionId={value.connectionId}
+                    model={value.model}
+                    emptyLabel={job === 'chat' ? 'Choose a connection' : 'Same as quick answers'}
+                    onChange={(next) => { save.reset(); setDraft({ ...value, ...next }); }}
                 />
-                {agent.connectionId && (
+                {job === 'agent' && value.connectionId && (
                     <label className="flex items-center gap-2 text-xs text-text-secondary">
-                        <input type="checkbox" checked={agent.supportsImages} onChange={(e) => setDraft({ ...agent, supportsImages: e.target.checked })} />
+                        <input type="checkbox" checked={value.supportsImages ?? false} onChange={(e) => { save.reset(); setDraft({ ...value, supportsImages: e.target.checked }); }} />
                         This model reads images (lets the agent look at the screen)
                     </label>
                 )}
                 <div className="flex flex-wrap items-center gap-2">
                     <button
-                        onClick={() => save.mutate()}
-                        disabled={save.isLoading}
+                        onClick={() => save.mutate(value)}
+                        disabled={!saved}
                         className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${save.isSuccess && !draft ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
                     >
-                        {save.isSuccess && !draft ? 'Saved!' : 'Save'}
+                        {save.isLoading ? 'Saving…' : save.isSuccess && !draft ? 'Saved!' : 'Save'}
                     </button>
-                    {save.error ? <p className="text-[11px] text-state-danger">{(save.error as Error).message}</p> : null}
+                    {save.error || error ? <p className="text-[11px] text-state-danger">{((save.error || error) as Error).message}</p> : null}
                 </div>
-            </div>
+            </fieldset>
+            {job === 'chat' && (!saved?.connectionId || !saved.model) && <p className="text-xs text-text-secondary">Not chosen: chat answers will say so until you pick a model.</p>}
         </div>
     );
 };

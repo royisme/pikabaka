@@ -15,6 +15,15 @@ Done (code; the rows and the speed have not been checked in a real call)
 
 Not done: the AI Providers page redesign (rows for quick answers and summaries, removing Fast Response Mode, cURL providers and the old default-model plumbing) is with a worker on branch `ai-settings`. Not verified: any of this in a real call.
 
+## AI settings completion: Phase B (branch `ai-settings`)
+
+- AI Providers now has Connections, Quick answers / Summaries / Agent rows, automatic embeddings text, then unchanged Proactive help. Ollama and LM Studio are OpenAI-compatible presets, not separate UI types. Active Model, local-provider polling/status UI and the static model catalogue are removed.
+- Both selector surfaces use the Quick answers connection and exact model id. Picking a fetched id or pressing Enter applies it, without a Save button. The overlay label reads the same row; its old default-model mount effect was removed here so Phase B is coherent.
+- Effects removed: AI Providers no longer starts/polls Ollama on mount (nor clears its timer on unmount); the selector no longer loads credentials/models and writes caches on mount/focus (queries replace reads); the overlay no longer restores/writes the default model on mount. Model-change subscriptions remain via `useMainEvent`, with cleanup owned by the hook. No new effects.
+- The popup content window grows from 140x200 to 360x380 to fit the picker. Opening, positioning, blur-close and stealth flags are unchanged.
+- Checks: renderer tsc 0, Electron tsc 0, tap 1 (973 pass, only the known missing DOCX fixture fails), lint 0. Warnings: 1147 to 1139 overall; touched source files 8 to 0, no file increases.
+- Owner: check the three independent Saves, inherited summary/agent model, images checkbox, local presets without keys, model fetch/type/select and live top-bar label at 380/600px in both themes. App and real providers were not run. Backend legacy fallback removal is Phase C.
+
 ## AI settings completion: Phase A (branch `ai-settings`)
 
 - Removed Fast Response Mode (runtime flag, both overrides, IPC, both preload surfaces, types, Settings popup and AI settings toggle) and cURL providers (types, stores, handlers, routing, UI, validators). No tests referenced the deleted cURL utilities. OpenAI-compatible connections remain.

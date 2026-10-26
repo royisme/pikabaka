@@ -1,199 +1,84 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { useQuery } from 'react-query';
-import { ChevronDown, Check, Cloud, Monitor, Server } from 'lucide-react';
-import { STANDARD_CLOUD_MODELS, prettifyModelId } from '../../utils/modelUtils';
+import React, { useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { ChevronDown } from 'lucide-react';
+import ConnectionModelPicker from '../settings/ConnectionModelPicker';
+import { useMainEvent } from '../../hooks/useMainEvent';
 import { useWindowEvent } from '../../hooks/useWindowEvent';
 
-interface ModelSelectorProps {
-    currentModel: string;
-    onSelectModel: (model: string) => void;
-}
+type ChatUse = { connectionId: string; model: string };
 
-export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSelectModel }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'cloud' | 'local'>('cloud');
-    const dropdownRef = useRef<HTMLDivElement>(null);
-
-    // Close on click outside
-    useWindowEvent(
-        'mousedown',
-        (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
+/** Shared by the inline dropdown and the floating model-selector window. */
+export const QuickAnswersPicker = () => {
+    const queryClient = useQueryClient();
+    const { data: saved, error } = useQuery(['chat-model'], () => window.electronAPI.chatModelGet());
+    const [draft, setDraft] = useState<ChatUse | null>(null);
+    const value = draft ?? saved ?? { connectionId: '', model: '' };
+    const save = useMutation(async (use: ChatUse) => {
+        const result = await window.electronAPI.chatModelSet(use);
+        if (!result.success) throw new Error(result.error || 'Could not switch model');
+        return use;
+    }, {
+        onSuccess: (use) => {
+            queryClient.setQueryData(['chat-model'], use);
+            setDraft(null);
         },
-        'document'
-    );
-
-    // Load Data via queries
-    const { data: ollamaModels = [] } = useQuery<string[]>(
-        ['ollama-models'],
-        () => (window.electronAPI?.getAvailableOllamaModels() as Promise<string[]>) ?? Promise.resolve([]),
-        { enabled: isOpen }
-    );
-
-    const { data: creds } = useQuery(
-        ['stored-credentials'],
-        () => window.electronAPI?.getStoredCredentials?.(),
-        { enabled: isOpen }
-    );
-
-    const cloudModels = useMemo(() => {
-        if (!creds) return [];
-        const cModels: { id: string; name: string; desc: string; provider: string }[] = [];
-        for (const [prov, cfg] of Object.entries(STANDARD_CLOUD_MODELS)) {
-            if (!cfg.hasKeyCheck(creds)) continue;
-            cfg.ids.forEach((id, i) => cModels.push({ id, name: cfg.names[i], desc: cfg.descs[i], provider: prov }));
-            const pm = creds?.[cfg.pmKey];
-            if (pm && !cfg.ids.includes(pm)) {
-                cModels.push({ id: pm, name: prettifyModelId(pm), desc: `${prov.charAt(0).toUpperCase() + prov.slice(1)} • Preferred`, provider: prov });
-            }
-        }
-        return cModels;
-    }, [creds]);
-
-    const handleSelect = (model: string) => {
-        // For custom/local, we might need to pass an ID or specific format
-        // The backend logic (LLMHelper) needs to know how to handle this string or we need a richer object
-        // For now, consistent with existing app, we pass a string. 
-        // We'll rely on a prefix convention or just the name if unique enough, 
-        // OR the app state handling this selection needs to store provider type.
-        // Assuming onSelectModel handles the switching logic.
-
-        onSelectModel(model);
-        setIsOpen(false);
-    };
-
-    const getModelDisplayName = (model: string) => {
-        if (model.startsWith('ollama-')) return model.replace('ollama-', '');
-        if (model === 'gemini-3.1-flash-lite-preview') return 'Gemini 3.1 Flash';
-        if (model === 'gemini-3.1-pro-preview') return 'Gemini 3.1 Pro';
-        if (model === 'llama-3.3-70b-versatile') return 'Groq Llama 3.3';
-        if (model === 'gpt-5.4') return 'GPT 5.4';
-        if (model === 'claude-sonnet-4-6') return 'Sonnet 4.6';
-
-        // Check dynamic cloud models
-        const cloud = cloudModels.find(m => m.id === model);
-        if (cloud) return cloud.name;
-
-        return model;
-    };
+    });
+    useMainEvent(window.electronAPI?.onModelChanged, () => { void queryClient.invalidateQueries(['chat-model']); });
+    useWindowEvent('focus', () => {
+        void queryClient.invalidateQueries(['chat-model']);
+        void queryClient.invalidateQueries(['ai-connections']);
+    });
 
     return (
-        <div className="relative" ref={dropdownRef}>
+        <div className="space-y-3 p-3">
+            <h3 className="text-sm font-bold text-text-primary">Quick answers</h3>
+            <fieldset disabled={save.isLoading || !saved} className="min-w-0">
+                <ConnectionModelPicker
+                    id="quick-answers"
+                    connectionId={value.connectionId}
+                    model={value.model}
+                    emptyLabel="Choose a connection"
+                    onChange={(next) => { save.reset(); setDraft(next); }}
+                    onModelSelect={(next) => { if (next.connectionId && next.model) save.mutate(next); }}
+                />
+            </fieldset>
+            <p className="text-[11px] text-text-secondary" aria-live="polite">
+                {save.error || error ? ((save.error || error) as Error).message
+                    : save.isLoading ? 'Switching…' : save.isSuccess && !draft ? 'Model switched.' : 'Pick a model, or type its id and press Enter to apply.'}
+            </p>
+        </div>
+    );
+};
+
+export const ModelSelector: React.FC = () => {
+    const queryClient = useQueryClient();
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const { data: use } = useQuery(['chat-model'], () => window.electronAPI.chatModelGet());
+    const { data: connections = [] } = useQuery(['ai-connections'], () => window.electronAPI.aiConnectionsList());
+    useMainEvent(window.electronAPI?.onModelChanged, () => { void queryClient.invalidateQueries(['chat-model']); });
+    useWindowEvent('mousedown', (event) => {
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setIsOpen(false);
+    }, 'document');
+    const connection = connections.find((c) => c.id === use?.connectionId);
+    const label = connection && use?.model ? `${connection.name}: ${use.model}` : 'Choose a model';
+
+    return (
+        <div className="relative min-w-0" ref={dropdownRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-bg-input hover:bg-bg-elevated border border-border-subtle rounded-lg transition-colors text-xs font-medium text-text-primary max-w-[150px]"
+                aria-expanded={isOpen}
+                title={label}
+                className="flex items-center gap-2 px-3 py-1.5 bg-bg-input hover:bg-bg-elevated border border-border-subtle rounded-lg text-xs font-medium text-text-primary max-w-[240px]"
             >
-                <span className="truncate">{getModelDisplayName(currentModel)}</span>
-                <ChevronDown size={14} className={`shrink-0 text-text-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                <span className="truncate">{label}</span>
+                <ChevronDown size={14} className="shrink-0 text-text-secondary" />
             </button>
-
             {isOpen && (
-                <div className="absolute bottom-full left-0 mb-2 w-64 bg-bg-item-surface border border-border-subtle rounded-xl shadow-xl z-50 overflow-hidden animated fadeIn">
-                    {/* Tabs */}
-                    <div className="flex border-b border-border-subtle bg-bg-input/50">
-                        <button
-                            onClick={() => setActiveTab('cloud')}
-                            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${activeTab === 'cloud' ? 'text-accent-primary bg-bg-item-surface border-t-2 border-t-accent-primary' : 'text-text-secondary hover:text-text-primary'}`}
-                        >
-                            Cloud
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('local')}
-                            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${activeTab === 'local' ? 'text-accent-primary bg-bg-item-surface border-t-2 border-t-accent-primary' : 'text-text-secondary hover:text-text-primary'}`}
-                        >
-                            Local
-                        </button>
-                    </div>
-
-                    {/* Content */}
-                    <div className="p-2 max-h-64 overflow-y-auto">
-
-                        {/* Cloud Models */}
-                        {activeTab === 'cloud' && (
-                            <div className="space-y-1">
-                                {cloudModels.length === 0 ? (
-                                    <div className="text-center py-6 text-text-tertiary">
-                                        <p className="text-xs mb-2">No cloud providers configured.</p>
-                                        <p className="text-[10px] opacity-70">Add API keys in Settings.</p>
-                                    </div>
-                                ) : (
-                                    cloudModels.map((m, idx) => {
-                                        const prevProvider = idx > 0 ? cloudModels[idx - 1].provider : null;
-                                        const showDivider = prevProvider && prevProvider !== m.provider;
-                                        const icon = m.provider === 'gemini' ? <Monitor size={14} /> : <Cloud size={14} />;
-                                        return (
-                                            <React.Fragment key={m.id}>
-                                                {showDivider && <div className="h-px bg-border-subtle my-1" />}
-                                                <ModelOption
-                                                    id={m.id}
-                                                    name={m.name}
-                                                    desc={m.desc}
-                                                    icon={icon}
-                                                    selected={currentModel === m.id}
-                                                    onSelect={() => handleSelect(m.id)}
-                                                />
-                                            </React.Fragment>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        )}
-
-                        {/* Local Models (Ollama) */}
-                        {activeTab === 'local' && (
-                            <div className="space-y-1">
-                                {ollamaModels.length === 0 ? (
-                                    <div className="text-center py-6 text-text-tertiary">
-                                        <p className="text-xs">No Ollama models found.</p>
-                                        <p className="text-[10px] mt-1 opacity-70">Ensure Ollama is running.</p>
-                                    </div>
-                                ) : (
-                                    ollamaModels.map(model => (
-                                        <ModelOption
-                                            key={model}
-                                            id={`ollama-${model}`}
-                                            name={model}
-                                            desc="Local"
-                                            icon={<Server size={14} />}
-                                            selected={currentModel === `ollama-${model}`}
-                                            onSelect={() => handleSelect(`ollama-${model}`)}
-                                        />
-                                    ))
-                                )}
-                            </div>
-                        )}
-                    </div>
+                <div className="absolute bottom-full left-0 mb-2 w-[340px] bg-bg-item-surface border border-border-subtle rounded-xl shadow-xl z-50" onKeyDown={(event) => { if (event.key === 'Escape') setIsOpen(false); }}>
+                    <QuickAnswersPicker />
                 </div>
             )}
         </div>
     );
 };
-
-interface ModelOptionProps {
-    id: string;
-    name: string;
-    desc: string;
-    icon: React.ReactNode;
-    selected: boolean;
-    onSelect: () => void;
-}
-
-const ModelOption: React.FC<ModelOptionProps> = ({ name, desc, icon, selected, onSelect }) => (
-    <button
-        onClick={onSelect}
-        className={`w-full flex items-center justify-between p-2 rounded-lg transition-colors group ${selected ? 'bg-accent-primary/10' : 'hover:bg-bg-input'}`}
-    >
-        <div className="flex items-center gap-3">
-            <div className={`p-1.5 rounded-md ${selected ? 'bg-accent-primary/20 text-accent-primary' : 'bg-bg-elevated text-text-secondary group-hover:text-text-primary'}`}>
-                {icon}
-            </div>
-            <div className="text-left">
-                <div className={`text-xs font-medium truncate max-w-[140px] ${selected ? 'text-accent-primary' : 'text-text-primary'}`}>{name}</div>
-                <div className="text-[10px] text-text-tertiary">{desc}</div>
-            </div>
-        </div>
-        {selected && <Check size={14} className="text-accent-primary" />}
-    </button>
-);

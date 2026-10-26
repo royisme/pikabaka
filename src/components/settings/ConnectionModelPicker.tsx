@@ -15,6 +15,7 @@ interface ConnectionModelPickerProps {
     emptyLabel?: string;
     modelPlaceholder?: string;
     onChange: (next: { connectionId: string; model: string }) => void;
+    onModelSelect?: (next: { connectionId: string; model: string }) => void;
 }
 
 /**
@@ -23,7 +24,7 @@ interface ConnectionModelPickerProps {
  * list are queries: the list is cached per connection, so choosing another connection never shows the
  * previous one's models, and nothing here needs an effect.
  */
-const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, connectionId, model, emptyLabel, modelPlaceholder = 'Model id', onChange }) => {
+const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, connectionId, model, emptyLabel, modelPlaceholder = 'Model id', onChange, onModelSelect }) => {
     const { data: connections = [] } = useQuery<AiConnectionView[]>(['ai-connections'], () => window.electronAPI.aiConnectionsList());
 
     // Fetched on demand (the button), never on its own: the host is asked only when the user asks.
@@ -58,7 +59,7 @@ const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, conne
                         className={field}
                     >
                         {emptyLabel !== undefined && <option value="">{emptyLabel}</option>}
-                        {connections.map((c) => (
+                        {connections.filter((c) => c.type !== 'ollama').map((c) => (
                             <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
                     </select>
@@ -71,6 +72,7 @@ const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, conne
                             value={model}
                             options={options}
                             onChange={(next) => onChange({ connectionId, model: next })}
+                            onSelect={(next) => onModelSelect?.({ connectionId, model: next })}
                             placeholder={modelPlaceholder}
                             disabled={connectionId === '' && emptyLabel !== undefined}
                         />

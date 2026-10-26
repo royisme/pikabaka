@@ -8,6 +8,7 @@ interface ModelComboboxProps {
     placeholder?: string;
     disabled?: boolean;
     onChange: (value: string) => void;
+    onSelect?: (value: string) => void;
 }
 
 const MAX_LIST_HEIGHT = 240;
@@ -18,7 +19,7 @@ const EDGE = 12;
  * typed; the list filters as you type, scrolls inside a fixed maximum height, and opens upward when
  * there is more room above the field than below, so it never runs off the window.
  */
-const ModelCombobox: React.FC<ModelComboboxProps> = ({ id, value, options, placeholder, disabled, onChange }) => {
+const ModelCombobox: React.FC<ModelComboboxProps> = ({ id, value, options, placeholder, disabled, onChange, onSelect }) => {
     const [open, setOpen] = useState(false);
     const [active, setActive] = useState(-1);
     const [place, setPlace] = useState<{ top: number; left: number; width: number; maxHeight: number; up: boolean } | null>(null);
@@ -67,11 +68,13 @@ const ModelCombobox: React.FC<ModelComboboxProps> = ({ id, value, options, place
 
     const pick = (option: string) => {
         onChange(option);
+        onSelect?.(option);
         setOpen(false);
         setActive(-1);
     };
 
     const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.nativeEvent.isComposing) return;
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
             if (!open) { openList(); return; }
@@ -82,6 +85,9 @@ const ModelCombobox: React.FC<ModelComboboxProps> = ({ id, value, options, place
         } else if (event.key === 'Enter' && open && active >= 0 && list[active] !== undefined) {
             event.preventDefault();
             pick(list[active]);
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            pick(value.trim());
         } else if (event.key === 'Escape' && open) {
             event.stopPropagation();
             setOpen(false);
@@ -111,7 +117,7 @@ const ModelCombobox: React.FC<ModelComboboxProps> = ({ id, value, options, place
                 // does not take focus away from the field (see the list's onMouseDown), so scrolling it is safe.
                 onBlur={() => setOpen(false)}
                 onKeyDown={onKeyDown}
-                className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
+                className="min-w-0 w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
             />
             {open && hasList && place && createPortal(
                 <ul
