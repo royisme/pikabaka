@@ -17,6 +17,6 @@ t.test('the instruction asks for STAR on stories, spoken sentences, and brackets
   t.match(header, /"S ·".*"T ·".*"A ·".*"R ·"/s);
   t.match(header, /short bracket the user fills in/);
   t.match(header, /Never invent the user's experience/);
-  t.match(header, /only the manner/i);
+  t.match(header, /Borrow only that manner/);
   t.match(footer, /no invented facts/);
 });
