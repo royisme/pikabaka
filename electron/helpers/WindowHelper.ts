@@ -151,8 +151,8 @@ export class WindowHelper {
         if (mode === 'none') {
           if (isMac) {
             return app.isPackaged
-              ? path.join(process.resourcesPath, "assets", "pika.icns")
-              : path.resolve(app.getAppPath(), "assets/pika.icns");
+              ? path.join(process.resourcesPath, "assets", "icon.png")
+              : path.resolve(app.getAppPath(), "assets/icon.png");
           } else if (isWin) {
             return app.isPackaged
               ? path.join(process.resourcesPath, "assets/icons/win/icon.ico")

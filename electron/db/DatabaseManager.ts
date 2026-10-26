@@ -243,65 +243,11 @@ export class DatabaseManager {
             this.db.pragma('user_version = 2');
         }
 
-        // Version 2 → 3: sqlite-vec virtual tables for native vector search
-        if (version < 3) {
-            console.log('[DatabaseManager] Applying migration v2 → v3: vec0 virtual tables');
-            try {
-                // Create vec0 virtual table for chunk embeddings (dynamic dimension)
-                this.db.exec(`
-                    CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
-                        chunk_id INTEGER PRIMARY KEY,
-                        embedding float
-                    );
-                `);
-
-                // Create vec0 virtual table for summary embeddings (dynamic dimension)
-                this.db.exec(`
-                    CREATE VIRTUAL TABLE IF NOT EXISTS vec_summaries USING vec0(
-                        summary_id INTEGER PRIMARY KEY,
-                        embedding float
-                    );
-                `);
-
-                // Migrate existing chunk embeddings from BLOB column to vec0 table
-                this.migrateExistingEmbeddings();
-
-                console.log('[DatabaseManager] vec0 virtual tables created successfully');
-            } catch (e) {
-                console.error('[DatabaseManager] vec0 migration failed (sqlite-vec may not be loaded):', e);
-                console.warn('[DatabaseManager] VectorStore will fall back to JS cosine similarity');
-            }
-            this.db.pragma('user_version = 3');
-        }
-
-        // Version 3 → 4: Drop strict 768-dim vec0 tables to allow flexible embedding dimensions
-        if (version < 4) {
-            console.log('[DatabaseManager] Applying migration v3 → v4: Drop strict dimension vec0 tables');
-            try {
-                this.db.exec('DROP TABLE IF EXISTS vec_chunks;');
-                this.db.exec('DROP TABLE IF EXISTS vec_summaries;');
-
-                this.db.exec(`
-                    CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
-                        chunk_id INTEGER PRIMARY KEY,
-                        embedding float
-                    );
-                `);
-
-                this.db.exec(`
-                    CREATE VIRTUAL TABLE IF NOT EXISTS vec_summaries USING vec0(
-                        summary_id INTEGER PRIMARY KEY,
-                        embedding float
-                    );
-                `);
-
-                this.migrateExistingEmbeddings();
-                console.log('[DatabaseManager] vec0 virtual tables recreated for flexible dimensions');
-            } catch (e) {
-                console.error('[DatabaseManager] vec0 migration v4 failed:', e);
-            }
-            this.db.pragma('user_version = 4');
-        }
+        // Versions 3 and 4 used to create single-table vec0 tables with no vector dimension, which
+        // sqlite-vec rejects. v8 drops them and provisions the per-dimension tables, so they only
+        // advance the version.
+        if (version < 3) this.db.pragma('user_version = 3');
+        if (version < 4) this.db.pragma('user_version = 4');
 
         // Version 4 → 5: Add embedding provider and dimensions columns
         if (version < 5) {
@@ -476,66 +422,6 @@ export class DatabaseManager {
             stmt.run(key);
         } catch (error) {
             console.error(`[DatabaseManager] Failed to delete app_state for key: ${key}`, error);
-        }
-    }
-
-    /**
-     * One-time migration: Copy existing BLOB embeddings into vec0 virtual tables.
-     */
-    private migrateExistingEmbeddings(): void {
-        if (!this.db) return;
-
-        // Migrate chunk embeddings
-        try {
-            const chunkRows = this.db.prepare(
-                'SELECT id, embedding FROM chunks WHERE embedding IS NOT NULL'
-            ).all() as any[];
-
-            if (chunkRows.length > 0) {
-                const insert = this.db.prepare(
-                    'INSERT OR IGNORE INTO vec_chunks(chunk_id, embedding) VALUES (?, ?)'
-                );
-                const migrateAll = this.db.transaction(() => {
-                    for (const row of chunkRows) {
-                        try {
-                            insert.run(row.id, row.embedding);
-                        } catch (err) {
-                            // On mismatch (e.g. mixed 768 and 3072 dims), nullify to re-embed later
-                            this.db.prepare('UPDATE chunks SET embedding = NULL WHERE id = ?').run(row.id);
-                        }
-                    }
-                });
-                migrateAll();
-                console.log(`[DatabaseManager] Migrated ${chunkRows.length} chunk embeddings to vec_chunks`);
-            }
-        } catch (e) {
-            console.error('[DatabaseManager] Failed to migrate chunk embeddings:', e);
-        }
-
-        // Migrate summary embeddings
-        try {
-            const summaryRows = this.db.prepare(
-                'SELECT id, embedding FROM chunk_summaries WHERE embedding IS NOT NULL'
-            ).all() as any[];
-
-            if (summaryRows.length > 0) {
-                const insert = this.db.prepare(
-                    'INSERT OR IGNORE INTO vec_summaries(summary_id, embedding) VALUES (?, ?)'
-                );
-                const migrateAll = this.db.transaction(() => {
-                    for (const row of summaryRows) {
-                        try {
-                            insert.run(row.id, row.embedding);
-                        } catch (err) {
-                            this.db.prepare('UPDATE chunk_summaries SET embedding = NULL WHERE id = ?').run(row.id);
-                        }
-                    }
-                });
-                migrateAll();
-                console.log(`[DatabaseManager] Migrated ${summaryRows.length} summary embeddings to vec_summaries`);
-            }
-        } catch (e) {
-            console.error('[DatabaseManager] Failed to migrate summary embeddings:', e);
         }
     }
 
