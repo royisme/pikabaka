@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery } from 'react-query';
 import { isTranscriptArrival, translationEnabledAfterEvent, upsertTranscriptSegment, type TranscriptDisplayMode, type TranscriptSegment } from '../lib/transcriptSegments';
+import { useLocalStorageValue } from './useLocalStorageValue';
+import { useMainEvent } from './useMainEvent';
 
 export function useMeetingTranscript() {
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
@@ -12,12 +15,27 @@ export function useMeetingTranscript() {
   const [sourceLanguage, setSourceLanguage] = useState('auto');
   const [theirLanguage, setTheirLanguage] = useState('english-us');
   const [myLanguage, setMyLanguage] = useState('english-us');
-  const [languageOptions, setLanguageOptions] = useState<Array<{ value: string; label: string }>>([]);
-  const [showTranscript, setShowTranscript] = useState(() => {
-    const stored = localStorage.getItem('pika_interviewer_transcript');
-    return stored !== 'false';
-  });
+  const [storedShowTranscript, setStoredShowTranscript] = useLocalStorageValue('pika_interviewer_transcript');
+  const showTranscript = storedShowTranscript !== 'false';
+  const setShowTranscript = useCallback(
+    (action: boolean | ((prev: boolean) => boolean)) => {
+      const next = typeof action === 'function' ? action(storedShowTranscript !== 'false') : action;
+      setStoredShowTranscript(String(next));
+    },
+    [storedShowTranscript, setStoredShowTranscript]
+  );
   const speakingTimeoutRef = useRef<number | null>(null);
+
+  const { data: languageOptions = [] } = useQuery(
+    ['recognition-languages'],
+    async () => {
+      const languages = await window.electronAPI?.getRecognitionLanguages?.();
+      return Object.entries(languages ?? {})
+        .map(([value, language]) => ({ value, label: (language as { label?: string }).label || value }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    },
+    { staleTime: Infinity }
+  );
 
   const loadTranslationSettings = useCallback(() => {
     window.electronAPI?.getTranscriptTranslationSettings?.()
@@ -36,15 +54,6 @@ export function useMeetingTranscript() {
 
   useEffect(() => {
     loadTranslationSettings();
-    window.electronAPI?.getRecognitionLanguages?.()
-      .then((languages) =>
-        setLanguageOptions(
-          Object.entries(languages ?? {})
-            .map(([value, language]) => ({ value, label: (language as { label?: string }).label || value }))
-            .sort((a, b) => a.label.localeCompare(b.label))
-        )
-      )
-      .catch(() => {});
     window.electronAPI?.getSttLanguage?.('interviewer')
       .then((lang) => {
         if (lang) setTheirLanguage(lang);
@@ -101,65 +110,12 @@ export function useMeetingTranscript() {
     [saveTranslationSettings, refreshLanguages]
   );
 
-  useEffect(() => {
-    localStorage.setItem('pika_interviewer_transcript', String(showTranscript));
-  }, [showTranscript]);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const stored = localStorage.getItem('pika_interviewer_transcript');
-      setShowTranscript(stored !== 'false');
-    };
-
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
-
-  useEffect(() => {
-    if (!window.electronAPI?.onNativeAudioTranscript) return;
-
-    return window.electronAPI.onNativeAudioTranscript((transcript) => {
-      if (transcript.speaker === 'user') {
-        if (transcript.final) {
-          const normalizedSegmentId =
-            transcript.segmentId ||
-            `user_${transcript.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-          setTranscriptSegments((prev) =>
-            upsertTranscriptSegment(prev, {
-              final: true,
-              text: transcript.text,
-              sourceText: transcript.sourceText,
-              translatedText: transcript.translatedText,
-              segmentId: normalizedSegmentId,
-              speaker: 'user',
-              speakerLabel: 'Me',
-              timestamp: transcript.timestamp,
-              translationState: transcript.translationState,
-              translationError: transcript.translationError,
-              detectedLanguage: transcript.detectedLanguage,
-              revision: transcript.revision,
-            })
-          );
-
-          // Own speech is never translated, so its `skipped` says nothing about whether translation is on.
-        }
-        return;
-      }
-
-      if (transcript.speaker !== 'interviewer') {
-        return;
-      }
-
-      const arrival = transcript.final && isTranscriptArrival(transcript.translationState);
-      // A translation report (streaming, complete, error) is a final event too, but the speaker may already be on the next sentence.
-      if (!transcript.final || arrival) setIsInterviewerSpeaking(!transcript.final);
-
+  useMainEvent(window.electronAPI?.onNativeAudioTranscript, (transcript) => {
+    if (transcript.speaker === 'user') {
       if (transcript.final) {
-        if (arrival) setCurrentInterviewerPartial('');
         const normalizedSegmentId =
-          transcript.segmentId || `legacy_${transcript.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        const speakerFromPayload = transcript.speakerLabel?.trim();
+          transcript.segmentId ||
+          `user_${transcript.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
         setTranscriptSegments((prev) =>
           upsertTranscriptSegment(prev, {
@@ -168,8 +124,8 @@ export function useMeetingTranscript() {
             sourceText: transcript.sourceText,
             translatedText: transcript.translatedText,
             segmentId: normalizedSegmentId,
-            speaker: 'interviewer',
-            speakerLabel: speakerFromPayload || undefined,
+            speaker: 'user',
+            speakerLabel: 'Me',
             timestamp: transcript.timestamp,
             translationState: transcript.translationState,
             translationError: transcript.translationError,
@@ -178,24 +134,59 @@ export function useMeetingTranscript() {
           })
         );
 
-        // The display mode and the on/off state are read when a request starts; later reports of that request carry stale copies.
-        if (arrival) {
-          if (transcript.displayMode) setTranscriptDisplayMode(transcript.displayMode);
-          setTranslationEnabled((current) => translationEnabledAfterEvent(current, transcript.translationState));
-
-          if (speakingTimeoutRef.current) {
-            window.clearTimeout(speakingTimeoutRef.current);
-          }
-          speakingTimeoutRef.current = window.setTimeout(() => {
-            setIsInterviewerSpeaking(false);
-            speakingTimeoutRef.current = null;
-          }, 3000);
-        }
-      } else {
-        setCurrentInterviewerPartial(transcript.text);
+        // Own speech is never translated, so its `skipped` says nothing about whether translation is on.
       }
-    });
-  }, []);
+      return;
+    }
+
+    if (transcript.speaker !== 'interviewer') {
+      return;
+    }
+
+    const arrival = transcript.final && isTranscriptArrival(transcript.translationState);
+    // A translation report (streaming, complete, error) is a final event too, but the speaker may already be on the next sentence.
+    if (!transcript.final || arrival) setIsInterviewerSpeaking(!transcript.final);
+
+    if (transcript.final) {
+      if (arrival) setCurrentInterviewerPartial('');
+      const normalizedSegmentId =
+        transcript.segmentId || `legacy_${transcript.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const speakerFromPayload = transcript.speakerLabel?.trim();
+
+      setTranscriptSegments((prev) =>
+        upsertTranscriptSegment(prev, {
+          final: true,
+          text: transcript.text,
+          sourceText: transcript.sourceText,
+          translatedText: transcript.translatedText,
+          segmentId: normalizedSegmentId,
+          speaker: 'interviewer',
+          speakerLabel: speakerFromPayload || undefined,
+          timestamp: transcript.timestamp,
+          translationState: transcript.translationState,
+          translationError: transcript.translationError,
+          detectedLanguage: transcript.detectedLanguage,
+          revision: transcript.revision,
+        })
+      );
+
+      // The display mode and the on/off state are read when a request starts; later reports of that request carry stale copies.
+      if (arrival) {
+        if (transcript.displayMode) setTranscriptDisplayMode(transcript.displayMode);
+        setTranslationEnabled((current) => translationEnabledAfterEvent(current, transcript.translationState));
+
+        if (speakingTimeoutRef.current) {
+          window.clearTimeout(speakingTimeoutRef.current);
+        }
+        speakingTimeoutRef.current = window.setTimeout(() => {
+          setIsInterviewerSpeaking(false);
+          speakingTimeoutRef.current = null;
+        }, 3000);
+      }
+    } else {
+      setCurrentInterviewerPartial(transcript.text);
+    }
+  });
 
   useEffect(() => {
     return () => {
