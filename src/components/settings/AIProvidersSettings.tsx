@@ -1,5 +1,6 @@
 import ConnectionsSettings from './ConnectionsSettings';
 import ModelUsesSettings from './ModelUsesSettings';
+import SearchIndexSettings from './SearchIndexSettings';
 import ProactiveHelpSettings from './ProactiveHelpSettings';
 
 export const AIProvidersSettings = () => (
@@ -10,8 +11,8 @@ export const AIProvidersSettings = () => (
             <ModelUsesSettings job="chat" />
             <ModelUsesSettings job="summary" />
             <ModelUsesSettings job="agent" />
-            <p className="text-xs text-text-secondary">Embeddings are chosen automatically for search.</p>
         </section>
+        <SearchIndexSettings />
         <ProactiveHelpSettings />
     </div>
 );

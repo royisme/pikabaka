@@ -13,6 +13,11 @@ Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR 
 - Phase C done: Ollama connection type, default-model storage accessors/IPC, prefix guessing for jobs and startup/meeting-end restoration removed. Both typechecks and lint exit 0; tests exit 1 only for the missing DOCX fixture. Local model servers use OpenAI-compatible connections; embedding/RAG Ollama stays.
 - Next: owner runtime acceptance of the settings rows, selector, inherited models, missing-selection errors and local servers. Legacy screenshot/suggestion/RAG/translation key routing remains outside this dispatch, including RAG's Ollama-prefixed id branch. No Audio translation or speech-recognition UI changes.
 
+## Search index model (owner-approved dispatch)
+
+- Done on `embed-settings`: a connection and exact embedding model id, forced Save/retry, active/fallback status and rebuild of incompatible or never-embedded completed meetings. Automatic selection and Ollama bootstrap remain.
+- Next: owner runtime acceptance with a real local embedding host, a model change, restart persistence, fallback warning and index rebuild. No app or real provider was run by the agent.
+
 ## Order
 
 S (rules and tooling) first. U0 (owner runtime check) can happen in parallel at any time. After that, U and R run as two independent tracks; inside a track, go in order.

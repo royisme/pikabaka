@@ -2,6 +2,7 @@ import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { DatabaseManager } from "../db/DatabaseManager"
+import { buildEmbeddingConfig } from "../rag/embeddingConfig"
 
 // Abort controllers of the RAG answers being streamed; module-level so a Stop from anywhere can end them.
 const activeRAGQueries = new Map<string, AbortController>();
@@ -171,6 +172,34 @@ export function registerRagHandlers(appState: AppState): void {
       console.error('[IPC rag:is-meeting-processed] Error:', error);
       return false;
     }
+  });
+
+  safeHandle('embedding-use-get', async () => CredentialsManager.getInstance().getEmbeddingUse());
+
+  safeHandle('embedding-use-set', async (_, use: { connectionId: string; model: string }) => {
+    try {
+      const ragManager = appState.getRAGManager();
+      if (!ragManager) throw new Error('RAGManager not initialized');
+      const cm = CredentialsManager.getInstance();
+      cm.setEmbeddingUse(use);
+      await ragManager.initializeEmbeddings(buildEmbeddingConfig(cm), { force: true });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
+  safeHandle('embedding-status', async () => {
+    const cm = CredentialsManager.getInstance();
+    const use = cm.getEmbeddingUse();
+    const connection = use.connectionId ? cm.resolveConnection(use.connectionId) : undefined;
+    const ragManager = appState.getRAGManager();
+    const status = ragManager?.getEmbeddingPipeline().getStatus() ?? { providerName: null, dimensions: null, usingSelected: false };
+    return {
+      ...status,
+      selectedLabel: use.connectionId ? `${connection?.name ?? use.connectionId}: ${use.model}` : null,
+      incompatible: status.providerName ? ragManager!.getIncompatibleMeetingsCount(status.providerName) : 0,
+    };
   });
 
   safeHandle('rag:reindex-incompatible-meetings', async () => {

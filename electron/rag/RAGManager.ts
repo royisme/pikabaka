@@ -8,17 +8,15 @@ import { preprocessTranscript, RawSegment } from './TranscriptPreprocessor';
 import { chunkTranscript } from './SemanticChunker';
 import { VectorStore } from './VectorStore';
 import { EmbeddingPipeline } from './EmbeddingPipeline';
+import type { AppAPIConfig } from './EmbeddingProviderResolver';
 import { RAGRetriever } from './RAGRetriever';
 import { LiveRAGIndexer } from './LiveRAGIndexer';
 import { buildRAGPrompt, NO_CONTEXT_FALLBACK, NO_GLOBAL_CONTEXT_FALLBACK } from './prompts';
 
-export interface RAGManagerConfig {
+export interface RAGManagerConfig extends AppAPIConfig {
     db: Database.Database;
     dbPath: string;       // Passed to VectorStore so worker can open its own read-only connection
     extPath: string;      // Resolved sqlite-vec extension path (no platform suffix)
-    openaiKey?: string;
-    geminiKey?: string;
-    ollamaUrl?: string;
 }
 
 /**
@@ -49,7 +47,8 @@ export class RAGManager {
         this.embeddingPipeline.initialize({
             openaiKey: config.openaiKey,
             geminiKey: config.geminiKey,
-            ollamaUrl: config.ollamaUrl
+            ollamaUrl: config.ollamaUrl,
+            selected: config.selected
         });
     }
 
@@ -64,8 +63,12 @@ export class RAGManager {
         return this.embeddingPipeline;
     }
 
-    initializeEmbeddings(keys: { openaiKey?: string, geminiKey?: string, ollamaUrl?: string }): void {
-        this.embeddingPipeline.initialize(keys);
+    initializeEmbeddings(config: AppAPIConfig, options?: { force?: boolean }): Promise<void> {
+        return this.embeddingPipeline.initialize(config, options);
+    }
+
+    getIncompatibleMeetingsCount(providerName: string): number {
+        return this.vectorStore.getIncompatibleMeetingsCount(providerName);
     }
 
     /**
@@ -427,24 +430,20 @@ export class RAGManager {
      * Deletes their unreadable geometric BLOBs and requeues them via the active EmbeddingPipeline.
      */
     async reindexIncompatibleMeetings(): Promise<void> {
+        await this.embeddingPipeline.processQueue();
         const providerName = this.embeddingPipeline.getActiveProviderName();
-        if (!providerName) {
-            console.error('[RAGManager] Cannot re-index: No active embedding provider available.');
-            return;
-        }
-
-        const count = this.vectorStore.getIncompatibleMeetingsCount(providerName);
-        if (count === 0) {
-            console.log('[RAGManager] No incompatible meetings found to reindex.');
-            return;
-        }
-
-        console.log(`[RAGManager] Re-indexing ${count} incompatible meetings for ${providerName} pipeline...`);
+        if (!providerName) throw new Error('No active embedding provider available');
         const affectedMeetingIds = this.vectorStore.deleteEmbeddingsForMeetings(providerName);
         
         for (const meetingId of affectedMeetingIds) {
-            // Queue the re-embedding background jobs
-            await this.embeddingPipeline.queueMeeting(meetingId);
+            // Completed/failed queue rows belong to the old index and must not block new work.
+            this.db.prepare('DELETE FROM embedding_queue WHERE meeting_id = ?').run(meetingId);
+            const indexedText = this.db.prepare(`
+                SELECT 1 FROM chunks WHERE meeting_id = ?
+                UNION ALL SELECT 1 FROM chunk_summaries WHERE meeting_id = ? LIMIT 1
+            `).get(meetingId, meetingId);
+            if (indexedText) await this.embeddingPipeline.queueMeeting(meetingId);
+            else await this.reprocessMeeting(meetingId);
         }
 
         console.log(`[RAGManager] Successfully requeued ${affectedMeetingIds.length} meetings for re-embedding.`);

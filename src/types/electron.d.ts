@@ -114,6 +114,10 @@ export interface ElectronAPI {
   aiConnectionDelete: (id: string) => Promise<{ success: boolean }>
   aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
   agentTest: (draft: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; reply?: string; toolCalls?: boolean | null; totalMs?: number; error?: string }>
+
+  embeddingUseGet: () => Promise<{ connectionId: string; model: string }>
+  embeddingUseSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
+  embeddingStatus: () => Promise<{ providerName: string | null; dimensions: number | null; usingSelected: boolean; selectedLabel: string | null; incompatible: number }>
   agentModelGet: () => Promise<{ connectionId: string; model: string; supportsImages: boolean }>
   agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; error?: string }>
   chatModelGet: () => Promise<{ connectionId: string; model: string }>
@@ -265,7 +269,7 @@ export interface ElectronAPI {
 
   // Provider Compatibility
   onIncompatibleProviderWarning: (callback: (data: { count: number, oldProvider: string, newProvider: string }) => void) => () => void;
-  reindexIncompatibleMeetings: () => Promise<void>;
+  reindexIncompatibleMeetings: () => Promise<{ success: boolean; error?: string }>;
 
   // Theme API
   getThemeMode: () => Promise<{ mode: 'system' | 'light' | 'dark', resolved: 'light' | 'dark' }>

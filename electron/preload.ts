@@ -94,6 +94,11 @@ interface ElectronAPI {
   aiConnectionDelete: (id: string) => Promise<{ success: boolean }>
   aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
   agentTest: (draft: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; reply?: string; toolCalls?: boolean | null; totalMs?: number; error?: string }>
+
+  embeddingUseGet: () => Promise<{ connectionId: string; model: string }>
+  embeddingUseSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
+  embeddingStatus: () => Promise<{ providerName: string | null; dimensions: number | null; usingSelected: boolean; selectedLabel: string | null; incompatible: number }>
+  reindexIncompatibleMeetings: () => Promise<{ success: boolean; error?: string }>
   agentModelGet: () => Promise<{ connectionId: string; model: string; supportsImages: boolean }>
   agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; error?: string }>
   chatModelGet: () => Promise<{ connectionId: string; model: string }>
@@ -601,6 +606,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   aiConnectionDelete: (id: string) => ipcRenderer.invoke("ai-connection-delete", id),
   aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => ipcRenderer.invoke("ai-connection-models", input),
   agentTest: (draft: { connectionId: string; model: string; supportsImages?: boolean }) => ipcRenderer.invoke("agent-test", draft),
+
+  embeddingUseGet: () => ipcRenderer.invoke("embedding-use-get"),
+  embeddingUseSet: (use: { connectionId: string; model: string }) => ipcRenderer.invoke("embedding-use-set", use),
+  embeddingStatus: () => ipcRenderer.invoke("embedding-status"),
   agentModelGet: () => ipcRenderer.invoke("agent-model-get"),
   agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => ipcRenderer.invoke("agent-model-set", use),
   chatModelGet: () => ipcRenderer.invoke("chat-model-get"),

@@ -10,6 +10,16 @@ What is done, what is broken, what is unverified. `TASKS.md` is what to do next;
 - Checks: renderer tsc 0, Electron tsc 0, tap 1 only for the known missing DOCX fixture, lint 0. Warnings: 1122 to 1099 overall, touched source files 255 to 232; no touched file increases. `grep -rni calendar electron src test` has no hits. No uncertain deletion, dependency change, install or pnpm script. No package became unused (`axios` still serves STT and model discovery).
 - Owner: start from the launcher, stop, check listing, force-quit/relaunch to exercise recovery, open an old meeting and the follow-up email modal; confirm calendar UI/reminders are absent. No app, real device, provider or packaged build was run. The modal's existing generic `invoke` calls are unchanged; the live preload exposes typed email methods instead, so their runtime behavior remains a pre-existing issue outside this removal.
 
+## Search index model selection (branch `embed-settings`)
+
+- Added `embeddingConnectionId` / `embeddingModel` and validated connection/model accessors. OpenAI-compatible and Gemini connections are supported, including keyless loopback hosts; Anthropic is refused. No existing key or channel was removed or renamed.
+- `ConnectionEmbeddingProvider` probes dimensions once, sends exact model ids without prefixes, times out after 30 seconds and reports fixed errors without response bodies, credentials or input text. An explicit choice falls back only to the bundled local model; Automatic retains the existing chain. Shared configuration applies at startup, Ollama readiness and Settings Save.
+- Search index settings reuse the picker with protocol filtering, query-backed drafts, Save and rebuild mutations, active model/dimensions and fallback/incompatibility status. No React effects added or removed.
+- Rebuild includes never-embedded completed meetings, resets old queue rows and regenerates missing chunks through the existing processing path. Forced model switches and rebuilds wait for queued writes before resetting index state. Rebuild success means queued, not finished.
+- Windowless tests use invented text, stubbed fetch, fake providers and in-memory SQLite. Checks: renderer tsc 0, Electron tsc 0, lint 0; full tap 1 only for the known absent, untracked DOCX fixture. Lint warnings 1122 to 1120 overall; no touched file increases.
+- Kept unchanged: Ollama bootstrap, chunking, other model-use rows, legacy LLM/provider-key routing and the unused `electron/preload/` tree. Removed only duplicate embedding configuration, the automatic-only settings sentence and the embedding-config log that could print credentials. No uncertain deletion.
+- Owner: test a real local embedding host (including keyless OpenAI-compatible embeddinggemma), exact ids and dimensions, a failing chosen model's local fallback, Save/retry and restart persistence, and a real model change followed by rebuild/search of old and previously unembedded meetings. Check Settings in both themes and at narrow width. The app, packaged builds and real providers were not run.
+
 ## 2026-10-26: translation speed and whole sentences, summaries on their own model (branch `ai-connections`)
 
 Owner tests on real calls: translation was slow, and rows were cut in the middle of sentences.

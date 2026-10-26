@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from 'react-query';
-import type { AiConnectionView } from '../../types/electron';
+import type { AiConnectionType, AiConnectionView } from '../../types/electron';
 import ModelCombobox from './ModelCombobox';
 
 const field = 'w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors';
@@ -14,6 +14,7 @@ interface ConnectionModelPickerProps {
     /** When set, an empty connection is allowed and means this (for example "Use the chat model"). */
     emptyLabel?: string;
     modelPlaceholder?: string;
+    types?: AiConnectionType[];
     onChange: (next: { connectionId: string; model: string }) => void;
     onModelSelect?: (next: { connectionId: string; model: string }) => void;
 }
@@ -24,7 +25,7 @@ interface ConnectionModelPickerProps {
  * list are queries: the list is cached per connection, so choosing another connection never shows the
  * previous one's models, and nothing here needs an effect.
  */
-const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, connectionId, model, emptyLabel, modelPlaceholder = 'Model id', onChange, onModelSelect }) => {
+const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, connectionId, model, emptyLabel, modelPlaceholder = 'Model id', types, onChange, onModelSelect }) => {
     const { data: connections = [] } = useQuery<AiConnectionView[]>(['ai-connections'], () => window.electronAPI.aiConnectionsList());
 
     // Fetched on demand (the button), never on its own: the host is asked only when the user asks.
@@ -59,7 +60,7 @@ const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, conne
                         className={field}
                     >
                         {emptyLabel !== undefined && <option value="">{emptyLabel}</option>}
-                        {connections.map((c) => (
+                        {connections.filter(c => !types || types.includes(c.type)).map((c) => (
                             <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
                     </select>

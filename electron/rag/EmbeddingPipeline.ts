@@ -30,7 +30,7 @@ export class EmbeddingPipeline {
     private fallbackMeetings = new Set<string>();
     private db: Database.Database;
     private vectorStore: VectorStore;
-    private isProcessing = false;
+    private processingPromise: Promise<void> | null = null;
     private initPromise: Promise<void> | null = null;
     /** Tracks the config used in the most recent successful initialize() call to enable idempotency. */
     private _lastConfig: AppAPIConfig | null = null;
@@ -47,15 +47,23 @@ export class EmbeddingPipeline {
      * or a cloud API key is loaded from CredentialsManager after startup).
      * If the config is unchanged or strictly worse, the existing initPromise is returned.
      */
-    async initialize(config: AppAPIConfig): Promise<void> {
+    async initialize(config: AppAPIConfig, options?: { force?: boolean }): Promise<void> {
         // Skip if config is identical or has no new information
-        if (this._lastConfig && !this._isConfigImprovement(this._lastConfig, config)) {
+        if (!options?.force && this._lastConfig && !this._isConfigImprovement(this._lastConfig, config)) {
             console.log('[EmbeddingPipeline] Config unchanged or no new keys — skipping re-initialization');
             return this.initPromise ?? Promise.resolve();
         }
         this._lastConfig = { ...config };
-        console.log('[EmbeddingPipeline] Initializing with config:', config);
-        this.initPromise = this._doInitialize(config);
+        console.log('[EmbeddingPipeline] Initializing embedding provider');
+        const previous = this.initPromise;
+        this.initPromise = (async () => {
+            await previous?.catch(() => {});
+            // Finish in-flight writes before a forced model switch changes index metadata.
+            if (options?.force) await this.processingPromise;
+            this.provider = null;
+            if (options?.force) this.fallbackMeetings.clear();
+            await this._doInitialize(config);
+        })();
         return this.initPromise;
     }
 
@@ -69,7 +77,9 @@ export class EmbeddingPipeline {
         return (
             hasNew(prev.openaiKey, next.openaiKey) ||
             hasNew(prev.geminiKey, next.geminiKey) ||
-            hasNew(prev.ollamaUrl, next.ollamaUrl)
+            hasNew(prev.ollamaUrl, next.ollamaUrl) ||
+            prev.selected?.connection.id !== next.selected?.connection.id ||
+            prev.selected?.model !== next.selected?.model
         );
     }
 
@@ -143,6 +153,15 @@ export class EmbeddingPipeline {
         }
     }
 
+    getStatus(): { providerName: string | null; dimensions: number | null; usingSelected: boolean } {
+        const selected = this._lastConfig?.selected;
+        return {
+            providerName: this.provider?.name ?? null,
+            dimensions: this.provider?.dimensions ?? null,
+            usingSelected: !!selected && this.provider?.name === `${selected.connection.id}:${selected.model}`,
+        };
+    }
+
     /**
      * Check if pipeline is ready
      */
@@ -182,10 +201,13 @@ export class EmbeddingPipeline {
      * Called when meeting ends
      */
     async queueMeeting(meetingId: string): Promise<void> {
+        const meeting = this.db.prepare('SELECT embedding_provider FROM meetings WHERE id = ?').get(meetingId) as { embedding_provider: string | null } | undefined;
+        if (meeting?.embedding_provider === null) this.fallbackMeetings.delete(meetingId);
         // Get chunks without embeddings
         const chunks = this.vectorStore.getChunksWithoutEmbeddings(meetingId);
 
-        if (chunks.length === 0) {
+        const summary = this.db.prepare('SELECT 1 FROM chunk_summaries WHERE meeting_id = ? AND embedding IS NULL').get(meetingId);
+        if (chunks.length === 0 && !summary) {
             console.log(`[EmbeddingPipeline] No chunks to embed for meeting ${meetingId}`);
             return;
         }
@@ -226,12 +248,12 @@ export class EmbeddingPipeline {
      * meeting is transparently downgraded to LocalEmbeddingProvider (on-device)
      * and its queue is reset so it re-embeds from scratch at the correct dimensions.
      */
-    async processQueue(): Promise<void> {
-        if (this.isProcessing) {
-            console.log('[EmbeddingPipeline] Already processing queue');
-            return;
-        }
+    processQueue(): Promise<void> {
+        this.processingPromise ??= this._processQueue().finally(() => { this.processingPromise = null; });
+        return this.processingPromise;
+    }
 
+    private async _processQueue(): Promise<void> {
         if (!this.provider) {
             console.log('[EmbeddingPipeline] No provider, skipping queue processing');
             return;
@@ -247,91 +269,85 @@ export class EmbeddingPipeline {
             console.warn(`[EmbeddingPipeline] Recovered ${stuckCount} stuck 'processing' items from prior crash.`);
         }
 
-        this.isProcessing = true;
+        while (true) {
+            // Fetch next pending item. Items marked for local fallback (retry_count = -1)
+            // are also eligible, so we use a broad filter.
+            const pending = this.db.prepare(`
+                SELECT * FROM embedding_queue
+                WHERE status = 'pending'
+                  AND (retry_count < ? OR retry_count = -1)
+                ORDER BY created_at ASC
+                LIMIT 1
+            `).get(MAX_RETRIES) as any;
 
-        try {
-            while (true) {
-                // Fetch next pending item. Items marked for local fallback (retry_count = -1)
-                // are also eligible, so we use a broad filter.
-                const pending = this.db.prepare(`
-                    SELECT * FROM embedding_queue 
-                    WHERE status = 'pending'
-                      AND (retry_count < ? OR retry_count = -1)
-                    ORDER BY created_at ASC
-                    LIMIT 1
-                `).get(MAX_RETRIES) as any;
+            if (!pending) {
+                console.log('[EmbeddingPipeline] Queue empty');
+                break;
+            }
 
-                if (!pending) {
-                    console.log('[EmbeddingPipeline] Queue empty');
-                    break;
-                }
+            // Determine which provider to use
+            const useFallback =
+                pending.retry_count === -1 ||
+                this.fallbackMeetings.has(pending.meeting_id);
+            const activeProvider = useFallback ? this.fallbackProvider : this.provider;
 
-                // Determine which provider to use
-                const useFallback =
-                    pending.retry_count === -1 ||
-                    this.fallbackMeetings.has(pending.meeting_id);
-                const activeProvider = useFallback ? this.fallbackProvider : this.provider;
-
-                if (!activeProvider) {
-                    // Cannot proceed — no provider at all (fallback also unavailable).
-                    // Reset item back to 'pending' so it can be retried when keys are configured.
-                    // Do NOT mark as 'failed' — that is a terminal state that can't be recovered.
-                    this.db.prepare(
-                        `UPDATE embedding_queue SET status = 'pending', error_message = 'No provider available' WHERE id = ?`
-                    ).run(pending.id);
-                    // Break the loop — there is nothing we can do until a provider becomes available.
-                    console.warn('[EmbeddingPipeline] No provider available (not even local fallback). Stopping queue processing.');
-                    break;
-                }
-
-                // Mark as processing
+            if (!activeProvider) {
+                // Cannot proceed — no provider at all (fallback also unavailable).
+                // Reset item back to 'pending' so it can be retried when keys are configured.
+                // Do NOT mark as 'failed' — that is a terminal state that can't be recovered.
                 this.db.prepare(
-                    `UPDATE embedding_queue SET status = 'processing' WHERE id = ?`
+                    `UPDATE embedding_queue SET status = 'pending', error_message = 'No provider available' WHERE id = ?`
                 ).run(pending.id);
+                // Break the loop — there is nothing we can do until a provider becomes available.
+                console.warn('[EmbeddingPipeline] No provider available (not even local fallback). Stopping queue processing.');
+                break;
+            }
 
-                try {
-                    if (pending.chunk_id) {
-                        await this.embedChunk(pending.chunk_id, activeProvider);
-                    } else {
-                        await this.embedMeetingSummary(pending.meeting_id, activeProvider);
-                    }
+            // Mark as processing
+            this.db.prepare(
+                `UPDATE embedding_queue SET status = 'processing' WHERE id = ?`
+            ).run(pending.id);
 
-                    // Mark as completed
+            try {
+                if (pending.chunk_id) {
+                    await this.embedChunk(pending.chunk_id, activeProvider);
+                } else {
+                    await this.embedMeetingSummary(pending.meeting_id, activeProvider);
+                }
+
+                // Mark as completed
+                this.db.prepare(`
+                    UPDATE embedding_queue
+                    SET status = 'completed', processed_at = ?
+                    WHERE id = ?
+                `).run(new Date().toISOString(), pending.id);
+
+            } catch (error: any) {
+                const newRetryCount = (pending.retry_count === -1 ? 0 : pending.retry_count) + 1;
+                console.error(
+                    `[EmbeddingPipeline] Error processing queue item ${pending.id} ` +
+                    `(retry ${newRetryCount}/${MAX_RETRIES}, provider: ${activeProvider.name}):`,
+                    error.message
+                );
+
+                if (!useFallback && newRetryCount >= MAX_RETRIES && this.fallbackProvider) {
+                    // Primary provider exhausted. Downgrade the meeting to local fallback.
+                    await this.activateMeetingFallback(pending.meeting_id);
+                } else {
+                    // Still have retries remaining — back-off and retry.
                     this.db.prepare(`
-                        UPDATE embedding_queue 
-                        SET status = 'completed', processed_at = ?
+                        UPDATE embedding_queue
+                        SET status = 'pending', retry_count = retry_count + 1, error_message = ?
                         WHERE id = ?
-                    `).run(new Date().toISOString(), pending.id);
+                    `).run(error.message, pending.id);
 
-                } catch (error: any) {
-                    const newRetryCount = (pending.retry_count === -1 ? 0 : pending.retry_count) + 1;
-                    console.error(
-                        `[EmbeddingPipeline] Error processing queue item ${pending.id} ` +
-                        `(retry ${newRetryCount}/${MAX_RETRIES}, provider: ${activeProvider.name}):`,
-                        error.message
-                    );
-
-                    if (!useFallback && newRetryCount >= MAX_RETRIES && this.fallbackProvider) {
-                        // Primary provider exhausted. Downgrade the meeting to local fallback.
-                        await this.activateMeetingFallback(pending.meeting_id);
-                    } else {
-                        // Still have retries remaining — back-off and retry.
-                        this.db.prepare(`
-                            UPDATE embedding_queue 
-                            SET status = 'pending', retry_count = retry_count + 1, error_message = ?
-                            WHERE id = ?
-                        `).run(error.message, pending.id);
-
-                        // Exponential backoff (skip for fallback items already reset)
-                        if (!useFallback) {
-                            const delay = RETRY_DELAY_BASE_MS * Math.pow(2, pending.retry_count);
-                            await this.delay(delay);
-                        }
+                    // Exponential backoff (skip for fallback items already reset)
+                    if (!useFallback) {
+                        const delay = RETRY_DELAY_BASE_MS * Math.pow(2, pending.retry_count);
+                        await this.delay(delay);
                     }
                 }
             }
-        } finally {
-            this.isProcessing = false;
         }
     }
 

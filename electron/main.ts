@@ -35,6 +35,7 @@ import { SystemAudioCapture } from "./audio/SystemAudioCapture"
 import { MicrophoneCapture } from "./audio/MicrophoneCapture"
 import { ThemeManager } from "./helpers/ThemeManager"
 import { RAGManager } from "./rag/RAGManager"
+import { buildEmbeddingConfig } from "./rag/embeddingConfig"
 import { DatabaseManager } from "./db/DatabaseManager"
 import { getMeetingAgent, getGate, refreshGate } from './agent/instance'
 import { type MeetingAgent, reportAgentError } from './agent/MeetingAgent'
@@ -431,13 +432,7 @@ export class AppState {
           // Re-resolve the embedding provider given that Ollama might now be available
           if (this.ragManager) {
              console.log('[AppState] Ollama model ready, re-evaluating RAG pipeline provider');
-             const { CredentialsManager } = require('./services/CredentialsManager');
-             const cm = CredentialsManager.getInstance();
-             this.ragManager.initializeEmbeddings({
-                openaiKey: cm.getOpenaiApiKey() || process.env.OPENAI_API_KEY || undefined,
-                geminiKey: cm.getGeminiApiKey() || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || undefined,
-                ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434"
-             });
+             await this.ragManager.initializeEmbeddings(buildEmbeddingConfig());
           }
         }
       } catch (err) {
@@ -452,18 +447,11 @@ export class AppState {
       const sqliteDb = db.getDb();
 
       if (sqliteDb) {
-        const { CredentialsManager } = require('./services/CredentialsManager');
-        const cm = CredentialsManager.getInstance();
-        const openaiKey = cm.getOpenaiApiKey() || process.env.OPENAI_API_KEY;
-        const geminiKey = cm.getGeminiApiKey() || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
-        
         this.ragManager = new RAGManager({ 
             db: sqliteDb, 
             dbPath: db.getDbPath(),
             extPath: db.getExtPath(),
-            openaiKey,
-            geminiKey,
-            ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434'
+            ...buildEmbeddingConfig()
         });
         this.ragManager.setLLMHelper(this.processingHelper.getLLMHelper());
         console.log('[AppState] RAGManager initialized');

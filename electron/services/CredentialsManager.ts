@@ -36,6 +36,9 @@ export interface StoredCredentials {
     /** Meeting summaries and titles. Unset means the same as quick answers. */
     summaryConnectionId?: string;
     summaryModel?: string;
+    /** Search embeddings. An empty connection keeps automatic provider selection. */
+    embeddingConnectionId?: string;
+    embeddingModel?: string;
     /** The agent's own model: a connection and a model id, chosen apart from the chat model. */
     agentConnectionId?: string;
     agentModel?: string;
@@ -608,6 +611,27 @@ export class CredentialsManager {
             this.credentials.summaryConnectionId = connectionId;
             this.credentials.summaryModel = model;
         }
+        this.saveCredentials();
+    }
+
+    public getEmbeddingUse(): { connectionId: string; model: string } {
+        return { connectionId: this.credentials.embeddingConnectionId || '', model: this.credentials.embeddingModel || '' };
+    }
+
+    public setEmbeddingUse(use: { connectionId: string; model: string }): void {
+        if (typeof use?.connectionId !== 'string' || typeof use.model !== 'string' || use.connectionId.length > 512 || use.model.length > 512) {
+            throw new Error('Invalid embedding model');
+        }
+        const connectionId = use.connectionId.trim();
+        const model = use.model.trim();
+        if (connectionId) {
+            const connection = this.resolveConnection(connectionId);
+            if (!connection) throw new Error('That connection does not exist');
+            if (connection.type !== 'openai' && connection.type !== 'gemini') throw new Error('Embeddings require an OpenAI-type or Gemini-type connection; Anthropic has no embeddings API');
+            if (!model) throw new Error('Choose an embedding model id');
+        }
+        this.credentials.embeddingConnectionId = connectionId || undefined;
+        this.credentials.embeddingModel = connectionId ? model : undefined;
         this.saveCredentials();
     }
 
