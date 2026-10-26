@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: the install ping is removed (branch `remove-install-ping`)
+
+Done
+- `electron/services/InstallPingManager.ts` is deleted and its call in `electron/lib/lifecycle.ts` removed. It sent a random install id, the app version and the platform, once per install, to `https://divine-sun-927d.natively.workers.dev`, an endpoint the repo does not explain. The owner called it dangerous code and asked for it to be removed.
+- A search of the hard-coded hosts in `electron/`, `src/` and `premium/` finds only the configured providers (OpenAI, Groq, Anthropic, Gemini, ElevenLabs, Deepgram, Azure, IBM, Tavily), Google sign-in for the calendar, GitHub (updates), buymeacoffee links, localhost and documentation links. One runtime request goes to a third party that is not a provider: `fonts.googleapis.com` (a web font), which shows a visitor's IP to Google; not changed. The check is a source search, not observed traffic.
+- Verified: `tsc` electron exit 0. `PRODUCT.md` now says the README's "no telemetry" sentence matches the code.
+- Not verified: the app was not run; a file `install_id.txt` and `install_ping_sent.txt` may remain in users' data folders and are harmless.
+
 ## 2026-10-26: analytics removed, speaker names settled (branch `remove-analytics`)
 
 Done (owner decisions on 2026-10-26: "remove initAnalytics, we have no such feature"; "the speaker names are Interviewer and Me")
