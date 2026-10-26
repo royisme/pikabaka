@@ -284,7 +284,9 @@ export class AppState {
           actionId === 'chat:brainstorm' ||
           actionId === 'chat:dynamicAction4' ||
           actionId === 'chat:scrollUp' ||
-          actionId === 'chat:scrollDown'
+          actionId === 'chat:scrollDown' ||
+          actionId === 'translation:toggle' ||
+          actionId === 'translation:toggle-original'
         ) {
           const actionMap: Record<string, string> = {
             'chat:whatToAnswer': 'whatToAnswer',
@@ -296,6 +298,8 @@ export class AppState {
             'chat:dynamicAction4': 'dynamicAction4',
             'chat:scrollUp': 'scrollUp',
             'chat:scrollDown': 'scrollDown',
+            'translation:toggle': 'toggleTranslation',
+            'translation:toggle-original': 'toggleOriginal',
           };
           const action = actionMap[actionId];
           // Send to all windows without focusing — stealth operation

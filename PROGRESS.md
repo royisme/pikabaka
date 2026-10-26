@@ -2,6 +2,15 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: T7 global translation shortcuts (branch `translation-shortcuts`, epic #38)
+
+Done
+- Two new rebindable global shortcuts (owner approved 2026-10-26): `translation:toggle` (turn translation on or off) and `translation:toggle-original` (show or hide the original text). macOS and Linux default to Cmd/Ctrl+Alt+T and Cmd/Ctrl+Alt+O; Windows defaults to Ctrl+Shift+F9 and Ctrl+Shift+F10 because Ctrl+Alt is AltGr on many layouts. They register in overlay mode only, like the other chat shortcuts, so they work while the overlay is not focused.
+- Flow: main process `onShortcutTriggered` sends `global-shortcut` with `toggleTranslation` or `toggleOriginal`; the overlay calls the same `saveTranslationSettings` as the header buttons. The translation toggle does nothing while no model is set.
+- Settings > Shortcuts lists both so they can be rebound (`useShortcuts` maps both ids in both directions).
+- Verified: both `tsc --noEmit` checks exit 0; tap passes. No new unit test: `KeybindManager` imports Electron and cannot be loaded by the tap runner.
+- Not verified: that either shortcut fires while another app has focus (macOS and Windows); that Cmd+Alt+T or Cmd+Alt+O is free of a system or other-app binding on the owner's machine; the Windows defaults on a real keyboard (the spec asked for them to be picked on one); the rebinding UI with F-keys (the key recorder was not checked for F9/F10).
+
 ## 2026-10-26: T8 error reason on the translation event (branch `translation-error-reason`, epic #38)
 
 Done

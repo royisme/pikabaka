@@ -2095,6 +2095,8 @@ Core Skills
                                             { id: 'captureAndProcess', label: 'Capture screen and ask AI' },
                                             { id: 'processScreenshots', label: 'Process current screenshots' },
                                             { id: 'resetCancel', label: 'Reset or cancel' },
+                                            { id: 'toggleTranslation', label: 'Turn translation on or off' },
+                                            { id: 'toggleOriginal', label: 'Show or hide the original text' },
                                         ].map((item) => (
                                             <div key={item.id} className="flex items-center justify-between py-2 border-b border-border-subtle/50 last:border-b-0">
                                                 <span className="text-sm text-text-secondary">{item.label}</span>

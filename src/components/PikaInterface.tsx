@@ -96,6 +96,9 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isShortcutPressed, chat.actionButtonMode]);
 
+    const transcriptRef = useRef(transcript);
+    transcriptRef.current = transcript;
+
     const generalHandlersRef = useRef<GeneralHandlers>(null!);
     generalHandlersRef.current = {
         toggleVisibility: () => window.electronAPI.toggleWindow(), processScreenshots: chat.handleWhatToSay,
@@ -121,6 +124,8 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         if (action === 'whatToAnswer') h.handleWhatToSay(); else if (action === 'shorten') h.handleFollowUp('shorten'); else if (action === 'followUp') h.handleFollowUpQuestions(); else if (action === 'recap') h.handleRecap(); else if (action === 'dynamicAction4') chat.actionButtonMode === 'brainstorm' ? h.handleBrainstorm() : h.handleRecap();
         else if (action === 'answer') h.handleAnswerNow(); else if (action === 'clarify') h.handleClarify(); else if (action === 'codeHint') h.handleCodeHint(); else if (action === 'brainstorm') h.handleBrainstorm(); else if (action === 'scrollUp') scrollContainerRef.current?.scrollBy({ top: -100, behavior: 'smooth' }); else if (action === 'scrollDown') scrollContainerRef.current?.scrollBy({ top: 100, behavior: 'smooth' });
         else if (action === 'processScreenshots') g.processScreenshots(); else if (action === 'resetCancel') g.resetCancel();
+        else if (action === 'toggleTranslation') { if (transcriptRef.current.translationConfigured) transcriptRef.current.saveTranslationSettings({ enabled: !transcriptRef.current.translationEnabled }); }
+        else if (action === 'toggleOriginal') transcriptRef.current.saveTranslationSettings({ displayMode: toggleOriginal(transcriptRef.current.transcriptDisplayMode) });
         setTimeout(() => { isStealthRef.current = false; }, 500);
     }), [chat.actionButtonMode]);
 
