@@ -3,7 +3,9 @@
  * Uses plaintext JSON in the userData directory.
  */
 
+import { BUILTIN_CONNECTIONS, CONNECTION_TYPES, connectionNeedsKey, isBuiltinConnection, normalizeBaseUrl, type Connection, type ConnectionType, type ConnectionView } from './aiConnections';
 import fs from 'fs';
+import { randomUUID } from 'node:crypto';
 import { DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT } from '../transcript/translationExecutor';
 import { getCredentialsJsonPath } from './configPaths';
 
@@ -24,6 +26,8 @@ export interface CurlProvider {
 export interface OpenAICompatibleProvider {
     id: string;
     name: string;
+    /** The wire protocol. Missing means `openai`, which is what every entry saved before types was. */
+    type?: ConnectionType;
     baseUrl: string;
     apiKey: string;
     /** Model id for chat/completions (set via Fetch Models or manually). */
@@ -39,6 +43,13 @@ export interface StoredCredentials {
     customProviders?: CustomProvider[];
     curlProviders?: CurlProvider[];
     openaiCompatibleProviders?: OpenAICompatibleProvider[];
+    /** Host overrides of the built-in connections (gemini, openai, claude, groq, ollama), by id. */
+    connectionBaseUrls?: Record<string, string>;
+    /** The agent's own model: a connection and a model id, chosen apart from the chat model. */
+    agentConnectionId?: string;
+    agentModel?: string;
+    /** Whether that model reads images (unknown for a model Pika has not been told about). */
+    agentModelImages?: boolean;
     defaultModel?: string;
     // STT Provider settings
     sttProvider?: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox';
@@ -492,6 +503,139 @@ export class CredentialsManager {
 
     public getCurlProviders(): CurlProvider[] {
         return this.credentials.curlProviders || [];
+    }
+
+    // ---- Connections: where a model is reached (type, host, key). See aiConnections.ts ----
+
+    private builtinKey(id: string): string {
+        switch (id) {
+            case 'gemini': return this.credentials.geminiApiKey || '';
+            case 'groq': return this.credentials.groqApiKey || '';
+            case 'openai': return this.credentials.openaiApiKey || '';
+            case 'claude': return this.credentials.claudeApiKey || '';
+            default: return '';
+        }
+    }
+
+    /** The connection with its key (main process only), or undefined for an unknown id. */
+    public resolveConnection(id: string): Connection | undefined {
+        const builtin = BUILTIN_CONNECTIONS.find(c => c.id === id);
+        if (builtin) {
+            const override = this.credentials.connectionBaseUrls?.[id];
+            const envOllama = id === 'ollama' ? process.env.OLLAMA_URL : undefined;
+            return {
+                id,
+                name: builtin.name,
+                type: builtin.type,
+                baseUrl: normalizeBaseUrl(override) ?? normalizeBaseUrl(envOllama) ?? builtin.defaultBaseUrl,
+                apiKey: this.builtinKey(id),
+                builtin: true,
+            };
+        }
+        const custom = (this.credentials.openaiCompatibleProviders || []).find(p => p.id === id);
+        if (!custom) return undefined;
+        return {
+            id,
+            name: custom.name,
+            type: custom.type && CONNECTION_TYPES.includes(custom.type) ? custom.type : 'openai',
+            baseUrl: normalizeBaseUrl(custom.baseUrl) ?? custom.baseUrl,
+            apiKey: custom.apiKey || '',
+            builtin: false,
+        };
+    }
+
+    /** Every connection, built-in ones first, for the settings screen: no key leaves the main process. */
+    public listConnections(): ConnectionView[] {
+        const ids = [...BUILTIN_CONNECTIONS.map(c => c.id as string), ...(this.credentials.openaiCompatibleProviders || []).map(p => p.id)];
+        return ids.flatMap(id => {
+            const connection = this.resolveConnection(id);
+            if (!connection) return [];
+            const builtin = BUILTIN_CONNECTIONS.find(c => c.id === id);
+            return [{
+                id,
+                name: connection.name,
+                type: connection.type,
+                baseUrl: connection.baseUrl,
+                customBaseUrl: !!builtin && connection.baseUrl !== builtin.defaultBaseUrl,
+                hasApiKey: connection.apiKey !== '',
+                builtin: !!builtin,
+            }];
+        });
+    }
+
+    /** Whether the connection can be used as it is: a key where one is needed. */
+    public isConnectionReady(id: string): boolean {
+        const connection = this.resolveConnection(id);
+        return !!connection && (connection.apiKey !== '' || !connectionNeedsKey(connection.type, connection.baseUrl));
+    }
+
+    /**
+     * Saves a connection. A built-in one takes a key and a host override (empty means the default);
+     * a custom one takes a name, a type and a host. A missing `apiKey` leaves the stored key as it is.
+     * Returns the id, or the reason it was refused.
+     */
+    public saveConnection(input: { id?: string; name?: string; type?: ConnectionType; baseUrl?: string; apiKey?: string }): { id: string } | { error: string } {
+        const baseUrl = (input.baseUrl ?? '').trim();
+        if (baseUrl && !normalizeBaseUrl(baseUrl)) return { error: 'The host must be an http or https address without a query or credentials' };
+        if (input.id && isBuiltinConnection(input.id)) {
+            const id = input.id;
+            const overrides = { ...(this.credentials.connectionBaseUrls || {}) };
+            if (baseUrl) overrides[id] = normalizeBaseUrl(baseUrl)!;
+            else delete overrides[id];
+            this.credentials.connectionBaseUrls = Object.keys(overrides).length ? overrides : undefined;
+            if (input.apiKey !== undefined) {
+                const key = input.apiKey.trim();
+                if (id === 'gemini') this.credentials.geminiApiKey = key || undefined;
+                else if (id === 'groq') this.credentials.groqApiKey = key || undefined;
+                else if (id === 'openai') this.credentials.openaiApiKey = key || undefined;
+                else if (id === 'claude') this.credentials.claudeApiKey = key || undefined;
+            }
+            this.saveCredentials();
+            return { id };
+        }
+        const name = (input.name ?? '').trim();
+        if (!name || name.length > 80) return { error: 'Give the connection a name' };
+        if (!input.type || !CONNECTION_TYPES.includes(input.type)) return { error: 'Choose a type' };
+        if (!baseUrl) return { error: 'A custom connection needs a host' };
+        const list = this.credentials.openaiCompatibleProviders || (this.credentials.openaiCompatibleProviders = []);
+        const existing = input.id ? list.find(p => p.id === input.id) : undefined;
+        if (input.id && !existing) return { error: 'That connection does not exist' };
+        const entry: OpenAICompatibleProvider = {
+            id: existing?.id ?? `conn-${randomUUID().slice(0, 8)}`,
+            name,
+            type: input.type,
+            baseUrl: normalizeBaseUrl(baseUrl)!,
+            apiKey: input.apiKey === undefined ? existing?.apiKey ?? '' : input.apiKey.trim(),
+            ...(existing?.preferredModel ? { preferredModel: existing.preferredModel } : {}),
+        };
+        if (existing) list[list.indexOf(existing)] = entry;
+        else list.push(entry);
+        this.saveCredentials();
+        return { id: entry.id };
+    }
+
+    public deleteConnection(id: string): boolean {
+        if (isBuiltinConnection(id) || !this.credentials.openaiCompatibleProviders) return false;
+        const before = this.credentials.openaiCompatibleProviders.length;
+        this.credentials.openaiCompatibleProviders = this.credentials.openaiCompatibleProviders.filter(p => p.id !== id);
+        if (this.credentials.agentConnectionId === id) this.credentials.agentConnectionId = undefined;
+        this.saveCredentials();
+        return this.credentials.openaiCompatibleProviders.length !== before;
+    }
+
+    public getAgentUse(): { connectionId: string; model: string; supportsImages: boolean } {
+        return {
+            connectionId: this.credentials.agentConnectionId || '',
+            model: this.credentials.agentModel || '',
+            supportsImages: this.credentials.agentModelImages === true,
+        };
+    }
+
+    public setAgentUse(use: { connectionId: string; model: string; supportsImages?: boolean }): void {
+        this.credentials.agentConnectionId = use.connectionId.trim() || undefined;
+        this.credentials.agentModel = use.model.trim() || undefined;
+        this.credentials.agentModelImages = use.supportsImages === true ? true : undefined;
+        this.saveCredentials();
     }
 
     public getOpenAICompatibleProviders(): OpenAICompatibleProvider[] {

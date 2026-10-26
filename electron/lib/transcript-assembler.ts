@@ -421,6 +421,8 @@ type TranslationConfig = {
   sourceLanguageKey: string;
   targetLanguageKey: string;
   oaiCompat?: { id: string; baseUrl: string; apiKey: string; preferredModel?: string };
+  /** The connection chosen for translation (any type and host), when it exists and can be used. */
+  connection?: { type: 'openai' | 'anthropic' | 'gemini' | 'ollama'; baseUrl: string; apiKey: string };
   standardProviders: Set<string>;
   isConfigured: boolean;
 };
@@ -433,6 +435,8 @@ function resolveTranslationConfig(forceTranslate: boolean): TranslationConfig {
   const oaiCompat = cm.getOpenAICompatibleProviders().find((p: { id: string }) => p.id === provider);
   const model: string = cm.getTranscriptTranslationModel().trim() || (oaiCompat?.preferredModel?.trim() ?? '');
   const prompt: string = cm.getTranscriptTranslationPrompt();
+  const resolved = cm.resolveConnection(provider);
+  const connection = resolved && cm.isConnectionReady(provider) ? { type: resolved.type, baseUrl: resolved.baseUrl, apiKey: resolved.apiKey } : undefined;
   const shouldTranslate = forceTranslate ? true : cm.getTranscriptTranslationEnabled();
   return {
     displayMode: cm.getTranscriptTranslationDisplayMode(),
@@ -442,6 +446,7 @@ function resolveTranslationConfig(forceTranslate: boolean): TranslationConfig {
     sourceLanguageKey: cm.getTranscriptTranslationSourceLanguage(),
     targetLanguageKey: cm.getTranscriptTranslationTargetLanguage(),
     oaiCompat,
+    connection,
     standardProviders,
     isConfigured:
       isTranscriptTranslationConfigured(shouldTranslate, model, prompt) &&
@@ -480,6 +485,9 @@ function runTranslationRequest(
     context: context.length > 0 ? context : undefined,
   };
   const llm = state.processingHelper.getLLMHelper();
+  if (config.connection) {
+    return llm.translateTranscriptText({ ...baseReq, provider: 'connection', connection: config.connection }, onProgress);
+  }
   if (config.oaiCompat && !config.standardProviders.has(config.provider)) {
     return llm.translateTranscriptText({
       ...baseReq,

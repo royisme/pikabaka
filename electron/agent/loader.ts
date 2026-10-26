@@ -7,20 +7,19 @@ async function named<T>(name: string, load: () => Promise<T>): Promise<T> {
 }
 
 async function load() {
-  const [durable, ai, models, sqlite, chord, schema, google, groq, openai, anthropic, systemOne] = await Promise.all([
+  const [durable, ai, models, sqlite, chord, schema, openAICompletionsApi, anthropicApi, googleApi, systemOne] = await Promise.all([
     named('@earendil-works/pi-durable', () => import('@earendil-works/pi-durable')),
     named('@earendil-works/pi-ai', () => import('@earendil-works/pi-ai')),
     named('@earendil-works/pi-ai/models', () => import('@earendil-works/pi-ai/models')),
     named('@earendil-works/pi-durable/storage/sqlite/node', () => import('@earendil-works/pi-durable/storage/sqlite/node')),
     named('@earendil-works/chord/context', () => import('@earendil-works/chord/context')),
     named('typebox', () => import('typebox')),
-    named('@earendil-works/pi-ai/providers/google', () => import('@earendil-works/pi-ai/providers/google')),
-    named('@earendil-works/pi-ai/providers/groq', () => import('@earendil-works/pi-ai/providers/groq')),
-    named('@earendil-works/pi-ai/providers/openai', () => import('@earendil-works/pi-ai/providers/openai')),
-    named('@earendil-works/pi-ai/providers/anthropic', () => import('@earendil-works/pi-ai/providers/anthropic')),
+    named('@earendil-works/pi-ai/api/openai-completions.lazy', () => import('@earendil-works/pi-ai/api/openai-completions.lazy')),
+    named('@earendil-works/pi-ai/api/anthropic-messages.lazy', () => import('@earendil-works/pi-ai/api/anthropic-messages.lazy')),
+    named('@earendil-works/pi-ai/api/google-generative-ai.lazy', () => import('@earendil-works/pi-ai/api/google-generative-ai.lazy')),
     named('@earendil-works/pi-ai/api/typesafe-system-one.lazy', () => import('@earendil-works/pi-ai/api/typesafe-system-one.lazy')),
   ]);
-  return { durable, ai, models, sqlite, chord, Type: schema.Type, google, groq, openai, anthropic, systemOne };
+  return { durable, ai, models, sqlite, chord, Type: schema.Type, openAICompletionsApi, anthropicApi, googleApi, systemOne };
 }
 
 export type AgentRuntime = Awaited<ReturnType<typeof load>>;

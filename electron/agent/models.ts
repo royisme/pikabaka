@@ -1,39 +1,13 @@
-import type { CredentialStore, Models, Model, Api } from '@earendil-works/pi-ai';
+import type { CredentialStore, Models } from '@earendil-works/pi-ai';
 import type { CredentialsManager } from '../services/CredentialsManager';
-import type { LLMHelper } from '../core/LLMHelper';
+import { connectionNeedsKey, openAiRoot, type Connection } from '../services/aiConnections';
 import { loadAgentRuntime } from './loader';
 import { GateError, type GateClassify, type GateErrorClass, type GateKind } from './gate';
 
-type Credentials = Pick<CredentialsManager,
-  'getGeminiApiKey' | 'getGroqApiKey' | 'getOpenaiApiKey' | 'getClaudeApiKey'>;
-
-export function createAgentCredentialStore(credentials: Credentials): CredentialStore {
-  const readers: Record<string, () => string | undefined> = {
-    google: () => credentials.getGeminiApiKey(),
-    groq: () => credentials.getGroqApiKey(),
-    openai: () => credentials.getOpenaiApiKey(),
-    anthropic: () => credentials.getClaudeApiKey(),
-  };
-  return {
-    async read(providerId) {
-      const key = Object.hasOwn(readers, providerId) ? readers[providerId]()?.trim() : undefined;
-      return key ? { type: 'api_key', key } : undefined;
-    },
-    async list() {
-      return Object.keys(readers).filter(id => readers[id]()?.trim()).map(providerId => ({ providerId, type: 'api_key' as const }));
-    },
-    async modify() { throw new Error('Agent credentials are read-only'); },
-    async delete() { throw new Error('Agent credentials are read-only'); },
-  };
-}
-
-export const AGENT_MODELS = [
-  { pikaProvider: 'gemini', pikaModel: 'gemini-3.1-flash-lite-preview', provider: 'google', modelId: 'gemini-3.1-flash-lite-preview', supportsTools: true, supportsImages: true },
-  { pikaProvider: 'gemini', pikaModel: 'gemini-3.1-pro-preview', provider: 'google', modelId: 'gemini-3.1-pro-preview', supportsTools: true, supportsImages: true },
-  { pikaProvider: 'groq', pikaModel: 'llama-3.3-70b-versatile', provider: 'groq', modelId: 'llama-3.3-70b-versatile', supportsTools: true, supportsImages: false },
-  { pikaProvider: 'openai', pikaModel: 'gpt-5.4', provider: 'openai', modelId: 'gpt-5.4', supportsTools: true, supportsImages: true },
-  { pikaProvider: 'claude', pikaModel: 'claude-sonnet-4-6', provider: 'anthropic', modelId: 'claude-sonnet-4-6', supportsTools: true, supportsImages: true },
-] as const;
+// The agent's model is a connection (type, host, key) and a model id, both chosen by the user. Pika
+// is not tied to a provider: any host of the openai, anthropic, gemini or ollama type works, and
+// the exact model id typed or fetched is the one that runs. It is registered with pi-ai as it is,
+// so an id pi-ai has never heard of runs as itself and is never swapped for another model.
 
 export interface AgentModel {
   models: Models;
@@ -43,49 +17,101 @@ export interface AgentModel {
 export type AgentModelResult = { ok: true; model: AgentModel } | { ok: false; reason: string };
 export interface ModelConfigSource { resolve(): Promise<AgentModelResult> }
 
-// Returning undefined from the store alone allows ambient auth. Deny it at the collection boundary too.
-export async function createAgentModels(credentials: Credentials): Promise<Models> {
-  const runtime = await loadAgentRuntime();
-  const models = runtime.models.createModels({
-    credentials: createAgentCredentialStore(credentials),
-    authContext: { env: async () => undefined, fileExists: async () => false },
-  });
-  models.setProvider(runtime.google.googleProvider());
-  models.setProvider(runtime.groq.groqProvider());
-  models.setProvider(runtime.openai.openaiProvider());
-  models.setProvider(runtime.anthropic.anthropicProvider());
-  return models;
+/** Answers only for this connection, from Pika's own store. pi-ai's ambient (environment) auth stays off. */
+export function createConnectionCredentialStore(connection: Connection): CredentialStore {
+  const key = () => connection.apiKey.trim() || (connectionNeedsKey(connection.type, connection.baseUrl) ? '' : 'none');
+  return {
+    async read(providerId) {
+      return providerId === connection.id && key() ? { type: 'api_key', key: key() } : undefined;
+    },
+    async list() {
+      return key() ? [{ providerId: connection.id, type: 'api_key' as const }] : [];
+    },
+    async modify() { throw new Error('Agent credentials are read-only'); },
+    async delete() { throw new Error('Agent credentials are read-only'); },
+  };
 }
 
-// Pika lets the user pick any model of a provider; the agent runs the picked model when pi-ai knows it,
-// otherwise that provider's default, so a key is all that decides whether the agent works.
-function providerOf(id: string): 'google' | 'groq' | 'openai' | 'anthropic' | undefined {
-  if (id.startsWith('gemini-') || id.startsWith('models/')) return 'google';
-  if (id.startsWith('claude-')) return 'anthropic';
-  if (id.startsWith('gpt-') || id.startsWith('o1-') || id.startsWith('o3-') || id.includes('openai')) return 'openai';
-  if (id.startsWith('llama-') || id.startsWith('mixtral-') || id.startsWith('gemma-')) return 'groq';
+/** Builds the pi-ai model for a connection and the exact model id. */
+export async function buildAgentModel(connection: Connection, modelId: string, supportsImages: boolean): Promise<AgentModel> {
+  const runtime = await loadAgentRuntime();
+  const input: ('text' | 'image')[] = supportsImages ? ['text', 'image'] : ['text'];
+  const common = {
+    id: modelId,
+    name: modelId,
+    provider: connection.id,
+    input,
+    reasoning: false,
+    // Unknown for a model Pika was not told about: conservative values, so a request is not refused for asking too much.
+    contextWindow: 128_000,
+    maxTokens: 8192,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  };
+  const auth = { apiKey: runtime.ai.envApiKeyAuth(connection.name, []) };
+  let provider;
+  if (connection.type === 'anthropic') {
+    provider = runtime.ai.createProvider({
+      id: connection.id, name: connection.name, auth,
+      models: [{ ...common, api: 'anthropic-messages', baseUrl: connection.baseUrl }],
+      api: runtime.anthropicApi.anthropicMessagesApi(),
+    });
+  } else if (connection.type === 'gemini') {
+    const root = /\/v1(beta|alpha)?$/.test(connection.baseUrl) ? connection.baseUrl : `${connection.baseUrl}/v1beta`;
+    provider = runtime.ai.createProvider({
+      id: connection.id, name: connection.name, auth,
+      models: [{ ...common, api: 'google-generative-ai', baseUrl: root }],
+      api: runtime.googleApi.googleGenerativeAIApi(),
+    });
+  } else {
+    // openai, and ollama through its OpenAI-compatible endpoint.
+    const root = connection.type === 'ollama' ? `${connection.baseUrl}/v1` : openAiRoot(connection.baseUrl);
+    provider = runtime.ai.createProvider({
+      id: connection.id, name: connection.name, auth,
+      models: [{ ...common, api: 'openai-completions', baseUrl: root }],
+      api: runtime.openAICompletionsApi.openAICompletionsApi(),
+    });
+  }
+  const models = runtime.models.createModels({
+    credentials: createConnectionCredentialStore(connection),
+    authContext: { env: async () => undefined, fileExists: async () => false },
+  });
+  models.setProvider(provider);
+  return { models, ref: { provider: connection.id, modelId }, supportsImages };
+}
+
+/** The family of a model id, used only to choose a default connection when the agent has none of its own. */
+function defaultConnectionFor(modelId: string): string | undefined {
+  if (modelId.startsWith('gemini-') || modelId.startsWith('models/')) return 'gemini';
+  if (modelId.startsWith('claude-')) return 'claude';
+  if (modelId.startsWith('gpt-') || modelId.startsWith('o1-') || modelId.startsWith('o3-') || modelId.includes('openai')) return 'openai';
+  if (modelId.startsWith('llama-') || modelId.startsWith('mixtral-') || modelId.startsWith('gemma-')) return 'groq';
   return undefined;
 }
 
+/**
+ * The agent's own choice (Settings, Agent) when there is one. Without it the agent uses the model the
+ * chat uses, on the connection that model belongs to, with that exact id: a first run needs no setup,
+ * and no other model is ever substituted.
+ */
 export async function resolveAgentModel(
-  llmHelper: Pick<LLMHelper, 'getCurrentModel' | 'isUsingOllama'>,
-  credentials?: CredentialsManager,
+  llmHelper: { getCurrentModel(): string; isUsingOllama(): boolean },
+  credentials: Pick<CredentialsManager, 'getAgentUse' | 'resolveConnection' | 'getMergedLlmCustomProviders'>,
 ): Promise<AgentModelResult> {
-  const unsupported = { ok: false, reason: 'The agent does not support this model' } as const;
-  if (llmHelper.isUsingOllama()) return unsupported;
-  const id = llmHelper.getCurrentModel();
-  const cm = credentials ?? (await import('../services/CredentialsManager.js')).CredentialsManager.getInstance();
-  if (cm.getMergedLlmCustomProviders().some(provider => provider.id === id)) return unsupported;
-  const provider = providerOf(id);
-  const fallback = AGENT_MODELS.find(entry => entry.provider === provider);
-  if (!provider || !fallback?.supportsTools) return unsupported;
-  const credential = await createAgentCredentialStore(cm).read(provider);
-  if (credential?.type !== 'api_key' || !credential.key) return { ok: false, reason: 'API key not configured for the agent' };
-  const models = await createAgentModels(cm);
-  const modelId = models.getModel(provider, id) ? id : fallback.modelId;
-  const catalogModel: Model<Api> | undefined = models.getModel(provider, modelId);
-  if (!catalogModel) return unsupported;
-  return { ok: true, model: { models, ref: { provider, modelId }, supportsImages: fallback.supportsImages } };
+  const use = credentials.getAgentUse();
+  let connectionId = use.connectionId;
+  let modelId = use.model;
+  if (!connectionId || !modelId) {
+    if (llmHelper.isUsingOllama()) return { ok: false, reason: 'Choose the agent model in Settings' };
+    modelId = llmHelper.getCurrentModel();
+    const custom = credentials.getMergedLlmCustomProviders().some(provider => provider.id === modelId);
+    const guessed = custom ? undefined : defaultConnectionFor(modelId);
+    if (!guessed) return { ok: false, reason: 'Choose the agent model in Settings' };
+    connectionId = guessed;
+  }
+  const connection = credentials.resolveConnection(connectionId);
+  if (!connection) return { ok: false, reason: 'The agent connection no longer exists' };
+  if (!connection.apiKey && connectionNeedsKey(connection.type, connection.baseUrl)) return { ok: false, reason: `No API key is saved for ${connection.name}` };
+  return { ok: true, model: await buildAgentModel(connection, modelId, use.connectionId ? use.supportsImages : false) };
 }
 
 // ---- The decision model behind the proactive gate (D4: configurable only) ----

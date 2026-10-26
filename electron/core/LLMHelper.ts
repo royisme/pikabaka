@@ -16,6 +16,8 @@ import { deepVariableReplacer, getByPath, injectImageIntoMessages } from '../uti
 import curl2Json from "@bany/curl-to-json";
 import { CustomProvider, CurlProvider, OpenAICompatibleProvider } from '../services/CredentialsManager';
 import { normalizeOpenAICompatibleBaseUrl } from '../utils/modelFetcher';
+import { openAiRoot, BUILTIN_CONNECTIONS } from '../services/aiConnections';
+import { CredentialsManager } from '../services/CredentialsManager';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import axios from 'axios';
@@ -42,7 +44,8 @@ export type TranscriptTranslationProvider =
   | 'groq'
   | 'openai'
   | 'claude'
-  | 'openai-compatible';
+  | 'openai-compatible'
+  | 'connection';
 
 export interface TranscriptTranslationRequest {
   provider: TranscriptTranslationProvider;
@@ -58,6 +61,8 @@ export interface TranscriptTranslationRequest {
   detectedLanguageKey?: string;
   /** When provider is `openai-compatible`, URL + key from AI Providers (saved endpoint). */
   openAICompatible?: { baseUrl: string; apiKey: string };
+  /** When provider is `connection`: the connection chosen for translation (its type decides how it is called). */
+  connection?: { type: 'openai' | 'anthropic' | 'gemini' | 'ollama'; baseUrl: string; apiKey: string };
   /** Previous translated turns, oldest first, for terminology/pronoun consistency. */
   context?: Array<{ source: string; translation: string }>;
 }
@@ -114,21 +119,21 @@ export class LLMHelper {
     // Initialize Groq client if API key provided
     if (groqApiKey) {
       this.groqApiKey = groqApiKey
-      this.groqClient = new Groq({ apiKey: groqApiKey })
+      this.groqClient = this.makeGroqClient(groqApiKey)
       console.log(`[LLMHelper] Groq client initialized with model: ${GROQ_MODEL}`)
     }
 
     // Initialize OpenAI client if API key provided
     if (openaiApiKey) {
       this.openaiApiKey = openaiApiKey
-      this.openaiClient = new OpenAI({ apiKey: openaiApiKey })
+      this.openaiClient = this.makeOpenAiClient(openaiApiKey)
       console.log(`[LLMHelper] OpenAI client initialized with model: ${OPENAI_MODEL}`)
     }
 
     // Initialize Claude client if API key provided
     if (claudeApiKey) {
       this.claudeApiKey = claudeApiKey
-      this.claudeClient = new Anthropic({ apiKey: claudeApiKey })
+      this.claudeClient = this.makeClaudeClient(claudeApiKey)
       console.log(`[LLMHelper] Claude client initialized with model: ${CLAUDE_MODEL}`)
     }
 
@@ -142,40 +147,67 @@ export class LLMHelper {
     } else if (apiKey) {
       this.apiKey = apiKey
       // Initialize with v1alpha API version for Gemini 3 support
-      this.client = new GoogleGenAI({
-        apiKey: apiKey,
-        httpOptions: { apiVersion: "v1alpha" }
-      })
+      this.client = this.makeGeminiClient(apiKey)
       // console.log(`[LLMHelper] Using Google Gemini 3 with model: ${this.geminiModel} (v1alpha API)`)
     } else {
       console.warn("[LLMHelper] No API key provided. Client will be uninitialized until key is set.")
     }
   }
 
+  /** The host the user set for a built-in connection (Settings, AI), or undefined for its default. */
+  private hostOverride(id: 'gemini' | 'openai' | 'claude' | 'groq'): string | undefined {
+    try {
+      const connection = CredentialsManager.getInstance().resolveConnection(id);
+      const builtin = BUILTIN_CONNECTIONS.find(candidate => candidate.id === id);
+      return connection && builtin && connection.baseUrl !== builtin.defaultBaseUrl ? connection.baseUrl : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private makeGeminiClient(apiKey: string): GoogleGenAI {
+    const host = this.hostOverride('gemini');
+    // Initialize with v1alpha API version for Gemini 3 support
+    return new GoogleGenAI({ apiKey, httpOptions: { apiVersion: "v1alpha", ...(host ? { baseUrl: host } : {}) } });
+  }
+
+  private makeGroqClient(apiKey: string): Groq {
+    const host = this.hostOverride('groq');
+    // The Groq SDK adds /openai/v1 itself; the connection stores the OpenAI-compatible root.
+    return new Groq({ apiKey, ...(host ? { baseURL: host.replace(/\/openai\/v1$/, '') } : {}) });
+  }
+
+  private makeOpenAiClient(apiKey: string): OpenAI {
+    const host = this.hostOverride('openai');
+    return new OpenAI({ apiKey, ...(host ? { baseURL: openAiRoot(host) } : {}) });
+  }
+
+  private makeClaudeClient(apiKey: string): Anthropic {
+    const host = this.hostOverride('claude');
+    return new Anthropic({ apiKey, ...(host ? { baseURL: host } : {}) });
+  }
+
   public setApiKey(apiKey: string) {
     this.apiKey = apiKey;
-    this.client = new GoogleGenAI({
-      apiKey: apiKey,
-      httpOptions: { apiVersion: "v1alpha" }
-    })
+    this.client = this.makeGeminiClient(apiKey)
     console.log("[LLMHelper] Gemini API Key updated.");
   }
 
   public setGroqApiKey(apiKey: string) {
     this.groqApiKey = apiKey;
-    this.groqClient = new Groq({ apiKey });
+    this.groqClient = this.makeGroqClient(apiKey);
     console.log("[LLMHelper] Groq API Key updated.");
   }
 
   public setOpenaiApiKey(apiKey: string) {
     this.openaiApiKey = apiKey;
-    this.openaiClient = new OpenAI({ apiKey });
+    this.openaiClient = this.makeOpenAiClient(apiKey);
     console.log("[LLMHelper] OpenAI API Key updated.");
   }
 
   public setClaudeApiKey(apiKey: string) {
     this.claudeApiKey = apiKey;
-    this.claudeClient = new Anthropic({ apiKey });
+    this.claudeClient = this.makeClaudeClient(apiKey);
     console.log("[LLMHelper] Claude API Key updated.");
   }
 
@@ -390,6 +422,94 @@ export class LLMHelper {
     return data.response || "";
   }
 
+  /** The SDK client for a translation connection: its type and host decide where the request goes. */
+  private connectionClients(c: NonNullable<TranscriptTranslationRequest['connection']>) {
+    const key = c.apiKey.trim();
+    return {
+      openai: () => new OpenAI({ apiKey: key || 'none', baseURL: openAiRoot(c.baseUrl) }),
+      anthropic: () => new Anthropic({ apiKey: key, baseURL: c.baseUrl }),
+      gemini: () => new GoogleGenAI({
+        apiKey: key,
+        httpOptions: { apiVersion: "v1alpha", ...(c.baseUrl.includes('generativelanguage.googleapis.com') ? {} : { baseUrl: c.baseUrl }) },
+      }),
+    };
+  }
+
+  private async translateViaConnection(
+    c: NonNullable<TranscriptTranslationRequest['connection']>,
+    model: string,
+    prompt: string
+  ): Promise<string> {
+    if (c.type === 'ollama') return this.callOllamaWithConfig(c.baseUrl, model, prompt);
+    const clients = this.connectionClients(c);
+    if (c.type === 'anthropic') {
+      const response = await clients.anthropic().messages.create({
+        model,
+        max_tokens: 4096,
+        messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
+      });
+      const textBlock = response.content.find(block => block.type === 'text');
+      return textBlock && textBlock.type === 'text' ? textBlock.text : "";
+    }
+    if (c.type === 'gemini') {
+      const response = await clients.gemini().models.generateContent({
+        model,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      });
+      return response.text || "";
+    }
+    const response = await clients.openai().chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      ...(c.baseUrl.includes('api.openai.com') ? { max_completion_tokens: 4096 } : { max_tokens: 4096 }),
+      stream: false,
+    });
+    return response.choices[0]?.message?.content || "";
+  }
+
+  private async streamViaConnection(
+    c: NonNullable<TranscriptTranslationRequest['connection']>,
+    model: string,
+    prompt: string,
+    onProgress: (textSoFar: string) => void
+  ): Promise<string> {
+    if (c.type === 'ollama') {
+      const response = await fetch(`${c.baseUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, prompt, stream: true, options: { temperature: 0.2, top_p: 0.9 } }),
+      });
+      if (!response.ok || !response.body) throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+      return streamText(ollamaDeltas(response.body as unknown as AsyncIterable<Uint8Array>), onProgress);
+    }
+    const clients = this.connectionClients(c);
+    if (c.type === 'anthropic') {
+      const stream = await clients.anthropic().messages.create({
+        model,
+        max_tokens: 4096,
+        messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
+        stream: true,
+      });
+      return streamText(anthropicDeltas(stream), onProgress);
+    }
+    if (c.type === 'gemini') {
+      const stream = await clients.gemini().models.generateContentStream({
+        model,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      });
+      return streamText(geminiDeltas(stream), onProgress);
+    }
+    const stream = await clients.openai().chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      ...(c.baseUrl.includes('api.openai.com') ? { max_completion_tokens: 4096 } : { max_tokens: 4096 }),
+      stream: true,
+    });
+    return streamText(openAIDeltas(stream), onProgress);
+  }
+
   /**
    * Same request as `translateTranscriptText`, read as a stream. `onProgress` gets the text so far,
    * throttled, starting with the first text. Text that has been reported is never taken back, so
@@ -401,6 +521,10 @@ export class LLMHelper {
     fullPrompt: string,
     onProgress: (textSoFar: string) => void
   ): Promise<string> {
+    if (request.provider === 'connection' && request.connection) {
+      return this.streamViaConnection(request.connection, model, fullPrompt, onProgress);
+    }
+
     if (request.provider === 'ollama') {
       const url = (request.ollamaUrl || this.ollamaUrl || "http://localhost:11434").trim();
       const response = await fetch(`${url}/api/generate`, {
@@ -515,6 +639,10 @@ export class LLMHelper {
         if (receivedText || reason !== 'other') throw error;
         console.warn('[LLMHelper] Translation stream failed before any text; retrying without streaming:', reason);
       }
+    }
+
+    if (request.provider === 'connection' && request.connection) {
+      return (await this.translateViaConnection(request.connection, model, fullPrompt)).trim();
     }
 
     if (request.provider === 'ollama') {
@@ -3346,10 +3474,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
 
     if (apiKey) {
       this.apiKey = apiKey;
-      this.client = new GoogleGenAI({
-        apiKey: apiKey,
-        httpOptions: { apiVersion: "v1alpha" }
-      });
+      this.client = this.makeGeminiClient(apiKey);
     } else if (!this.client) {
       throw new Error("No Gemini API key provided and no existing client");
     }

@@ -10,6 +10,8 @@ type PreloadAgentEvent = { meetingId: string } & (
 type PreloadThreadLine = { id: string; role: 'user' | 'assistant' | 'tool'; text: string };
 
 // Types for the exposed Electron API
+type AiConnectionType = 'openai' | 'anthropic' | 'gemini' | 'ollama'
+interface AiConnectionView { id: string; name: string; type: AiConnectionType; baseUrl: string; customBaseUrl: boolean; hasApiKey: boolean; builtin: boolean }
 interface AgentApprovalRequest { id: string; meetingId: string; tool: 'bash' | 'write' | 'edit' | 'read'; target: string; detail?: string; folder: string; outside?: boolean }
 type AgentApprovalEvent = { type: 'requested'; request: AgentApprovalRequest } | { type: 'settled'; id: string; allowed: boolean }
 interface AgentProactiveCard { id: string; meetingId: string; segmentId: string; kind: string; text: string; time: number }
@@ -89,6 +91,12 @@ interface ElectronAPI {
   agentWorkspaceGet: () => Promise<{ root: string; error?: string }>
   agentWorkspacePick: () => Promise<{ canceled: boolean; root?: string; error?: string }>
   agentWorkspaceClear: () => Promise<{ success: boolean }>
+  aiConnectionsList: () => Promise<AiConnectionView[]>
+  aiConnectionSave: (input: { id?: string; name?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; id?: string; error?: string }>
+  aiConnectionDelete: (id: string) => Promise<{ success: boolean }>
+  aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
+  agentModelGet: () => Promise<{ connectionId: string; model: string; supportsImages: boolean }>
+  agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; error?: string }>
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string }>
 
   // STT Provider Management
@@ -602,6 +610,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   agentWorkspaceGet: () => ipcRenderer.invoke("agent-workspace-get"),
   agentWorkspacePick: () => ipcRenderer.invoke("agent-workspace-pick"),
   agentWorkspaceClear: () => ipcRenderer.invoke("agent-workspace-clear"),
+  aiConnectionsList: () => ipcRenderer.invoke("ai-connections-list"),
+  aiConnectionSave: (input: { id?: string; name?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => ipcRenderer.invoke("ai-connection-save", input),
+  aiConnectionDelete: (id: string) => ipcRenderer.invoke("ai-connection-delete", id),
+  aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => ipcRenderer.invoke("ai-connection-models", input),
+  agentModelGet: () => ipcRenderer.invoke("agent-model-get"),
+  agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => ipcRenderer.invoke("agent-model-set", use),
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) =>
     ipcRenderer.invoke("translate-transcript-segment", segment),
 

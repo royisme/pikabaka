@@ -11,6 +11,7 @@ import { registerTranslationHandlers } from "./translation"
 import { registerMiscHandlers } from "./misc"
 import { registerGateHandlers } from "./gate"
 import { registerApprovalHandlers } from "./approval"
+import { registerConnectionHandlers } from "./connections"
 import { registerAgentHandlers } from "./agent"
 
 export function initializeIpcHandlers(appState: AppState): void {
@@ -26,5 +27,6 @@ export function initializeIpcHandlers(appState: AppState): void {
   registerMiscHandlers(appState)
   registerGateHandlers(appState)
   registerApprovalHandlers()
+  registerConnectionHandlers(appState)
   registerAgentHandlers(appState)
 }

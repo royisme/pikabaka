@@ -3,6 +3,8 @@ export interface AgentGateDecision {
   help?: number; kind?: string; kindProbability?: number; latencyMs?: number; outcome: string
 }
 
+export type AiConnectionType = 'openai' | 'anthropic' | 'gemini' | 'ollama'
+export interface AiConnectionView { id: string; name: string; type: AiConnectionType; baseUrl: string; customBaseUrl: boolean; hasApiKey: boolean; builtin: boolean }
 export interface AgentApprovalRequest { id: string; meetingId: string; tool: 'bash' | 'write' | 'edit' | 'read'; target: string; detail?: string; folder: string; outside?: boolean }
 export type AgentApprovalEvent = { type: 'requested'; request: AgentApprovalRequest } | { type: 'settled'; id: string; allowed: boolean }
 export interface AgentProactiveCard { id: string; meetingId: string; segmentId: string; kind: string; text: string; time: number }
@@ -109,6 +111,12 @@ export interface ElectronAPI {
   agentWorkspaceGet: () => Promise<{ root: string; error?: string }>
   agentWorkspacePick: () => Promise<{ canceled: boolean; root?: string; error?: string }>
   agentWorkspaceClear: () => Promise<{ success: boolean }>
+  aiConnectionsList: () => Promise<AiConnectionView[]>
+  aiConnectionSave: (input: { id?: string; name?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; id?: string; error?: string }>
+  aiConnectionDelete: (id: string) => Promise<{ success: boolean }>
+  aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
+  agentModelGet: () => Promise<{ connectionId: string; model: string; supportsImages: boolean }>
+  agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; error?: string }>
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string; translatedText?: string }>
 
   // STT Provider Management
