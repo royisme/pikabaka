@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: R5 early translation design note (branch `early-translation-note`, issue #33)
+
+Done
+- `docs/design-early-translation.md` answers the three questions on #33 from a read-only audit of every STT provider (interim shape, stability data, boundary signal) and of the places where an emitted translation can go stale. Options A (stable-prefix tracker), B (speculative translation at the provider's own boundary) and C (nothing more); recommendation: C now, B if the R1 timing logs show the flush gap is a large share of the wait, not A.
+- Not verified: the audit's "unconfirmed" items (whether ElevenLabs partials are cumulative; that Deepgram interims cover only audio since the last `is_final`); the latency itself (no real call has been logged yet).
+- Owner decisions listed at the end of the note.
+
 ## 2026-10-26: a reopened turn supersedes its old revision at once (branch `reopen-revision-guard`)
 
 Found by the STT audit for R5 (read-only subagent, then checked in the code)

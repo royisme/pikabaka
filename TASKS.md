@@ -47,7 +47,7 @@ Direction: port the ideas from the OmniVoice project (`../OmniVoice`, macOS-only
 | R2 | Streaming translation request and token events; `translationState: 'streaming'`; a reopened turn cancels its request | unit test: a superseded `segmentId + revision` writes nothing; providers that cannot stream deliver one chunk | #30 | done on branch `translation-streaming` (stacked); owner runs a real call per provider |
 | R3 | `committed` plus `preview` event model; the row shows muted preview that disappears when the commit covers it | unit test on the reducer: committed only appends, preview is replaced; committed text never moves | #31 | not needed for streamed LLM text (it is append-only); relevant only for early translation, see R5 |
 | R4 | `EntityMasker` in TypeScript with tests (read the OmniVoice source in full first) | mask and restore tests for URL, path, flag, snake_case, filename, backticks and a model that drops placeholders | #32 | module ported and tested on branch `entity-masker-port`; not wired (speech transcripts rarely contain such entities) |
-| R5 | **Owner decision:** design note for stable-prefix and early translation against second-pass correction; audit which STT providers send full-replace hypotheses | the note answers the three questions on #33 and the owner has agreed | #33 | blocked on R3 |
+| R5 | **Owner decision:** design note for stable-prefix and early translation against second-pass correction; audit which STT providers send full-replace hypotheses | the note answers the three questions on #33 and the owner has agreed | #33 | design note written on branch `early-translation-note`; waits for the owner's three decisions in the note |
 
 ## T. Live translation UI for calls (epic #38)
 
