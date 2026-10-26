@@ -21,7 +21,7 @@
     "clean": "rimraf dist dist-electron",
     "dev": "vite",
     "typecheck": "tsc --noEmit && tsc -p electron/tsconfig.json --noEmit",
-    "lint": "eslint src electron test --no-inline-config --max-warnings 1268",
+    "lint": "eslint src electron test --no-inline-config --max-warnings 1265",
     "test": "tap --node-arg=--import=tsx \"test/**/*.test.ts\"",
     "verify": "pnpm run typecheck && pnpm run lint && pnpm run test",
     "build:web:raw": "pnpm run clean && tsc && vite build",

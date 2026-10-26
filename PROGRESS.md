@@ -2,6 +2,15 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: analytics removed, speaker names settled (branch `remove-analytics`)
+
+Done (owner decisions on 2026-10-26: "remove initAnalytics, we have no such feature"; "the speaker names are Interviewer and Me")
+- The Google Analytics code is removed: `src/lib/analytics/` is deleted and so are `initAnalytics()` (which injected the Google Tag Manager script at every start) and all 30 tracking calls and imports in `App.tsx`, `Launcher.tsx`, `SettingsOverlay.tsx`, `PikaInterface.tsx`, `useMeetingChat.ts` and `ConnectCalendarButton.tsx`. The now-empty app-open and app-close effect in `App.tsx` is gone. A renderer build contains no `googletagmanager` string. The lint warning cap drops from 1268 to 1265 (three removed warnings).
+- Speaker vocabulary: the post-meeting view said "Them"; it now says "Interviewer" (the live overlay already did), with "Me" for the user in both. `PRODUCT.md` records the decision.
+- **Found, not removed:** `InstallPingManager` is active. On the first launch `sendAnonymousInstallPing()` (`electron/lib/lifecycle.ts:69-71`) sends a random install id, the app version and the platform to `https://divine-sun-927d.natively.workers.dev`, once. The repo does not say whose endpoint that is, and the README says "no telemetry runs by default". Waiting for the owner's decision.
+- Verified: both `tsc --noEmit` checks exit 0; lint exit 0 (1265 warnings); tap 786 of 786; a renderer build succeeds.
+- Not verified: the app was not run, so no check that the launcher and settings still behave after the removed lines (the removals were single statements and all type-check).
+
 ## 2026-10-26: fixes from an independent UI review (branch `ui-review-fixes`)
 
 Done (fixes for an independent read-only review of the UI code against Q1 to Q14 by an Opus subagent; its arithmetic was checked on the points below, and a renderer build confirmed that every new class generates CSS)

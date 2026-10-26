@@ -9,7 +9,6 @@ import {
     Pencil, MapPin, HelpCircle, Zap, SlidersHorizontal, PointerOff,
     AlertCircle, Loader2, Shield
 } from 'lucide-react';
-import { analytics } from '../lib/analytics/analytics.service';
 import { AboutSection } from './AboutSection';
 import { AIProvidersSettings } from './settings/AIProvidersSettings';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -1486,7 +1485,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     setIsUndetectable(newState);
                                                     window.electronAPI?.setUndetectable(newState);
                                                     // Analytics: Undetectable Mode Toggle
-                                                    analytics.trackModeSelected(newState ? 'undetectable' : 'overlay');
                                                 }}
                                                 className={`w-11 h-6 rounded-full relative transition-colors ${isUndetectable ? 'bg-accent-primary' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                             >
@@ -1882,7 +1880,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         // @ts-ignore
                                                         window.electronAPI?.setDisguise(option.id);
                                                         // Analytics
-                                                        analytics.trackModeSelected(`disguise_${option.id}`);
                                                     }}
                                                     className={`p-3 rounded-lg border text-left flex items-center gap-3 transition-all ${disguiseMode === option.id
                                                         ? 'bg-accent-primary border-accent-primary text-white shadow-lg shadow-blue-500/20'

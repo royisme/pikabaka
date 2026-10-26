@@ -89,7 +89,7 @@ const MeetingDetails: React.FC<MeetingDetailsProps> = ({ meeting: initialMeeting
                 segmentId: `dashboard_${meeting.id}_${index}`,
                 text: entry.text,
                 speaker: entry.speaker === 'user' ? 'user' : 'interviewer',
-                speakerLabel: entry.speaker === 'user' ? 'Me' : 'Them',
+                speakerLabel: entry.speaker === 'user' ? 'Me' : 'Interviewer',
                 timestamp: entry.timestamp,
             });
             if (result?.success && result?.translatedText) {
@@ -155,7 +155,7 @@ KEY POINTS:
 ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'None'}
             `.trim();
         } else if (activeTab === 'transcript' && meeting.transcript) {
-            textToCopy = meeting.transcript.map(t => `[${formatTime(t.timestamp)}] ${t.speaker === 'user' ? 'Me' : 'Them'}: ${t.text}`).join('\n');
+            textToCopy = meeting.transcript.map(t => `[${formatTime(t.timestamp)}] ${t.speaker === 'user' ? 'Me' : 'Interviewer'}: ${t.text}`).join('\n');
         } else if (activeTab === 'usage' && meeting.usage) {
             textToCopy = meeting.usage.map(u => `Q: ${u.question || ''}\nA: ${u.answer || ''}`).join('\n\n');
         }
@@ -429,7 +429,7 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                                     <div className="flex items-center justify-between mb-1">
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-xs font-semibold text-text-primary">
-                                                                {entry.speaker === 'user' ? 'Me' : 'Them'}
+                                                                {entry.speaker === 'user' ? 'Me' : 'Interviewer'}
                                                             </span>
                                                             <span className="text-xs text-text-secondary font-mono">{entry.timestamp ? formatTime(entry.timestamp) : '0:00'}</span>
                                                         </div>

@@ -34,14 +34,14 @@ node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.t
 | Check | Command | Notes |
 | --- | --- | --- |
 | Typecheck | `pnpm run typecheck` (renderer, then Electron) | both exit 0 |
-| Lint | `pnpm run lint` | ESLint 9 with the plugin's recommended TypeScript set; 1268 existing findings are warnings and the script caps them with `--max-warnings 1268`, so the number may go down and never up. Lower the cap in `package.json` when you fix some. Every other recommended rule is an error |
+| Lint | `pnpm run lint` | ESLint 9 with the plugin's recommended TypeScript set; 1265 existing findings are warnings and the script caps them with `--max-warnings 1265`, so the number may go down and never up. Lower the cap in `package.json` when you fix some. Every other recommended rule is an error |
 | Unit and integration tests | `pnpm run test` (tap over `test/**/*.test.ts`) | 755 passed on 2026-10-26 |
 | Everything | `pnpm run verify` | typecheck, lint, test; the build scripts without `:raw` run it first |
 | Build smoke | `pnpm run build:web:raw` and `build:electron:raw` | what `build-smoke.yml` runs |
 
 CI runs two workflows on pull requests: `verify.yml` (typecheck, lint, tests) and `build-smoke.yml` (the two builds). Neither was exercised on GitHub from this checkout: the files are checked in, and a first run will show whether the macOS runner can run the tests.
 
-Under an agent's shell, run the tools without pnpm when `node_modules` may be out of step (see "pnpm caveat"): `node node_modules/typescript/bin/tsc --noEmit`, `node node_modules/eslint/bin/eslint.js src electron test --no-inline-config --max-warnings 1268`, `node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.ts"`.
+Under an agent's shell, run the tools without pnpm when `node_modules` may be out of step (see "pnpm caveat"): `node node_modules/typescript/bin/tsc --noEmit`, `node node_modules/eslint/bin/eslint.js src electron test --no-inline-config --max-warnings 1265`, `node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.ts"`.
 
 ## UI changes
 

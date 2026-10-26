@@ -32,10 +32,6 @@ const ConnectCalendarButton: React.FC<ConnectCalendarButtonProps> = ({ className
             if (res.success) {
                 setConnected(true);
                 props.onConnect?.();
-                // Track calendar connection
-                import('../../lib/analytics/analytics.service').then(({ analytics }) => {
-                    analytics.trackCalendarConnected();
-                });
             }
         } catch (err) {
             console.error(err);

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { electronChatFetch } from '../lib/electronChatFetch';
-import { analytics } from '../lib/analytics/analytics.service';
 import { userEchoMessage } from '../lib/userEcho';
 
 /** What the user asked last, so a failed or unwanted answer can be asked again. */
@@ -558,7 +557,6 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
 
   const handleWhatToSay = useCallback(async () => {
     remember({ kind: 'what_to_say' });
-    analytics.trackCommandExecuted('what_to_say');
     await submitPrompt({
       userText: attachedContext.length > 0
         ? 'What should I say about this?'
@@ -571,7 +569,6 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   const handleFollowUp = useCallback(async (intent: string = 'rephrase') => {
     remember(null);
     beginProcessing();
-    analytics.trackCommandExecuted('follow_up_' + intent);
     try {
       await window.electronAPI.generateFollowUp(intent);
     } catch (err) {
@@ -587,7 +584,6 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   const handleCodeHint = useCallback(async () => {
     remember({ kind: 'code_hint' });
     beginProcessing();
-    analytics.trackCommandExecuted('code_hint');
 
     const currentAttachments = attachedContext;
     if (currentAttachments.length > 0) {

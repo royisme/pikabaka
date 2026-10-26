@@ -4,7 +4,6 @@ import ChatColumn from './meeting/ChatColumn';
 import SplitterShell from './meeting/SplitterShell';
 import TranscriptColumn from './meeting/TranscriptColumn';
 import OverlayTopBar from './meeting/OverlayTopBar';
-import { analytics } from '../lib/analytics/analytics.service';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { getDefaultOverlayOpacity, getOverlayAppearance } from '../lib/overlayAppearance';
@@ -57,7 +56,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     useEffect(() => { if (isExpanded) { window.electronAPI.showWindow(isStealthRef.current); isStealthRef.current = false; } else setTimeout(() => window.electronAPI.hideWindow(), 400); }, [isExpanded]);
     useEffect(() => window.electronAPI?.onToggleExpand?.(() => setIsExpanded((prev) => !prev)), []);
     useEffect(() => window.electronAPI?.onEnsureExpanded?.(() => { isStealthRef.current = true; setIsExpanded(true); }), []);
-    useEffect(() => window.electronAPI?.onSessionReset?.(() => { console.log('[PikaInterface] Resetting session state...'); chat.setSystemMessages([]); chat.setInputValue(''); chat.setAttachedContext([]); audio.setManualTranscript(''); audio.setVoiceInput(''); chat.setIsProcessing(false); analytics.trackConversationStarted(); }), [chat.setSystemMessages, chat.setInputValue, chat.setAttachedContext, audio.setManualTranscript, audio.setVoiceInput, chat.setIsProcessing]);
+    useEffect(() => window.electronAPI?.onSessionReset?.(() => { console.log('[PikaInterface] Resetting session state...'); chat.setSystemMessages([]); chat.setInputValue(''); chat.setAttachedContext([]); audio.setManualTranscript(''); audio.setVoiceInput(''); chat.setIsProcessing(false); }), [chat.setSystemMessages, chat.setInputValue, chat.setAttachedContext, audio.setManualTranscript, audio.setVoiceInput, chat.setIsProcessing]);
 
     const handleScreenshotAttach = useCallback((data: ScreenshotAttachment) => { setIsExpanded(true); chat.setAttachedContext((prev) => (prev.some((s) => s.path === data.path) ? prev : [...prev, data].slice(-5))); }, [chat.setAttachedContext]);
     const shownMessageIdRef = useRef<string | undefined>(undefined);
