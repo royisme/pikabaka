@@ -3,6 +3,7 @@ import { Languages, TriangleAlert } from 'lucide-react';
 import type { TranscriptDisplayMode, TranscriptSegment } from '../../lib/transcriptSegments';
 import { rowSlot, transcriptRowParts, type RowSlot } from '../../lib/transcriptRow';
 import { countNewRows, isNearBottom, nextTranscriptScroll } from '../../lib/answerScroll';
+import { nextAnnouncement } from '../../lib/transcriptAnnounce';
 
 interface TranscriptNotesProps {
     segments: TranscriptSegment[];
@@ -83,6 +84,19 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
 
     const slotContext = { mode: displayMode, translationOn, now };
 
+    // Screen readers hear each finished translation once. The list itself is not a live region.
+    const announcedRef = useRef<Set<string> | null>(null);
+    const [announcement, setAnnouncement] = useState('');
+    useEffect(() => {
+        const first = announcedRef.current === null;
+        const announced = (announcedRef.current ??= new Set<string>());
+        const next = nextAnnouncement(segments, announced);
+        if (!next) return;
+        next.keys.forEach((key) => announced.add(key));
+        // What is already on screen when the list first appears is not read out.
+        if (!first) setAnnouncement(next.text);
+    }, [segments]);
+
     const newestOtherIndex = useMemo(() => {
         for (let i = segments.length - 1; i >= 0; i--) {
             if (!isOwnSpeech(segments[i])) return i;
@@ -108,6 +122,15 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
         setRowsWhenFollowStopped((stopped) => (near ? null : stopped ?? segments.length));
     };
 
+    // Enter on the focused list opens or closes the newest other-party row. The arrow, Page and
+    // Home/End keys are the browser's own for a focused scroller; reaching the bottom resumes following.
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key !== 'Enter' || event.target !== event.currentTarget || newestOtherIndex < 0) return;
+        event.preventDefault();
+        const id = segments[newestOtherIndex].segmentId;
+        setExpandedId((current) => (current === id ? null : id));
+    };
+
     const jumpToLatest = () => {
         const el = containerRef.current;
         if (!el) return;
@@ -127,7 +150,10 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
             <div
                 ref={containerRef}
                 onScroll={handleScroll}
-                aria-live="polite"
+                onKeyDown={handleKeyDown}
+                role="log"
+                aria-live="off"
+                tabIndex={0}
                 aria-label="Meeting transcript"
                 className="h-full w-full overflow-y-auto px-4 pt-2 pb-1"
             >
@@ -218,6 +244,10 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                         </div>
                     )}
                 </div>
+            </div>
+
+            <div className="sr-only" aria-live="polite" aria-atomic="true">
+                {announcement}
             </div>
 
             {rowsWhenFollowStopped !== null && (

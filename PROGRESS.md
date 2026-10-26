@@ -2,6 +2,15 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: T6 announcer and keyboard (branch `transcript-a11y`, epic #38)
+
+Done
+- The transcript list is now `role="log"` with `aria-live="off"` and one tab stop (`tabIndex=0`). The browser's own keys scroll it (arrows, Page Up/Down, Home, End); reaching the bottom resumes following through the scroll handler from T2. Enter on the focused list opens or closes the newest other-party row.
+- A visually hidden polite region announces each finished, current translation of the other party once (`nextAnnouncement`, `src/lib/transcriptAnnounce.ts`). Partial text, pending, failed, stale, same-language and own-speech rows are never read; a burst announces only the newest and marks the older ones. What is on screen when the list first appears is not read out.
+- Verified: both `tsc --noEmit` checks exit 0; tap passes (6 new assertions for what is and is not announced).
+- Not verified: with VoiceOver (macOS) or NVDA (Windows): that the announcement is read once, that tab order reaches the list from the header controls, and that Enter on the focused list behaves as intended. No screen reader was run.
+- Not done: the spec's custom key handling beyond Enter (40px steps, Cmd+Up/Down interplay with the answer list); the browser defaults are used.
+
 ## 2026-10-26: T5 header controls and status dot (branch `transcript-header`, epic #38)
 
 Done
