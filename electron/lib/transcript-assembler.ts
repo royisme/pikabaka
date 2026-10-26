@@ -483,7 +483,7 @@ type TranslationConfig = {
   targetLanguageKey: string;
   oaiCompat?: { id: string; baseUrl: string; apiKey: string; preferredModel?: string };
   /** The connection chosen for translation (any type and host), when it exists and can be used. */
-  connection?: { type: 'openai' | 'anthropic' | 'gemini' | 'ollama'; baseUrl: string; apiKey: string };
+  connection?: { type: 'openai' | 'anthropic' | 'gemini'; baseUrl: string; apiKey: string };
   standardProviders: Set<string>;
   isConfigured: boolean;
 };

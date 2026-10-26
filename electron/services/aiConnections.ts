@@ -3,9 +3,9 @@
 // Pika is not tied to any provider: OpenAI, Groq, OpenRouter, a gateway of your own and the like
 // are all the `openai` type with their own host; Claude and compatible services are `anthropic`.
 
-export type ConnectionType = 'openai' | 'anthropic' | 'gemini' | 'ollama';
+export type ConnectionType = 'openai' | 'anthropic' | 'gemini';
 
-export const CONNECTION_TYPES: ConnectionType[] = ['openai', 'anthropic', 'gemini', 'ollama'];
+export const CONNECTION_TYPES: ConnectionType[] = ['openai', 'anthropic', 'gemini'];
 
 /** The built-in connections: where each type is reached by default. Their host can be overridden. */
 export const BUILTIN_CONNECTIONS = [
@@ -13,7 +13,6 @@ export const BUILTIN_CONNECTIONS = [
     { id: 'openai', name: 'OpenAI', type: 'openai', defaultBaseUrl: 'https://api.openai.com/v1' },
     { id: 'claude', name: 'Anthropic Claude', type: 'anthropic', defaultBaseUrl: 'https://api.anthropic.com' },
     { id: 'groq', name: 'Groq', type: 'openai', defaultBaseUrl: 'https://api.groq.com/openai/v1' },
-    { id: 'ollama', name: 'Ollama (local)', type: 'ollama', defaultBaseUrl: 'http://localhost:11434' },
 ] as const satisfies ReadonlyArray<{ id: string; name: string; type: ConnectionType; defaultBaseUrl: string }>;
 
 export type BuiltinConnectionId = (typeof BUILTIN_CONNECTIONS)[number]['id'];
@@ -84,4 +83,4 @@ export function isLoopbackUrl(baseUrl: string): boolean {
     }
 }
 
-export const connectionNeedsKey = (type: ConnectionType, baseUrl: string): boolean => type !== 'ollama' && !isLoopbackUrl(baseUrl);
+export const connectionNeedsKey = (baseUrl: string): boolean => !isLoopbackUrl(baseUrl);

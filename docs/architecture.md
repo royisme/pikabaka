@@ -21,7 +21,9 @@ Channel groups: window control, LLM switching and keys, audio and STT control, s
 
 ## AI providers
 
-- **LLM:** OpenAI, Anthropic, Gemini, Groq, Ollama and OpenAI-compatible custom endpoints, routed through `LLMHelper` (`electron/core/LLMHelper.ts`).
+- **Connections:** OpenAI-compatible, Anthropic and Gemini protocols (`electron/services/aiConnections.ts`), with a host and optional local-host key. Built-ins are Gemini, OpenAI, Claude and Groq; local servers such as Ollama and LM Studio are ordinary OpenAI-compatible connections. `CredentialsManager` drops stored connections of unsupported types when read.
+- **Model uses:** Quick answers (`chat`), summaries and the agent each select a connection and exact model id through `electron/ipc/connections.ts`. Empty summary/agent connections inherit Quick answers; an unchosen Quick answers row returns a setup error, never a guessed provider or default model. Settings and the top-bar selector read the same rows. `LLMHelper.streamChat` routes through the chat row; summaries/titles use the summary row, and `electron/agent/models.ts` resolves the agent row. Other legacy LLM paths still use provider keys directly.
+- **Legacy LLM paths:** screenshot analysis, suggestions, RAG chat, `chatWithGemini` and the legacy translation-provider list retain direct provider-key routing. The `chat:stream-meeting` RAG handler reads the chosen chat model instead of the removed default setting, but its prefix-based provider routing is unchanged.
 - **STT:** Google Cloud Speech (default), Deepgram, ElevenLabs, Soniox, OpenAI (WebSocket with REST fallback), Groq, Azure, IBM Watson, under `electron/audio/`. Falls back to Google on failure.
 - **RAG:** cascading embeddings (OpenAI, Gemini, Ollama, then a bundled local model) stored in SQLite with `sqlite-vec` (`electron/rag/`, `electron/db/`).
 

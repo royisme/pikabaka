@@ -10,7 +10,7 @@ type PreloadAgentEvent = { meetingId: string } & (
 type PreloadThreadLine = { id: string; role: 'user' | 'assistant' | 'tool'; text: string };
 
 // Types for the exposed Electron API
-type AiConnectionType = 'openai' | 'anthropic' | 'gemini' | 'ollama'
+type AiConnectionType = 'openai' | 'anthropic' | 'gemini'
 interface AiConnectionView { id: string; name: string; type: AiConnectionType; baseUrl: string; customBaseUrl: boolean; hasApiKey: boolean; builtin: boolean }
 interface AgentApprovalRequest { id: string; meetingId: string; tool: 'bash' | 'write' | 'edit' | 'read'; target: string; detail?: string; folder: string; outside?: boolean }
 type AgentApprovalEvent = { type: 'requested'; request: AgentApprovalRequest } | { type: 'settled'; id: string; allowed: boolean }
@@ -65,10 +65,7 @@ interface ElectronAPI {
   quitApp: () => Promise<void>
 
   // LLM Model Management
-  getCurrentLlmConfig: () => Promise<{ provider: "ollama" | "gemini"; model: string; isOllama: boolean }>
   getAvailableOllamaModels: () => Promise<string[]>
-  switchToOllama: (model?: string, url?: string) => Promise<{ success: boolean; error?: string }>
-  switchToGemini: (apiKey?: string, modelId?: string) => Promise<{ success: boolean; error?: string }>
   testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey?: string) => Promise<{ success: boolean; error?: string }>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
 
@@ -181,11 +178,7 @@ interface ElectronAPI {
   onIntelligenceError: (callback: (data: { error: string; mode: string }) => void) => () => void
 
   // Model Management
-  getDefaultModel: () => Promise<{ model: string }>
-  setModel: (modelId: string) => Promise<{ success: boolean; error?: string }>
-  setDefaultModel: (modelId: string) => Promise<{ success: boolean; error?: string }>
   toggleModelSelector: (coords: { x: number; y: number }) => Promise<void>
-  forceRestartOllama: () => Promise<void>
 
   // Settings Window
   toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>
@@ -574,10 +567,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   // LLM Model Management
-  getCurrentLlmConfig: () => ipcRenderer.invoke("get-current-llm-config"),
   getAvailableOllamaModels: () => ipcRenderer.invoke("get-available-ollama-models"),
-  switchToOllama: (model?: string, url?: string) => ipcRenderer.invoke("switch-to-ollama", model, url),
-  switchToGemini: (apiKey?: string, modelId?: string) => ipcRenderer.invoke("switch-to-gemini", apiKey, modelId),
   testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey: string) => ipcRenderer.invoke("test-llm-connection", provider, apiKey),
   selectServiceAccount: () => ipcRenderer.invoke("select-service-account"),
 
@@ -897,11 +887,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   // Model Management
-  getDefaultModel: () => ipcRenderer.invoke('get-default-model'),
-  setModel: (modelId: string) => ipcRenderer.invoke('set-model', modelId),
-  setDefaultModel: (modelId: string) => ipcRenderer.invoke('set-default-model', modelId),
   toggleModelSelector: (coords: { x: number; y: number }) => ipcRenderer.invoke('toggle-model-selector', coords),
-  forceRestartOllama: () => ipcRenderer.invoke('force-restart-ollama'),
 
   // Settings Window
   toggleSettingsWindow: (coords?: { x: number; y: number }) => ipcRenderer.invoke('toggle-settings-window', coords),

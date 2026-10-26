@@ -65,8 +65,7 @@ export function registerConnectionHandlers(appState: AppState): void {
   })
 
   // The model of quick answers ("chat") and of meeting summaries ("summary"): a connection and a model id.
-  // An empty connection means "not chosen": quick answers then use the model chosen before connections existed,
-  // and summaries use the quick-answers model.
+  // An empty chat connection means "not chosen"; summaries inherit the quick-answers model.
   for (const job of ['chat', 'summary'] as const) {
     safeHandle(`${job}-model-get`, async () => CredentialsManager.getInstance().getModelUse(job))
 
@@ -76,6 +75,7 @@ export function registerConnectionHandlers(appState: AppState): void {
       if (use.connectionId && !cm.resolveConnection(use.connectionId)) return { success: false, error: 'That connection does not exist' }
       cm.setModelUse(job, use)
       if (job === 'chat') {
+        appState.modelSelectorWindowHelper.hideWindow();
         for (const win of BrowserWindow.getAllWindows()) {
           if (!win.isDestroyed()) win.webContents.send('model-changed', use.model)
         }

@@ -952,21 +952,6 @@ export class AppState {
       await this.getMeetingAgent().deleteStore(agentMeetingId).catch(error => reportAgentError(error, agentMeetingId));
     }
 
-    // Revert to Default Model — synchronous, no blocking I/O
-    try {
-      const { CredentialsManager } = require('./services/CredentialsManager');
-      const cm = CredentialsManager.getInstance();
-      const defaultModel = cm.getDefaultModel();
-      const all = cm.getMergedLlmCustomProviders();
-      console.log(`[Main] Reverting model to default: ${defaultModel}`);
-      this.processingHelper.getLLMHelper().setModel(defaultModel, all);
-      BrowserWindow.getAllWindows().forEach(win => {
-        if (!win.isDestroyed()) win.webContents.send('model-changed', defaultModel);
-      });
-    } catch (e) {
-      console.error('[Main] Failed to revert model:', e);
-    }
-
     // ─── Background post-processing ──────────────────────────────────────────
     // These are the previously blocking operations that caused the stop-button
     // delay. They are pure background tasks with no UI dependency:

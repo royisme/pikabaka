@@ -10,7 +10,8 @@ Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR 
 
 - Phase A done: Fast Response Mode and cURL providers removed end to end. Both typechecks and lint exit 0; tests exit 1 only for the missing DOCX fixture. Owner runtime checks remain.
 - Phase B done: Connections, three model-use rows and the quick-answers selectors replace Active Model and the local-provider UI. Both typechecks and lint exit 0; tests exit 1 only for the missing DOCX fixture. Owner runtime checks remain.
-- Next: Phase C, remove the Ollama connection type and unused default-model plumbing. Local model servers use OpenAI-compatible connections; embedding/RAG Ollama stays. No Audio translation or speech-recognition changes.
+- Phase C done: Ollama connection type, default-model storage accessors/IPC, prefix guessing for jobs and startup/meeting-end restoration removed. Both typechecks and lint exit 0; tests exit 1 only for the missing DOCX fixture. Local model servers use OpenAI-compatible connections; embedding/RAG Ollama stays.
+- Next: owner runtime acceptance of the settings rows, selector, inherited models, missing-selection errors and local servers. Legacy screenshot/suggestion/RAG/translation key routing remains outside this dispatch, including RAG's Ollama-prefixed id branch. No Audio translation or speech-recognition UI changes.
 
 ## Order
 

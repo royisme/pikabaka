@@ -111,14 +111,6 @@ export class ProcessingHelper {
       console.warn('[ProcessingHelper] ModelVersionManager initialization failed (non-critical):', err.message);
     });
 
-    // NEW: Load Default Model Config
-    const defaultModel = credManager.getDefaultModel();
-    if (defaultModel) {
-      console.log(`[ProcessingHelper] Loading stored Default Model: ${defaultModel}`);
-      const allProviders = credManager.getMergedLlmCustomProviders();
-      this.llmHelper.setModel(defaultModel, allProviders);
-    }
-
     // Load Languages
     const sttLanguage = credManager.getSttLanguage();
     const aiResponseLanguage = credManager.getAiResponseLanguage();

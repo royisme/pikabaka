@@ -566,20 +566,6 @@ export function registerCoreHandlers(appState: AppState): void {
   });
 
   // LLM Model Management Handlers
-  safeHandle("get-current-llm-config", async () => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      return {
-        provider: llmHelper.getCurrentProvider(),
-        model: llmHelper.getCurrentModel(),
-        isOllama: llmHelper.isUsingOllama()
-      };
-    } catch (error: any) {
-      // console.error("Error getting current LLM config:", error);
-      throw error;
-    }
-  });
-
   safeHandle("get-available-ollama-models", async () => {
     try {
       const llmHelper = appState.processingHelper.getLLMHelper();
@@ -591,43 +577,6 @@ export function registerCoreHandlers(appState: AppState): void {
     }
   });
 
-  safeHandle("switch-to-ollama", async (_, model?: string, url?: string) => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      await llmHelper.switchToOllama(model, url);
-      return { success: true };
-    } catch (error: any) {
-      // console.error("Error switching to Ollama:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle("force-restart-ollama", async () => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      const success = await llmHelper.forceRestartOllama();
-      return { success };
-    } catch (error: any) {
-      console.error("Error force restarting Ollama:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle('restart-ollama', async () => {
-    try {
-      // First try to kill it if it's running
-      await appState.processingHelper.getLLMHelper().forceRestartOllama();
-
-      // The forceRestartOllama now calls OllamaManager.getInstance().init() internally
-      // so we don't need to do it again here.
-
-      return true;
-    } catch (error: any) {
-      console.error("[IPC restart-ollama] Failed to restart:", error);
-      return false;
-    }
-  });
-
   safeHandle("ensure-ollama-running", async () => {
     try {
       const { OllamaManager } = require('../services/OllamaManager');
@@ -635,24 +584,6 @@ export function registerCoreHandlers(appState: AppState): void {
       return { success: true };
     } catch (error: any) {
       return { success: false, message: error.message };
-    }
-  });
-
-  safeHandle("switch-to-gemini", async (_, apiKey?: string, modelId?: string) => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      await llmHelper.switchToGemini(apiKey, modelId);
-
-      // Persist API key if provided
-      if (apiKey) {
-        const { CredentialsManager } = require('../services/CredentialsManager');
-        CredentialsManager.getInstance().setGeminiApiKey(apiKey);
-      }
-
-      return { success: true };
-    } catch (error: any) {
-      // console.error("Error switching to Gemini:", error);
-      return { success: false, error: error.message };
     }
   });
 

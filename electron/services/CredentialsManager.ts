@@ -28,9 +28,9 @@ export interface StoredCredentials {
     claudeApiKey?: string;
     googleServiceAccountPath?: string;
     openaiCompatibleProviders?: OpenAICompatibleProvider[];
-    /** Host overrides of the built-in connections (gemini, openai, claude, groq, ollama), by id. */
+    /** Host overrides of the built-in connections (gemini, openai, claude, groq), by id. */
     connectionBaseUrls?: Record<string, string>;
-    /** Quick answers and chat: a connection and an exact model id. Unset means the legacy `defaultModel` decides. */
+    /** Quick answers and chat: a connection and an exact model id. Unset means not chosen. */
     chatConnectionId?: string;
     chatModel?: string;
     /** Meeting summaries and titles. Unset means the same as quick answers. */
@@ -41,7 +41,6 @@ export interface StoredCredentials {
     agentModel?: string;
     /** Whether that model reads images (unknown for a model Pika has not been told about). */
     agentModelImages?: boolean;
-    defaultModel?: string;
     // STT Provider settings
     sttProvider?: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox';
     groqSttApiKey?: string;
@@ -305,9 +304,6 @@ export class CredentialsManager {
         this.credentials.transcriptTranslationTargetLanguage = key;
         this.saveCredentials();
     }
-    public getDefaultModel(): string {
-        return this.credentials.defaultModel || 'gemini-3.1-flash-lite-preview';
-    }
 
     public getAllCredentials(): StoredCredentials {
         return { ...this.credentials };
@@ -467,12 +463,6 @@ export class CredentialsManager {
         this.saveCredentials();
         console.log(`[CredentialsManager] Transcript Translation Display Mode set to: ${mode}`);
     }
-    public setDefaultModel(model: string): void {
-        this.credentials.defaultModel = model;
-        this.saveCredentials();
-        console.log(`[CredentialsManager] Default Model set to: ${model}`);
-    }
-
     public getPreferredModel(provider: 'gemini' | 'groq' | 'openai' | 'claude'): string | undefined {
         const key = `${provider}PreferredModel` as keyof StoredCredentials;
         return this.credentials[key] as string | undefined;
@@ -502,17 +492,16 @@ export class CredentialsManager {
         const builtin = BUILTIN_CONNECTIONS.find(c => c.id === id);
         if (builtin) {
             const override = this.credentials.connectionBaseUrls?.[id];
-            const envOllama = id === 'ollama' ? process.env.OLLAMA_URL : undefined;
             return {
                 id,
                 name: builtin.name,
                 type: builtin.type,
-                baseUrl: normalizeBaseUrl(override) ?? normalizeBaseUrl(envOllama) ?? builtin.defaultBaseUrl,
+                baseUrl: normalizeBaseUrl(override) ?? builtin.defaultBaseUrl,
                 apiKey: this.builtinKey(id),
                 builtin: true,
             };
         }
-        const custom = (this.credentials.openaiCompatibleProviders || []).find(p => p.id === id);
+        const custom = this.getOpenAICompatibleProviders().find(p => p.id === id);
         if (!custom) return undefined;
         return {
             id,
@@ -526,7 +515,7 @@ export class CredentialsManager {
 
     /** Every connection, built-in ones first, for the settings screen: no key leaves the main process. */
     public listConnections(): ConnectionView[] {
-        const ids = [...BUILTIN_CONNECTIONS.map(c => c.id as string), ...(this.credentials.openaiCompatibleProviders || []).map(p => p.id)];
+        const ids = [...BUILTIN_CONNECTIONS.map(c => c.id as string), ...this.getOpenAICompatibleProviders().map(p => p.id)];
         return ids.flatMap(id => {
             const connection = this.resolveConnection(id);
             if (!connection) return [];
@@ -546,7 +535,7 @@ export class CredentialsManager {
     /** Whether the connection can be used as it is: a key where one is needed. */
     public isConnectionReady(id: string): boolean {
         const connection = this.resolveConnection(id);
-        return !!connection && (connection.apiKey !== '' || !connectionNeedsKey(connection.type, connection.baseUrl));
+        return !!connection && (connection.apiKey !== '' || !connectionNeedsKey(connection.baseUrl));
     }
 
     /**
@@ -622,35 +611,15 @@ export class CredentialsManager {
         this.saveCredentials();
     }
 
-    /**
-     * The connection and model a job uses. Quick answers fall back to the model chosen before connections
-     * existed (`defaultModel`), read once as a starting point; summaries fall back to quick answers.
-     */
-    public resolveModelUse(job: 'chat' | 'summary'): { connection: Connection; model: string } | { error: string } {
-        let use = this.getModelUse(job);
-        if (!use.connectionId && job === 'summary') use = this.getModelUse('chat');
-        if (!use.connectionId || !use.model) {
-            const legacy = this.legacyChatUse();
-            if (!legacy) return { error: job === 'chat' ? 'Choose the quick answers model in Settings, AI Providers' : 'Choose the summary model in Settings, AI Providers' };
-            use = legacy;
-        }
+    /** Summaries and the agent inherit quick answers only when their own connection is empty. */
+    public resolveModelUse(job: 'chat' | 'summary' | 'agent'): { connection: Connection; model: string } | { error: string } {
+        let use = job === 'agent' ? this.getAgentUse() : this.getModelUse(job);
+        if (!use.connectionId && job !== 'chat') use = this.getModelUse('chat');
+        if (!use.connectionId || !use.model) return { error: 'Choose the quick answers model in Settings, AI Providers' };
         const connection = this.resolveConnection(use.connectionId);
         if (!connection) return { error: 'The connection chosen for this job no longer exists' };
-        if (!connection.apiKey && connectionNeedsKey(connection.type, connection.baseUrl)) return { error: `No API key is saved for ${connection.name}` };
+        if (!connection.apiKey && connectionNeedsKey(connection.baseUrl)) return { error: `No API key is saved for ${connection.name}` };
         return { connection, model: use.model };
-    }
-
-    /** The old single "active model" id, mapped to a connection by what it looks like. Only a starting point. */
-    private legacyChatUse(): { connectionId: string; model: string } | undefined {
-        const id = this.credentials.defaultModel || 'gemini-3.1-flash-lite-preview';
-        if (id.startsWith('ollama-')) return { connectionId: 'ollama', model: id.slice('ollama-'.length) };
-        const custom = (this.credentials.openaiCompatibleProviders || []).find(p => p.id === id);
-        if (custom) return custom.preferredModel ? { connectionId: custom.id, model: custom.preferredModel } : undefined;
-        if (id.startsWith('gemini-') || id.startsWith('models/')) return { connectionId: 'gemini', model: id.replace(/^models\//, '') };
-        if (id.startsWith('claude-')) return { connectionId: 'claude', model: id };
-        if (id.startsWith('gpt-') || id.startsWith('o1-') || id.startsWith('o3-')) return { connectionId: 'openai', model: id };
-        if (id.startsWith('llama-') || id.startsWith('mixtral-') || id.startsWith('gemma-')) return { connectionId: 'groq', model: id };
-        return undefined;
     }
 
     public getAgentUse(): { connectionId: string; model: string; supportsImages: boolean } {
@@ -669,12 +638,7 @@ export class CredentialsManager {
     }
 
     public getOpenAICompatibleProviders(): OpenAICompatibleProvider[] {
-        return this.credentials.openaiCompatibleProviders || [];
-    }
-
-    /** Non-built-in connections retained for legacy model routing. */
-    public getMergedLlmCustomProviders(): OpenAICompatibleProvider[] {
-        return this.getOpenAICompatibleProviders();
+        return (this.credentials.openaiCompatibleProviders || []).filter(p => p.type === undefined || CONNECTION_TYPES.includes(p.type));
     }
 
     public saveOpenAICompatibleProvider(provider: OpenAICompatibleProvider): void {

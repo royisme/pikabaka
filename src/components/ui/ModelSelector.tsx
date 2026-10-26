@@ -23,8 +23,13 @@ export const QuickAnswersPicker = () => {
             setDraft(null);
         },
     });
-    useMainEvent(window.electronAPI?.onModelChanged, () => { void queryClient.invalidateQueries(['chat-model']); });
+    useMainEvent(window.electronAPI?.onModelChanged, () => {
+        setDraft(null);
+        void queryClient.invalidateQueries(['chat-model']);
+    });
     useWindowEvent('focus', () => {
+        setDraft(null);
+        save.reset();
         void queryClient.invalidateQueries(['chat-model']);
         void queryClient.invalidateQueries(['ai-connections']);
     });

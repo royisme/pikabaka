@@ -2,10 +2,7 @@ import { ipcRenderer } from "electron"
 
 export function llmChannels() {
   return {
-    getCurrentLlmConfig: () => ipcRenderer.invoke("get-current-llm-config"),
     getAvailableOllamaModels: () => ipcRenderer.invoke("get-available-ollama-models"),
-    switchToOllama: (model?: string, url?: string) => ipcRenderer.invoke("switch-to-ollama", model, url),
-    switchToGemini: (apiKey?: string, modelId?: string) => ipcRenderer.invoke("switch-to-gemini", apiKey, modelId),
     testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey: string) => ipcRenderer.invoke("test-llm-connection", provider, apiKey),
     selectServiceAccount: () => ipcRenderer.invoke("select-service-account"),
     setGeminiApiKey: (apiKey: string) => ipcRenderer.invoke("set-gemini-api-key", apiKey),
@@ -35,11 +32,7 @@ export function llmChannels() {
         ipcRenderer.removeListener("gemini-stream-error", subscription)
       }
     },
-    getDefaultModel: () => ipcRenderer.invoke('get-default-model'),
-    setModel: (modelId: string) => ipcRenderer.invoke('set-model', modelId),
-    setDefaultModel: (modelId: string) => ipcRenderer.invoke('set-default-model', modelId),
     toggleModelSelector: (coords: { x: number; y: number }) => ipcRenderer.invoke('toggle-model-selector', coords),
-    forceRestartOllama: () => ipcRenderer.invoke('force-restart-ollama'),
     getOpenAICompatibleProviders: () => ipcRenderer.invoke('get-openai-compatible-providers'),
     saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) =>
       ipcRenderer.invoke('save-openai-compatible-provider', provider),

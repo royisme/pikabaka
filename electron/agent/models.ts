@@ -5,7 +5,7 @@ import { loadAgentRuntime } from './loader';
 import { GateError, type GateClassify, type GateErrorClass, type GateKind } from './gate';
 
 // The agent's model is a connection (type, host, key) and a model id, both chosen by the user. Pika
-// is not tied to a provider: any host of the openai, anthropic, gemini or ollama type works, and
+// is not tied to a provider: any host of the openai, anthropic or gemini type works, and
 // the exact model id typed or fetched is the one that runs. It is registered with pi-ai as it is,
 // so an id pi-ai has never heard of runs as itself and is never swapped for another model.
 
@@ -19,7 +19,7 @@ export interface ModelConfigSource { resolve(): Promise<AgentModelResult> }
 
 /** Answers only for this connection, from Pika's own store. pi-ai's ambient (environment) auth stays off. */
 export function createConnectionCredentialStore(connection: Connection): CredentialStore {
-  const key = () => connection.apiKey.trim() || (connectionNeedsKey(connection.type, connection.baseUrl) ? '' : 'none');
+  const key = () => connection.apiKey.trim() || (connectionNeedsKey(connection.baseUrl) ? '' : 'none');
   return {
     async read(providerId) {
       return providerId === connection.id && key() ? { type: 'api_key', key: key() } : undefined;
@@ -63,8 +63,7 @@ export async function buildAgentModel(connection: Connection, modelId: string, s
       api: runtime.googleApi.googleGenerativeAIApi(),
     });
   } else {
-    // openai, and ollama through its OpenAI-compatible endpoint.
-    const root = connection.type === 'ollama' ? `${connection.baseUrl}/v1` : openAiRoot(connection.baseUrl);
+    const root = openAiRoot(connection.baseUrl);
     provider = runtime.ai.createProvider({
       id: connection.id, name: connection.name, auth,
       models: [{ ...common, api: 'openai-completions', baseUrl: root }],
@@ -79,39 +78,14 @@ export async function buildAgentModel(connection: Connection, modelId: string, s
   return { models, ref: { provider: connection.id, modelId }, supportsImages };
 }
 
-/** The family of a model id, used only to choose a default connection when the agent has none of its own. */
-function defaultConnectionFor(modelId: string): string | undefined {
-  if (modelId.startsWith('gemini-') || modelId.startsWith('models/')) return 'gemini';
-  if (modelId.startsWith('claude-')) return 'claude';
-  if (modelId.startsWith('gpt-') || modelId.startsWith('o1-') || modelId.startsWith('o3-') || modelId.includes('openai')) return 'openai';
-  if (modelId.startsWith('llama-') || modelId.startsWith('mixtral-') || modelId.startsWith('gemma-')) return 'groq';
-  return undefined;
-}
-
-/**
- * The agent's own choice (Settings, Agent) when there is one. Without it the agent uses the model the
- * chat uses, on the connection that model belongs to, with that exact id: a first run needs no setup,
- * and no other model is ever substituted.
- */
+/** The agent's own choice, or the exact Quick answers connection and model when it inherits. */
 export async function resolveAgentModel(
-  llmHelper: { getCurrentModel(): string; isUsingOllama(): boolean },
-  credentials: Pick<CredentialsManager, 'getAgentUse' | 'resolveConnection' | 'getMergedLlmCustomProviders'>,
+  credentials: Pick<CredentialsManager, 'getAgentUse' | 'resolveModelUse'>,
 ): Promise<AgentModelResult> {
+  const resolved = credentials.resolveModelUse('agent');
+  if ('error' in resolved) return { ok: false, reason: resolved.error };
   const use = credentials.getAgentUse();
-  let connectionId = use.connectionId;
-  let modelId = use.model;
-  if (!connectionId || !modelId) {
-    if (llmHelper.isUsingOllama()) return { ok: false, reason: 'Choose the agent model in Settings' };
-    modelId = llmHelper.getCurrentModel();
-    const custom = credentials.getMergedLlmCustomProviders().some(provider => provider.id === modelId);
-    const guessed = custom ? undefined : defaultConnectionFor(modelId);
-    if (!guessed) return { ok: false, reason: 'Choose the agent model in Settings' };
-    connectionId = guessed;
-  }
-  const connection = credentials.resolveConnection(connectionId);
-  if (!connection) return { ok: false, reason: 'The agent connection no longer exists' };
-  if (!connection.apiKey && connectionNeedsKey(connection.type, connection.baseUrl)) return { ok: false, reason: `No API key is saved for ${connection.name}` };
-  return { ok: true, model: await buildAgentModel(connection, modelId, use.connectionId ? use.supportsImages : false) };
+  return { ok: true, model: await buildAgentModel(resolved.connection, resolved.model, use.connectionId ? use.supportsImages : false) };
 }
 
 // ---- The decision model behind the proactive gate (D4: configurable only) ----

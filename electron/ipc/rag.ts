@@ -231,7 +231,9 @@ export function registerRagHandlers(appState: AppState): void {
 
     try {
       const cm = CredentialsManager.getInstance();
-      const currentModel = cm.getDefaultModel();
+      const use = cm.resolveModelUse('chat');
+      if ('error' in use) throw new Error(use.error);
+      const currentModel = use.model;
 
       // Build provider model using AI SDK based on model prefix
       const { streamText } = await import('ai');

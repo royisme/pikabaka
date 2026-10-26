@@ -3,7 +3,7 @@ export interface AgentGateDecision {
   help?: number; kind?: string; kindProbability?: number; latencyMs?: number; outcome: string
 }
 
-export type AiConnectionType = 'openai' | 'anthropic' | 'gemini' | 'ollama'
+export type AiConnectionType = 'openai' | 'anthropic' | 'gemini'
 export interface AiConnectionView { id: string; name: string; type: AiConnectionType; baseUrl: string; customBaseUrl: boolean; hasApiKey: boolean; builtin: boolean }
 export interface AgentApprovalRequest { id: string; meetingId: string; tool: 'bash' | 'write' | 'edit' | 'read'; target: string; detail?: string; folder: string; outside?: boolean }
 export type AgentApprovalEvent = { type: 'requested'; request: AgentApprovalRequest } | { type: 'settled'; id: string; allowed: boolean }
@@ -85,10 +85,7 @@ export interface ElectronAPI {
   closeAdvancedSettings: () => Promise<void>
 
   // LLM Model Management
-  getCurrentLlmConfig: () => Promise<{ provider: "ollama" | "gemini"; model: string; isOllama: boolean }>
   getAvailableOllamaModels: () => Promise<string[]>
-  switchToOllama: (model?: string, url?: string) => Promise<{ success: boolean; error?: string }>
-  switchToGemini: (apiKey?: string, modelId?: string) => Promise<{ success: boolean; error?: string }>
   testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey?: string) => Promise<{ success: boolean; error?: string }>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
 
@@ -226,11 +223,7 @@ export interface ElectronAPI {
   onGeminiStreamError: (callback: (error: string) => void) => () => void;
 
   // Model Management
-  getDefaultModel: () => Promise<{ model: string }>;
-  setModel: (modelId: string) => Promise<{ success: boolean; error?: string }>;
-  setDefaultModel: (modelId: string) => Promise<{ success: boolean; error?: string }>;
   toggleModelSelector: (coords: { x: number; y: number }) => Promise<void>;
-  forceRestartOllama: () => Promise<void>;
 
   // Settings Window
   toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>;

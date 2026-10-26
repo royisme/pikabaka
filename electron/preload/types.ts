@@ -44,10 +44,7 @@ export interface ElectronAPI {
   quitApp: () => Promise<void>
 
   // LLM Model Management
-  getCurrentLlmConfig: () => Promise<{ provider: "ollama" | "gemini"; model: string; isOllama: boolean }>
   getAvailableOllamaModels: () => Promise<string[]>
-  switchToOllama: (model?: string, url?: string) => Promise<{ success: boolean; error?: string }>
-  switchToGemini: (apiKey?: string, modelId?: string) => Promise<{ success: boolean; error?: string }>
   testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey?: string) => Promise<{ success: boolean; error?: string }>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
 
@@ -133,11 +130,7 @@ export interface ElectronAPI {
   onIntelligenceError: (callback: (data: { error: string; mode: string }) => void) => () => void
 
   // Model Management
-  getDefaultModel: () => Promise<{ model: string }>
-  setModel: (modelId: string) => Promise<{ success: boolean; error?: string }>
-  setDefaultModel: (modelId: string) => Promise<{ success: boolean; error?: string }>
   toggleModelSelector: (coords: { x: number; y: number }) => Promise<void>
-  forceRestartOllama: () => Promise<void>
 
   // Settings Window
   toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>

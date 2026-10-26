@@ -59,7 +59,7 @@ const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, conne
                         className={field}
                     >
                         {emptyLabel !== undefined && <option value="">{emptyLabel}</option>}
-                        {connections.filter((c) => c.type !== 'ollama').map((c) => (
+                        {connections.map((c) => (
                             <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
                     </select>

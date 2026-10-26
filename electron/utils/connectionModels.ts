@@ -26,13 +26,10 @@ export async function fetchConnectionModels(input: { type: ConnectionType; baseU
                 timeout: TIMEOUT_MS,
             });
             ids = (response.data?.data ?? []).map((m: { id?: string }) => m.id);
-        } else if (input.type === 'gemini') {
+        } else {
             const root = /\/v1(beta|alpha)?$/.test(base) ? base : `${base}/v1beta`;
             const response = await axios.get(`${root}/models`, { params: { pageSize: 1000 }, headers: { 'x-goog-api-key': key }, timeout: TIMEOUT_MS });
             ids = (response.data?.models ?? []).map((m: { name?: string }) => (m.name ?? '').replace(/^models\//, ''));
-        } else {
-            const response = await axios.get(`${base}/api/tags`, { timeout: TIMEOUT_MS });
-            ids = (response.data?.models ?? []).map((m: { name?: string }) => m.name);
         }
         return [...new Set(ids.filter((id): id is string => typeof id === 'string' && id !== ''))].sort().map(id => ({ id, label: id }));
     } catch (error) {

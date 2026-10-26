@@ -30,7 +30,7 @@ export function getMeetingAgent(): MeetingAgent {
       getStartTimeMs: meetingId => DatabaseManager.getInstance().getMeetingDetails(meetingId)?.startTimeMs ?? Date.now(),
       dataDir: app.getPath('userData'),
     },
-    getModelConfigSource: () => ({ resolve: () => resolveAgentModel(state.processingHelper.getLLMHelper(), CredentialsManager.getInstance()) }),
+    getModelConfigSource: () => ({ resolve: () => resolveAgentModel(CredentialsManager.getInstance()) }),
     recentSegments: (id, sinceMs) => DatabaseManager.getInstance().getRecentSegments(id, sinceMs),
     searchSegments: (id, query, limit) => DatabaseManager.getInstance().searchSegments(id, query, limit),
     searchMeetings: async query => {
@@ -98,7 +98,7 @@ export async function draftCard(decision: GateDecision): Promise<AssistCard | un
   const cm = CredentialsManager.getInstance();
   if (!decision.kind || state.getCurrentMeetingId() !== decision.meetingId) return undefined;
   try {
-    const resolved = await resolveAgentModel(state.processingHelper.getLLMHelper(), cm);
+    const resolved = await resolveAgentModel(cm);
     if (!resolved.ok) return undefined;
     const lines = DatabaseManager.getInstance().getRecentSegments(decision.meetingId, Date.now() - 3 * 60_000).slice(-6)
       .map(segment => ({ speaker: segment.speaker === 'user' ? 'You' as const : 'Them' as const, text: segment.text }));

@@ -1,5 +1,4 @@
 import { fetchSttModels, STT_MODEL_PROVIDERS, type SttModelProvider } from "../utils/sttModels"
-import { BrowserWindow } from "electron"
 import { AppState } from "../main"
 import { AudioDevices } from "../audio/AudioDevices"
 import { DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE, isTranscriptAssemblerProfile } from "../lib/transcript-assembler"
@@ -453,74 +452,6 @@ export function registerSttHandlers(appState: AppState): void {
       const rawMsg = error?.response?.data?.error?.message || error?.response?.data?.message || (error.response?.data?.error?.type ? `${error.response.data.error.type}: ${error.response.data.error.message}` : error.message) || 'Connection failed';
       const msg = sanitizeErrorMessage(rawMsg);
       return { success: false, error: msg };
-    }
-  });
-
-  safeHandle("set-model", async (_, modelId: string) => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      const cm = CredentialsManager.getInstance();
-
-      const allProviders = cm.getMergedLlmCustomProviders();
-
-      llmHelper.setModel(modelId, allProviders);
-
-      // Close the selector window if open
-      appState.modelSelectorWindowHelper.hideWindow();
-
-      // Broadcast to all windows so PikaInterface can update its selector (session-only update)
-      BrowserWindow.getAllWindows().forEach(win => {
-        if (!win.isDestroyed()) {
-          win.webContents.send('model-changed', modelId);
-        }
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error setting model:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Persist default model (from Settings) + update runtime + broadcast to all windows
-  safeHandle("set-default-model", async (_, modelId: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      const cm = CredentialsManager.getInstance();
-      cm.setDefaultModel(modelId);
-
-      // Also update the runtime model
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      const allProviders = cm.getMergedLlmCustomProviders();
-      llmHelper.setModel(modelId, allProviders);
-
-      // Close the selector window if open
-      appState.modelSelectorWindowHelper.hideWindow();
-
-      // Broadcast to all windows so PikaInterface can update its selector
-      BrowserWindow.getAllWindows().forEach(win => {
-        if (!win.isDestroyed()) {
-          win.webContents.send('model-changed', modelId);
-        }
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error setting default model:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Read the persisted default model
-  safeHandle("get-default-model", async () => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      const cm = CredentialsManager.getInstance();
-      return { model: cm.getDefaultModel() };
-    } catch (error: any) {
-      console.error("Error getting default model:", error);
-      return { model: 'gemini-3.1-flash-lite-preview' };
     }
   });
 

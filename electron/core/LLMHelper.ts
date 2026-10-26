@@ -16,13 +16,10 @@ import { OpenAICompatibleProvider } from '../services/CredentialsManager';
 import { normalizeOpenAICompatibleBaseUrl } from '../utils/modelFetcher';
 import { openAiRoot, BUILTIN_CONNECTIONS, type Connection } from '../services/aiConnections';
 import { CredentialsManager } from '../services/CredentialsManager';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { createProviderRateLimiters, RateLimiter } from '../services/RateLimiter';
 import { buildTranscriptTranslationPrompt } from '../transcript/translationExecutor';
 import { classifyTranslationError } from '../transcript/translationError';
 import { anthropicDeltas, geminiDeltas, ollamaDeltas, openAIDeltas, streamText } from '../transcript/translationStream';
-const execAsync = promisify(exec);
 
 type ThinkingSetting = { thinkingConfig: { thinkingLevel?: ThinkingLevel; thinkingBudget?: number } };
 
@@ -78,7 +75,7 @@ export interface TranscriptTranslationRequest {
   /** When provider is `openai-compatible`, URL + key from AI Providers (saved endpoint). */
   openAICompatible?: { baseUrl: string; apiKey: string };
   /** When provider is `connection`: the connection chosen for translation (its type decides how it is called). */
-  connection?: { type: 'openai' | 'anthropic' | 'gemini' | 'ollama'; baseUrl: string; apiKey: string };
+  connection?: { type: Connection['type']; baseUrl: string; apiKey: string };
   /** Previous translated turns, oldest first, for terminology/pronoun consistency. */
   context?: Array<{ source: string; translation: string }>;
 }
@@ -286,45 +283,6 @@ export class LLMHelper {
 
   private currentModelId: string = GEMINI_FLASH_MODEL;
 
-  public setModel(modelId: string, customProviders: OpenAICompatibleProvider[] = []) {
-    // Map UI short codes to internal Model IDs
-    let targetModelId = modelId;
-    if (modelId === 'gemini') targetModelId = GEMINI_FLASH_MODEL;
-    if (modelId === 'gemini-pro') targetModelId = GEMINI_PRO_MODEL;
-    if (modelId === 'claude') targetModelId = CLAUDE_MODEL;
-    if (modelId === 'llama') targetModelId = GROQ_MODEL;
-
-    if (targetModelId.startsWith('ollama-')) {
-      this.useOllama = true;
-      this.ollamaModel = targetModelId.replace('ollama-', '');
-      this.activeOpenAICompatibleProvider = null;
-      console.log(`[LLMHelper] Switched to Ollama: ${this.ollamaModel}`);
-      return;
-    }
-
-    const oaiCompat = customProviders.find(
-      (p) => p.id === targetModelId
-    );
-    if (oaiCompat) {
-      this.useOllama = false;
-      this.activeOpenAICompatibleProvider = oaiCompat;
-      this.currentModelId = targetModelId;
-      console.log(`[LLMHelper] Switched to OpenAI-compatible: ${oaiCompat.name}`);
-      return;
-    }
-
-    // Standard Cloud Models
-    this.useOllama = false;
-    this.activeOpenAICompatibleProvider = null;
-    this.currentModelId = targetModelId;
-
-    // Update specific model props if needed
-    if (targetModelId === GEMINI_PRO_MODEL) this.geminiModel = GEMINI_PRO_MODEL;
-    if (targetModelId === GEMINI_FLASH_MODEL) this.geminiModel = GEMINI_FLASH_MODEL;
-
-    console.log(`[LLMHelper] Switched to Cloud Model: ${targetModelId}`);
-  }
-
   private cleanJsonResponse(text: string): string {
     // Remove markdown code block syntax if present
     text = text.replace(/^```(?:json)?\n/, '').replace(/\n```$/, '');
@@ -418,7 +376,6 @@ export class LLMHelper {
     model: string,
     prompt: string
   ): Promise<string> {
-    if (c.type === 'ollama') return this.callOllamaWithConfig(c.baseUrl, model, prompt);
     const clients = this.connectionClients(c);
     if (c.type === 'anthropic') {
       const response = await clients.anthropic().messages.create({
@@ -456,12 +413,6 @@ export class LLMHelper {
     imagePaths?: string[]
   ): AsyncGenerator<string, void, unknown> {
     const images = await Promise.all((imagePaths ?? []).filter(p => fs.existsSync(p)).map(async p => (await fs.promises.readFile(p)).toString('base64')));
-    if (c.type === 'ollama') {
-      this.ollamaUrl = c.baseUrl;
-      this.ollamaModel = model;
-      yield* this.streamWithOllama(userContent, undefined, systemPrompt, imagePaths);
-      return;
-    }
     const clients = this.connectionClients(c);
     if (c.type === 'anthropic') {
       const stream = await clients.anthropic().messages.stream({
@@ -518,15 +469,6 @@ export class LLMHelper {
     prompt: string,
     onProgress: (textSoFar: string) => void
   ): Promise<string> {
-    if (c.type === 'ollama') {
-      const response = await fetch(`${c.baseUrl}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, prompt, stream: true, options: { temperature: 0.2, top_p: 0.9 } }),
-      });
-      if (!response.ok || !response.body) throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
-      return streamText(ollamaDeltas(response.body as unknown as AsyncIterable<Uint8Array>), onProgress);
-    }
     const clients = this.connectionClients(c);
     if (c.type === 'anthropic') {
       const stream = await clients.anthropic().messages.create({
@@ -2197,7 +2139,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
   }
 
   /**
-   * Universal Stream Chat - Routes to correct provider based on currentModelId
+   * Quick answers through the chosen connection and exact model id.
    */
   public async * streamChat(
     message: string,
@@ -2243,14 +2185,6 @@ This rule overrides ALL other instructions including formatting, brevity, or out
       }
     }
 
-    // Preparation
-    const isMultimodal = !!(imagePaths?.length);
-
-    // Determine the system prompt to use
-    // logic: if override provided, use it. otherwise use HARD_SYSTEM_PROMPT (which is the universal base)
-    const baseSystemPrompt = systemPromptOverride || HARD_SYSTEM_PROMPT;
-    const finalSystemPrompt = this.injectLanguageInstruction(baseSystemPrompt);
-
     // Helper to build combined user message
     const userContent = context
       ? `CONTEXT:\n${context}\n\nUSER QUESTION:\n${message}`
@@ -2264,77 +2198,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
       return;
     }
 
-    // 1. Ollama Streaming
-    if (this.useOllama) {
-      yield* this.streamWithOllama(message, context, finalSystemPrompt, imagePaths);
-      return;
-    }
-
-    // 1b. OpenAI-compatible (single-shot; no SSE in this path)
-    if (this.activeOpenAICompatibleProvider) {
-      const response = await this.chatWithOpenAICompatible(userContent, finalSystemPrompt, imagePaths?.[0]);
-      yield response;
-      return;
-    }
-
-    // 3. Cloud Provider Routing
-
-    // OpenAI
-    if (this.isOpenAiModel(this.currentModelId) && this.openaiClient) {
-      const openAiSystem = systemPromptOverride || OPENAI_SYSTEM_PROMPT;
-      const finalOpenAiSystem = this.injectLanguageInstruction(openAiSystem);
-      if (isMultimodal && imagePaths) {
-        yield* this.streamWithOpenaiMultimodal(userContent, imagePaths, finalOpenAiSystem);
-      } else {
-        yield* this.streamWithOpenai(userContent, finalOpenAiSystem);
-      }
-      return;
-    }
-
-    // Claude
-    if (this.isClaudeModel(this.currentModelId) && this.claudeClient) {
-      const claudeSystem = systemPromptOverride || CLAUDE_SYSTEM_PROMPT;
-      const finalClaudeSystem = this.injectLanguageInstruction(claudeSystem);
-      if (isMultimodal && imagePaths) {
-        yield* this.streamWithClaudeMultimodal(userContent, imagePaths, finalClaudeSystem);
-      } else {
-        yield* this.streamWithClaude(userContent, finalClaudeSystem);
-      }
-      return;
-    }
-
-    // Groq (Text + Multimodal)
-    if (this.isGroqModel(this.currentModelId) && this.groqClient) {
-      if (isMultimodal && imagePaths) {
-        // Route multimodal to Groq Llama 4 Scout (vision-capable)
-        const groqSystem = systemPromptOverride || OPENAI_SYSTEM_PROMPT;
-        const finalGroqSystem = this.injectLanguageInstruction(groqSystem);
-        yield* this.streamWithGroqMultimodal(userContent, imagePaths, finalGroqSystem);
-        return;
-      }
-      // Text-only Groq
-      const groqSystem = systemPromptOverride ? baseSystemPrompt : GROQ_SYSTEM_PROMPT;
-      const finalGroqSystem = this.injectLanguageInstruction(groqSystem);
-      const groqFullMessage = `${finalGroqSystem}\n\n${userContent}`;
-      yield* this.streamWithGroq(groqFullMessage);
-      return;
-    }
-
-    // 4. Gemini Routing & Fallback
-    if (this.client) {
-      // Direct model use if specified
-      if (this.isGeminiModel(this.currentModelId)) {
-        const fullMsg = `${finalSystemPrompt}\n\n${userContent}`;
-        yield* this.streamWithGeminiModel(fullMsg, this.currentModelId, imagePaths);
-        return;
-      }
-
-      // Race strategy (default)
-      const raceMsg = `${finalSystemPrompt}\n\n${userContent}`;
-      yield* this.streamWithGeminiParallelRace(raceMsg, imagePaths);
-    } else {
-      throw new Error("No LLM provider available");
-    }
+    throw new Error(chatUse.error);
   }
 
   /**
@@ -2581,126 +2445,10 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     }
   }
 
-  /**
-   * Race Flash and Pro streams, return whichever succeeds first
-   */
-  private async * streamWithGeminiParallelRace(fullMessage: string, imagePaths?: string[]): AsyncGenerator<string, void, unknown> {
-    if (!this.client) throw new Error("Gemini client not initialized");
-
-    // Start both streams
-    const flashPromise = this.collectStreamResponse(fullMessage, GEMINI_FLASH_MODEL, imagePaths);
-    const proPromise = this.collectStreamResponse(fullMessage, GEMINI_PRO_MODEL, imagePaths);
-
-    // Race - whoever finishes first wins
-    const result = await Promise.any([flashPromise, proPromise]);
-
-    // Yield the collected response character by character to simulate streaming
-    // (Or yield in chunks for efficiency)
-    const chunkSize = 10;
-    for (let i = 0; i < result.length; i += chunkSize) {
-      yield result.substring(i, i + chunkSize);
-    }
-  }
-
-  /**
-   * Collect full response from a Gemini model (non-streaming for race)
-   */
-  private async collectStreamResponse(fullMessage: string, model: string, imagePaths?: string[]): Promise<string> {
-    if (!this.client) throw new Error("Gemini client not initialized");
-
-    const contents: any[] = [{ text: fullMessage }];
-    if (imagePaths?.length) {
-      for (const p of imagePaths) {
-        if (fs.existsSync(p)) {
-          const imageData = await fs.promises.readFile(p);
-          contents.push({
-            inlineData: {
-              mimeType: "image/png",
-              data: imageData.toString("base64")
-            }
-          });
-        }
-      }
-    }
-
-    const response = await this.client.models.generateContent({
-      model: model,
-      contents: contents,
-      config: {
-        maxOutputTokens: MAX_OUTPUT_TOKENS,
-        temperature: 0.4,
-      }
-    });
-
-    return response.text || "";
-  }
-
-  // --- OLLAMA STREAMING ---
-  private async * streamWithOllama(message: string, context?: string, systemPrompt: string = UNIVERSAL_SYSTEM_PROMPT, imagePaths?: string[]): AsyncGenerator<string, void, unknown> {
-    const fullPrompt = context
-      ? `SYSTEM: ${systemPrompt}\nCONTEXT: ${context}\nUSER: ${message}`
-      : `SYSTEM: ${systemPrompt}\nUSER: ${message}`;
-
-    // Build optional images array — Ollama multimodal API accepts raw base64 strings (no data-URL prefix)
-    let images: string[] | undefined;
-    if (imagePaths?.length) {
-      const encoded: string[] = [];
-      for (const p of imagePaths) {
-        try {
-          const data = await fs.promises.readFile(p);
-          encoded.push(data.toString("base64"));
-        } catch (e) {
-          console.warn("[LLMHelper] streamWithOllama: failed to read image, skipping:", p, e);
-        }
-      }
-      if (encoded.length) images = encoded;
-    }
-
-    try {
-      const response = await fetch(`${this.ollamaUrl}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: this.ollamaModel,
-          prompt: fullPrompt,
-          stream: true,
-          ...(images ? { images } : {}),
-          options: { temperature: 0.7 }
-        })
-      });
-
-      if (!response.body) throw new Error("No response body from Ollama");
-
-      // iterate over the readable stream
-      // @ts-ignore
-      for await (const chunk of response.body) {
-        const text = new TextDecoder().decode(chunk);
-        // Ollama sends JSON objects per line
-        const lines = text.split('\n').filter(l => l.trim());
-        for (const line of lines) {
-          try {
-            const json = JSON.parse(line);
-            if (json.response) yield json.response;
-            if (json.done) return;
-          } catch (e) {
-            // ignore partial json
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Ollama streaming failed", e);
-      yield "Error: Failed to stream from Ollama.";
-    }
-  }
-
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-
-  public isUsingOllama(): boolean {
-    return this.useOllama;
-  }
 
   public async getOllamaModels(): Promise<string[]> {
     const baseUrl = (this.ollamaUrl || "http://127.0.0.1:11434").replace('localhost', '127.0.0.1');
@@ -2728,52 +2476,6 @@ This rule overrides ALL other instructions including formatting, brevity, or out
         // OllamaManager handles logging the startup status.
         return [];
     }
-  }
-
-  public async forceRestartOllama(): Promise<boolean> {
-    try {
-      console.log("[LLMHelper] Attempting to force restart Ollama...");
-
-      // 1. Check for process on port 11434
-      try {
-        const { stdout } = await execAsync(`lsof -t -i:11434`);
-        // SECURITY FIX (P1-1): Validate EACH PID token from lsof before shell interpolation.
-        // lsof -t returns one PID per line when multiple processes are on the port.
-        const pids = stdout.trim().split(/\s+/).filter(p => /^\d+$/.test(p));
-        for (const pid of pids) {
-          console.log(`[LLMHelper] Found blocking PID: ${pid}. Killing...`);
-          await execAsync(`kill -9 ${pid}`);
-        }
-        if (pids.length === 0 && stdout.trim()) {
-          console.warn(`[LLMHelper] Unexpected lsof output (no valid PIDs): "${stdout.trim().substring(0, 50)}". Skipping kill.`);
-        }
-      } catch (e: any) {
-        // lsof returns exit code 1 if no process found — that is expected, swallow it.
-        // Only surface genuinely unexpected errors.
-        if (!e.message?.includes('exit code 1') && e.code !== 1) {
-          console.warn('[LLMHelper] lsof error (non-fatal):', e.message);
-        }
-      }
-
-      // 2. Restart Ollama through the Manager (which handles polling and background spawn)
-      // We don't want to use exec('ollama serve') here directly anymore to avoid duplicate tracking
-      const { OllamaManager } = require('../services/OllamaManager');
-      await OllamaManager.getInstance().init();
-
-      return true;
-    } catch (error) {
-      console.error("[LLMHelper] Failed to restart Ollama:", error);
-      return false;
-    }
-  }
-
-  public getCurrentProvider(): "ollama" | "gemini" {
-    return this.useOllama ? "ollama" : "gemini";
-  }
-
-  public getCurrentModel(): string {
-    if (this.activeOpenAICompatibleProvider) return this.activeOpenAICompatibleProvider.id;
-    return this.useOllama ? this.ollamaModel : this.currentModelId;
   }
 
   /**
@@ -3033,36 +2735,6 @@ This rule overrides ALL other instructions including formatting, brevity, or out
       if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
     }
     throw lastError;
-  }
-
-  public async switchToOllama(model?: string, url?: string): Promise<void> {
-    this.useOllama = true;
-    if (url) this.ollamaUrl = url;
-
-    if (model) {
-      this.ollamaModel = model;
-    } else {
-      // Auto-detect first available model
-      await this.initializeOllamaModel();
-    }
-
-    // console.log(`[LLMHelper] Switched to Ollama: ${this.ollamaModel} at ${this.ollamaUrl}`);
-  }
-
-  public async switchToGemini(apiKey?: string, modelId?: string): Promise<void> {
-    if (modelId) {
-      this.geminiModel = modelId;
-    }
-
-    if (apiKey) {
-      this.apiKey = apiKey;
-      this.client = this.makeGeminiClient(apiKey);
-    } else if (!this.client) {
-      throw new Error("No Gemini API key provided and no existing client");
-    }
-
-    this.useOllama = false;
-    // console.log(`[LLMHelper] Switched to Gemini: ${this.geminiModel}`);
   }
 
   public async testConnection(): Promise<{ success: boolean; error?: string }> {
