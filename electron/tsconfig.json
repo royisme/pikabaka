@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "module": "CommonJS",
+    "module": "nodenext",
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -11,7 +11,7 @@
     "baseUrl": ".",
     "rootDir": "..",
     "outDir": "../dist-electron",
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "resolveJsonModule": true,
     "types": ["node", "better-sqlite3", "ws", "uuid", "screenshot-desktop"]
   },
