@@ -17,7 +17,7 @@ interface SplitterShellProps {
 }
 
 const ZoneHeader: React.FC<{ icon: React.ReactNode; label: string; children?: React.ReactNode }> = ({ icon, label, children }) => (
-    <div className="flex min-h-[28px] items-center gap-1.5 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider overlay-text-muted border-b border-border-subtle/50 bg-black/10 select-none shrink-0">
+    <div className="flex min-h-[28px] items-center gap-1.5 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider overlay-text-muted border-b overlay-hairline bg-black/10 select-none shrink-0">
         {icon}
         <span>{label}</span>
         {children}

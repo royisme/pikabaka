@@ -500,6 +500,10 @@ textarea,
   color: var(--overlay-text-placeholder);
 }
 
+.overlay-hairline {
+  border-color: var(--overlay-border-soft);
+}
+
 /* Interaction Utilities - Reusable */
 .interaction-base {
   transition-property: transform, opacity, background-color, border-color, color;

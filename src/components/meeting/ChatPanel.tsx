@@ -519,7 +519,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           disabled={isProcessing}
           className={`flex min-w-[9rem] items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10.5px] font-semibold transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 disabled:cursor-wait ${
             primaryQuiet
-              ? `border border-border-subtle/55 ${quickActionClass}`
+              ? `border overlay-hairline ${quickActionClass}`
               : 'bg-[#0071E3] text-white shadow-[0_4px_14px_rgba(0,113,227,0.18)] hover:bg-[#0066CC]'
           }`}
           style={primaryQuiet ? appearance.chipStyle : undefined}
@@ -527,16 +527,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           <Zap className="w-3 h-3 opacity-75" /> {isProcessing ? 'Answering…' : 'What to say'}
           {!isProcessing && shortcuts.whatToAnswer.length > 0 && <KeyBadge keys={shortcuts.whatToAnswer} className="ml-0.5 opacity-80" />}
         </button>
-        <button onClick={handleClarify} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+        <button onClick={handleClarify} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
           <MessageSquare className="w-3 h-3 opacity-65" /> Clarify
         </button>
-        <button onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+        <button onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
           {actionButtonMode === 'brainstorm'
             ? <><Lightbulb className="w-3 h-3 opacity-65" /> Ideas</>
             : <><RefreshCw className="w-3 h-3 opacity-65" /> Recap</>
           }
         </button>
-        <button onClick={handleFollowUpQuestions} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border border-border-subtle/55 transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+        <button onClick={handleFollowUpQuestions} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[10.5px] font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
           <HelpCircle className="w-3 h-3 opacity-65" /> Follow-up
         </button>
       </div>
@@ -616,7 +616,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               aria-label="Choose model"
               className={`
                 flex items-center gap-2 px-3 py-1.5
-                border border-border-subtle/60 rounded-lg transition-colors
+                border overlay-hairline rounded-lg transition-colors
                 text-xs font-medium w-[140px]
                 interaction-base interaction-press
                 ${controlSurfaceClass}

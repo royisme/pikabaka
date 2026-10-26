@@ -73,7 +73,7 @@ Owner approved on 2026-10-26: the top bar instead of the pill and both zone head
 | # | Step | Acceptance | State |
 | --- | --- | --- | --- |
 | V1 | Answer zone never clips: pixel floors for both zones, overlay `minHeight` 400 | unit test: both zones above their floors at 350px, 250px and 1000px; owner checks at 420px with translation on | done on branch `overlay-split-clamp` |
-| V2 | Hairlines use a real border class (`border-border-subtle/NN` generates no CSS) | no `border-border-subtle/` left in the overlay files; Q12 | not started |
+| V2 | Hairlines use a real border class (`border-border-subtle/NN` generates no CSS) | no `border-border-subtle/` left in the overlay files; Q12 | done on branch `overlay-hairlines` (written by a Gemini 3.8 worker through pi, merged by the lead) |
 | V3 | One audio status: `audioStatus()`, chip, zone line, Settings deep link; the amber box is gone | unit test covers every row of spec section 6; Q6, Q14 | done on branch `audio-status`; owner checks the chip over a quiet call and the Fix audio deep link on macOS and Windows |
 | V4 | The primary action follows the state ("Fix audio" when there is no audio) | Q4, Q5 in all six states | done on branch `primary-follows-state`; owner checks the six states |
 | V5 | One-line empty states | Q11 | done on branch `empty-states` |
