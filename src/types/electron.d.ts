@@ -372,9 +372,47 @@ export interface ElectronAPI {
   cropperCancelled: () => void;
   onResetCropper: (callback: (data: { hudPosition: { x: number; y: number } }) => void) => () => void;
 
+  // Agent API
+  agentStatus: () => Promise<AgentStatus>;
+  agentSubmit: (payload: AgentSubmitPayload) => Promise<AgentSubmitResult>;
+  agentAbort: () => Promise<{ success: boolean }>;
+  agentGetThread: () => Promise<AgentThreadLine[]>;
+  onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
+
   // Platform
   platform: NodeJS.Platform;
 }
+
+export type MeetingAgentEvent = { meetingId: string } & (
+  | { type: 'run_started' | 'run_settled' }
+  | { type: 'text_delta' | 'text_final'; text: string }
+  | { type: 'tool_started' | 'tool_finished'; toolName: string }
+  | { type: 'run_failed'; errorClass: string }
+);
+export type AgentEvent = MeetingAgentEvent;
+
+export interface AgentThreadLine {
+  id: string;
+  role: 'user' | 'assistant' | 'tool';
+  text: string;
+}
+export type ThreadLine = AgentThreadLine;
+
+export interface AgentStatus {
+  meetingActive: boolean;
+  available: boolean;
+  reason?: string;
+}
+
+export interface AgentSubmitPayload {
+  text: string;
+  mode?: 'followup' | 'steer';
+  requestId?: string;
+}
+
+export type AgentSubmitResult =
+  | { ok: true; requestId: string }
+  | { ok: false; reason: string };
 
 declare global {
   interface Window {

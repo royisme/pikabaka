@@ -81,6 +81,12 @@ export class MeetingAgent {
 
   constructor(private readonly deps: AgentDeps) {}
 
+  async modelAvailability(): Promise<{ ok: boolean; reason?: string }> {
+    const resolved = await this.deps.getModelConfigSource().resolve();
+    if ('reason' in resolved) return { ok: false, reason: resolved.reason };
+    return { ok: true };
+  }
+
   private file(meetingId: string): string {
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(meetingId)) throw new Error('Invalid meeting id');
     return path.join(this.deps.userDataDir, 'agent', `${meetingId}.sqlite`);

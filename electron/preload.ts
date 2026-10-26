@@ -1,5 +1,14 @@
 import { contextBridge, ipcRenderer } from "electron"
 
+type PreloadAgentEvent = { meetingId: string } & (
+  | { type: 'run_started' | 'run_settled' }
+  | { type: 'text_delta' | 'text_final'; text: string }
+  | { type: 'tool_started' | 'tool_finished'; toolName: string }
+  | { type: 'run_failed'; errorClass: string }
+);
+
+type PreloadThreadLine = { id: string; role: 'user' | 'assistant' | 'tool'; text: string };
+
 // Types for the exposed Electron API
 interface AgentApprovalRequest { id: string; meetingId: string; tool: 'bash' | 'write' | 'edit' | 'read'; target: string; detail?: string; folder: string; outside?: boolean }
 type AgentApprovalEvent = { type: 'requested'; request: AgentApprovalRequest } | { type: 'settled'; id: string; allowed: boolean }
@@ -329,6 +338,13 @@ interface ElectronAPI {
   cropperConfirmed: (bounds: Electron.Rectangle) => void;
   cropperCancelled: () => void;
   onResetCropper: (callback: (data: { hudPosition: { x: number; y: number } }) => void) => () => void;
+
+  // Agent API
+  agentStatus: () => Promise<{ meetingActive: boolean; available: boolean; reason?: string }>;
+  agentSubmit: (payload: { text: string; mode?: 'followup' | 'steer'; requestId?: string }) => Promise<{ ok: true; requestId: string } | { ok: false; reason: string }>;
+  agentAbort: () => Promise<{ success: boolean }>;
+  agentGetThread: () => Promise<PreloadThreadLine[]>;
+  onAgentEvent: (callback: (event: PreloadAgentEvent) => void) => () => void;
 
   // Platform
   platform: NodeJS.Platform;
@@ -1189,6 +1205,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on('reset-cropper', subscription)
     return () => {
       ipcRenderer.removeListener('reset-cropper', subscription)
+    }
+  },
+
+  // Agent API
+  agentStatus: () => ipcRenderer.invoke('agent-status'),
+  agentSubmit: (payload: { text: string; mode?: 'followup' | 'steer'; requestId?: string }) =>
+    ipcRenderer.invoke('agent-submit', payload),
+  agentAbort: () => ipcRenderer.invoke('agent-abort'),
+  agentGetThread: () => ipcRenderer.invoke('agent-get-thread'),
+  onAgentEvent: (callback: (event: PreloadAgentEvent) => void) => {
+    const subscription = (_: unknown, event: PreloadAgentEvent) => callback(event)
+    ipcRenderer.on('agent-event', subscription)
+    return () => {
+      ipcRenderer.removeListener('agent-event', subscription)
     }
   },
 

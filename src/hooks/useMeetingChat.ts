@@ -32,7 +32,23 @@ export type Message = {
     yourTarget: number | null;
     currency: string;
   };
+  isWorkingState?: boolean;
 };
+
+function toolWorkingMessage(toolName: string): string {
+  switch (toolName) {
+    case 'search_transcript':
+      return 'Searching the transcript…';
+    case 'recent_transcript':
+      return 'Reading the latest lines…';
+    case 'search_meetings':
+      return 'Searching past meetings…';
+    case 'screenshot':
+      return 'Looking at the screen…';
+    default:
+      return 'Working…';
+  }
+}
 
 type KnowledgeContext = {
   matchedJDSignals: Array<{ requirement: string; relevance: number }>;
@@ -65,6 +81,39 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   };
   // systemMessages holds quick-action responses (WhatToSay, Clarify, Recap, etc.)
   const [systemMessages, setSystemMessages] = useState<Message[]>([]);
+  const isAgentRunRef = useRef(false);
+  const [isAgentAvailable, setIsAgentAvailable] = useState(false);
+  const setSystemMessagesIfLive = useCallback<typeof setSystemMessages>((update) => {
+    if (!cancelledRef.current) setSystemMessages(update);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkStatus = async () => {
+      if (!window.electronAPI?.agentStatus) return;
+      try {
+        const res = await window.electronAPI.agentStatus();
+        if (isMounted) setIsAgentAvailable(Boolean(res?.available));
+      } catch {
+        if (isMounted) setIsAgentAvailable(false);
+      }
+    };
+    void checkStatus();
+
+    const unsubscribe = window.electronAPI?.onMeetingStateChanged?.(({ isActive }) => {
+      if (isActive) {
+        void checkStatus();
+      } else {
+        if (isMounted) setIsAgentAvailable(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe?.();
+    };
+  }, []);
+
   const knowledgeContextTimeoutRef = useRef<number | null>(null);
   const conversationContextRef = useRef(conversationContext);
 
@@ -174,9 +223,6 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   useEffect(() => {
     if (!window.electronAPI) return;
     const cleanups: Array<() => void> = [];
-    const setSystemMessagesIfLive: typeof setSystemMessages = (update) => {
-      if (!cancelledRef.current) setSystemMessages(update);
-    };
 
     // ---- Assist (generic insight from streaming) ----
     if (window.electronAPI.onIntelligenceAssistUpdate) {
@@ -352,7 +398,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     console.log('[useMeetingChat] registering gemini-stream listeners. has onGeminiStreamToken:', !!window.electronAPI.onGeminiStreamToken);
     if (window.electronAPI.onGeminiStreamToken) {
       cleanups.push(window.electronAPI.onGeminiStreamToken((token) => {
-        console.log('[gemini-stream-token]', String(token).slice(0, 40));
+        console.log('[gemini-stream-token]', String(token).length);
         setSystemMessagesIfLive((prev) => {
           const last = prev[prev.length - 1];
           if (last && last.isStreaming) {
@@ -395,7 +441,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     // ---- Streaming: RAG live query (rag:query-live) ----
     if (window.electronAPI.onRAGStreamChunk) {
       cleanups.push(window.electronAPI.onRAGStreamChunk((data) => {
-        console.log('[rag-stream-chunk]', String(data.chunk).slice(0, 40));
+        console.log('[rag-stream-chunk]', String(data.chunk).length);
         setSystemMessagesIfLive((prev) => {
           const last = prev[prev.length - 1];
           if (last && last.isStreaming) {
@@ -435,8 +481,90 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
       }));
     }
 
+    // ---- Agent Events (MeetingAgent) ----
+    if (window.electronAPI.onAgentEvent) {
+      cleanups.push(window.electronAPI.onAgentEvent((event) => {
+        switch (event.type) {
+          case 'run_started':
+            setIsProcessing(true);
+            break;
+          case 'text_delta':
+            setSystemMessagesIfLive((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && last.isStreaming) {
+                const updated = [...prev];
+                const baseText = last.isWorkingState ? '' : last.text;
+                updated[updated.length - 1] = {
+                  ...last,
+                  text: baseText + event.text,
+                  isWorkingState: false,
+                };
+                return updated;
+              }
+              return prev;
+            });
+            break;
+          case 'text_final':
+            setSystemMessagesIfLive((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && last.isStreaming) {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                  ...last,
+                  text: event.text,
+                  isStreaming: false,
+                  isWorkingState: false,
+                };
+                return updated;
+              }
+              return prev;
+            });
+            break;
+          case 'tool_started':
+            setSystemMessagesIfLive((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && last.isStreaming && (!last.text || last.isWorkingState)) {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                  ...last,
+                  text: toolWorkingMessage(event.toolName),
+                  isWorkingState: true,
+                };
+                return updated;
+              }
+              return prev;
+            });
+            break;
+          case 'run_settled':
+            setIsProcessing(false);
+            isAgentRunRef.current = false;
+            setSystemMessagesIfLive((prev) =>
+              prev.map((m) => (m.isStreaming ? { ...m, isStreaming: false, isWorkingState: false } : m))
+            );
+            break;
+          case 'run_failed':
+            setIsProcessing(false);
+            isAgentRunRef.current = false;
+            setSystemMessagesIfLive((prev) => {
+              const nonStreaming = prev.filter((m) => !(m.isStreaming && (!m.text || m.isWorkingState)));
+              const finalized = nonStreaming.map((m) => (m.isStreaming ? { ...m, isStreaming: false, isWorkingState: false } : m));
+              return [
+                ...finalized,
+                {
+                  id: Date.now().toString(),
+                  role: 'system',
+                  text: 'The agent could not answer. Try again.',
+                  isError: true,
+                },
+              ];
+            });
+            break;
+        }
+      }));
+    }
+
     return () => cleanups.forEach((fn) => fn());
-  }, []);
+  }, [setSystemMessagesIfLive]);
 
   // Clarify streaming listeners — intentionally empty dep array so they survive
   // expand/collapse cycles without orphaning an in-flight stream.
@@ -497,7 +625,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     if (!promptText && currentAttachments.length === 0) return;
     if (clearAttachments) setAttachedContext([]);
 
-    console.log('[submitPrompt] entry', { promptText: promptText.slice(0, 60), placeholderIntent, echoPrompt, attachments: currentAttachments.length });
+    console.log('[submitPrompt] entry', { promptLength: promptText.length, placeholderIntent, echoPrompt, attachments: currentAttachments.length });
 
     const replyTo = placeholderIntent === 'what_to_answer' ? options.getReplyContext?.() : undefined;
     const echo = userEchoMessage({ id: Date.now().toString(), promptText, echoPrompt, attachments: currentAttachments });
@@ -711,12 +839,75 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
         setIsProcessing(false);
       }
     } else {
-      // Text-only: route through submitPrompt so IPC/RAG streams update the placeholder listeners.
-      remember({ kind: 'manual', text: userText });
-      await submitPrompt({
-        userText,
-        placeholderIntent: 'manual',
-      });
+      let isAvailable = false;
+      try {
+        const agentStatus = await window.electronAPI?.agentStatus?.();
+        isAvailable = Boolean(agentStatus?.available);
+        setIsAgentAvailable(isAvailable);
+      } catch {
+        isAvailable = false;
+        setIsAgentAvailable(false);
+      }
+
+      if (isAvailable) {
+        remember({ kind: 'manual', text: userText });
+        const echo = userEchoMessage({ id: Date.now().toString(), promptText: userText, echoPrompt: true, attachments: [] });
+        const placeholderId = (Date.now() + 1).toString();
+        const placeholder: Message = {
+          id: placeholderId,
+          role: 'system',
+          text: '',
+          isStreaming: true,
+          intent: 'manual',
+        };
+        setSystemMessages((prev) => (echo ? [...prev, echo, placeholder] : [...prev, placeholder]));
+        beginProcessing();
+        isAgentRunRef.current = true;
+
+        try {
+          const result = await window.electronAPI.agentSubmit({ text: userText });
+          if (cancelledRef.current) return;
+          if (!result || !result.ok) {
+            isAgentRunRef.current = false;
+            setIsProcessing(false);
+            const reason = (result && !result.ok && result.reason) ? result.reason : 'Agent submission failed';
+            setSystemMessages((prev) => {
+              const withoutPlaceholder = prev.filter((m) => m.id !== placeholderId);
+              return [
+                ...withoutPlaceholder,
+                {
+                  id: Date.now().toString(),
+                  role: 'system',
+                  text: reason,
+                  isError: true,
+                },
+              ];
+            });
+          }
+        } catch (err) {
+          isAgentRunRef.current = false;
+          setIsProcessing(false);
+          setSystemMessages((prev) => {
+            const withoutPlaceholder = prev.filter((m) => m.id !== placeholderId);
+            return [
+              ...withoutPlaceholder,
+              {
+                id: Date.now().toString(),
+                role: 'system',
+                text: `Error: ${err}`,
+                isError: true,
+              },
+            ];
+          });
+        }
+      } else {
+        // Text-only: route through submitPrompt so IPC/RAG streams update the placeholder listeners.
+        remember({ kind: 'manual', text: userText });
+        await submitPrompt({
+          userText,
+          placeholderIntent: 'manual',
+        });
+      }
     }
   }, [inputValue, attachedContext, submitPrompt, pushSystemError]);
 
@@ -726,6 +917,14 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
    */
   const stopGeneration = useCallback(async () => {
     cancelledRef.current = true;
+    if (isAgentRunRef.current) {
+      try {
+        await window.electronAPI.agentAbort?.();
+      } catch (error) {
+        console.warn('[useMeetingChat] agentAbort failed:', error);
+      }
+      isAgentRunRef.current = false;
+    }
     try {
       await window.electronAPI.cancelGeneration();
     } catch (error) {
@@ -736,7 +935,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     stop();
     setIsProcessing(false);
     setSystemMessages((prev) =>
-      prev.filter((m) => !(m.isStreaming && m.text === '')).map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
+      prev.filter((m) => !(m.isStreaming && m.text === '')).map((m) => (m.isStreaming ? { ...m, isStreaming: false, isWorkingState: false } : m))
     );
     // Tokens already on their way arrive within moments; after that, answers the engine starts by itself are wanted again.
     window.setTimeout(() => { cancelledRef.current = false; }, 1000);
@@ -754,7 +953,56 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
       case 'follow_up_questions': return handleFollowUpQuestions();
       case 'brainstorm': return handleBrainstorm();
       case 'code_hint': return handleCodeHint();
-      case 'manual': return submitPrompt({ userText: action.text, placeholderIntent: 'manual', echoPrompt: false });
+      case 'manual': {
+        let isAvailable = false;
+        try {
+          const status = await window.electronAPI?.agentStatus?.();
+          isAvailable = Boolean(status?.available);
+        } catch {
+          isAvailable = false;
+        }
+        if (isAvailable) {
+          const placeholderId = (Date.now() + 1).toString();
+          const placeholder: Message = {
+            id: placeholderId,
+            role: 'system',
+            text: '',
+            isStreaming: true,
+            intent: 'manual',
+          };
+          setSystemMessages((prev) => [...prev, placeholder]);
+          beginProcessing();
+          isAgentRunRef.current = true;
+          try {
+            const result = await window.electronAPI.agentSubmit({ text: action.text });
+            if (cancelledRef.current) return;
+            if (!result || !result.ok) {
+              isAgentRunRef.current = false;
+              setIsProcessing(false);
+              const reason = (result && !result.ok && result.reason) ? result.reason : 'Agent submission failed';
+              setSystemMessages((prev) => {
+                const withoutPlaceholder = prev.filter((m) => m.id !== placeholderId);
+                return [
+                  ...withoutPlaceholder,
+                  { id: Date.now().toString(), role: 'system', text: reason, isError: true },
+                ];
+              });
+            }
+          } catch (err) {
+            isAgentRunRef.current = false;
+            setIsProcessing(false);
+            setSystemMessages((prev) => {
+              const withoutPlaceholder = prev.filter((m) => m.id !== placeholderId);
+              return [
+                ...withoutPlaceholder,
+                { id: Date.now().toString(), role: 'system', text: `Error: ${err}`, isError: true },
+              ];
+            });
+          }
+          return;
+        }
+        return submitPrompt({ userText: action.text, placeholderIntent: 'manual', echoPrompt: false });
+      }
     }
   }, [handleWhatToSay, handleClarify, handleRecap, handleFollowUpQuestions, handleBrainstorm, handleCodeHint, submitPrompt]);
 
@@ -784,5 +1032,6 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     handleBrainstorm,
     handleAnswerNow,
     handleManualSubmit,
+    isAgentAvailable,
   };
 }
