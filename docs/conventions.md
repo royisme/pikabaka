@@ -89,6 +89,37 @@ Applies to TypeScript in `src`, `electron` and `test`. Where existing code diffe
 - New files stay under about 500 lines. This is a guideline, not enforced; `SettingsOverlay.tsx`, `LLMHelper.ts` and a few others already exceed it and are not split as a side effect of another change.
 - Name a file for what it holds; avoid `utils`, `helpers`, `common`, `misc`.
 
+## React effects
+
+An effect connects a component to a system outside React (a subscription, a timer, the DOM, a window). It is not a way to run code when state changes. "You Might Not Need an Effect" (react.dev) is the reference; the rules here are what it means in this repo.
+
+Ask these in order. The first that fits is the answer.
+
+| The effect does this | Do this instead |
+| --- | --- |
+| Computes a value from props or state, then `setState`s it | Compute it in render; `useMemo` only if it is measurably slow |
+| Resets or adjusts state when a prop changes | Give the component a `key` (a different id starts fresh), or keep the state where the changing value lives |
+| Reacts to a click, a submit or a message from the user | Do it in that event handler |
+| Notifies a parent after a state change | Call the parent's callback in the same handler that changed the state |
+| Reads data from the main process (`window.electronAPI`) on mount or when an id changes | `useQuery` (react-query): the key holds the inputs, the cache holds the result. Writes are `useMutation` with `invalidateQueries` on success |
+| Copies server or saved data into local state to edit it | Keep a draft over the data: `const value = draft ?? saved`. Save clears the draft |
+| Follows an event stream from the main process | `useMainEvent(window.electronAPI?.onXxx, handler)` |
+| Follows a `window` or `document` event (keys, resize, focus) | `useWindowEvent`; an event on one element is a prop (`onKeyDown`) |
+| Follows `localStorage`, `matchMedia`, the theme attribute or another store that changes outside React | `useSyncExternalStore` (`useLocalStorageValue` for localStorage) |
+| Measures the DOM before paint (a popup's position, a scroll size) | `useLayoutEffect` or a ref callback, with a cleanup; measure again in the handler that opens it when that is enough |
+| Runs a timer, an animation frame, an observer, a WebSocket | Keep the effect; it is an external system. Clean up in the return, and give it the narrowest dependencies |
+| Runs once per mount for something outside React (focus an input, start a tracker) | Keep the effect, or a ref callback; say why in one line |
+
+Rules:
+
+- An effect that only runs while `[]` and reads no props is suspect: ask what it is connecting to. If the answer is "main process data", it is a query.
+- Never add state whose only job is to trigger an effect (a counter, a flag, a "version"). Call the function from the handler.
+- Never `setState` inside an effect to derive state from other state.
+- Every subscription returns its unsubscribe. A fetch that can be outrun (a stale response) belongs in react-query, not in an effect with an `ignore` flag.
+- Prefer one custom hook with a name (`useMeetingChat`) over several effects in a component; the effects that stay live in a hook that says what they connect to.
+- Do not "fix" a dependency list by removing a dependency. If the effect needs a value that changes often but should not resubscribe, the latest-ref pattern in `useMainEvent` and `useWindowEvent` is the answer.
+- Behaviour does not change when you remove an effect. Remove one at a time and say, for each, what happened on mount, on each change and on unmount before and after.
+
 ## Tests
 
 - Pure logic gets a unit test in `test/unit/` (tap). Examples: the scroll-follow rule, a message reducer, `EntityMasker`, the translation event model, the assembler.
