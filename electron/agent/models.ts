@@ -2,6 +2,7 @@ import type { CredentialStore, Models, Model, Api } from '@earendil-works/pi-ai'
 import type { CredentialsManager } from '../services/CredentialsManager';
 import type { LLMHelper } from '../core/LLMHelper';
 import { loadAgentRuntime } from './loader';
+import { GateError, type GateClassify, type GateErrorClass, type GateKind } from './gate';
 
 type Credentials = Pick<CredentialsManager,
   'getGeminiApiKey' | 'getGroqApiKey' | 'getOpenaiApiKey' | 'getClaudeApiKey'>;
@@ -85,4 +86,114 @@ export async function resolveAgentModel(
   const catalogModel: Model<Api> | undefined = models.getModel(provider, modelId);
   if (!catalogModel) return unsupported;
   return { ok: true, model: { models, ref: { provider, modelId }, supportsImages: fallback.supportsImages } };
+}
+
+// ---- The decision model behind the proactive gate (D4: configurable only) ----
+
+export interface GateCredentials {
+  getAgentGateModel(): string;
+  getAgentGateBaseUrl(): string;
+  getAgentGateApiKey(): string;
+}
+
+const GATE_PROVIDER = 'pika-gate';
+
+function isLoopback(baseUrl: string): boolean {
+  try {
+    const host = new URL(baseUrl).hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1';
+  } catch {
+    return false;
+  }
+}
+
+/** Reads only the gate's own key; a local gateway may run without one. */
+export function createGateCredentialStore(credentials: GateCredentials): CredentialStore {
+  const key = () => credentials.getAgentGateApiKey().trim() || (isLoopback(credentials.getAgentGateBaseUrl()) ? 'none' : '');
+  return {
+    async read(providerId) {
+      return providerId === GATE_PROVIDER && key() ? { type: 'api_key', key: key() } : undefined;
+    },
+    async list() {
+      return key() ? [{ providerId: GATE_PROVIDER, type: 'api_key' as const }] : [];
+    },
+    async modify() { throw new Error('Agent credentials are read-only'); },
+    async delete() { throw new Error('Agent credentials are read-only'); },
+  };
+}
+
+/** Maps a failed classification to a short class; the message itself (it can quote the response) is dropped. */
+export function gateErrorClass(message: string | undefined): GateErrorClass {
+  const text = message ?? '';
+  if (/\b(401|403)\b|unauthori[sz]ed|forbidden|api key/i.test(text)) return 'auth';
+  if (/timeout|timed out|abort/i.test(text)) return 'timeout';
+  if (/ECONN|ENOTFOUND|EAI_AGAIN|fetch failed|network|\b(5\d\d|429)\b/i.test(text)) return 'network';
+  return 'bad_response';
+}
+
+const GATE_KINDS: GateKind[] = ['answer_question', 'explain_term', 'check_fact', 'action_item', 'nothing'];
+
+/** The classifier for the current gate settings, or undefined when it is not configured. */
+export async function createGateClassify(credentials: GateCredentials): Promise<GateClassify | undefined> {
+  const model = credentials.getAgentGateModel().trim();
+  const baseUrl = credentials.getAgentGateBaseUrl().trim();
+  const store = createGateCredentialStore(credentials);
+  if (!model || !baseUrl || !(await store.read(GATE_PROVIDER))) return undefined;
+  const runtime = await loadAgentRuntime();
+  const models = runtime.models.createModels({
+    credentials: store,
+    authContext: { env: async () => undefined, fileExists: async () => false },
+  });
+  models.setProvider(runtime.ai.createProvider({
+    id: GATE_PROVIDER,
+    name: 'Decision model',
+    auth: { apiKey: runtime.ai.envApiKeyAuth('Decision model', []) },
+    models: [{
+      type: 'classifier',
+      id: model,
+      name: model,
+      api: 'typesafe-system-one',
+      provider: GATE_PROVIDER,
+      baseUrl,
+      input: ['text'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 32768,
+    }],
+    classifiers: { 'typesafe-system-one': runtime.systemOne.typesafeSystemOneApi() },
+  }));
+  const classifier = models.getModelOfType('classifier', GATE_PROVIDER, model);
+  if (!classifier) return undefined;
+  return async (input, options) => {
+    const result = await models.classify(classifier, {
+      state: {
+        conversation: input.lines.map(line => ({ speaker: line.speaker, text: line.text })),
+        user_language: input.userLanguage,
+        seconds_since_last_help: input.secondsSinceCard,
+      },
+      questions: {
+        help: {
+          type: 'bool',
+          instructions: 'The conversation is a live meeting. Would the user, who is "You", benefit from help from an assistant right now? Help means answering a question put to them, explaining a term, checking a fact or number, or noting an action item.',
+          criteria: { true: 'Help would clearly benefit the user right now', false: 'No help is needed right now' },
+        },
+        kind: {
+          type: 'choice',
+          instructions: 'What kind of help would fit the latest turn of the other party?',
+          criteria: {
+            answer_question: 'The other party put a question to the user',
+            explain_term: 'The other party used a term or name the user may not know',
+            check_fact: 'A fact, figure or claim could be wrong and is worth checking',
+            action_item: 'Someone took on a task or a date that should be noted',
+            nothing: 'None of these',
+          },
+        },
+      },
+    }, { signal: options.signal, timeoutMs: options.timeoutMs, maxRetries: 0 });
+    if (result.stopReason === 'aborted') throw new GateError('timeout');
+    const help = result.answers.help;
+    const kind = result.answers.kind;
+    if (result.stopReason === 'error') throw new GateError(gateErrorClass(result.errorMessage));
+    if (help?.type !== 'bool' || kind?.type !== 'choice' || !GATE_KINDS.includes(kind.choice as GateKind)) throw new GateError('bad_response');
+    return { help: help.probability, kind: kind.choice as GateKind, kindProbability: kind.probabilities[kind.choice] ?? kind.confidence };
+  };
 }

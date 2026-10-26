@@ -36,7 +36,7 @@ import { MicrophoneCapture } from "./audio/MicrophoneCapture"
 import { ThemeManager } from "./helpers/ThemeManager"
 import { RAGManager } from "./rag/RAGManager"
 import { DatabaseManager } from "./db/DatabaseManager"
-import { getMeetingAgent } from './agent/instance'
+import { getMeetingAgent, getGate, refreshGate } from './agent/instance'
 import { type MeetingAgent, reportAgentError } from './agent/MeetingAgent'
 import { warmupIntentClassifier } from "./llm"
 import {
@@ -610,7 +610,10 @@ export class AppState {
   public recordTranscriptSegment(segment: { segmentId: string; revision: number; speaker: TranscriptSpeaker; text: string; timestampMs: number }): void {
     if (!this.currentMeetingId) return;
     try {
-      DatabaseManager.getInstance().upsertSegment({ meetingId: this.currentMeetingId, ...segment });
+      const written = DatabaseManager.getInstance().upsertSegment({ meetingId: this.currentMeetingId, ...segment });
+      if (written && segment.speaker === 'interviewer') {
+        getGate().onSegment({ meetingId: this.currentMeetingId, segmentId: segment.segmentId, revision: segment.revision });
+      }
     } catch (err) {
       console.error('[Main] Failed to record a transcript segment:', (err as Error).message);
     }
@@ -848,6 +851,7 @@ export class AppState {
     this.currentMeetingId = this.intelligenceManager.startMeeting(metadata);
     if (this.currentMeetingId) {
       void this.getMeetingAgent().open(this.currentMeetingId).catch(error => reportAgentError(error));
+      void refreshGate();
     }
 
     // Emit session reset to clear UI state immediately
@@ -939,6 +943,7 @@ export class AppState {
     // user starts a new session before background processing finishes.
     const agentMeetingId = this.currentMeetingId;
     if (agentMeetingId) {
+      getGate().stop(agentMeetingId);
       await this.getMeetingAgent().stop(agentMeetingId).catch(error => reportAgentError(error, agentMeetingId));
     }
     const meetingId = await this.intelligenceManager.stopMeeting(stoppedAtMs);

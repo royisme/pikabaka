@@ -9,6 +9,7 @@ import { registerRagHandlers } from "./rag"
 import { registerKnowledgeHandlers } from "./knowledge"
 import { registerTranslationHandlers } from "./translation"
 import { registerMiscHandlers } from "./misc"
+import { registerGateHandlers } from "./gate"
 
 export function initializeIpcHandlers(appState: AppState): void {
   registerCoreHandlers(appState)
@@ -21,4 +22,5 @@ export function initializeIpcHandlers(appState: AppState): void {
   registerKnowledgeHandlers(appState)
   registerTranslationHandlers(appState)
   registerMiscHandlers(appState)
+  registerGateHandlers(appState)
 }

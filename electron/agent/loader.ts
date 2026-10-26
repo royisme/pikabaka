@@ -7,7 +7,7 @@ async function named<T>(name: string, load: () => Promise<T>): Promise<T> {
 }
 
 async function load() {
-  const [durable, ai, models, sqlite, chord, schema, google, groq, openai, anthropic] = await Promise.all([
+  const [durable, ai, models, sqlite, chord, schema, google, groq, openai, anthropic, systemOne] = await Promise.all([
     named('@earendil-works/pi-durable', () => import('@earendil-works/pi-durable')),
     named('@earendil-works/pi-ai', () => import('@earendil-works/pi-ai')),
     named('@earendil-works/pi-ai/models', () => import('@earendil-works/pi-ai/models')),
@@ -18,8 +18,9 @@ async function load() {
     named('@earendil-works/pi-ai/providers/groq', () => import('@earendil-works/pi-ai/providers/groq')),
     named('@earendil-works/pi-ai/providers/openai', () => import('@earendil-works/pi-ai/providers/openai')),
     named('@earendil-works/pi-ai/providers/anthropic', () => import('@earendil-works/pi-ai/providers/anthropic')),
+    named('@earendil-works/pi-ai/api/typesafe-system-one.lazy', () => import('@earendil-works/pi-ai/api/typesafe-system-one.lazy')),
   ]);
-  return { durable, ai, models, sqlite, chord, Type: schema.Type, google, groq, openai, anthropic };
+  return { durable, ai, models, sqlite, chord, Type: schema.Type, google, groq, openai, anthropic, systemOne };
 }
 
 export type AgentRuntime = Awaited<ReturnType<typeof load>>;

@@ -64,6 +64,13 @@ export interface StoredCredentials {
     /** Recognition language key (RECOGNITION_LANGUAGES) or 'auto' */
     transcriptTranslationSourceLanguage?: string;
     transcriptTranslationTargetLanguage?: string;
+    // Proactive help: the decision model (a System One classifier) behind the gate
+    agentGateMode?: 'log' | 'on' | 'off';
+    agentGateModel?: string;
+    agentGateBaseUrl?: string;
+    agentGateApiKey?: string;
+    agentGateThreshold?: number;
+    agentGateCooldownSeconds?: number;
     // Tavily Search
     tavilyApiKey?: string;
     // Dynamic Model Discovery – preferred models per provider
@@ -182,6 +189,51 @@ export class CredentialsManager {
     // The language the user speaks; follows the other party's language until set on its own.
     public getSttLanguageUser(): string {
         return this.credentials.sttLanguageUser || this.getSttLanguage();
+    }
+
+    public getAgentGateMode(): 'log' | 'on' | 'off' {
+        const mode = this.credentials.agentGateMode;
+        return mode === 'on' || mode === 'off' ? mode : 'log';
+    }
+
+    public getAgentGateModel(): string {
+        return this.credentials.agentGateModel || '';
+    }
+
+    public getAgentGateBaseUrl(): string {
+        return this.credentials.agentGateBaseUrl || '';
+    }
+
+    public getAgentGateApiKey(): string {
+        return this.credentials.agentGateApiKey || '';
+    }
+
+    public getAgentGateThreshold(): number {
+        const value = this.credentials.agentGateThreshold;
+        return typeof value === 'number' && value >= 0 && value <= 1 ? value : 0.7;
+    }
+
+    public getAgentGateCooldownSeconds(): number {
+        const value = this.credentials.agentGateCooldownSeconds;
+        return typeof value === 'number' && value >= 0 ? value : 120;
+    }
+
+    public setAgentGateSettings(settings: {
+        mode?: 'log' | 'on' | 'off';
+        model?: string;
+        baseUrl?: string;
+        apiKey?: string;
+        threshold?: number;
+        cooldownSeconds?: number;
+    }): void {
+        if (settings.mode !== undefined) this.credentials.agentGateMode = settings.mode;
+        if (settings.model !== undefined) this.credentials.agentGateModel = settings.model.trim() || undefined;
+        if (settings.baseUrl !== undefined) this.credentials.agentGateBaseUrl = settings.baseUrl.trim() || undefined;
+        if (settings.apiKey !== undefined) this.credentials.agentGateApiKey = settings.apiKey.trim() || undefined;
+        if (settings.threshold !== undefined) this.credentials.agentGateThreshold = settings.threshold;
+        if (settings.cooldownSeconds !== undefined) this.credentials.agentGateCooldownSeconds = settings.cooldownSeconds;
+        this.saveCredentials();
+        console.log('[CredentialsManager] Proactive help settings updated');
     }
 
     public getAiResponseLanguage(): string {

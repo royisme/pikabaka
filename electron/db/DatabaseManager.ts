@@ -531,6 +531,13 @@ export class DatabaseManager {
         return meetingRecord.upsertSegment(this.db, segment);
     }
 
+    public getSegmentRevision(meetingId: string, segmentId: string): number | undefined {
+        if (!this.db) return undefined;
+        const row = this.db.prepare('SELECT revision FROM transcripts WHERE meeting_id = ? AND segment_id = ?')
+            .get(meetingId, segmentId) as { revision: number | null } | undefined;
+        return row?.revision ?? undefined;
+    }
+
     public getRecentSegments(meetingId: string, sinceMs: number): Array<{
         segmentId: string; revision: number | null; speaker: string; text: string; timestampMs: number;
     }> {

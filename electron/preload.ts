@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer } from "electron"
 
 // Types for the exposed Electron API
+interface AgentGateDecision {
+  time: number; meetingId: string; segmentId: string; revision: number; model: string; threshold: number; cooldownSeconds: number
+  help?: number; kind?: string; kindProbability?: number; latencyMs?: number; outcome: string
+}
 interface ElectronAPI {
   updateContentDimensions: (dimensions: {
     width: number
@@ -62,6 +66,10 @@ interface ElectronAPI {
   getStoredCredentials: () => Promise<{ hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: string; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; hasSonioxKey: boolean }>
   getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude'; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both' }>
   setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude'; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) => Promise<{ success: boolean }>
+  agentGateGetSettings: () => Promise<{ mode: 'log' | 'on' | 'off'; model: string; baseUrl: string; hasApiKey: boolean; threshold: number; cooldownSeconds: number }>
+  agentGateSetSettings: (settings: { mode?: 'log' | 'on' | 'off'; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }) => Promise<{ success: boolean; error?: string }>
+  agentGateStatus: () => Promise<{ mode: 'log' | 'on' | 'off'; configured: boolean; state: 'ok' | 'unavailable' | 'unconfigured'; reason?: string; lastDecision?: AgentGateDecision }>
+  agentGateLog: () => Promise<AgentGateDecision[]>
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string }>
 
   // STT Provider Management
@@ -549,6 +557,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getTranscriptTranslationSettings: () => ipcRenderer.invoke("get-transcript-translation-settings"),
   setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude'; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) =>
     ipcRenderer.invoke("set-transcript-translation-settings", settings),
+  agentGateGetSettings: () => ipcRenderer.invoke("agent-gate-get-settings"),
+  agentGateSetSettings: (settings: { mode?: 'log' | 'on' | 'off'; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }) => ipcRenderer.invoke("agent-gate-set-settings", settings),
+  agentGateStatus: () => ipcRenderer.invoke("agent-gate-status"),
+  agentGateLog: () => ipcRenderer.invoke("agent-gate-log"),
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) =>
     ipcRenderer.invoke("translate-transcript-segment", segment),
 

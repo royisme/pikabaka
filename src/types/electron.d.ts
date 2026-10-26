@@ -1,3 +1,8 @@
+export interface AgentGateDecision {
+  time: number; meetingId: string; segmentId: string; revision: number; model: string; threshold: number; cooldownSeconds: number
+  help?: number; kind?: string; kindProbability?: number; latencyMs?: number; outcome: string
+}
+
 export interface ElectronAPI {
   updateContentDimensions: (dimensions: {
     width: number
@@ -89,6 +94,10 @@ export interface ElectronAPI {
   getStoredCredentials: () => Promise<{ hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; groqSttModel?: string; hasSonioxKey?: boolean; hasTavilyKey?: boolean; transcriptTranslationEnabled?: boolean; transcriptTranslationProvider?: string; transcriptTranslationModel?: string; transcriptTranslationPrompt?: string; transcriptTranslationDisplayMode?: 'original' | 'translated' | 'both'; transcriptTranslationSourceLanguage?: string; transcriptTranslationTargetLanguage?: string; geminiPreferredModel?: string; groqPreferredModel?: string; openaiPreferredModel?: string; claudePreferredModel?: string }>
   getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both'; sourceLanguage: string; targetLanguage: string }>
   setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both'; sourceLanguage?: string; targetLanguage?: string }) => Promise<{ success: boolean }>
+  agentGateGetSettings: () => Promise<{ mode: 'log' | 'on' | 'off'; model: string; baseUrl: string; hasApiKey: boolean; threshold: number; cooldownSeconds: number }>
+  agentGateSetSettings: (settings: { mode?: 'log' | 'on' | 'off'; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }) => Promise<{ success: boolean; error?: string }>
+  agentGateStatus: () => Promise<{ mode: 'log' | 'on' | 'off'; configured: boolean; state: 'ok' | 'unavailable' | 'unconfigured'; reason?: string; lastDecision?: AgentGateDecision }>
+  agentGateLog: () => Promise<AgentGateDecision[]>
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string; translatedText?: string }>
 
   // STT Provider Management

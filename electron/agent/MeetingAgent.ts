@@ -9,6 +9,7 @@ import type { MeetingToolDeps } from './tools/meetingTools';
 import { loadAgentRuntime } from './loader';
 import { meetingContext, MEETING_INSTRUCTIONS } from './context';
 import { createMeetingTools } from './tools/meetingTools';
+import { gateLogFile } from './gateLog';
 
 export interface AgentDeps extends MeetingToolDeps {
   userDataDir: string;
@@ -348,6 +349,7 @@ export class MeetingAgent {
     this.deleted.add(meetingId);
     await this.stop(meetingId);
     await Promise.all(['', '-wal', '-shm'].map(suffix => rm(file + suffix, { force: true })));
+    await rm(gateLogFile(this.deps.userDataDir, meetingId), { force: true });
   }
 
   deleteAllStores(): Promise<void> {
@@ -359,7 +361,7 @@ export class MeetingAgent {
         throw error;
       });
       const diskIds = files.flatMap(file => {
-        const match = /^([a-zA-Z0-9][a-zA-Z0-9_-]{0,127})\.sqlite(?:-wal|-shm)?$/.exec(file);
+        const match = /^([a-zA-Z0-9][a-zA-Z0-9_-]{0,127})\.(?:sqlite(?:-wal|-shm)?|gate\.jsonl)$/.exec(file);
         return match ? [match[1]] : [];
       });
       const ids = new Set([...this.stores.keys(), ...diskIds]);

@@ -5,7 +5,10 @@ import { CredentialsManager } from '../services/CredentialsManager';
 import { DatabaseManager } from '../db/DatabaseManager';
 import { VectorStore } from '../rag/VectorStore';
 import { MeetingAgent } from './MeetingAgent';
-import { resolveAgentModel } from './models';
+import { resolveAgentModel, createGateClassify } from './models';
+import { Gate, type GateClassify } from './gate';
+import { appendGateDecision } from './gateLog';
+import { reportAgentError } from './MeetingAgent';
 
 let instance: MeetingAgent | undefined;
 
@@ -39,4 +42,40 @@ export function getMeetingAgent(): MeetingAgent {
     }),
   });
   return instance;
+}
+
+let gate: Gate | undefined;
+let classifier: GateClassify | undefined;
+let classifierFor = '';
+
+/** Builds the decision-model classifier for the current settings; the gate itself reads it synchronously. */
+export async function refreshGate(): Promise<void> {
+  const cm = CredentialsManager.getInstance();
+  const signature = [cm.getAgentGateModel(), cm.getAgentGateBaseUrl(), cm.getAgentGateApiKey()].join('\n');
+  if (signature === classifierFor) return;
+  classifierFor = signature;
+  classifier = await createGateClassify(cm).catch((error): undefined => { reportAgentError(error); return undefined; });
+}
+
+export function getGate(): Gate {
+  if (gate) return gate;
+  const cm = CredentialsManager.getInstance();
+  const manager = () => DatabaseManager.getInstance();
+  gate = new Gate({
+    getClassifier: () => classifier,
+    getSettings: () => ({
+      mode: cm.getAgentGateMode(),
+      threshold: cm.getAgentGateThreshold(),
+      cooldownSeconds: cm.getAgentGateCooldownSeconds(),
+      model: cm.getAgentGateModel(),
+    }),
+    now: () => Date.now(),
+    getSegmentRevision: (meetingId, segmentId) => manager().getSegmentRevision(meetingId, segmentId),
+    isMeetingActive: meetingId => AppState.getInstance().getCurrentMeetingId() === meetingId,
+    getLines: meetingId => manager().getRecentSegments(meetingId, Date.now() - 3 * 60_000).slice(-6)
+      .map(segment => ({ speaker: segment.speaker === 'user' ? 'You' as const : 'Them' as const, text: segment.text })),
+    getUserLanguage: () => cm.getSttLanguageUser(),
+    log: decision => appendGateDecision(app.getPath('userData'), decision),
+  });
+  return gate;
 }
