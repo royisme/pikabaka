@@ -1,5 +1,5 @@
 import t from 'tap';
-import { isTranslationStale, translationEnabledAfterEvent, upsertTranscriptSegment } from '../src/lib/transcriptSegments';
+import { isTranscriptArrival, isTranslationStale, translationEnabledAfterEvent, upsertTranscriptSegment } from '../src/lib/transcriptSegments';
 import { buildTranscriptTranslationPrompt, isTranscriptTranslationConfigured } from '../electron/transcript/translationExecutor';
 
 t.test('upsertTranscriptSegment appends and patches by segmentId', (t) => {
@@ -140,5 +140,27 @@ t.test('streaming events grow the translation and keep the wait that began at pe
   t.equal(more[0].translatedText, 'Bonjour');
   t.equal(translationEnabledAfterEvent(false, 'streaming'), true);
   t.equal(isTranslationStale(more[0]), false);
+  t.end();
+});
+
+t.test('only the transcript text arriving counts as the speaker finishing', (t) => {
+  t.equal(isTranscriptArrival(undefined), true);
+  t.equal(isTranscriptArrival('pending'), true);
+  t.equal(isTranscriptArrival('skipped'), true);
+  for (const state of ['streaming', 'complete', 'error'] as const) t.equal(isTranscriptArrival(state), false, state);
+  t.end();
+});
+
+t.test('a stream that fails after some text drops the cut-off translation', (t) => {
+  const pending = upsertTranscriptSegment([], { final: true, text: 'Hello there', segmentId: 's1', translationState: 'pending', revision: 1 }, 1000);
+  const streaming = upsertTranscriptSegment(pending, { final: true, text: 'Hello there', translatedText: 'Bon', segmentId: 's1', translationState: 'streaming', revision: 1 }, 1100);
+  const failed = upsertTranscriptSegment(streaming, { final: true, text: 'Hello there', segmentId: 's1', translationState: 'error', translationError: 'timeout', revision: 1 }, 1200);
+  t.equal(failed[0].translatedText, undefined);
+  t.equal(failed[0].translationState, 'error');
+  t.equal(failed[0].translationError, 'timeout');
+  const completeThenError = upsertTranscriptSegment(
+    upsertTranscriptSegment(pending, { final: true, text: 'Hello there', translatedText: 'Bonjour', segmentId: 's1', translationState: 'complete', revision: 1 }, 1300),
+    { final: true, text: 'Hello there', segmentId: 's1', translationState: 'error', revision: 1 }, 1400);
+  t.equal(completeThenError[0].translatedText, 'Bonjour', 'a finished translation is kept when a manual retranslate fails');
   t.end();
 });

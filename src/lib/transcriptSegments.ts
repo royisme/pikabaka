@@ -40,6 +40,16 @@ function defaultSpeakerLabelForEvent(event: TranscriptEventForSegment): string {
   return 'User 1';
 }
 
+/**
+ * A final event is either the transcript's own final text (`pending` when translation will follow,
+ * `skipped` when it will not) or a later report about that text's translation (`streaming`,
+ * `complete`, `error`). Only the first kind is the speaker finishing; the second must not clear the
+ * live line, change the display mode, or tell whether translation is on.
+ */
+export function isTranscriptArrival(state: TranscriptSegment['translationState'] | undefined): boolean {
+  return state === undefined || state === 'pending' || state === 'skipped';
+}
+
 /** A `skipped` final means translation is off or not configured; any other state means it is on. */
 export function translationEnabledAfterEvent(
   current: boolean,
@@ -105,7 +115,10 @@ export function upsertTranscriptSegment(
   updated[index] = {
     ...existing,
     sourceText,
-    translatedText: event.translatedText?.trim() || existing.translatedText,
+    // A stream that failed after some text leaves a cut-off translation behind: drop it, so the row shows the failure and not half a sentence.
+    translatedText:
+      event.translatedText?.trim() ||
+      (event.translationState === 'error' && existing.translationState === 'streaming' ? undefined : existing.translatedText),
     timestamp: existing.timestamp,
     speakerLabel: event.speakerLabel?.trim()
       ? event.speakerLabel.trim().slice(0, 32)
@@ -117,7 +130,9 @@ export function upsertTranscriptSegment(
     translationError: (event.translationState || existing.translationState) === 'error' ? event.translationError : undefined,
     translatedRevision: event.translatedText?.trim()
       ? (event.revision ?? existing.revision)
-      : existing.translatedRevision,
+      : event.translationState === 'error' && existing.translationState === 'streaming'
+        ? undefined
+        : existing.translatedRevision,
     receivedAt: event.translationState === 'pending' ? now : existing.receivedAt,
   };
   return updated;

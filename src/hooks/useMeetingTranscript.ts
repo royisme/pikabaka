@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { translationEnabledAfterEvent, upsertTranscriptSegment, type TranscriptDisplayMode, type TranscriptSegment } from '../lib/transcriptSegments';
+import { isTranscriptArrival, translationEnabledAfterEvent, upsertTranscriptSegment, type TranscriptDisplayMode, type TranscriptSegment } from '../lib/transcriptSegments';
 
 export function useMeetingTranscript() {
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
@@ -95,10 +95,7 @@ export function useMeetingTranscript() {
             })
           );
 
-          if (transcript.displayMode) {
-            setTranscriptDisplayMode(transcript.displayMode);
-          }
-          setTranslationEnabled((current) => translationEnabledAfterEvent(current, transcript.translationState));
+          // Own speech is never translated, so its `skipped` says nothing about whether translation is on.
         }
         return;
       }
@@ -107,10 +104,12 @@ export function useMeetingTranscript() {
         return;
       }
 
-      setIsInterviewerSpeaking(!transcript.final);
+      const arrival = transcript.final && isTranscriptArrival(transcript.translationState);
+      // A translation report (streaming, complete, error) is a final event too, but the speaker may already be on the next sentence.
+      if (!transcript.final || arrival) setIsInterviewerSpeaking(!transcript.final);
 
       if (transcript.final) {
-        setCurrentInterviewerPartial('');
+        if (arrival) setCurrentInterviewerPartial('');
         const normalizedSegmentId =
           transcript.segmentId || `legacy_${transcript.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const speakerFromPayload = transcript.speakerLabel?.trim();
@@ -132,18 +131,19 @@ export function useMeetingTranscript() {
           })
         );
 
-        if (transcript.displayMode) {
-          setTranscriptDisplayMode(transcript.displayMode);
-        }
-        setTranslationEnabled((current) => translationEnabledAfterEvent(current, transcript.translationState));
+        // The display mode and the on/off state are read when a request starts; later reports of that request carry stale copies.
+        if (arrival) {
+          if (transcript.displayMode) setTranscriptDisplayMode(transcript.displayMode);
+          setTranslationEnabled((current) => translationEnabledAfterEvent(current, transcript.translationState));
 
-        if (speakingTimeoutRef.current) {
-          window.clearTimeout(speakingTimeoutRef.current);
+          if (speakingTimeoutRef.current) {
+            window.clearTimeout(speakingTimeoutRef.current);
+          }
+          speakingTimeoutRef.current = window.setTimeout(() => {
+            setIsInterviewerSpeaking(false);
+            speakingTimeoutRef.current = null;
+          }, 3000);
         }
-        speakingTimeoutRef.current = window.setTimeout(() => {
-          setIsInterviewerSpeaking(false);
-          speakingTimeoutRef.current = null;
-        }, 3000);
       } else {
         setCurrentInterviewerPartial(transcript.text);
       }

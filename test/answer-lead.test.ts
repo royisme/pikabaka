@@ -34,6 +34,8 @@ t.test('latestOtherPartyText skips own speech and falls back to the live partial
     { sourceText: 'Sure, when?', speaker: 'user' as const },
   ];
   t.equal(latestOtherPartyText(rows), 'Can we move the call?');
+  t.equal(latestOtherPartyText(rows, '  And what about Friday  '), 'And what about Friday', 'a live partial is newer than any final line');
+  t.equal(latestOtherPartyText(rows, '   '), 'Can we move the call?', 'a blank partial is ignored');
   t.equal(latestOtherPartyText([{ sourceText: 'Me only', speaker: 'user' }], '  Are you there  '), 'Are you there');
   t.equal(latestOtherPartyText([]), undefined);
   t.equal(latestOtherPartyText([{ sourceText: '  ', speaker: 'interviewer' }]), undefined);

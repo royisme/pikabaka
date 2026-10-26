@@ -698,6 +698,12 @@ export class IntelligenceEngine extends EventEmitter {
                 fullHint += token;
             }
 
+            if (this.currentGenerationId !== generationId) {
+                // Stopped or superseded: keep the half answer out of the session and say nothing more.
+                this.setMode('idle');
+                return null;
+            }
+
             if (!fullHint || fullHint.trim().length < 5) {
                 fullHint = "I couldn't detect any code in the screenshot. Try screenshotting your code editor directly.";
             }

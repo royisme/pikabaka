@@ -2,6 +2,25 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: fixes from an independent logic review (branch `review-fixes`)
+
+Done (fixes for an independent read-only review by an Opus subagent of the logic, IPC and hook changes; every finding below was checked in the code before it was fixed)
+1. **Own speech switched translation off.** A user turn is emitted as `skipped`, and the hook took that as "translation is off": the Translate button flipped after you spoke, pending rows lost their "Translating" slot, and the default split jumped. Own speech no longer touches the translation state. The display mode and the on/off state are now read only from the event that announces the speaker's text (`pending` or `skipped`), not from the later reports of that request, which carry copies from when the request started and undid a toggle within 80 ms.
+2. **Streaming ticks wiped the live partial.** They are `final` events too; every tick blanked the live line and reset the speaking timer. Only the text arriving (`isTranscriptArrival`) does that now.
+3. **Stop did not stop a RAG answer**, and a quick Retry after Stop could receive the old answer's chunks. Stop now aborts the RAG queries too (`cancelActiveRagQueries`), and a Stop during retrieval no longer falls through to the plain chat.
+4. **The overlay lost its height after Hide** (plausible: collapsing sets the window to its minimum, which was then taken for the user's choice). The reopen height is now the saved one or the 420px default, never the window's current height.
+5. **A cut-off translation looked finished.** A stream that failed after some text left half a sentence under a "complete-looking" row. The error now drops the partial translation, so the row shows "Translation failed" and Retry; a finished translation is kept when a later manual retranslate fails.
+6. **Retry could repeat the wrong request, or do nothing.** It now shows only when the last request can be repeated (not after a screenshot question, a rewrite or Answer-now).
+7. **After Stop, the engine's own answers were dropped** until the next user request; the flag now settles after a second.
+8. **A stopped code hint went into the session history** (with the "couldn't detect any code" fallback if little text had arrived). It now returns without saving, like the other modes.
+9. **An OpenAI-compatible endpoint that ignores `stream: true`** answered with plain JSON and produced a blank translation; an empty stream now falls through to the ordinary request.
+10. **The streaming fallback retried on every early error**, doubling requests on a rate limit; it now retries only an unclassified failure (the endpoint cannot stream).
+11. **Fix audio showed the launcher without the stealth handling** (on Windows the opacity shield). The show logic is now one function shared with `switchToLauncher`, and "Fix audio" uses it.
+12. **The "Re:" line could name the previous turn**: it now prefers a live partial, which is newer than any final line.
+- Small: Stop no longer undoes a request started while it was waiting for the main process; the follow-up-questions button always clears its busy state.
+- Verified: both `tsc --noEmit` checks exit 0; lint exit 0, 1268 warnings (the cap); tap passes (new tests: arrival classification, a failed stream drops its partial translation, the partial-wins reply context). Items 3, 4, 7, 8, 9, 10, 11 are in the main process or the hook and have no unit test: the engine, the window and the hook cannot be loaded by the tap runner.
+- Not fixed: pressing Fix audio when the settings window is already open on another tab does not switch it to Audio; on macOS Cmd+W can close the launcher shown this way while a meeting runs (the same as switching to the launcher by hand today).
+
 ## 2026-10-26: S3 PRODUCT.md draft (branch `product-brief`)
 
 Done (S3, the PRODUCT half; drafted by a Gemini 3.8 worker through pi, then checked against the repo and corrected by the lead)

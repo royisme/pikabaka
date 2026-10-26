@@ -1,6 +1,7 @@
 import { app } from "electron"
 import { safeHandle, broadcastOpenAICompatibleProvidersChanged } from "./safeHandle"
 import { AppState } from "../main"
+import { cancelActiveRagQueries } from "./rag"
 import { DatabaseManager } from "../db/DatabaseManager"
 import * as path from "path"
 import { RECOGNITION_LANGUAGES, AI_RESPONSE_LANGUAGES } from "../config/languages"
@@ -477,6 +478,7 @@ export function registerCoreHandlers(appState: AppState): void {
   // Stop the answer being generated: the engine's streams and the chat stream both end at their next token.
   safeHandle("cancel-generation", () => {
     appState.getIntelligenceManager().cancelGeneration()
+    cancelActiveRagQueries()
     _chatStreamId++
     return { success: true }
   })
@@ -492,7 +494,7 @@ export function registerCoreHandlers(appState: AppState): void {
     const launcher = appState.getWindowHelper().getLauncherWindow()
     if (!launcher || launcher.isDestroyed()) return { success: false }
     launcher.webContents.send('open-settings-section', { section })
-    launcher.show()
+    appState.getWindowHelper().showLauncherAlongside()
     return { success: true }
   })
 

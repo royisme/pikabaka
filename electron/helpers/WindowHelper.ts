@@ -494,12 +494,9 @@ export class WindowHelper {
       // For now, center it nicely
       const primaryDisplay = screen.getPrimaryDisplay()
       const workArea = primaryDisplay.workArea;
-      const currentBounds = this.overlayWindow.getBounds();
-      // A fresh window is 1px tall: open at the height the user left it last time, or a size that has room for an answer.
-      const targetHeight = Math.min(
-        workArea.height,
-        currentBounds.height > 1 ? currentBounds.height : this.readSavedOverlayHeight() ?? DEFAULT_OVERLAY_HEIGHT
-      );
+      // Open at the height the user last chose, or a size that has room for an answer. The window's current height is not
+      // used: hiding the overlay collapses the window to its minimum, which would then be mistaken for a choice.
+      const targetHeight = Math.min(workArea.height, this.readSavedOverlayHeight() ?? DEFAULT_OVERLAY_HEIGHT);
       const overlayWidth = Math.min(600, Math.floor(screen.getPrimaryDisplay().workAreaSize.width * 0.9));
       const overlayX = Math.floor(workArea.x + (workArea.width - overlayWidth) / 2)
       const overlayY = Math.floor(workArea.y + (workArea.height - targetHeight) / 2)
@@ -538,12 +535,11 @@ export class WindowHelper {
     }
   }
 
-  public switchToLauncher(inactive?: boolean): void {
-    console.log(`[WindowHelper] Switching to LAUNCHER (inactive: ${!!inactive})`);
-    this.currentWindowMode = 'launcher';
-    KeybindManager.getInstance().setMode('launcher'); // Adapted from public PR #123 — verify premium interaction
-
-    // Show Launcher FIRST
+  /**
+   * Shows the launcher with the same stealth handling every time: on Windows it appears at zero
+   * opacity until content protection is applied, so no frame can leak into a screen share.
+   */
+  private showLauncherWindow(inactive?: boolean): void {
     if (this.launcherWindow && !this.launcherWindow.isDestroyed()) {
       if (process.platform === 'win32' && this.contentProtection) {
         // Opacity Shield: Show at 0 opacity first
@@ -565,6 +561,20 @@ export class WindowHelper {
       }
       this.isWindowVisible = true;
     }
+  }
+
+  /** Shows the launcher next to a running meeting overlay (to reach the full settings) without changing the window mode. */
+  public showLauncherAlongside(): void {
+    this.showLauncherWindow(false);
+  }
+
+  public switchToLauncher(inactive?: boolean): void {
+    console.log(`[WindowHelper] Switching to LAUNCHER (inactive: ${!!inactive})`);
+    this.currentWindowMode = 'launcher';
+    KeybindManager.getInstance().setMode('launcher'); // Adapted from public PR #123 — verify premium interaction
+
+    // Show Launcher FIRST
+    this.showLauncherWindow(inactive);
 
     // Hide Overlay SECOND
     if (this.overlayWindow && !this.overlayWindow.isDestroyed()) {

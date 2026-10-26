@@ -54,6 +54,12 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   // After the user stops an answer, tokens already on their way must not open a new message; the next request clears this.
   const cancelledRef = useRef(false);
   const lastActionRef = useRef<LastAction | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
+  // Remember what was asked so Retry can ask it again; null where asking again would not repeat it (a screenshot, a rewrite).
+  const remember = (action: LastAction | null) => {
+    lastActionRef.current = action;
+    setCanRetry(action !== null);
+  };
   const beginProcessing = () => {
     cancelledRef.current = false;
     setIsProcessing(true);
@@ -520,6 +526,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
       if (!skipRag && currentAttachments.length === 0) {
         console.log('[submitPrompt] calling ragQueryLive…');
         const ragResult = await window.electronAPI.ragQueryLive?.(promptText);
+        if (cancelledRef.current) return;
         console.log('[submitPrompt] ragQueryLive result', ragResult);
         if (ragResult?.success) return;
       }
@@ -550,7 +557,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   }, [attachedContext, conversationContextRef, setAttachedContext, setIsProcessing, setSystemMessages]);
 
   const handleWhatToSay = useCallback(async () => {
-    lastActionRef.current = { kind: 'what_to_say' };
+    remember({ kind: 'what_to_say' });
     analytics.trackCommandExecuted('what_to_say');
     await submitPrompt({
       userText: attachedContext.length > 0
@@ -562,6 +569,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   }, [submitPrompt, attachedContext.length]);
 
   const handleFollowUp = useCallback(async (intent: string = 'rephrase') => {
+    remember(null);
     beginProcessing();
     analytics.trackCommandExecuted('follow_up_' + intent);
     try {
@@ -577,7 +585,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   }, [setIsProcessing, setSystemMessages]);
 
   const handleCodeHint = useCallback(async () => {
-    lastActionRef.current = { kind: 'code_hint' };
+    remember({ kind: 'code_hint' });
     beginProcessing();
     analytics.trackCommandExecuted('code_hint');
 
@@ -603,7 +611,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   }, [attachedContext, setAttachedContext, setIsProcessing, setSystemMessages]);
 
   const handleClarify = useCallback(async () => {
-    lastActionRef.current = { kind: 'clarify' };
+    remember({ kind: 'clarify' });
     beginProcessing();
     try {
       await window.electronAPI.generateClarify();
@@ -614,18 +622,19 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   }, [pushSystemError]);
 
   const handleFollowUpQuestions = useCallback(async () => {
-    lastActionRef.current = { kind: 'follow_up_questions' };
+    remember({ kind: 'follow_up_questions' });
     beginProcessing();
     try {
       await window.electronAPI.generateFollowUpQuestions();
     } catch (err) {
       pushSystemError(err);
+    } finally {
       setIsProcessing(false);
     }
   }, [pushSystemError]);
 
   const handleRecap = useCallback(async () => {
-    lastActionRef.current = { kind: 'recap' };
+    remember({ kind: 'recap' });
     beginProcessing();
     try {
       await window.electronAPI.generateRecap();
@@ -637,7 +646,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   }, [pushSystemError]);
 
   const handleBrainstorm = useCallback(async () => {
-    lastActionRef.current = { kind: 'brainstorm' };
+    remember({ kind: 'brainstorm' });
     beginProcessing();
     const currentAttachments = attachedContext;
 
@@ -657,6 +666,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   }, [attachedContext, pushSystemError]);
 
   const handleAnswerNow = useCallback(async () => {
+    remember(null);
     if (!inputValue) return;
 
     // Try RAG first; fall back to useChat/sendMessage
@@ -680,7 +690,8 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     if (currentAttachments.length > 0) setAttachedContext([]);
 
     if (currentAttachments.length > 0) {
-      // Screenshots: use legacy streamGeminiChat (supports image paths)
+      // Screenshots: use legacy streamGeminiChat (supports image paths). The attachment is gone afterwards, so there is nothing to repeat.
+      remember(null);
       setSystemMessages((prev) => [
         ...prev,
         {
@@ -705,7 +716,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
       }
     } else {
       // Text-only: route through submitPrompt so IPC/RAG streams update the placeholder listeners.
-      lastActionRef.current = { kind: 'manual', text: userText };
+      remember({ kind: 'manual', text: userText });
       await submitPrompt({
         userText,
         placeholderIntent: 'manual',
@@ -724,11 +735,15 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     } catch (error) {
       console.warn('[useMeetingChat] cancelGeneration failed:', error);
     }
+    // The user may have asked something new while the main process was answering: that request owns the state now.
+    if (!cancelledRef.current) return;
     stop();
     setIsProcessing(false);
     setSystemMessages((prev) =>
       prev.filter((m) => !(m.isStreaming && m.text === '')).map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
     );
+    // Tokens already on their way arrive within moments; after that, answers the engine starts by itself are wanted again.
+    window.setTimeout(() => { cancelledRef.current = false; }, 1000);
   }, [stop]);
 
   /** Asks again what was asked last; a failure message at the end of the list is removed first. */
@@ -750,6 +765,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   return {
     stopGeneration,
     retryLast,
+    canRetry,
     knowledgeContext,
     attachedContext,
     setAttachedContext,

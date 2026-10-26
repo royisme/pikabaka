@@ -505,12 +505,15 @@ export class LLMHelper {
           receivedText = true;
           onProgress(textSoFar);
         });
-        return streamed.trim();
+        // An endpoint that ignores `stream: true` and answers with plain JSON yields no text and no error: ask again without streaming.
+        if (streamed.trim()) return streamed.trim();
       } catch (error) {
-        // An endpoint that cannot stream fails before any text: ask once more without streaming.
-        // After text has been shown, a retry would replace it, so the failure stands.
-        if (receivedText) throw error;
-        console.warn('[LLMHelper] Translation stream failed before any text; retrying without streaming:', classifyTranslationError(error));
+        // A failure that says why (wrong key, rate limit, timeout, no connection) would only repeat, so it stands. An endpoint that
+        // cannot stream fails with something unclassified before any text: ask once more without streaming. After text has been
+        // shown, a retry would replace it.
+        const reason = classifyTranslationError(error);
+        if (receivedText || reason !== 'other') throw error;
+        console.warn('[LLMHelper] Translation stream failed before any text; retrying without streaming:', reason);
       }
     }
 
