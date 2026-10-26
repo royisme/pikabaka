@@ -9,6 +9,9 @@ export function useMeetingTranscript() {
   const [translationEnabled, setTranslationEnabled] = useState(false);
   const [translationConfigured, setTranslationConfigured] = useState(false);
   const [targetLanguage, setTargetLanguage] = useState('chinese');
+  const [sourceLanguage, setSourceLanguage] = useState('auto');
+  const [theirLanguage, setTheirLanguage] = useState('english-us');
+  const [myLanguage, setMyLanguage] = useState('english-us');
   const [languageOptions, setLanguageOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [showTranscript, setShowTranscript] = useState(() => {
     const stored = localStorage.getItem('pika_interviewer_transcript');
@@ -26,6 +29,7 @@ export function useMeetingTranscript() {
         setTranslationConfigured(configured);
         setTranslationEnabled(!!settings?.enabled && configured);
         if (settings?.targetLanguage) setTargetLanguage(settings.targetLanguage);
+        if (settings?.sourceLanguage) setSourceLanguage(settings.sourceLanguage);
       })
       .catch(() => {});
   }, []);
@@ -41,17 +45,60 @@ export function useMeetingTranscript() {
         )
       )
       .catch(() => {});
+    window.electronAPI?.getSttLanguage?.('interviewer')
+      .then((lang) => {
+        if (lang) setTheirLanguage(lang);
+      })
+      .catch(() => {});
+    window.electronAPI?.getSttLanguage?.('user')
+      .then((lang) => {
+        if (lang) setMyLanguage(lang);
+      })
+      .catch(() => {});
   }, [loadTranslationSettings]);
 
   /** Saves a header change; on failure the saved settings win and are read back. */
   const saveTranslationSettings = useCallback(
-    (patch: { enabled?: boolean; targetLanguage?: string; displayMode?: TranscriptDisplayMode }) => {
+    (patch: { enabled?: boolean; targetLanguage?: string; displayMode?: TranscriptDisplayMode; sourceLanguage?: string }) => {
       if (patch.enabled !== undefined) setTranslationEnabled(patch.enabled);
       if (patch.targetLanguage !== undefined) setTargetLanguage(patch.targetLanguage);
       if (patch.displayMode !== undefined) setTranscriptDisplayMode(patch.displayMode);
+      if (patch.sourceLanguage !== undefined) setSourceLanguage(patch.sourceLanguage);
       window.electronAPI?.setTranscriptTranslationSettings?.(patch).catch(loadTranslationSettings);
     },
     [loadTranslationSettings]
+  );
+
+  const refreshLanguages = useCallback(async () => {
+    try {
+      const [interviewer, user] = await Promise.all([
+        window.electronAPI?.getSttLanguage?.('interviewer'),
+        window.electronAPI?.getSttLanguage?.('user'),
+      ]);
+      if (interviewer) setTheirLanguage(interviewer);
+      if (user) setMyLanguage(user);
+    } catch {}
+  }, []);
+
+  const changeSpokenLanguage = useCallback(
+    async (speaker: 'interviewer' | 'user', key: string) => {
+      if (speaker === 'interviewer') {
+        setTheirLanguage(key);
+        saveTranslationSettings({ sourceLanguage: key });
+      } else {
+        setMyLanguage(key);
+      }
+
+      try {
+        const result = await window.electronAPI?.setRecognitionLanguage?.(key, speaker);
+        if (result && !result.success) {
+          await refreshLanguages();
+        }
+      } catch {
+        await refreshLanguages();
+      }
+    },
+    [saveTranslationSettings, refreshLanguages]
   );
 
   useEffect(() => {
@@ -204,6 +251,10 @@ export function useMeetingTranscript() {
     translationEnabled,
     translationConfigured,
     targetLanguage,
+    sourceLanguage,
+    theirLanguage,
+    myLanguage,
+    changeSpokenLanguage,
     languageOptions,
     saveTranslationSettings,
     setTranscriptDisplayMode,

@@ -456,6 +456,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
     // Recognition Language
     const [recognitionLanguage, setRecognitionLanguage] = useState('');
+    const [userRecognitionLanguage, setUserRecognitionLanguage] = useState('');
     const [selectedSttGroup, setSelectedSttGroup] = useState('');
     const [availableLanguages, setAvailableLanguages] = useState<Record<string, any>>({});
 
@@ -649,6 +650,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 } else {
                     setSelectedSttGroup('English');
                 }
+
+                if (window.electronAPI?.getSttLanguage) {
+                    const storedUserStt = await window.electronAPI.getSttLanguage('user');
+                    setUserRecognitionLanguage(storedUserStt || currentLangKey || 'english-us');
+                }
             }
 
             if (window.electronAPI?.getAiResponseLanguages) {
@@ -680,6 +686,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         }
         if (window.electronAPI?.setRecognitionLanguage) {
             await window.electronAPI.setRecognitionLanguage(key);
+        }
+    };
+
+    const handleUserLanguageChange = async (key: string) => {
+        setUserRecognitionLanguage(key);
+        if (window.electronAPI?.setRecognitionLanguage) {
+            await window.electronAPI.setRecognitionLanguage(key, 'user');
         }
     };
 
@@ -2428,7 +2441,7 @@ Core Skills
 
                                             {/* Recognition Language Family */}
                                             <CustomSelect
-                                                label="Language"
+                                                label="Their language"
                                                 icon={<Globe size={14} />}
                                                 value={selectedSttGroup}
                                                 options={(STT_PROVIDERS_WITHOUT_AUTO.has(sttProvider)
@@ -2466,6 +2479,21 @@ Core Skills
                                                         ? 'Auto: detect language per segment for multilingual meetings. Not available on Azure / IBM Watson.'
                                                         : 'Select the primary language being spoken in the meeting. Choose Auto for multilingual meetings.'}
                                                 </p>
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-medium text-text-secondary block">You speak</label>
+                                                <select
+                                                    value={userRecognitionLanguage || 'english-us'}
+                                                    onChange={(e) => { void handleUserLanguageChange(e.target.value); }}
+                                                    className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
+                                                >
+                                                    {translationLanguageOptions.map((o) => (
+                                                        <option key={o.value} value={o.value}>
+                                                            {o.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                             </div>
                                         </div>
                                     </div>

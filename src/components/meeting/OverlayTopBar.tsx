@@ -14,9 +14,12 @@ interface OverlayTopBarProps {
     displayMode: TranscriptDisplayMode;
     translationEnabled: boolean;
     translationConfigured: boolean;
+    theirLanguage: string;
+    myLanguage: string;
     targetLanguage: string;
     languageOptions: Array<{ value: string; label: string }>;
     onToggleTranslation: () => void;
+    onChangeSpokenLanguage: (speaker: 'interviewer' | 'user', key: string) => void;
     onChangeTargetLanguage: (value: string) => void;
     onToggleOriginal: () => void;
     onSetUpTranslation: () => void;
@@ -55,9 +58,12 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
     displayMode,
     translationEnabled,
     translationConfigured,
+    theirLanguage,
+    myLanguage,
     targetLanguage,
     languageOptions,
     onToggleTranslation,
+    onChangeSpokenLanguage,
     onChangeTargetLanguage,
     onToggleOriginal,
     onSetUpTranslation,
@@ -81,12 +87,31 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
     }, [confirmingQuit]);
 
     const languageLabel = languageOptions.find((option) => option.value === targetLanguage)?.label;
+    const theirLanguageLabel = languageOptions.find((option) => option.value === theirLanguage)?.label;
+    const myLanguageLabel = languageOptions.find((option) => option.value === myLanguage)?.label;
+
     const languageItems: PopoverMenuItem[] = languageOptions.map((option) => ({
         key: option.value,
         label: option.label,
         role: 'menuitemradio',
         checked: option.value === targetLanguage,
         onSelect: () => onChangeTargetLanguage(option.value),
+    }));
+
+    const theirLanguageItems: PopoverMenuItem[] = languageOptions.map((option) => ({
+        key: option.value,
+        label: option.label,
+        role: 'menuitemradio',
+        checked: option.value === theirLanguage,
+        onSelect: () => onChangeSpokenLanguage('interviewer', option.value),
+    }));
+
+    const myLanguageItems: PopoverMenuItem[] = languageOptions.map((option) => ({
+        key: option.value,
+        label: option.label,
+        role: 'menuitemradio',
+        checked: option.value === myLanguage,
+        onSelect: () => onChangeSpokenLanguage('user', option.value),
     }));
 
     const menuItems: PopoverMenuItem[] = [
@@ -96,6 +121,8 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
         ...(translationConfigured
             ? [
                   { key: 'translate', label: 'Translate', role: 'menuitemcheckbox', checked: translationEnabled, hint: toggleTranslationKeys.length > 0 ? <KeyBadge keys={toggleTranslationKeys} /> : undefined, onSelect: onToggleTranslation, className: 'min-[480px]:hidden' } satisfies PopoverMenuItem,
+                  { key: 'their-language', label: `Their language: ${shortLanguageLabel(theirLanguage, theirLanguageLabel)}`, onSelect: () => { void window.electronAPI?.toggleSettingsWindow?.(); }, className: 'min-[480px]:hidden' } satisfies PopoverMenuItem,
+                  { key: 'my-language', label: `You speak: ${shortLanguageLabel(myLanguage, myLanguageLabel)}`, onSelect: () => { void window.electronAPI?.toggleSettingsWindow?.(); }, className: 'min-[480px]:hidden' } satisfies PopoverMenuItem,
                   { key: 'original', label: 'Show original', role: 'menuitemcheckbox', checked: displayMode === 'both', hint: toggleOriginalKeys.length > 0 ? <KeyBadge keys={toggleOriginalKeys} /> : undefined, onSelect: onToggleOriginal, className: 'min-[480px]:hidden' } satisfies PopoverMenuItem,
               ]
             : []),
@@ -140,6 +167,18 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
                             <Languages className="h-3 w-3" aria-hidden="true" />
                             <span>Translate</span>
                         </button>
+                        <PopoverMenu
+                            label="Their language"
+                            trigger={<span>Them {shortLanguageLabel(theirLanguage, theirLanguageLabel)} ▾</span>}
+                            triggerClassName={`no-drag hidden min-[480px]:inline-flex ${barButton}`}
+                            items={theirLanguageItems}
+                        />
+                        <PopoverMenu
+                            label="You speak"
+                            trigger={<span>You {shortLanguageLabel(myLanguage, myLanguageLabel)} ▾</span>}
+                            triggerClassName={`no-drag hidden min-[480px]:inline-flex ${barButton}`}
+                            items={myLanguageItems}
+                        />
                         <PopoverMenu
                             label={`Translate into ${languageLabel ?? targetLanguage}`}
                             trigger={<span>→ {shortLanguageLabel(targetLanguage, languageLabel)} ▾</span>}
