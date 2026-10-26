@@ -133,6 +133,32 @@ export function gateErrorClass(message: string | undefined): GateErrorClass {
 
 const GATE_KINDS: GateKind[] = ['answer_question', 'explain_term', 'check_fact', 'action_item', 'nothing'];
 
+/** What the settings screen shows after it sends a made-up conversation to the decision model. */
+export interface GateTestResult { success: boolean; help?: number; kind?: GateKind; latencyMs?: number; error?: string }
+
+const GATE_TEST_ERROR: Record<GateErrorClass, string> = {
+  timeout: 'The decision model did not answer within 2 seconds.',
+  auth: 'The decision model refused the key (401 or 403).',
+  network: 'The decision model could not be reached (connection refused, DNS, or a server error).',
+  bad_response: 'The host answered, but not in the format this model expects: requests go to the base URL followed by /systemone and need an answer of that kind.',
+};
+
+/** Sends an invented question through the decision model the way a meeting does, and reports what it decided. */
+export async function testGateModel(credentials: GateCredentials): Promise<GateTestResult> {
+  const classify = await createGateClassify(credentials);
+  if (!classify) return { success: false, error: 'Set a model and a base URL first (a key is optional for a local address).' };
+  const started = Date.now();
+  try {
+    const answer = await classify(
+      { lines: [{ speaker: 'Them', text: 'Could you walk me through the hardest technical decision you owned on the billing project?' }], userLanguage: 'english-us', secondsSinceCard: 600 },
+      { signal: AbortSignal.timeout(5_000), timeoutMs: 5_000 },
+    );
+    return { success: true, help: answer.help, kind: answer.kind, latencyMs: Date.now() - started };
+  } catch (error) {
+    return { success: false, latencyMs: Date.now() - started, error: error instanceof GateError ? GATE_TEST_ERROR[error.errorClass] : 'The decision model could not be run.' };
+  }
+}
+
 /** The classifier for the current gate settings, or undefined when it is not configured. */
 export async function createGateClassify(credentials: GateCredentials): Promise<GateClassify | undefined> {
   const model = credentials.getAgentGateModel().trim();

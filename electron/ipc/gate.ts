@@ -4,6 +4,7 @@ import { safeHandle } from "./safeHandle"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { draftCard, getGate, refreshGate } from "../agent/instance"
 import { latestGateMeeting, readGateDecisions } from "../agent/gateLog"
+import { testGateModel } from "../agent/models"
 
 const MODES = ['log', 'on', 'off']
 
@@ -50,6 +51,17 @@ export function registerGateHandlers(appState: AppState): void {
     CredentialsManager.getInstance().setAgentGateSettings(settings)
     await refreshGate()
     return { success: true }
+  })
+
+  // Runs an invented question through the decision model as shown (saved or not).
+  safeHandle("agent-gate-test", async (_, draft: { model?: string; baseUrl?: string; apiKey?: string }) => {
+    const cm = CredentialsManager.getInstance()
+    const text = (value: unknown, saved: string) => (typeof value === 'string' ? value : saved)
+    return testGateModel({
+      getAgentGateModel: () => text(draft?.model, cm.getAgentGateModel()),
+      getAgentGateBaseUrl: () => text(draft?.baseUrl, cm.getAgentGateBaseUrl()),
+      getAgentGateApiKey: () => (draft?.apiKey ? draft.apiKey : cm.getAgentGateApiKey()),
+    })
   })
 
   safeHandle("agent-gate-status", async () => {

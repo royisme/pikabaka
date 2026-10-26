@@ -99,6 +99,7 @@ interface ElectronAPI {
   embeddingUseSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
   embeddingStatus: () => Promise<{ providerName: string | null; dimensions: number | null; usingSelected: boolean; selectedLabel: string | null; incompatible: number }>
   reindexIncompatibleMeetings: () => Promise<{ success: boolean; error?: string }>
+  agentGateTest: (draft: { model?: string; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; help?: number; kind?: string; latencyMs?: number; error?: string }>
   agentModelGet: () => Promise<{ connectionId: string; model: string; supportsImages: boolean }>
   agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; error?: string }>
   chatModelGet: () => Promise<{ connectionId: string; model: string }>
@@ -612,6 +613,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   embeddingUseGet: () => ipcRenderer.invoke("embedding-use-get"),
   embeddingUseSet: (use: { connectionId: string; model: string }) => ipcRenderer.invoke("embedding-use-set", use),
   embeddingStatus: () => ipcRenderer.invoke("embedding-status"),
+  agentGateTest: (draft: { model?: string; baseUrl?: string; apiKey?: string }) => ipcRenderer.invoke("agent-gate-test", draft),
   agentModelGet: () => ipcRenderer.invoke("agent-model-get"),
   agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => ipcRenderer.invoke("agent-model-set", use),
   chatModelGet: () => ipcRenderer.invoke("chat-model-get"),

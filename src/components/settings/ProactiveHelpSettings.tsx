@@ -68,6 +68,9 @@ const ProactiveHelpSettings: React.FC = () => {
         }
     );
 
+    // The test uses what is typed (saved or not); an untouched key field uses the saved key.
+    const test = useMutation(() => window.electronAPI.agentGateTest({ model, baseUrl, ...(apiKey ? { apiKey } : {}) }));
+
     const clearKey = useMutation(
         async () => {
             const result = await window.electronAPI.agentGateSetSettings({ apiKey: '' });
@@ -173,10 +176,31 @@ const ProactiveHelpSettings: React.FC = () => {
                     >
                         {showSaved ? 'Saved!' : 'Save proactive help settings'}
                     </button>
+                    <button
+                        onClick={() => test.mutate()}
+                        disabled={test.isLoading}
+                        className="px-4 py-2 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary transition-colors disabled:opacity-50"
+                    >
+                        {test.isLoading ? 'Testing…' : 'Test decision model'}
+                    </button>
                     {statusLine && (
                         <p className={`text-[11px] sm:pl-1 ${status.data?.state === 'unavailable' ? 'text-state-danger' : 'text-text-tertiary'}`}>{statusLine}</p>
                     )}
                 </div>
+                {(test.isError || test.data) && (
+                    <div className="rounded-lg border border-border-subtle bg-bg-input/50 px-3 py-2">
+                        {test.isError ? (
+                            <p className="text-[11px] text-state-danger">{(test.error as Error).message}</p>
+                        ) : test.data?.success ? (
+                            <p className="text-xs text-text-primary">
+                                It decided help is {percent(test.data.help)} likely, kind: {test.data.kind?.replace('_', ' ')}, in {test.data.latencyMs} ms.
+                                {test.data.help !== undefined && test.data.help < threshold ? ' That is under the threshold, so no card would show.' : ' A card would show.'}
+                            </p>
+                        ) : (
+                            <p className="text-[11px] text-state-danger">{test.data?.error}</p>
+                        )}
+                    </div>
+                )}
                 {(save.error || clearKey.error) ? <p className="text-[11px] text-state-danger">{((save.error || clearKey.error) as Error).message}</p> : null}
 
                 <div className="space-y-1.5">

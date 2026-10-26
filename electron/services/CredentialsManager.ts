@@ -226,7 +226,8 @@ export class CredentialsManager {
 
     public getAgentGateMode(): 'log' | 'on' | 'off' {
         const mode = this.credentials.agentGateMode;
-        return mode === 'on' || mode === 'off' ? mode : 'log';
+        // Unset means on: once a decision model is set, a question puts a card on screen without a click.
+        return mode === 'log' || mode === 'off' ? mode : 'on';
     }
 
     public getAgentGateModel(): string {
