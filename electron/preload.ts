@@ -217,7 +217,7 @@ interface ElectronAPI {
   onOverlayMousePassthroughChanged: (callback: (enabled: boolean) => void) => () => void
 
   // Streaming listeners
-  streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean }) => Promise<void>
+  streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean; ragMiss?: boolean }) => Promise<void>
   cancelGeneration: () => Promise<{ success: boolean }>
   onGeminiStreamToken: (callback: (token: string) => void) => () => void
   onGeminiStreamDone: (callback: () => void) => () => void
@@ -846,7 +846,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
 
   // Streaming Chat
-  streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean }) => ipcRenderer.invoke("gemini-chat-stream", message, imagePaths, context, options),
+  streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean; ragMiss?: boolean }) => ipcRenderer.invoke("gemini-chat-stream", message, imagePaths, context, options),
   cancelGeneration: () => ipcRenderer.invoke('cancel-generation'),
 
   onGeminiStreamToken: (callback: (token: string) => void) => {

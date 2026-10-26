@@ -648,6 +648,8 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
 
     beginProcessing();
 
+    // The record and the user's materials had nothing for this question: the answer then says so to the model.
+    let ragMissed = false;
     try {
       if (!skipRag && currentAttachments.length === 0) {
         console.log('[submitPrompt] calling ragQueryLive…');
@@ -655,6 +657,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
         if (cancelledRef.current) return;
         console.log('[submitPrompt] ragQueryLive result', ragResult);
         if (ragResult?.success) return;
+        ragMissed = ragResult?.fallback === true;
       }
 
       console.log('[submitPrompt] calling streamGeminiChat…');
@@ -662,7 +665,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
         promptText,
         currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined,
         conversationContextRef.current,
-        streamOptions
+        { ...streamOptions, ...(ragMissed ? { ragMiss: true } : {}) }
       );
       console.log('[submitPrompt] streamGeminiChat invoke resolved');
     } catch (err) {

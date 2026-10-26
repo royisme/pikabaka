@@ -322,7 +322,7 @@ export function registerCoreHandlers(appState: AppState): void {
   // Each new invocation increments the ID; any in-flight iteration bails as soon as it detects
   // that a newer stream has taken over.
 
-  safeHandle("gemini-chat-stream", async (event, message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean }) => {
+  safeHandle("gemini-chat-stream", async (event, message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean; ragMiss?: boolean }) => {
     try {
       console.log("[IPC] gemini-chat-stream started using LLMHelper.streamChat");
       const llmHelper = appState.processingHelper.getLLMHelper();
@@ -341,12 +341,11 @@ export function registerCoreHandlers(appState: AppState): void {
 
       let fullResponse = "";
 
-      // Context Injection for "Answer" button (100s rolling window)
+      // Context Injection for "Answer" button (100s rolling window; 10 minutes when the record had nothing for the question)
       if (!context) {
-        // User requested 100 seconds of context for the answer button
         // Logic: If no explicit context provided (like from manual override), auto-inject from IntelligenceManager
         try {
-          const autoContext = intelligenceManager.getFormattedContext(100);
+          const autoContext = intelligenceManager.getFormattedContext(options?.ragMiss ? 600 : 100);
           if (autoContext && autoContext.trim().length > 0) {
             context = autoContext;
             console.log(`[IPC] Auto - injected 100s context for gemini - chat - stream(${context.length} chars)`);
@@ -354,6 +353,12 @@ export function registerCoreHandlers(appState: AppState): void {
         } catch (ctxErr) {
           console.warn("[IPC] Failed to auto-inject context:", ctxErr);
         }
+      }
+
+      // Nothing in the meeting record or the user's materials matched: tell the model, so it neither pretends it
+      // looked something up nor makes up facts about the user.
+      if (options?.ragMiss) {
+        context = `[No passage of the meeting record or the user's own materials matched this question. Answer from the conversation below and general knowledge. If the answer depends on facts about the user that are not in the conversation (their projects, numbers, employers), say so in one short sentence or leave a [bracket] to fill; never invent them.]\n\n${context ?? ''}`;
       }
 
       try {

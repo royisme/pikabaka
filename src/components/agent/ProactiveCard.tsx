@@ -17,8 +17,9 @@ interface ProactiveCardProps {
 }
 
 /**
- * Pika's one quiet suggestion. The kind label marks it (not size), it fades in over 150ms, makes no
- * sound, and goes only when dismissed or replaced.
+ * Pika's one quiet suggestion. It sits in the column above the chat, never over it: the chat gives
+ * way (at most 40% of the column goes to the card, which scrolls past that). The kind label marks it
+ * (not size), it fades in over 150ms, makes no sound, and goes only when dismissed or replaced.
  */
 const ProactiveCard: React.FC<ProactiveCardProps> = ({ card, onDismiss, onAskMore }) => (
     <motion.aside
@@ -27,7 +28,7 @@ const ProactiveCard: React.FC<ProactiveCardProps> = ({ card, onDismiss, onAskMor
         transition={{ duration: 0.15 }}
         role="status"
         aria-label="Pika suggestion"
-        className="absolute inset-x-2 top-2 z-20 rounded-xl border overlay-hairline overlay-shell-surface px-3 py-2 shadow-lg"
+        className="mx-2 mt-2 max-h-[40%] shrink-0 overflow-y-auto rounded-xl border overlay-hairline overlay-shell-surface px-3 py-2"
     >
         <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
