@@ -11,7 +11,6 @@ interface TranscriptColumnProps {
     translationEnabled: boolean;
     showTranscript: boolean;
     handleTranslateTranscriptSegment: (segment: TranscriptSegment) => void;
-    sttStatus: { label: string; toneClass: string; dotClass: string };
     sttNeedsTroubleshooting: boolean;
     showSttErrorDetail: boolean;
     nativeAudioHealth: { lastError: string | null };
@@ -27,7 +26,6 @@ const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
     translationEnabled,
     showTranscript,
     handleTranslateTranscriptSegment,
-    sttStatus,
     sttNeedsTroubleshooting,
     showSttErrorDetail,
     nativeAudioHealth,
@@ -43,7 +41,6 @@ const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
             translationEnabled={translationEnabled}
             showTranscript={showTranscript}
             handleTranslateTranscriptSegment={handleTranslateTranscriptSegment}
-            sttStatus={sttStatus}
             sttNeedsTroubleshooting={sttNeedsTroubleshooting}
             showSttErrorDetail={showSttErrorDetail}
             nativeAudioHealth={nativeAudioHealth}

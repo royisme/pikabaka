@@ -7,22 +7,52 @@ export function useMeetingTranscript() {
   const [currentInterviewerPartial, setCurrentInterviewerPartial] = useState('');
   const [transcriptDisplayMode, setTranscriptDisplayMode] = useState<TranscriptDisplayMode>('original');
   const [translationEnabled, setTranslationEnabled] = useState(false);
+  const [translationConfigured, setTranslationConfigured] = useState(false);
+  const [targetLanguage, setTargetLanguage] = useState('chinese');
+  const [languageOptions, setLanguageOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [showTranscript, setShowTranscript] = useState(() => {
     const stored = localStorage.getItem('pika_interviewer_transcript');
     return stored !== 'false';
   });
   const speakingTimeoutRef = useRef<number | null>(null);
 
-  useEffect(() => {
+  const loadTranslationSettings = useCallback(() => {
     window.electronAPI?.getTranscriptTranslationSettings?.()
       .then((settings) => {
         if (settings?.displayMode) {
           setTranscriptDisplayMode(settings.displayMode);
         }
-        setTranslationEnabled(!!settings?.enabled && !!settings.model?.trim());
+        const configured = !!settings?.model?.trim();
+        setTranslationConfigured(configured);
+        setTranslationEnabled(!!settings?.enabled && configured);
+        if (settings?.targetLanguage) setTargetLanguage(settings.targetLanguage);
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    loadTranslationSettings();
+    window.electronAPI?.getRecognitionLanguages?.()
+      .then((languages) =>
+        setLanguageOptions(
+          Object.entries(languages ?? {})
+            .map(([value, language]) => ({ value, label: (language as { label?: string }).label || value }))
+            .sort((a, b) => a.label.localeCompare(b.label))
+        )
+      )
+      .catch(() => {});
+  }, [loadTranslationSettings]);
+
+  /** Saves a header change; on failure the saved settings win and are read back. */
+  const saveTranslationSettings = useCallback(
+    (patch: { enabled?: boolean; targetLanguage?: string; displayMode?: TranscriptDisplayMode }) => {
+      if (patch.enabled !== undefined) setTranslationEnabled(patch.enabled);
+      if (patch.targetLanguage !== undefined) setTargetLanguage(patch.targetLanguage);
+      if (patch.displayMode !== undefined) setTranscriptDisplayMode(patch.displayMode);
+      window.electronAPI?.setTranscriptTranslationSettings?.(patch).catch(loadTranslationSettings);
+    },
+    [loadTranslationSettings]
+  );
 
   useEffect(() => {
     localStorage.setItem('pika_interviewer_transcript', String(showTranscript));
@@ -170,6 +200,10 @@ export function useMeetingTranscript() {
     currentInterviewerPartial,
     transcriptDisplayMode,
     translationEnabled,
+    translationConfigured,
+    targetLanguage,
+    languageOptions,
+    saveTranslationSettings,
     setTranscriptDisplayMode,
     showTranscript,
     setShowTranscript,

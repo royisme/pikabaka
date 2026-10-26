@@ -10,15 +10,12 @@ interface TranscriptPanelProps {
     translationEnabled: boolean;
     showTranscript: boolean;
     handleTranslateTranscriptSegment: (segment: TranscriptSegment) => void;
-    sttStatus: { label: string; toneClass: string; dotClass: string };
     sttNeedsTroubleshooting: boolean;
     showSttErrorDetail: boolean;
     nativeAudioHealth: { lastError: string | null };
     appearance: ReturnType<typeof import('../../lib/overlayAppearance').getOverlayAppearance>;
     isLightTheme: boolean;
 }
-
-const subtleSurfaceClass = 'overlay-subtle-surface';
 
 const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
     transcriptSegments,
@@ -28,7 +25,6 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
     translationEnabled,
     showTranscript,
     handleTranslateTranscriptSegment,
-    sttStatus,
     sttNeedsTroubleshooting,
     showSttErrorDetail,
     nativeAudioHealth,
@@ -61,16 +57,9 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                 )}
             </div>
 
-            <div className="shrink-0 px-4 pt-2 pb-1 no-drag" aria-live="polite" aria-atomic="true">
-                <div
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium border border-border-subtle/70 ${subtleSurfaceClass} ${sttStatus.toneClass}`}
-                    style={appearance.subtleStyle}
-                >
-                    <span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${sttStatus.dotClass}`} />
-                    <span>{sttStatus.label}</span>
-                    {showSttErrorDetail && <span className="opacity-80">- {nativeAudioHealth.lastError}</span>}
-                </div>
-            </div>
+            {showSttErrorDetail && nativeAudioHealth.lastError && (
+                <p className="shrink-0 px-4 pb-1 text-[11px] overlay-text-muted no-drag">{nativeAudioHealth.lastError}</p>
+            )}
 
             {sttNeedsTroubleshooting && (
                 <div className="mx-4 mb-2 shrink-0 p-2 rounded-lg border border-state-warning-border bg-state-warning-soft no-drag">

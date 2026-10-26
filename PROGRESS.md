@@ -2,6 +2,16 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: T5 header controls and status dot (branch `transcript-header`, epic #38)
+
+Done
+- The transcript zone header carries the controls (`TranscriptHeaderControls`, shown through a new `leftHeader` slot in `SplitterShell`): an STT status dot with its label (label text from 480px up, always as screen-reader text), a Translate toggle (`aria-pressed`), a target-language select, and an Original toggle (`both` and `translated`; it never writes `original`). When no translation model is set, the header shows one button, "Set up translation", which opens Settings. Below 480px the buttons keep their icons and accessible names and lose their words.
+- Changes save through the existing `set-transcript-translation-settings` channel and update the screen at once; if the save fails the saved settings are read back. Language names come from `getRecognitionLanguages`, the same list Settings uses.
+- The STT chip below the list is gone; a failing STT shows its error as one line, and the troubleshooting box stays.
+- Verified: both `tsc --noEmit` checks exit 0; tap passes (3 new assertions for the Original toggle).
+- Not verified: how the header fits at 380px with "Live Transcript" and four controls (estimated about 272px of 356px from the class sizes, not measured); the native `<select>` inside the translucent overlay window; that Settings and the header stay in step when Settings changes a value mid-call (the header corrects on the next transcript event); the "Set up translation" path with no model set.
+- "Configured" means a model is set. A provider that supplies a default model (OpenAI-compatible with a preferred model) and an empty model field reads as not configured here.
+
 ## 2026-10-26: T4 revision-safe translations (branch `revision-safe-translation`, issue #37)
 
 Done

@@ -1,5 +1,6 @@
 import t from 'tap';
 import { hasUsableTranslation, rowSlot, transcriptRowParts } from '../src/lib/transcriptRow';
+import { toggleOriginal } from '../src/lib/transcriptDisplay';
 
 const translated = { sourceText: 'Can we move the call to Friday?', translatedText: '我们能把电话改到周五吗？', translationState: 'complete' as const };
 const pending = { sourceText: 'Can we move the call to Friday?', translatedText: undefined, translationState: 'pending' as const };
@@ -100,4 +101,10 @@ t.test('a stale translation with no request behind it is hidden, never shown as 
 t.test('a current translation is not updating', async (t) => {
   const current = { ...stale, translatedRevision: 2, translationState: 'complete' as const };
   t.equal(transcriptRowParts(current, 'both', false).updating, false);
+});
+
+t.test('the header Original toggle flips both and translated, and never writes original', async (t) => {
+  t.equal(toggleOriginal('both'), 'translated');
+  t.equal(toggleOriginal('translated'), 'both');
+  t.equal(toggleOriginal('original'), 'both');
 });
