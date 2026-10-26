@@ -42,23 +42,18 @@ const scale = (min: number, max: number, strength: number, ease = 1) =>
 export const getOverlayAppearance = (opacity: number, theme: OverlayTheme): OverlayAppearance => {
     const strength = normalizeOpacity(opacity);
     const surfaceStrength = Math.pow(strength, 1.02);
-    const blurStrength = Math.pow(strength, 0.94);
 
     if (theme === 'light') {
         return {
             shellStyle: {
-                backgroundColor: `rgba(247, 249, 253, ${scale(0.74, 0.975, surfaceStrength)})`,
+                backgroundColor: `rgba(247, 249, 253, ${scale(0.94, 0.985, strength)})`,
                 borderColor: `rgba(59, 130, 246, ${scale(0.11, 0.17, surfaceStrength)})`,
                 boxShadow: `0 24px 48px rgba(59, 130, 246, ${scale(0.035, 0.08, surfaceStrength)})`,
-                backdropFilter: `blur(${scale(8, 17, blurStrength)}px) saturate(132%)`,
-                WebkitBackdropFilter: `blur(${scale(8, 17, blurStrength)}px) saturate(132%)`,
             },
             pillStyle: {
                 backgroundColor: `rgba(255, 255, 255, ${scale(0.72, 0.955, surfaceStrength)})`,
                 borderColor: `rgba(59, 130, 246, ${scale(0.09, 0.155, surfaceStrength)})`,
                 boxShadow: `0 12px 28px rgba(59, 130, 246, ${scale(0.02, 0.06, surfaceStrength)})`,
-                backdropFilter: `blur(${scale(5, 10, blurStrength)}px) saturate(130%)`,
-                WebkitBackdropFilter: `blur(${scale(5, 10, blurStrength)}px) saturate(130%)`,
             },
             transcriptStyle: {
                 backgroundColor: 'transparent',
@@ -101,18 +96,14 @@ export const getOverlayAppearance = (opacity: number, theme: OverlayTheme): Over
 
     return {
         shellStyle: {
-            backgroundColor: `rgba(24, 27, 34, ${scale(0.92, 0.975, surfaceStrength)})`,
+            backgroundColor: `rgba(24, 27, 34, ${scale(0.95, 0.985, strength)})`,
             borderColor: `rgba(255, 255, 255, ${scale(0.11, 0.15, surfaceStrength)})`,
             boxShadow: `0 24px 48px rgba(0, 0, 0, ${scale(0.1, 0.23, surfaceStrength)})`,
-            backdropFilter: `blur(${scale(8, 18, blurStrength)}px) saturate(130%)`,
-            WebkitBackdropFilter: `blur(${scale(8, 18, blurStrength)}px) saturate(130%)`,
         },
         pillStyle: {
             backgroundColor: `rgba(27, 30, 37, ${scale(0.7, 0.95, surfaceStrength)})`,
             borderColor: `rgba(255, 255, 255, ${scale(0.1, 0.145, surfaceStrength)})`,
             boxShadow: `0 12px 28px rgba(0, 0, 0, ${scale(0.05, 0.16, surfaceStrength)})`,
-            backdropFilter: `blur(${scale(5, 12, blurStrength)}px) saturate(128%)`,
-            WebkitBackdropFilter: `blur(${scale(5, 12, blurStrength)}px) saturate(128%)`,
         },
         transcriptStyle: {
             backgroundColor: 'transparent',

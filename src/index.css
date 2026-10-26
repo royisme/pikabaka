@@ -63,6 +63,7 @@
 
   --overlay-bg: rgba(24, 27, 34, 0.84);
   --overlay-opacity: 0.78;
+  --overlay-action: #0071E3;
   --overlay-border: rgba(255, 255, 255, 0.11);
   --overlay-border-soft: rgba(255, 255, 255, 0.07);
   --overlay-panel-bg: rgba(24, 27, 34, 0.84);
@@ -86,10 +87,8 @@
   --overlay-text-primary: rgba(245, 247, 255, 0.98);
   --overlay-text-secondary: rgba(221, 227, 243, 0.9);
   --overlay-text-muted: rgba(186, 194, 217, 0.8);
-  --overlay-text-placeholder: rgba(186, 194, 217, 0.64);
+  --overlay-text-placeholder: var(--overlay-text-muted);
   --overlay-text-strong: #ffffff;
-  --overlay-shell-blur: 17px;
-  --overlay-pill-blur: 11px;
   --overlay-transcript-blur: 8px;
 
   /* ─── Semantic state tokens ─────────────────────────────────────────────
@@ -173,11 +172,9 @@
   --overlay-pill-shadow: rgba(15, 23, 42, 0.07);
   --overlay-text-primary: rgba(15, 23, 42, 0.97);
   --overlay-text-secondary: rgba(30, 41, 59, 0.86);
-  --overlay-text-muted: rgba(51, 65, 85, 0.74);
-  --overlay-text-placeholder: rgba(71, 85, 105, 0.6);
+  --overlay-text-muted: rgba(51, 65, 85, 0.82);
+  --overlay-text-placeholder: var(--overlay-text-muted);
   --overlay-text-strong: #020617;
-  --overlay-shell-blur: 16px;
-  --overlay-pill-blur: 10px;
   --overlay-transcript-blur: 6px;
 }
 
@@ -369,8 +366,6 @@ textarea,
   background: var(--overlay-panel-bg);
   border-color: var(--overlay-border);
   box-shadow: 0 24px 40px var(--overlay-panel-shadow);
-  backdrop-filter: blur(var(--overlay-shell-blur)) saturate(138%);
-  -webkit-backdrop-filter: blur(var(--overlay-shell-blur)) saturate(138%);
 }
 
 .overlay-shell-surface,
@@ -385,22 +380,10 @@ textarea,
   color: var(--overlay-text-primary);
 }
 
-[data-theme='light'] .overlay-shell-surface {
-  backdrop-filter: blur(var(--overlay-shell-blur)) saturate(145%);
-  -webkit-backdrop-filter: blur(var(--overlay-shell-blur)) saturate(145%);
-}
-
 .overlay-pill-surface {
   background: var(--overlay-pill-bg);
   border-color: var(--overlay-border);
   box-shadow: 0 16px 28px var(--overlay-pill-shadow);
-  backdrop-filter: blur(var(--overlay-pill-blur)) saturate(134%);
-  -webkit-backdrop-filter: blur(var(--overlay-pill-blur)) saturate(134%);
-}
-
-[data-theme='light'] .overlay-pill-surface {
-  backdrop-filter: blur(var(--overlay-pill-blur)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--overlay-pill-blur)) saturate(140%);
 }
 
 .overlay-transcript-surface {
