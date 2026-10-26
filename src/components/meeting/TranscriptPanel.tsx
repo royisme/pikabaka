@@ -37,8 +37,8 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
     const placeholderText = 'Transcript will appear here when meeting audio is detected';
 
     return (
-        <div className="flex h-full flex-col overflow-y-auto custom-scrollbar">
-            <div className="flex-1">
+        <div className="flex h-full min-h-0 flex-col">
+            <div className="flex-1 min-h-0">
                 {showTranscript && hasTranscriptContent ? (
                     <RollingTranscript
                         segments={transcriptSegments}
@@ -58,7 +58,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                 )}
             </div>
 
-            <div className="px-4 pt-2 pb-1 no-drag" aria-live="polite" aria-atomic="true">
+            <div className="shrink-0 px-4 pt-2 pb-1 no-drag" aria-live="polite" aria-atomic="true">
                 <div
                     className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium border border-border-subtle/70 ${subtleSurfaceClass} ${sttStatus.toneClass}`}
                     style={appearance.subtleStyle}
@@ -70,7 +70,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
             </div>
 
             {sttNeedsTroubleshooting && (
-                <div className="mx-4 mb-2 p-2 rounded-lg border border-state-warning-border bg-state-warning-soft no-drag">
+                <div className="mx-4 mb-2 shrink-0 p-2 rounded-lg border border-state-warning-border bg-state-warning-soft no-drag">
                     <p className={`text-[10px] ${isLightTheme ? 'text-amber-800' : 'text-amber-200'}`}>
                         STT has no usable system audio input. Check output device routing and permissions.
                     </p>

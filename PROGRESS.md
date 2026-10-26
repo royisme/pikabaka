@@ -2,6 +2,17 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: T2 one scroll container and the follow rule (branch `transcript-follow`, epic #38)
+
+Done
+- The transcript zone has one scroller: the row list in `RollingTranscript`, `h-full` inside the zone. `TranscriptPanel` no longer scrolls and the `max-h-[280px]` cap is gone; the STT status chip and the troubleshooting box are `shrink-0` rows below the list instead of scrolling with it.
+- Following is a ref set from scroll events (`isNearBottom`, 32px). While following, any content change (row, live partial, translation, revision, expanding a row) pins the bottom with an instant `scrollTop`; no smooth scroll. Scrolling up stops it; returning within 32px or the jump button resumes it.
+- The jump button floats over the list (`absolute`, so it moves nothing) and shows "↓ N new" (N = rows added since following stopped; partial and translation updates add none), "↓ Latest" when N is 0, and "↓ N" below 480px window width. Its accessible name carries the count.
+- `nextTranscriptScroll` and `countNewRows` are pure functions in `src/lib/answerScroll.ts`.
+- Verified: both `tsc --noEmit` checks exit 0; tap 393 of 393 (8 new assertions covering pin, hold, resume and the count).
+- Not verified: scroll behaviour in the running app (a live call, scrolling up mid-stream, the button at 380px and 600px); whether Chromium scroll anchoring keeps a late translation from moving the row being read (the spec assumes it; untested here); the zone resizing while following (no `ResizeObserver`, so the bottom is not re-pinned when the window or splitter changes).
+- Not done here, still T6: `role="log"`, `aria-live="off"`, the End and arrow keys. The list still has `aria-live="polite"`, which re-announces rows as they change.
+
 ## 2026-10-26: T1 flat rows, translation first (branch `transcript-rows`, issue #36)
 
 Done

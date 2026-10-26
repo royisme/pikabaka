@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Languages } from 'lucide-react';
 import type { TranscriptDisplayMode, TranscriptSegment } from '../../lib/transcriptSegments';
 import { transcriptRowParts } from '../../lib/transcriptRow';
+import { countNewRows, isNearBottom, nextTranscriptScroll } from '../../lib/answerScroll';
 
 interface TranscriptNotesProps {
     segments: TranscriptSegment[];
@@ -29,9 +30,11 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
     partialSpeakerLabel = 'Interviewer',
     onTranslateSegment,
 }) => {
-    const bottomRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [userScrolled, setUserScrolled] = useState(false);
+    // Following is read from scroll events, not measured after a render: by then new content has
+    // already grown the list and the reader would look as if they had scrolled up.
+    const followingRef = useRef(true);
+    const [rowsWhenFollowStopped, setRowsWhenFollowStopped] = useState<number | null>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
     const hasContent = segments.length > 0 || !!partialText;
@@ -48,31 +51,43 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
     const contentSignature = segments.reduce(
         (acc, s) => acc + s.sourceText.length + (s.translatedText?.length ?? 0), 0);
 
-    useEffect(() => {
-        if (!userScrolled && bottomRef.current) {
-            bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    useLayoutEffect(() => {
+        const el = containerRef.current;
+        if (el && nextTranscriptScroll({ following: followingRef.current, contentChanged: true }) === 'pin') {
+            el.scrollTop = el.scrollHeight;
         }
-    }, [segments.length, contentSignature, partialText, userScrolled]);
+    }, [segments.length, contentSignature, partialText, expandedId]);
 
     const handleScroll = () => {
         const el = containerRef.current;
         if (!el) return;
-        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
-        setUserScrolled(!atBottom);
+        const near = isNearBottom(el);
+        followingRef.current = near;
+        setRowsWhenFollowStopped((stopped) => (near ? null : stopped ?? segments.length));
     };
+
+    const jumpToLatest = () => {
+        const el = containerRef.current;
+        if (!el) return;
+        followingRef.current = true;
+        setRowsWhenFollowStopped(null);
+        el.scrollTop = el.scrollHeight;
+    };
+
+    const newRows = countNewRows(segments.length, rowsWhenFollowStopped);
 
     if (!hasContent) return null;
 
     const lastLabel = segments.length > 0 ? segments[segments.length - 1].speakerLabel : undefined;
 
     return (
-        <div className="px-4 pt-2 pb-1 no-drag">
+        <div className="relative h-full min-h-0 no-drag">
             <div
                 ref={containerRef}
                 onScroll={handleScroll}
                 aria-live="polite"
                 aria-label="Meeting transcript"
-                className="w-full min-h-[80px] max-h-[280px] overflow-y-auto"
+                className="h-full w-full overflow-y-auto px-4 pt-2 pb-1"
             >
                 <div className="space-y-2.5 pr-0.5">
                     {segments.map((seg, index) => {
@@ -171,31 +186,21 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                             </p>
                         </div>
                     )}
-
-                    <div ref={bottomRef} className="h-px" />
                 </div>
             </div>
 
-            {userScrolled && (
+            {rowsWhenFollowStopped !== null && (
                 <button
                     type="button"
-                    aria-label="Scroll to latest"
-                    onClick={() => {
-                        setUserScrolled(false);
-                        bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                    }}
-                    className="mt-1 ml-auto flex items-center gap-1 text-[11px] text-text-tertiary hover:text-text-secondary transition-colors"
+                    aria-label={newRows > 0 ? `Jump to latest, ${newRows} new ${newRows === 1 ? 'line' : 'lines'}` : 'Jump to latest'}
+                    onClick={jumpToLatest}
+                    className="absolute bottom-2 right-3 flex items-center gap-1 rounded-full border border-border-subtle px-2.5 py-1 text-[11px] font-medium overlay-text-primary overlay-subtle-surface"
                 >
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                        <path
-                            d="M5 2v6M2 6l3 3 3-3"
-                            stroke="currentColor"
-                            strokeWidth="1.2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-                    </svg>
-                    Jump to latest
+                    <span aria-hidden="true">↓</span>
+                    <span aria-hidden="true">
+                        {newRows > 0 ? newRows : 'Latest'}
+                        {newRows > 0 && <span className="hidden min-[480px]:inline"> new</span>}
+                    </span>
                 </button>
             )}
         </div>

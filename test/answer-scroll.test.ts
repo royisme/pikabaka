@@ -1,5 +1,5 @@
 import t from 'tap';
-import { FOLLOW_THRESHOLD_PX, isNearBottom, nextScrollAction } from '../src/lib/answerScroll';
+import { FOLLOW_THRESHOLD_PX, countNewRows, isNearBottom, nextScrollAction, nextTranscriptScroll } from '../src/lib/answerScroll';
 
 t.test('isNearBottom counts only the last 32px as following', async (t) => {
   t.equal(FOLLOW_THRESHOLD_PX, 32);
@@ -24,4 +24,18 @@ t.test('tokens of the shown message follow only while the reader is at the botto
 t.test('an empty list does nothing', async (t) => {
   t.equal(nextScrollAction(undefined, undefined, true), 'none');
   t.equal(nextScrollAction(undefined, 'm1', false), 'none');
+});
+
+t.test('the transcript pins only while following and only when content changed', async (t) => {
+  t.equal(nextTranscriptScroll({ following: true, contentChanged: true }), 'pin');
+  t.equal(nextTranscriptScroll({ following: true, contentChanged: false }), 'hold');
+  t.equal(nextTranscriptScroll({ following: false, contentChanged: true }), 'hold', 'reader scrolled up');
+  t.equal(nextTranscriptScroll({ following: false, contentChanged: false }), 'hold');
+});
+
+t.test('new rows are counted from where following stopped', async (t) => {
+  t.equal(countNewRows(10, null), 0, 'still following');
+  t.equal(countNewRows(10, 10), 0, 'no new rows, only partial or translation updates');
+  t.equal(countNewRows(13, 10), 3);
+  t.equal(countNewRows(8, 10), 0, 'rows removed never gives a negative count');
 });

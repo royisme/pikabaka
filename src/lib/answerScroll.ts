@@ -23,3 +23,17 @@ export function nextScrollAction(
   if (lastMessageId !== shownMessageId) return 'show-start';
   return following ? 'follow' : 'none';
 }
+
+/**
+ * The transcript is a log: the newest line is the news, so while the reader is at the bottom
+ * every content change (a row, a live partial, a translation, a revision) keeps the bottom
+ * in view. Once the reader has scrolled up, nothing moves.
+ */
+export function nextTranscriptScroll(args: { following: boolean; contentChanged: boolean }): 'pin' | 'hold' {
+  return args.following && args.contentChanged ? 'pin' : 'hold';
+}
+
+/** Rows added since following stopped; live partials and translation updates add none. */
+export function countNewRows(totalRows: number, rowsWhenFollowStopped: number | null): number {
+  return rowsWhenFollowStopped === null ? 0 : Math.max(0, totalRows - rowsWhenFollowStopped);
+}
