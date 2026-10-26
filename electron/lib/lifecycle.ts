@@ -152,7 +152,6 @@ export async function initializeApp() {
         try {
           const { CredentialsManager } = require('../services/CredentialsManager');
           CredentialsManager.getInstance().scrubMemory();
-          appState.processingHelper.getLLMHelper().scrubKeys();
           console.log('[Main] Credentials scrubbed from memory on quit');
         } catch (e) {
           console.error('[Main] Failed to scrub credentials on quit:', e);

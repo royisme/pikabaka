@@ -64,7 +64,7 @@ export interface StoredCredentials {
     /** How answers sound (a manner of speaking, free text). Unset means the default style. */
     answerStyle?: string;
     transcriptTranslationEnabled?: boolean;
-    /** `ollama` | `gemini` | `groq` | `openai` | `claude` | OpenAI-compatible provider id from AI Providers */
+    /** Connection id from AI Providers. An unknown or removed id is not configured. */
     transcriptTranslationProvider?: string;
     transcriptTranslationModel?: string;
     transcriptTranslationPrompt?: string;
@@ -328,30 +328,6 @@ export class CredentialsManager {
     // Setters (auto-save)
     // =========================================================================
 
-    public setGeminiApiKey(key: string): void {
-        this.credentials.geminiApiKey = key;
-        this.saveCredentials();
-        console.log('[CredentialsManager] Gemini API Key updated');
-    }
-
-    public setGroqApiKey(key: string): void {
-        this.credentials.groqApiKey = key;
-        this.saveCredentials();
-        console.log('[CredentialsManager] Groq API Key updated');
-    }
-
-    public setOpenaiApiKey(key: string): void {
-        this.credentials.openaiApiKey = key;
-        this.saveCredentials();
-        console.log('[CredentialsManager] OpenAI API Key updated');
-    }
-
-    public setClaudeApiKey(key: string): void {
-        this.credentials.claudeApiKey = key;
-        this.saveCredentials();
-        console.log('[CredentialsManager] Claude API Key updated');
-    }
-
     public setGoogleServiceAccountPath(filePath: string): void {
         this.credentials.googleServiceAccountPath = filePath;
         this.saveCredentials();
@@ -477,17 +453,6 @@ export class CredentialsManager {
         this.credentials.transcriptTranslationDisplayMode = mode;
         this.saveCredentials();
         console.log(`[CredentialsManager] Transcript Translation Display Mode set to: ${mode}`);
-    }
-    public getPreferredModel(provider: 'gemini' | 'groq' | 'openai' | 'claude'): string | undefined {
-        const key = `${provider}PreferredModel` as keyof StoredCredentials;
-        return this.credentials[key] as string | undefined;
-    }
-
-    public setPreferredModel(provider: 'gemini' | 'groq' | 'openai' | 'claude', modelId: string): void {
-        const key = `${provider}PreferredModel` as keyof StoredCredentials;
-        (this.credentials as any)[key] = modelId;
-        this.saveCredentials();
-        console.log(`[CredentialsManager] ${provider} preferred model set to: ${modelId}`);
     }
 
     // ---- Connections: where a model is reached (type, host, key). See aiConnections.ts ----
@@ -675,27 +640,6 @@ export class CredentialsManager {
 
     public getOpenAICompatibleProviders(): OpenAICompatibleProvider[] {
         return (this.credentials.openaiCompatibleProviders || []).filter(p => p.type === undefined || CONNECTION_TYPES.includes(p.type));
-    }
-
-    public saveOpenAICompatibleProvider(provider: OpenAICompatibleProvider): void {
-        if (!this.credentials.openaiCompatibleProviders) {
-            this.credentials.openaiCompatibleProviders = [];
-        }
-        const index = this.credentials.openaiCompatibleProviders.findIndex(p => p.id === provider.id);
-        if (index !== -1) {
-            this.credentials.openaiCompatibleProviders[index] = provider;
-        } else {
-            this.credentials.openaiCompatibleProviders.push(provider);
-        }
-        this.saveCredentials();
-        console.log(`[CredentialsManager] OpenAI-compatible provider '${provider.name}' saved`);
-    }
-
-    public deleteOpenAICompatibleProvider(id: string): void {
-        if (!this.credentials.openaiCompatibleProviders) return;
-        this.credentials.openaiCompatibleProviders = this.credentials.openaiCompatibleProviders.filter(p => p.id !== id);
-        this.saveCredentials();
-        console.log(`[CredentialsManager] OpenAI-compatible provider '${id}' deleted`);
     }
 
     public clearAll(): void {

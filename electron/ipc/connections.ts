@@ -2,7 +2,7 @@ import { BrowserWindow } from "electron"
 import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
 import { CredentialsManager } from "../services/CredentialsManager"
-import { CONNECTION_TYPES, isBuiltinConnection, type ConnectionType } from "../services/aiConnections"
+import { CONNECTION_TYPES, type ConnectionType } from "../services/aiConnections"
 import { fetchConnectionModels } from "../utils/connectionModels"
 
 // Connections (type, host, key) and the agent's own model. The key never leaves the main process:
@@ -20,16 +20,6 @@ export function registerConnectionHandlers(appState: AppState): void {
     const cm = CredentialsManager.getInstance()
     const result = cm.saveConnection(input)
     if ('error' in result) return { success: false, error: result.error }
-    // The chat helper builds its clients from the key and host: rebuild them when a built-in one changed.
-    if (isBuiltinConnection(result.id)) {
-      const llm = appState.processingHelper.getLLMHelper()
-      if (result.id === 'gemini') llm.setApiKey(cm.getGeminiApiKey() ?? '')
-      else if (result.id === 'groq') llm.setGroqApiKey(cm.getGroqApiKey() ?? '')
-      else if (result.id === 'openai') llm.setOpenaiApiKey(cm.getOpenaiApiKey() ?? '')
-      else if (result.id === 'claude') llm.setClaudeApiKey(cm.getClaudeApiKey() ?? '')
-      appState.getIntelligenceManager().resetEngine()
-      appState.getIntelligenceManager().initializeLLMs()
-    }
     return { success: true, id: result.id }
   })
 

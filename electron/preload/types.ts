@@ -42,20 +42,10 @@ export interface ElectronAPI {
 
   analyzeImageFile: (path: string) => Promise<void>
   quitApp: () => Promise<void>
-
-  // LLM Model Management
-  getAvailableOllamaModels: () => Promise<string[]>
-  testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey?: string) => Promise<{ success: boolean; error?: string }>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
-
-  // API Key Management
-  setGeminiApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setGroqApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setOpenaiApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setClaudeApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   getStoredCredentials: () => Promise<{ hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: string; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; hasSonioxKey: boolean }>
-  getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude'; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both' }>
-  setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude'; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) => Promise<{ success: boolean }>
+  getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both' }>
+  setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) => Promise<{ success: boolean }>
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string; translatedText?: string }>
 
   // STT Provider Management
@@ -138,12 +128,6 @@ export interface ElectronAPI {
   // Demo
   seedDemo: () => Promise<{ success: boolean }>
 
-  // Custom Providers
-  getOpenAICompatibleProviders: () => Promise<Array<{ id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }>>
-  saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) => Promise<{ success: boolean; error?: string }>
-  deleteOpenAICompatibleProvider: (id: string) => Promise<{ success: boolean; error?: string }>
-  fetchOpenAICompatibleModels: (baseUrl: string, apiKey: string) => Promise<{ success: boolean; models?: { id: string; label: string }[]; error?: string }>
-
   // Follow-up Email
   generateFollowupEmail: (input: any) => Promise<string>
   extractEmailsFromTranscript: (transcript: Array<{ text: string }>) => Promise<string[]>
@@ -181,7 +165,6 @@ export interface ElectronAPI {
 
 
   onUndetectableChanged: (callback: (state: boolean) => void) => () => void
-  onOpenAICompatibleProvidersChanged: (callback: () => void) => () => void
   onModelChanged: (callback: (modelId: string) => void) => () => void
 
   // Ollama

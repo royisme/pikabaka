@@ -11,7 +11,7 @@ Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR 
 - Phase A done: Fast Response Mode and cURL providers removed end to end. Both typechecks and lint exit 0; tests exit 1 only for the missing DOCX fixture. Owner runtime checks remain.
 - Phase B done: Connections, three model-use rows and the quick-answers selectors replace Active Model and the local-provider UI. Both typechecks and lint exit 0; tests exit 1 only for the missing DOCX fixture. Owner runtime checks remain.
 - Phase C done: Ollama connection type, default-model storage accessors/IPC, prefix guessing for jobs and startup/meeting-end restoration removed. Both typechecks and lint exit 0; tests exit 1 only for the missing DOCX fixture. Local model servers use OpenAI-compatible connections; embedding/RAG Ollama stays.
-- Model-call cleanup (owner-approved dispatch, `legacy-keys`): Phase 1 routes interactive generation, suggestions, screenshots and RAG answers through Quick answers. Phase 2 removes unused provider clients/IPC and legacy translation routing; Phase 3 adds Quick answers and Summaries tests in Settings.
+- Model-call cleanup (owner-approved dispatch, `legacy-keys`): Phase 1 routes interactive generation, suggestions, screenshots and RAG answers through Quick answers. Phase 2 done: unused provider clients/IPC and legacy translation routing removed. Phase 3 adds Quick answers and Summaries tests in Settings.
 - Next: finish the remaining cleanup phases, then owner runtime acceptance of the settings rows, selector, inherited models, missing-selection errors and local servers. No Audio translation or speech-recognition UI changes.
 
 ## Search index model (owner-approved dispatch)

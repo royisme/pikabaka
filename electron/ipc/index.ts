@@ -1,6 +1,5 @@
 import { AppState } from "../main"
 import { registerCoreHandlers } from "./core"
-import { registerModelDiscoveryHandlers } from "./model-discovery"
 import { registerSttHandlers } from "./stt"
 import { registerMeetingHandlers } from "./meeting"
 import { registerIntelligenceHandlers } from "./intelligence"
@@ -17,7 +16,6 @@ import { registerAgentHandlers } from "./agent"
 
 export function initializeIpcHandlers(appState: AppState): void {
   registerCoreHandlers(appState)
-  registerModelDiscoveryHandlers(appState)
   registerSttHandlers(appState)
   registerMeetingHandlers(appState)
   registerIntelligenceHandlers(appState)

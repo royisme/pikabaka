@@ -83,17 +83,7 @@ export interface ElectronAPI {
   closeSettingsWindow: () => Promise<void>
   toggleAdvancedSettings: () => Promise<void>
   closeAdvancedSettings: () => Promise<void>
-
-  // LLM Model Management
-  getAvailableOllamaModels: () => Promise<string[]>
-  testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey?: string) => Promise<{ success: boolean; error?: string }>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
-
-  // API Key Management
-  setGeminiApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setGroqApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setOpenaiApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setClaudeApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   getStoredCredentials: () => Promise<{ hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; groqSttModel?: string; sttModels?: Record<string, string>; hasSonioxKey?: boolean; hasTavilyKey?: boolean; transcriptTranslationEnabled?: boolean; transcriptTranslationProvider?: string; transcriptTranslationModel?: string; transcriptTranslationPrompt?: string; transcriptTranslationDisplayMode?: 'original' | 'translated' | 'both'; transcriptTranslationSourceLanguage?: string; transcriptTranslationTargetLanguage?: string; geminiPreferredModel?: string; groqPreferredModel?: string; openaiPreferredModel?: string; claudePreferredModel?: string }>
   testTranscriptTranslation: (draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => Promise<{ success: boolean; sample: string; translatedText?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
   getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both'; sourceLanguage: string; targetLanguage: string }>
@@ -239,12 +229,6 @@ export interface ElectronAPI {
   // Demo
   seedDemo: () => Promise<{ success: boolean }>;
 
-  // Custom Providers
-  getOpenAICompatibleProviders: () => Promise<Array<{ id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }>>;
-  saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) => Promise<{ success: boolean; error?: string }>;
-  deleteOpenAICompatibleProvider: (id: string) => Promise<{ success: boolean; error?: string }>;
-  fetchOpenAICompatibleModels: (baseUrl: string, apiKey: string) => Promise<{ success: boolean; models?: { id: string; label: string }[]; error?: string }>;
-
   // Follow-up Email
   generateFollowupEmail: (input: any) => Promise<string>;
   extractEmailsFromTranscript: (transcript: Array<{ text: string }>) => Promise<string[]>;
@@ -262,7 +246,6 @@ export interface ElectronAPI {
   getMicrophoneMuted: () => Promise<boolean>;
   setMicrophoneMuted: (muted: boolean) => Promise<{ success: boolean }>;
   onMicrophoneMutedChanged: (callback: (muted: boolean) => void) => () => void;
-  onOpenAICompatibleProvidersChanged: (callback: () => void) => () => void;
   onModelChanged: (callback: (modelId: string) => void) => () => void;
 
   onOllamaPullProgress: (callback: (data: { status: string; percent: number }) => void) => () => void;
@@ -341,10 +324,6 @@ export interface ElectronAPI {
 
   // Tavily Search API
   setTavilyApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-
-  // Dynamic Model Discovery
-  fetchProviderModels: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey: string) => Promise<{ success: boolean; models?: { id: string; label: string }[]; error?: string }>
-  setProviderPreferredModel: (provider: 'gemini' | 'groq' | 'openai' | 'claude', modelId: string) => Promise<void>
 
   // License Management
   licenseActivate: (key: string) => Promise<{ success: boolean; error?: string }>

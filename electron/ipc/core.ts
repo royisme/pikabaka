@@ -1,5 +1,5 @@
 import { app } from "electron"
-import { safeHandle, broadcastOpenAICompatibleProvidersChanged } from "./safeHandle"
+import { safeHandle } from "./safeHandle"
 import { AppState } from "../main"
 import { cancelActiveRagQueries } from "./rag"
 import { DatabaseManager } from "../db/DatabaseManager"
@@ -284,12 +284,10 @@ export function registerCoreHandlers(appState: AppState): void {
     try {
       const result = await appState.processingHelper.getLLMHelper().chatWithGemini(message, imagePaths, context, options?.skipSystemPrompt);
 
-      console.log(`[IPC] gemini - chat response: `, result ? result.substring(0, 50) : "(empty)");
-
       // Don't process empty responses
       if (!result || result.trim().length === 0) {
         console.warn("[IPC] Empty response from LLM, not updating IntelligenceManager");
-        return "I apologize, but I couldn't generate a response. Please try again.";
+        throw new Error('The quick answers model returned no text');
       }
 
       // Sync with IntelligenceManager so Follow-Up/Recap work
@@ -308,7 +306,6 @@ export function registerCoreHandlers(appState: AppState): void {
       // 2. Add assistant response and set as last message
       console.log(`[IPC] Updating IntelligenceManager with assistant message...`);
       intelligenceManager.addAssistantMessage(result);
-      console.log(`[IPC] Updated IntelligenceManager.Last message: `, intelligenceManager.getLastAssistantMessage()?.substring(0, 50));
 
       // Log Usage
       intelligenceManager.logUsage('chat', message, result);
@@ -386,7 +383,7 @@ export function registerCoreHandlers(appState: AppState): void {
         }
 
       } catch (streamError: any) {
-        console.error("[IPC] Streaming error:", streamError);
+        console.error("[IPC] Streaming request failed");
         if (_chatStreamId === myStreamId) {
           event.sender.send("gemini-stream-error", streamError.message || "Unknown streaming error");
         }
@@ -395,7 +392,7 @@ export function registerCoreHandlers(appState: AppState): void {
       return null; // Return null as data is sent via events
 
     } catch (error: any) {
-      console.error("[IPC] Error in gemini-chat-stream setup:", error);
+      console.error("[IPC] Chat stream setup failed");
       throw error;
     }
   });
@@ -565,18 +562,6 @@ export function registerCoreHandlers(appState: AppState): void {
     return process.arch;
   });
 
-  // LLM Model Management Handlers
-  safeHandle("get-available-ollama-models", async () => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      const models = await llmHelper.getOllamaModels();
-      return models;
-    } catch (error: any) {
-      // console.error("Error getting Ollama models:", error);
-      throw error;
-    }
-  });
-
   safeHandle("ensure-ollama-running", async () => {
     try {
       const { OllamaManager } = require('../services/OllamaManager');
@@ -584,93 +569,6 @@ export function registerCoreHandlers(appState: AppState): void {
       return { success: true };
     } catch (error: any) {
       return { success: false, message: error.message };
-    }
-  });
-
-  // Dedicated API key setters (for Settings UI Save buttons)
-  safeHandle("set-gemini-api-key", async (_, apiKey: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      CredentialsManager.getInstance().setGeminiApiKey(apiKey);
-
-      // Also update the LLMHelper immediately
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      llmHelper.setApiKey(apiKey);
-
-      // CQ-06 fix: cancel any in-flight LLM stream before swapping LLM clients.
-      // Use resetEngine() (NOT reset()) so session transcript is preserved mid-meeting.
-      // initializeLLMs() now also calls engine.reset() internally for double-safety.
-      appState.getIntelligenceManager().resetEngine();
-      // Re-init IntelligenceManager
-      appState.getIntelligenceManager().initializeLLMs();
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error saving Gemini API key:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle("set-groq-api-key", async (_, apiKey: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      CredentialsManager.getInstance().setGroqApiKey(apiKey);
-
-      // Also update the LLMHelper immediately
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      llmHelper.setGroqApiKey(apiKey);
-
-      // CQ-06 fix: cancel in-flight stream before re-init (engine only, not session)
-      appState.getIntelligenceManager().resetEngine();
-      // Re-init IntelligenceManager
-      appState.getIntelligenceManager().initializeLLMs();
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error saving Groq API key:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle("set-openai-api-key", async (_, apiKey: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      CredentialsManager.getInstance().setOpenaiApiKey(apiKey);
-
-      // Also update the LLMHelper immediately
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      llmHelper.setOpenaiApiKey(apiKey);
-
-      // CQ-06 fix: cancel in-flight stream before re-init (engine only, not session)
-      appState.getIntelligenceManager().resetEngine();
-      // Re-init IntelligenceManager
-      appState.getIntelligenceManager().initializeLLMs();
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error saving OpenAI API key:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle("set-claude-api-key", async (_, apiKey: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      CredentialsManager.getInstance().setClaudeApiKey(apiKey);
-
-      // Also update the LLMHelper immediately
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      llmHelper.setClaudeApiKey(apiKey);
-
-      // CQ-06 fix: cancel in-flight stream before re-init (engine only, not session)
-      appState.getIntelligenceManager().resetEngine();
-      // Re-init IntelligenceManager
-      appState.getIntelligenceManager().initializeLLMs();
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error saving Claude API key:", error);
-      return { success: false, error: error.message };
     }
   });
 

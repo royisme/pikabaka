@@ -481,10 +481,8 @@ type TranslationConfig = {
   prompt: string;
   sourceLanguageKey: string;
   targetLanguageKey: string;
-  oaiCompat?: { id: string; baseUrl: string; apiKey: string; preferredModel?: string };
   /** The connection chosen for translation (any type and host), when it exists and can be used. */
   connection?: { type: 'openai' | 'anthropic' | 'gemini'; baseUrl: string; apiKey: string };
-  standardProviders: Set<string>;
   isConfigured: boolean;
 };
 
@@ -496,9 +494,7 @@ function resolveTranslationConfig(
   const { CredentialsManager } = require('../services/CredentialsManager');
   const cm = CredentialsManager.getInstance();
   const provider: string = override?.provider ?? cm.getTranscriptTranslationProvider();
-  const standardProviders = new Set(['ollama', 'gemini', 'groq', 'openai', 'claude']);
-  const oaiCompat = cm.getOpenAICompatibleProviders().find((p: { id: string }) => p.id === provider);
-  const model: string = (override?.model ?? cm.getTranscriptTranslationModel()).trim() || (oaiCompat?.preferredModel?.trim() ?? '');
+  const model: string = (override?.model ?? cm.getTranscriptTranslationModel()).trim();
   const prompt: string = override?.prompt ?? cm.getTranscriptTranslationPrompt();
   const resolved = cm.resolveConnection(provider);
   const connection = resolved && cm.isConnectionReady(provider) ? { type: resolved.type, baseUrl: resolved.baseUrl, apiKey: resolved.apiKey } : undefined;
@@ -510,12 +506,8 @@ function resolveTranslationConfig(
     prompt,
     sourceLanguageKey: cm.getTranscriptTranslationSourceLanguage(),
     targetLanguageKey: override?.targetLanguage ?? cm.getTranscriptTranslationTargetLanguage(),
-    oaiCompat,
     connection,
-    standardProviders,
-    isConfigured:
-      isTranscriptTranslationConfigured(shouldTranslate, model, prompt) &&
-      (standardProviders.has(provider) ? true : !!oaiCompat),
+    isConfigured: isTranscriptTranslationConfigured(shouldTranslate, model, prompt) && !!connection,
   };
 }
 
@@ -543,27 +535,13 @@ function runTranslationRequest(
     model: config.model,
     prompt: config.prompt,
     sourceText: turn.text,
-    ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434",
     sourceLanguageKey: config.sourceLanguageKey,
     targetLanguageKey: config.targetLanguageKey,
     detectedLanguageKey: turn.detectedLanguage,
     context: context.length > 0 ? context : undefined,
   };
   const llm = state.processingHelper.getLLMHelper();
-  if (config.connection) {
-    return llm.translateTranscriptText({ ...baseReq, provider: 'connection', connection: config.connection }, onProgress);
-  }
-  if (config.oaiCompat && !config.standardProviders.has(config.provider)) {
-    return llm.translateTranscriptText({
-      ...baseReq,
-      provider: 'openai-compatible',
-      openAICompatible: { baseUrl: config.oaiCompat.baseUrl, apiKey: config.oaiCompat.apiKey },
-    }, onProgress);
-  }
-  return llm.translateTranscriptText({
-    ...baseReq,
-    provider: config.provider as 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude',
-  }, onProgress);
+  return llm.translateTranscriptText({ ...baseReq, provider: 'connection', connection: config.connection }, onProgress);
 }
 
 /** A turn this short is not worth a request that may be thrown away. */

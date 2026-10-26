@@ -109,3 +109,27 @@ t.test('each connection protocol preserves role history and receives the abort s
         await t.rejects(collect(llm.streamChat('Invented final question', undefined, undefined, '', { signal: controller.signal })), { name: 'AbortError' });
     }
 });
+
+t.test('translation requires a connection and retains the Gemini thinking-setting 400 fallback', async t => {
+    const llm = new LLMHelper();
+    const request = { provider: 'connection' as const, model: 'gemini-3-invented-test', prompt: 'Translate the invented text', sourceText: 'Invented example' };
+    await t.rejects(llm.translateTranscriptText(request), { message: 'Translation connection is not configured' });
+    await t.rejects(llm.translateTranscriptText({ ...request, provider: 'ollama' } as unknown as Parameters<Helper['translateTranscriptText']>[0]), { message: 'Translation connection is not configured' });
+    const settings: unknown[] = [];
+    Reflect.set(llm, 'connectionClients', () => ({
+        gemini: () => ({ models: { generateContent: async (body: { config: unknown }) => {
+            settings.push(body.config);
+            if (settings.length < 3) throw Object.assign(new Error('Invented unsupported thinking level'), { status: 400 });
+            return { text: 'invented translation' };
+        } } }),
+    }));
+    t.equal(await llm.translateTranscriptText({ ...request, connection: { type: 'gemini', baseUrl: 'http://localhost:1234', apiKey: '' } }), 'invented translation');
+    t.same(settings, [{ thinkingConfig: { thinkingLevel: 'MINIMAL' } }, { thinkingConfig: { thinkingLevel: 'LOW' } }, undefined]);
+    let calls = 0;
+    Reflect.set(llm, 'streamViaConnection', async () => {
+        calls++;
+        throw Object.assign(new Error('Invented rate limit'), { status: 429 });
+    });
+    await t.rejects(llm.translateTranscriptText({ ...request, connection: { type: 'gemini', baseUrl: 'http://localhost:1234', apiKey: '' } }, () => {}), { status: 429 });
+    t.equal(calls, 1, 'a classified failure is not retried without streaming');
+});

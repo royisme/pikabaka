@@ -63,21 +63,11 @@ interface ElectronAPI {
 
   analyzeImageFile: (path: string) => Promise<void>
   quitApp: () => Promise<void>
-
-  // LLM Model Management
-  getAvailableOllamaModels: () => Promise<string[]>
-  testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey?: string) => Promise<{ success: boolean; error?: string }>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
-
-  // API Key Management
-  setGeminiApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setGroqApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setOpenaiApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setClaudeApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   getStoredCredentials: () => Promise<{ hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: string; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; hasSonioxKey: boolean }>
   testTranscriptTranslation: (draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => Promise<{ success: boolean; sample: string; translatedText?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
-  getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude'; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both' }>
-  setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude'; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) => Promise<{ success: boolean }>
+  getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both' }>
+  setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) => Promise<{ success: boolean }>
   agentGateGetSettings: () => Promise<{ mode: 'log' | 'on' | 'off'; model: string; baseUrl: string; hasApiKey: boolean; threshold: number; cooldownSeconds: number }>
   agentGateSetSettings: (settings: { mode?: 'log' | 'on' | 'off'; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }) => Promise<{ success: boolean; error?: string }>
   agentGateStatus: () => Promise<{ mode: 'log' | 'on' | 'off'; configured: boolean; state: 'ok' | 'unavailable' | 'unconfigured'; reason?: string; lastDecision?: AgentGateDecision }>
@@ -198,12 +188,6 @@ interface ElectronAPI {
   // Demo
   seedDemo: () => Promise<{ success: boolean }>
 
-  // Custom Providers
-  getOpenAICompatibleProviders: () => Promise<Array<{ id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }>>
-  saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) => Promise<{ success: boolean; error?: string }>
-  deleteOpenAICompatibleProvider: (id: string) => Promise<{ success: boolean; error?: string }>
-  fetchOpenAICompatibleModels: (baseUrl: string, apiKey: string) => Promise<{ success: boolean; models?: { id: string; label: string }[]; error?: string }>
-
   // Follow-up Email
   generateFollowupEmail: (input: any) => Promise<string>
   extractEmailsFromTranscript: (transcript: Array<{ text: string }>) => Promise<string[]>
@@ -243,7 +227,6 @@ interface ElectronAPI {
   getMicrophoneMuted: () => Promise<boolean>
   setMicrophoneMuted: (muted: boolean) => Promise<{ success: boolean }>
   onMicrophoneMutedChanged: (callback: (muted: boolean) => void) => () => void
-  onOpenAICompatibleProvidersChanged: (callback: () => void) => () => void
   onModelChanged: (callback: (modelId: string) => void) => () => void
 
   // Ollama
@@ -569,21 +552,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.removeListener("toggle-expand", subscription)
     }
   },
-
-  // LLM Model Management
-  getAvailableOllamaModels: () => ipcRenderer.invoke("get-available-ollama-models"),
-  testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey: string) => ipcRenderer.invoke("test-llm-connection", provider, apiKey),
   selectServiceAccount: () => ipcRenderer.invoke("select-service-account"),
-
-  // API Key Management
-  setGeminiApiKey: (apiKey: string) => ipcRenderer.invoke("set-gemini-api-key", apiKey),
-  setGroqApiKey: (apiKey: string) => ipcRenderer.invoke("set-groq-api-key", apiKey),
-  setOpenaiApiKey: (apiKey: string) => ipcRenderer.invoke("set-openai-api-key", apiKey),
-  setClaudeApiKey: (apiKey: string) => ipcRenderer.invoke("set-claude-api-key", apiKey),
   getStoredCredentials: () => ipcRenderer.invoke("get-stored-credentials"),
   testTranscriptTranslation: (draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => ipcRenderer.invoke("test-transcript-translation", draft),
   getTranscriptTranslationSettings: () => ipcRenderer.invoke("get-transcript-translation-settings"),
-  setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude'; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) =>
+  setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) =>
     ipcRenderer.invoke("set-transcript-translation-settings", settings),
   agentGateGetSettings: () => ipcRenderer.invoke("agent-gate-get-settings"),
   agentGateSetSettings: (settings: { mode?: 'log' | 'on' | 'off'; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }) => ipcRenderer.invoke("agent-gate-set-settings", settings),
@@ -915,14 +888,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Demo
   seedDemo: () => ipcRenderer.invoke('seed-demo'),
 
-  // Custom Providers
-  getOpenAICompatibleProviders: () => ipcRenderer.invoke('get-openai-compatible-providers'),
-  saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) =>
-    ipcRenderer.invoke('save-openai-compatible-provider', provider),
-  deleteOpenAICompatibleProvider: (id: string) => ipcRenderer.invoke('delete-openai-compatible-provider', id),
-  fetchOpenAICompatibleModels: (baseUrl: string, apiKey: string) =>
-    ipcRenderer.invoke('fetch-openai-compatible-models', baseUrl, apiKey),
-
   // Follow-up Email
   generateFollowupEmail: (input: any) => ipcRenderer.invoke('generate-followup-email', input),
   extractEmailsFromTranscript: (transcript: Array<{ text: string }>) => ipcRenderer.invoke('extract-emails-from-transcript', transcript),
@@ -967,14 +932,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on('overlay-mouse-passthrough-changed', subscription)
     return () => {
       ipcRenderer.removeListener('overlay-mouse-passthrough-changed', subscription)
-    }
-  },
-
-  onOpenAICompatibleProvidersChanged: (callback: () => void) => {
-    const subscription = () => callback()
-    ipcRenderer.on('openai-compatible-providers-changed', subscription)
-    return () => {
-      ipcRenderer.removeListener('openai-compatible-providers-changed', subscription)
     }
   },
 
@@ -1174,10 +1131,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Tavily Search API
   setTavilyApiKey: (apiKey: string) => ipcRenderer.invoke('set-tavily-api-key', apiKey),
-
-  // Dynamic Model Discovery
-  fetchProviderModels: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey: string) => ipcRenderer.invoke('fetch-provider-models', provider, apiKey),
-  setProviderPreferredModel: (provider: 'gemini' | 'groq' | 'openai' | 'claude', modelId: string) => ipcRenderer.invoke('set-provider-preferred-model', provider, modelId),
 
   // License Management
   licenseActivate: (key: string) => ipcRenderer.invoke('license:activate', key),

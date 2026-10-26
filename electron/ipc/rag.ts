@@ -60,7 +60,7 @@ export function registerRagHandlers(appState: AppState): void {
           return { fallback: true };
         }
 
-        console.error("[RAG] Query error:", error);
+        console.error("[RAG] Query failed");
         event.sender.send("rag:stream-error", { meetingId, error: msg });
       }
       return { success: false, error: error.message };
@@ -105,7 +105,7 @@ export function registerRagHandlers(appState: AppState): void {
           console.log(`[RAG] JIT query failed with '${msg}', falling back to regular live chat`);
           return { fallback: true };
         }
-        console.error("[RAG] Live query error:", error);
+        console.error("[RAG] Live query failed");
         event.sender.send("rag:stream-error", { live: true, error: msg });
       }
       return { success: false, error: error.message };

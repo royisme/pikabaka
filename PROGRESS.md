@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## Chosen models: Phase 2 (`legacy-keys`)
+
+- Removed the cached Gemini/Groq/OpenAI/Claude clients, key/env constructor wiring, prefix routing, unused generation/stream/getter/proxy/fallback/Ollama helpers, model version discovery/scheduler, obsolete model fetcher and orphaned rate limiters. Quit still scrubs CredentialsManager; LLMHelper no longer holds key copies.
+- Translation dispatch now requires a ready connection id and an explicit model id. Legacy native/provider branches, preferred-model fallback and their request/config fields are gone; prompts, context, streaming fallback and Gemini thinking-level 400 retry remain. Unknown stored keys remain tolerated without a migration.
+- Removed unused provider-key/test/discovery/preferred-model/compatible-provider CRUD IPC, preload entries/types and provider-change event. Also removed the unused native Ollama model-list channel and obsolete dependency-injection client interface. Kept get-stored-credentials for Audio Settings, built-in key fields/saveConnection for connections and embeddings, and embedding/Ollama bootstrap code unchanged. Legacy-named chat and vision methods/channels keep callers but have no direct-key routing. No uncertain deletion; grep over electron/src/test finds no removed routing helpers or IPC.
+- Checks: renderer tsc 0, Electron tsc 0, full tap 1 (1191 passing assertions; only the known missing DOCX fixture fails), lint 0. Warnings: 1081 to 977 overall; touched files 383 to 279, no file increases. Six new assertions cover connection-only translation, thinking-setting retries and no retry after rate limits.
+- Owner: verify ordinary and screenshot quick actions, suggestion, RAG history/Stop, meeting summary and translation on the chosen hosts, including missing models/keys and obsolete translation ids. The app and real providers were not run; Settings test buttons are Phase 3.
+
 ## Chosen models: Phase 1 (`legacy-keys`)
 
 - Interactive generation, JSON tasks, suggestions and screenshot analysis collect the Quick answers connection stream; streaming entry points and RAG use the same path. Failures propagate instead of trying another provider or returning an apology.

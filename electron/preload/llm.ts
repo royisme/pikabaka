@@ -2,13 +2,7 @@ import { ipcRenderer } from "electron"
 
 export function llmChannels() {
   return {
-    getAvailableOllamaModels: () => ipcRenderer.invoke("get-available-ollama-models"),
-    testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey: string) => ipcRenderer.invoke("test-llm-connection", provider, apiKey),
     selectServiceAccount: () => ipcRenderer.invoke("select-service-account"),
-    setGeminiApiKey: (apiKey: string) => ipcRenderer.invoke("set-gemini-api-key", apiKey),
-    setGroqApiKey: (apiKey: string) => ipcRenderer.invoke("set-groq-api-key", apiKey),
-    setOpenaiApiKey: (apiKey: string) => ipcRenderer.invoke("set-openai-api-key", apiKey),
-    setClaudeApiKey: (apiKey: string) => ipcRenderer.invoke("set-claude-api-key", apiKey),
     getStoredCredentials: () => ipcRenderer.invoke("get-stored-credentials"),
     streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean }) => ipcRenderer.invoke("gemini-chat-stream", message, imagePaths, context, options),
     onGeminiStreamToken: (callback: (token: string) => void) => {
@@ -33,21 +27,6 @@ export function llmChannels() {
       }
     },
     toggleModelSelector: (coords: { x: number; y: number }) => ipcRenderer.invoke('toggle-model-selector', coords),
-    getOpenAICompatibleProviders: () => ipcRenderer.invoke('get-openai-compatible-providers'),
-    saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) =>
-      ipcRenderer.invoke('save-openai-compatible-provider', provider),
-    deleteOpenAICompatibleProvider: (id: string) => ipcRenderer.invoke('delete-openai-compatible-provider', id),
-    fetchOpenAICompatibleModels: (baseUrl: string, apiKey: string) =>
-      ipcRenderer.invoke('fetch-openai-compatible-models', baseUrl, apiKey),
-    fetchProviderModels: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey: string) => ipcRenderer.invoke('fetch-provider-models', provider, apiKey),
-    setProviderPreferredModel: (provider: 'gemini' | 'groq' | 'openai' | 'claude', modelId: string) => ipcRenderer.invoke('set-provider-preferred-model', provider, modelId),
-    onOpenAICompatibleProvidersChanged: (callback: () => void) => {
-      const subscription = () => callback()
-      ipcRenderer.on('openai-compatible-providers-changed', subscription)
-      return () => {
-        ipcRenderer.removeListener('openai-compatible-providers-changed', subscription)
-      }
-    },
     onModelChanged: (callback: (modelId: string) => void) => {
       const subscription = (_: any, modelId: string) => callback(modelId)
       ipcRenderer.on('model-changed', subscription)
