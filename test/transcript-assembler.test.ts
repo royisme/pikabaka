@@ -20,7 +20,6 @@ t.test('shouldReopenFlushedTurn decides reopen eligibility', (t) => {
     fragmentFlushDelayMs: 2600,
     speechEndedSentenceFlushMs: 260,
     speechEndedFragmentFlushMs: 1100,
-    minWordsBeforeSentenceFlush: 18,
     maxTurnDurationMs: 10000,
     reopenWindowMs: 5000,
   };

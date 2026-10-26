@@ -1,5 +1,6 @@
 import { classifyTranslationError } from "../transcript/translationError";
 import { formatTranslationTiming } from "../transcript/translationStream";
+import { splitAtLastSentence } from "../transcript/sentences";
 import { SpeculativeTranslations } from "../transcript/speculativeTranslation";
 import type { AppState } from "../main"
 import { CredentialsManager } from "../services/CredentialsManager"
@@ -16,6 +17,8 @@ export interface BufferedTranscriptTurn {
   flushTimer: NodeJS.Timeout | null;
   detectedLanguage?: string;
   revision: number;
+  /** When the speech provider last reported words that are not final yet: the speaker is still talking. */
+  lastActivityAt?: number;
 }
 
 export interface FlushedTranscriptTurn {
@@ -40,9 +43,6 @@ export interface TranscriptAssemblerThresholds {
   fragmentFlushDelayMs: number;
   speechEndedSentenceFlushMs: number;
   speechEndedFragmentFlushMs: number;
-  /** Minimum word count before a sentence-ending can trigger the shorter flush delay.
-   *  Segments with fewer words use fragmentFlushDelayMs even if they end with punctuation. */
-  minWordsBeforeSentenceFlush: number;
   maxTurnDurationMs: number;
   /** How long (from lastUpdatedAt) a flushed non-sentence-final turn stays reopenable. */
   reopenWindowMs: number;
@@ -57,7 +57,6 @@ const TRANSCRIPT_ASSEMBLER_THRESHOLDS: Record<TranscriptAssemblerProfile, Transc
     fragmentFlushDelayMs: 2600,
     speechEndedSentenceFlushMs: 260,
     speechEndedFragmentFlushMs: 1100,
-    minWordsBeforeSentenceFlush: 18,
     maxTurnDurationMs: 0,
     reopenWindowMs: 6500,
   },
@@ -67,7 +66,6 @@ const TRANSCRIPT_ASSEMBLER_THRESHOLDS: Record<TranscriptAssemblerProfile, Transc
     fragmentFlushDelayMs: 1450,
     speechEndedSentenceFlushMs: 120,
     speechEndedFragmentFlushMs: 500,
-    minWordsBeforeSentenceFlush: 8,
     maxTurnDurationMs: 0,
     reopenWindowMs: 4000,
   },
@@ -77,7 +75,6 @@ const TRANSCRIPT_ASSEMBLER_THRESHOLDS: Record<TranscriptAssemblerProfile, Transc
     fragmentFlushDelayMs: 5000,
     speechEndedSentenceFlushMs: 400,
     speechEndedFragmentFlushMs: 1500,
-    minWordsBeforeSentenceFlush: 10,
     maxTurnDurationMs: 30000,
     reopenWindowMs: 9500,
   },
@@ -208,9 +205,46 @@ export function scheduleBufferedTranscriptFlush(appState: AppState, speaker: Tra
   if (buffer.flushTimer) {
     clearTimeout(buffer.flushTimer);
   }
-  buffer.flushTimer = setTimeout(() => {
-    void flushBufferedTranscriptTurn(appState, speaker);
-  }, delayMs);
+  buffer.flushTimer = setTimeout(() => flushWhenQuiet(appState, speaker), delayMs);
+}
+
+/** The turn holds a finished sentence: it cannot grow any more, so it is shown soon. */
+function hasFinishedSentence(text: string): boolean {
+  return splitAtLastSentence(text).finished !== '';
+}
+
+/** While the speaker is still talking, a turn that stops mid-sentence is held rather than flushed. */
+const SPEAKING_HOLD_MS = 1500;
+const SPEAKING_RECHECK_MS = 500;
+/** A turn is never held longer than this, for speech that has no punctuation. */
+const MAX_HOLD_MS = 20000;
+
+function flushWhenQuiet(appState: AppState, speaker: TranscriptSpeaker): void {
+  const buffer = (appState as any).transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
+  if (!buffer) return;
+  const now = Date.now();
+  const speaking = now - (buffer.lastActivityAt ?? 0) < SPEAKING_HOLD_MS;
+  // Only a turn with no finished sentence yet is held: with one, the flush shows it and carries the rest on.
+  if (speaking && !splitAtLastSentence(buffer.text).finished && now - buffer.startedAt < MAX_HOLD_MS) {
+    scheduleBufferedTranscriptFlush(appState, speaker, SPEAKING_RECHECK_MS);
+    return;
+  }
+  void flushBufferedTranscriptTurn(appState, speaker);
+}
+
+/** Words that are not final yet were heard: the turn being assembled is still going on. */
+export function noteTranscriptActivity(appState: AppState, speaker: TranscriptSpeaker, timestamp: number): void {
+  const buffer = (appState as any).transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
+  if (!buffer) return;
+  buffer.lastActivityAt = timestamp;
+  // The silence that ends a turn is counted from the last words heard, not from the last final.
+  buffer.lastUpdatedAt = Math.max(buffer.lastUpdatedAt, timestamp);
+}
+
+/** The words of the turn being assembled, which are final but not yet in a row. */
+export function getBufferedTranscriptText(appState: AppState, speaker: TranscriptSpeaker): string {
+  const buffer = (appState as any).transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
+  return buffer ? normalizeTranscriptText(appState, buffer.text) : '';
 }
 
 export function bufferFinalTranscriptChunk(
@@ -228,13 +262,14 @@ export function bufferFinalTranscriptChunk(
 
   let buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   if (buffer && timestamp - buffer.lastUpdatedAt > thresholds.maxSilenceBeforeNewTurnMs) {
-    void flushBufferedTranscriptTurn(appState, speaker);
+    void flushBufferedTranscriptTurn(appState, speaker, { all: true });
     buffer = null;
   }
 
   if (buffer && thresholds.maxTurnDurationMs > 0 && timestamp - buffer.startedAt > thresholds.maxTurnDurationMs) {
     void flushBufferedTranscriptTurn(appState, speaker);
-    buffer = null;
+    // The unfinished sentence at the end stays behind as the turn that goes on.
+    buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   }
 
   if (!buffer) {
@@ -274,8 +309,7 @@ export function bufferFinalTranscriptChunk(
     if (detectedLanguage) buffer.detectedLanguage = detectedLanguage;
   }
 
-  const wordCount = countTranscriptWords(appState, buffer.text);
-  const isSentenceComplete = endsSentence(appState, buffer.text) && wordCount >= thresholds.minWordsBeforeSentenceFlush;
+  const isSentenceComplete = hasFinishedSentence(buffer.text);
   const flushDelayMs = isSentenceComplete
     ? thresholds.sentenceFlushDelayMs
     : thresholds.fragmentFlushDelayMs;
@@ -287,8 +321,7 @@ export function handleSpeakerSpeechEnded(appState: AppState, speaker: Transcript
   const buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   if (!buffer) return;
   const thresholds = getTranscriptAssemblerThresholds(appState);
-  const wordCount = countTranscriptWords(appState, buffer.text);
-  const isSentenceComplete = endsSentence(appState, buffer.text) && wordCount >= thresholds.minWordsBeforeSentenceFlush;
+  const isSentenceComplete = hasFinishedSentence(buffer.text);
   scheduleBufferedTranscriptFlush(
     appState,
     speaker,
@@ -324,7 +357,11 @@ export function resetBufferedTranscriptTurns(appState: AppState): void {
   speculatedTurns.clear();
 }
 
-export async function flushBufferedTranscriptTurn(appState: AppState, speaker: TranscriptSpeaker): Promise<void> {
+/**
+ * Writes and shows the turn up to its last finished sentence. The unfinished sentence after it is
+ * carried into a new turn, so a row never ends in the middle of a sentence; `all` flushes everything.
+ */
+export async function flushBufferedTranscriptTurn(appState: AppState, speaker: TranscriptSpeaker, options?: { all?: boolean }): Promise<void> {
   const state = appState as any;
   const buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   if (!buffer) return;
@@ -334,12 +371,31 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
   }
   state.transcriptTurnBuffers[speaker] = null;
 
-  const text = normalizeTranscriptText(appState, buffer.text);
+  let text = normalizeTranscriptText(appState, buffer.text);
   if (!text) return;
+
+  const thresholds = getTranscriptAssemblerThresholds(appState);
+  if (!options?.all) {
+    const { finished, rest } = splitAtLastSentence(text);
+    if (finished && rest) {
+      text = finished;
+      state.transcriptTurnBuffers[speaker] = {
+        segmentId: createTranscriptSegmentId(appState, speaker, buffer.lastUpdatedAt),
+        startedAt: buffer.lastUpdatedAt,
+        lastUpdatedAt: buffer.lastUpdatedAt,
+        confidence: buffer.confidence,
+        text: rest,
+        flushTimer: null,
+        detectedLanguage: buffer.detectedLanguage,
+        revision: 1,
+        lastActivityAt: buffer.lastActivityAt,
+      } satisfies BufferedTranscriptTurn;
+      scheduleBufferedTranscriptFlush(appState, speaker, thresholds.fragmentFlushDelayMs);
+    }
+  }
 
   const timestamp = buffer.startedAt || Date.now();
   const confidence = buffer.confidence || 0;
-  const thresholds = getTranscriptAssemblerThresholds(appState);
   const endedSentence = endsSentence(appState, text);
 
   state.transcriptSegmentRevisions.set(buffer.segmentId, buffer.revision);
@@ -514,7 +570,9 @@ const speculatedTurns = new Set<string>();
  * and this one is discarded (the revision guard also drops anything for a superseded revision).
  */
 function startSpeculativeTranslation(appState: AppState, buffer: BufferedTranscriptTurn): void {
-  const text = normalizeTranscriptText(appState, buffer.text);
+  const whole = normalizeTranscriptText(appState, buffer.text);
+  // Only up to the last finished sentence: that is what the flush will show, and the rest is carried on.
+  const text = splitAtLastSentence(whole).finished || whole;
   if (countTranscriptWords(appState, text) < MIN_WORDS_TO_SPECULATE) return;
   const config = resolveTranslationConfig(false);
   if (!config.isConfigured || isSameAsTarget(config, buffer.detectedLanguage)) return;

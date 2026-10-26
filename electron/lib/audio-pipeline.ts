@@ -14,7 +14,10 @@ import {
   bufferFinalTranscriptChunk,
   emitNativeAudioTranscript,
   emitTranscriptWithTranslation,
+  getBufferedTranscriptText,
   handleSpeakerSpeechEnded,
+  mergeTranscriptText,
+  noteTranscriptActivity,
   normalizeTranscriptText,
 } from "./transcript-assembler"
 
@@ -171,10 +174,13 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
         handleSpeakerSpeechEnded(appState, speaker);
       }
     } else if (trimmed) {
+      noteTranscriptActivity(appState, speaker, timestamp);
+      // Final words that are not in a row yet come first, so none of what was said disappears from the live line.
+      const liveText = mergeTranscriptText(appState, getBufferedTranscriptText(appState, speaker), segment.text);
       emitNativeAudioTranscript(appState, {
         speaker,
-        text: segment.text,
-        sourceText: segment.text,
+        text: liveText,
+        sourceText: liveText,
         translatedText: undefined,
         timestamp,
         final: segment.isFinal,
