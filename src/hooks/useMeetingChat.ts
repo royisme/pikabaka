@@ -501,7 +501,9 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
                 };
                 return updated;
               }
-              return prev;
+              // A later step of the same run (after a tool call) starts a new message.
+              if (!isAgentRunRef.current) return prev;
+              return [...prev, { id: `${Date.now()}-${prev.length}`, role: 'system', text: event.text, isStreaming: true, intent: 'manual' }];
             });
             break;
           case 'text_final':
@@ -517,7 +519,8 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
                 };
                 return updated;
               }
-              return prev;
+              if (!isAgentRunRef.current || !event.text.trim() || last?.text === event.text) return prev;
+              return [...prev, { id: `${Date.now()}-${prev.length}`, role: 'system', text: event.text, intent: 'manual' }];
             });
             break;
           case 'tool_started':
@@ -532,7 +535,9 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
                 };
                 return updated;
               }
-              return prev;
+              // The step before the tool call already ended its message: show the working state as a new one.
+              if (!isAgentRunRef.current || (last && last.isStreaming)) return prev;
+              return [...prev, { id: `${Date.now()}-${prev.length}`, role: 'system', text: toolWorkingMessage(event.toolName), isStreaming: true, isWorkingState: true, intent: 'manual' }];
             });
             break;
           case 'run_settled':
