@@ -16,6 +16,7 @@ module.exports = {
         'secondary-container': 'var(--secondary-container)',
         outline: 'var(--outline)',
         'outline-variant': 'var(--outline-variant)',
+        'on-primary': 'var(--on-primary)',
         bg: {
           primary: 'var(--bg-primary)',
           secondary: 'var(--bg-secondary)',

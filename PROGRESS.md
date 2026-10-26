@@ -2,6 +2,22 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: one theme palette for dark, light and system (branch `electron-upgrade`)
+
+Problem (owner's screenshot): in the light theme the overlay's "..." menu was a dark navy box with dark text. Cause: `[data-theme='light']` redefined only the `overlay-*` and `state-*` tokens. The base family (`--surface*`, `--bg-*`, `--text-*`, `--border-*`, `--primary`, `--secondary`, `--outline*`) had no light values, on `main` too, so the launcher, the settings pages and the meeting views stayed dark in the light theme (a light search pill with light text on a dark page) and 20 files patched it with `isLight ? ... : ...`.
+
+Done
+- `src/index.css`: a full light palette for the base family (grey canvas, white cards and menus, deep blue `#0a60c9` accent, slate text at 4.5:1 or more), deeper light `state-*` colours, `--on-primary` (dark on the pale dark-theme accent, white on the light-theme accent) and `--overlay-menu-bg`. Dark `--text-tertiary` raised from 3.5:1 to 4.5:1 or more. `text-on-primary` in `tailwind.config.js`.
+- Components: the menu surface uses `--overlay-menu-bg`; nine `text-white` on `bg-accent-primary` and the Start Pika button use `text-on-primary` (it was white on pale blue, 1.7:1, in dark); two `text-gray-400` headings, two `text-blue-500` links and the inactive meeting tab use tokens; the Settings popup's key hints lost their `opacity-60` and went from 10px to 11px; the menu no longer draws a separator above its first item.
+- `test/theme-tokens.test.ts` fails when the dark block has a literal colour the light block lacks (it reports 29 tokens against the old CSS). `DESIGN.md` ("Two token families, one rule") and `docs/conventions.md` describe the rule.
+
+Verified (the built app, real windows, over a debugging port, with a temporary profile)
+- Screenshots in both themes of the launcher, the full settings page, the About tab, the meeting details, the Settings popup, and the overlay with its language and "..." menus open.
+- A script computed text against effective background contrast for every visible text node in each view and theme. Result: 0 failures in the launcher, meeting details and overlay; the only item left in the settings views is the "Fast responses" row, which is greyed out on purpose when no Groq key is stored. The AI Providers tab still has 9px and 7px badges and disabled Save buttons below 4.5:1 (disabled states, and sizes below the 11px floor; not touched).
+- `pnpm run verify` exit 0 (812 tests), both builds exit 0.
+
+Not verified: the Model selector window and the cropper (not opened), the other tabs' interactive states (hover, focus), the macOS "system" setting switching live while the app runs (the attribute switch was exercised, the OS event was not), and any real meeting.
+
 ## 2026-10-26: Electron 33 to 44 (branch `electron-upgrade`)
 
 Why 44, not 45: Electron 44 and 45 embed the same Node 24.22 and N-API 10, and every native module loaded on both (Opus checked in `/tmp`). 45.0.0 was five days old with no patch release, and Opus reported (not re-run here) that better-sqlite3 12.11.1 does not compile against it. 44 is supported until Electron 47 (early 2027). Move to 45 after a few patch releases.

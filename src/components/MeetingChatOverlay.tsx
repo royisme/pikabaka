@@ -65,7 +65,7 @@ const UserMessage: React.FC<{ content: string }> = ({ content }) => (
         transition={{ duration: 0.15 }}
         className="flex justify-end mb-6"
     >
-        <div className="bg-accent-primary text-white px-5 py-3 rounded-2xl rounded-tr-md max-w-[70%] text-[15px] leading-relaxed">
+        <div className="bg-accent-primary text-on-primary px-5 py-3 rounded-2xl rounded-tr-md max-w-[70%] text-[15px] leading-relaxed">
             {content}
         </div>
     </motion.div>
@@ -361,7 +361,7 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
                                 <button
                                     type="submit"
                                     disabled={!input.trim() || isLoading}
-                                    className="px-3 py-2 rounded-xl bg-accent-primary text-white text-[13px] font-medium disabled:opacity-50"
+                                    className="px-3 py-2 rounded-xl bg-accent-primary text-on-primary text-[13px] font-medium disabled:opacity-50"
                                 >
                                     Send
                                 </button>

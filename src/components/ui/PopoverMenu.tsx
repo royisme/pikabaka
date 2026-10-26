@@ -83,11 +83,11 @@ const PopoverMenu: React.FC<PopoverMenuProps> = ({ label, trigger, items, trigge
                     ref={listRef}
                     role="menu"
                     aria-label={label}
-                    className={`absolute top-full z-50 mt-1 max-h-[60vh] min-w-[200px] overflow-y-auto rounded-xl border overlay-hairline bg-bg-elevated p-1 shadow-lg ${align === 'right' ? 'right-0' : 'left-0'}`}
+                    className={`absolute top-full z-50 mt-1 max-h-[60vh] min-w-[200px] overflow-y-auto rounded-xl border overlay-hairline bg-[var(--overlay-menu-bg)] p-1 shadow-lg ${align === 'right' ? 'right-0' : 'left-0'}`}
                 >
-                    {items.map((item) => (
+                    {items.map((item, index) => (
                         <React.Fragment key={item.key}>
-                            {item.separatorBefore && <div role="separator" className="my-1 h-px bg-current opacity-10" />}
+                            {item.separatorBefore && index > 0 && <div role="separator" className="my-1 h-px bg-current opacity-10" />}
                             <button
                                 type="button"
                                 role={item.role ?? 'menuitem'}

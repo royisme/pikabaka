@@ -855,7 +855,7 @@ export const AIProvidersSettings: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={handleSaveOai}
-                                    className="px-4 py-2 rounded-lg text-xs font-medium bg-accent-primary text-white hover:bg-accent-secondary transition-colors flex items-center gap-2"
+                                    className="px-4 py-2 rounded-lg text-xs font-medium bg-accent-primary text-on-primary hover:bg-accent-secondary transition-colors flex items-center gap-2"
                                 >
                                     <Save size={14} /> Save
                                 </button>
@@ -1050,7 +1050,7 @@ export const AIProvidersSettings: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={handleSaveCustom}
-                                    className="px-4 py-2 rounded-lg text-xs font-medium bg-accent-primary text-white hover:bg-accent-secondary transition-colors flex items-center gap-2"
+                                    className="px-4 py-2 rounded-lg text-xs font-medium bg-accent-primary text-on-primary hover:bg-accent-secondary transition-colors flex items-center gap-2"
                                 >
                                     <Save size={14} /> Save Provider
                                 </button>

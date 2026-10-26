@@ -33,7 +33,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, onStartMeeting }) => {
                 <button
                     type="button"
                     onClick={onStartMeeting}
-                    className="mt-6 rounded-full bg-accent-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-primary/90 focus:outline-none focus:ring-2 focus:ring-accent-primary/40"
+                    className="mt-6 rounded-full bg-accent-primary px-5 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:bg-accent-primary/90 focus:outline-none focus:ring-2 focus:ring-accent-primary/40"
                 >
                     Start your first meeting
                 </button>

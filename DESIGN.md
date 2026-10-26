@@ -19,7 +19,21 @@ One panel that is the window (no transparent margin around it), from top to bott
 | Text | `overlay-text-primary`, `overlay-text-secondary`, `overlay-text-muted` (placeholder equals muted); `overlay-text-strong` for emphasis |
 | Dividers | `overlay-hairline` (it sets `--overlay-border-soft`); `border-border-subtle/NN` generates no CSS and must not be used |
 | The one filled control | `--overlay-action` (`#0071E3`, white text on it): the primary action, Send, Fix audio. At most one is filled on screen |
+| Menu and popover surface | `--overlay-menu-bg` (opaque; white on light). Never `bg-bg-elevated` inside the overlay |
 | State | `state-success`, `state-warning`, `state-danger` for a dot, icon or border; the words stay in `overlay-text-primary` |
+
+### Two token families, one rule
+
+The overlay uses `overlay-*`. The launcher, the settings pages, the meeting details and the chat views use the base family: `bg-bg-*`, `text-text-*`, `border-border-*`, `accent-*`, `primary`, `secondary`, and `on-primary` for text on a solid `primary` fill. Both families are defined for both themes in `src/index.css` (`:root` is dark, `[data-theme='light']` is light), and `test/theme-tokens.test.ts` fails when the dark block has a colour the light block lacks. Pick the family by the surface you are on and never mix them: an `overlay-*` text colour on a `bg-bg-*` surface, or the reverse, is how dark text lands on a dark panel.
+
+| | Dark | Light |
+| --- | --- | --- |
+| Canvas, sidebar, card and menu | `#0d0d1c`, `#111127`, `#1b1b40` | `#f2f4f9`, `#fafbfd`, `#ffffff` (cards and menus are lifted by shadow, not by fill) |
+| Accent (`primary`) and text on it | `#a8c8ff`, `#0b1530` | `#0a60c9`, `#ffffff` |
+| Text, secondary, tertiary | near white, down to 4.5:1 on the cards | slate 900, slate 800, slate 600, all 4.5:1 or more on the canvas |
+| `state-*` words (`text-state-*-strong`) | bright green, amber, red | deep green, amber, red (`#166534`, `#92400e`, `#991b1b`), 4.5:1 or more on white |
+
+Fills that carry text get a pair: pale fill with dark text in dark, deep fill with white text in light, both through `primary` and `on-primary`. `text-white` on a `primary` fill is a bug (1.7:1 in dark).
 
 **Legibility floor.** The user's opacity slider (stored 0.35 to 1) maps onto a shell alpha of 0.95 to 0.985 in the dark theme and 0.94 to 0.985 in the light theme. Nothing below the floor is possible, because text behind the panel must stay behind it. `backdrop-filter` is not used: a transparent window cannot blur what is behind it.
 

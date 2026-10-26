@@ -51,13 +51,15 @@
 
   --text-primary: rgba(245, 247, 255, 0.96);
   --text-secondary: rgba(201, 209, 235, 0.8);
-  --text-tertiary: rgba(145, 153, 188, 0.68);
+  --text-tertiary: rgba(160, 168, 203, 0.78);
   --text-accent: var(--primary);
 
   --border-subtle: transparent;
   --border-muted: var(--outline-variant);
 
   --accent-primary: var(--primary);
+  /* Text on a solid --primary fill. */
+  --on-primary: #0b1530;
   --accent-muted: rgba(168, 200, 255, 0.14);
   --accent-live: var(--secondary);
 
@@ -67,6 +69,7 @@
   --overlay-border: rgba(255, 255, 255, 0.11);
   --overlay-border-soft: rgba(255, 255, 255, 0.07);
   --overlay-panel-bg: rgba(24, 27, 34, 0.84);
+  --overlay-menu-bg: rgb(33, 37, 46);
   --overlay-pill-bg: rgba(27, 30, 37, 0.8);
   --overlay-transcript-bg: rgba(15, 18, 26, 0.34);
   --overlay-chip-bg: rgba(50, 56, 66, 0.76);
@@ -142,17 +145,60 @@
 [data-theme='light'] {
   color-scheme: light;
 
+  /* Base palette. Dark has deep indigo surfaces and a pale blue accent; light is the same cool
+     hue family: grey canvas, white cards and menus lifted by shadow, and a deep blue accent
+     (5.5:1 on the canvas, 6:1 on white). Every token the dark block sets that the app reads is
+     set here too, so a component never mixes a dark surface with light text. The bg-*, text-*,
+     border-* and accent-* aliases in :root follow --surface* and --primary. */
+  --surface: #f2f4f9;
+  --surface-container-low: #fafbfd;
+  --surface-container-high: #ffffff;
+  --surface-variant: rgba(226, 232, 244, 0.7);
+  --surface-tint: #0a60c9;
+  --primary: #0a60c9;
+  --primary-container: #2f7de1;
+  --secondary: #1a7f43;
+  --secondary-container: rgba(26, 127, 67, 0.12);
+  --outline: rgba(15, 23, 42, 0.16);
+  --outline-variant: rgba(15, 23, 42, 0.09);
+
+  --bg-input: rgba(255, 255, 255, 0.96);
+  --bg-component: rgba(15, 23, 42, 0.045);
+  --bg-toggle-switch: rgba(15, 23, 42, 0.2);
+  --bg-item-surface: rgba(15, 23, 42, 0.04);
+  --bg-item-active: rgba(10, 96, 201, 0.1);
+
+  --text-primary: rgba(15, 23, 42, 0.96);
+  --text-secondary: rgba(30, 41, 59, 0.84);
+  --text-tertiary: rgba(71, 85, 105, 0.9);
+
+  --border-subtle: rgba(15, 23, 42, 0.08);
+
+  --accent-muted: rgba(10, 96, 201, 0.1);
+  --on-primary: #ffffff;
+
+  /* The dark block's state colours are bright (#22c55e is 2.3:1 on white). On light surfaces the
+     foreground states are deep enough for small text (4.5:1 or more on white and on the canvas). */
+  --state-success: #15803d;
+  --state-success-strong: #166534;
+  --state-warning: #b45309;
+  --state-warning-strong: #92400e;
+  --state-danger: #c81e1e;
+  --state-danger-strong: #991b1b;
+
   /* Soften hot semantic states slightly on light backgrounds */
   --state-success-bg: rgba(34, 197, 94, 0.10);
   --state-warning-bg: rgba(245, 158, 11, 0.10);
   --state-danger-bg: rgba(239, 68, 68, 0.10);
   --state-info-bg: rgba(59, 130, 246, 0.10);
+  --state-info-border: rgba(10, 96, 201, 0.3);
 
   --overlay-bg: rgba(247, 249, 253, 0.9);
   --overlay-opacity: 0.8;
   --overlay-border: rgba(59, 130, 246, 0.13);
   --overlay-border-soft: rgba(59, 130, 246, 0.08);
   --overlay-panel-bg: rgba(247, 249, 253, 0.9);
+  --overlay-menu-bg: #ffffff;
   --overlay-pill-bg: rgba(255, 255, 255, 0.86);
   --overlay-transcript-bg: rgba(255, 255, 255, 0.46);
   --overlay-chip-bg: rgba(248, 250, 253, 0.86);

@@ -265,8 +265,8 @@ const Launcher: React.FC<LauncherProps> = ({
                                             } else {
                                                 onStartMeeting();
                                             }
-                                        }} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className={`flex shrink-0 items-center justify-center gap-3 rounded-full px-6 py-3 font-celeb text-xl font-medium text-white shadow-lg ${isMeetingActive ? 'bg-state-success' : 'bg-state-info'}`}>
-                                            {isMeetingActive && <span className="h-2.5 w-2.5 rounded-full bg-white shadow-sm" />}
+                                        }} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className={`flex shrink-0 items-center justify-center gap-3 rounded-full px-6 py-3 font-celeb text-xl font-medium text-on-primary shadow-lg ${isMeetingActive ? 'bg-secondary' : 'bg-primary'}`}>
+                                            {isMeetingActive && <span className="h-2.5 w-2.5 rounded-full bg-on-primary shadow-sm" />}
                                             {isMeetingActive ? 'Meeting ongoing' : 'Start Pika'}
                                         </motion.button>
                                     </div>
