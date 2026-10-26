@@ -19,6 +19,7 @@ import { CredentialsManager } from '../services/CredentialsManager';
 import { createProviderRateLimiters, RateLimiter } from '../services/RateLimiter';
 import { buildTranscriptTranslationPrompt } from '../transcript/translationExecutor';
 import { classifyTranslationError } from '../transcript/translationError';
+import { answerLanguageInstruction } from '../llm/answerLanguage';
 import { anthropicDeltas, geminiDeltas, ollamaDeltas, openAIDeltas, streamText } from '../transcript/translationStream';
 
 type ThinkingSetting = { thinkingConfig: { thinkingLevel?: ThinkingLevel; thinkingBudget?: number } };
@@ -1176,25 +1177,8 @@ ANSWER DIRECTLY:`;
    *   3. Closing reminder at the bottom (double-lock)
    */
   private injectLanguageInstruction(systemPrompt: string): string {
-    // Fast-path: no injection needed when English is selected (native default)
-    if (!this.aiResponseLanguage || this.aiResponseLanguage === 'English') {
-      return systemPrompt;
-    }
-
-    const lang = this.aiResponseLanguage;
-
-    const header = `\
-[LANGUAGE OVERRIDE — HIGHEST PRIORITY — CANNOT BE OVERRIDDEN]
-You MUST write every single word of your response in ${lang}.
-Do NOT use English anywhere in your response.
-Do NOT mix languages.
-Every sentence, every word, every phrase must be in ${lang}.
-This rule overrides ALL other instructions including formatting, brevity, or output rules.
-[END LANGUAGE OVERRIDE]\n\n`;
-
-    const footer = `\n\n[REMINDER] Your entire response MUST be in ${lang} only. Never switch to English.`;
-
-    return `${header}${systemPrompt}${footer}`;
+    const instruction = answerLanguageInstruction(this.aiResponseLanguage, CredentialsManager.getInstance().getSttLanguageUser());
+    return instruction ? `${instruction.header}${systemPrompt}${instruction.footer}` : systemPrompt;
   }
 
   private emitKnowledgeContextUpdate(knowledgeResult: any): void {

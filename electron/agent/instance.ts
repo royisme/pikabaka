@@ -102,7 +102,7 @@ export async function draftCard(decision: GateDecision): Promise<AssistCard | un
     if (!resolved.ok) return undefined;
     const lines = DatabaseManager.getInstance().getRecentSegments(decision.meetingId, Date.now() - 3 * 60_000).slice(-6)
       .map(segment => ({ speaker: segment.speaker === 'user' ? 'You' as const : 'Them' as const, text: segment.text }));
-    const text = await runAssist(resolved.model, { kind: decision.kind, lines, language: cm.getAiResponseLanguage() }, AbortSignal.timeout(15_000));
+    const text = await runAssist(resolved.model, { kind: decision.kind, lines, language: cm.getAiResponseLanguage(), spokenLanguageKey: cm.getSttLanguageUser() }, AbortSignal.timeout(15_000));
     if (!text || state.getCurrentMeetingId() !== decision.meetingId) return undefined;
     return { id: randomUUID(), meetingId: decision.meetingId, segmentId: decision.segmentId, kind: decision.kind, text, time: Date.now() };
   } catch (error) {

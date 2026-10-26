@@ -1,3 +1,4 @@
+import { answerLanguageInstruction } from '../llm/answerLanguage';
 import type { AgentModel } from './models';
 import type { GateKind, GateLine } from './gate';
 
@@ -31,7 +32,7 @@ const SYSTEM = [
 
 export async function runAssist(
   model: AgentModel,
-  input: { kind: GateKind; lines: GateLine[]; language: string },
+  input: { kind: GateKind; lines: GateLine[]; language: string; spokenLanguageKey: string },
   signal: AbortSignal,
 ): Promise<string | undefined> {
   const goal = GOALS[input.kind];
@@ -43,10 +44,10 @@ export async function runAssist(
     systemPrompt: SYSTEM,
     messages: [{
       role: 'user',
-      content: `${goal}\nAnswer in ${input.language}.\n\nTranscript (newest last):\n${transcript}`,
+      content: `${goal}\n${answerLanguageInstruction(input.language, input.spokenLanguageKey)?.header ?? `Answer in ${input.language}.`}\nTranscript (newest last):\n${transcript}`,
       timestamp: Date.now(),
     }],
-  }, { signal, timeoutMs: 15_000, maxRetries: 0, maxTokens: 200 });
+  }, { signal, timeoutMs: 15_000, maxRetries: 0, maxTokens: 320 });
   if (response.stopReason === 'error' || response.stopReason === 'aborted') return undefined;
   const text = response.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('').trim();
   return text && text.toUpperCase() !== 'SKIP' ? text : undefined;
