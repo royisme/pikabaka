@@ -193,17 +193,10 @@ interface ElectronAPI {
   openSettingsSection: (section: string) => Promise<{ success: boolean }>
   onOpenSettingsSection: (callback: (data: { section: string }) => void) => () => void
 
-  // Groq Fast Text Mode
-  getGroqFastTextMode: () => Promise<{ enabled: boolean }>
-  setGroqFastTextMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>
-
   // Demo
   seedDemo: () => Promise<{ success: boolean }>
 
   // Custom Providers
-  saveCustomProvider: (provider: any) => Promise<{ success: boolean; id?: string; error?: string }>
-  getCustomProviders: () => Promise<any[]>
-  deleteCustomProvider: (id: string) => Promise<{ success: boolean; error?: string }>
   getOpenAICompatibleProviders: () => Promise<Array<{ id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }>>
   saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) => Promise<{ success: boolean; error?: string }>
   deleteOpenAICompatibleProvider: (id: string) => Promise<{ success: boolean; error?: string }>
@@ -246,7 +239,6 @@ interface ElectronAPI {
 
 
   onUndetectableChanged: (callback: (state: boolean) => void) => () => void
-  onGroqFastTextChanged: (callback: (enabled: boolean) => void) => () => void
   onOpenAICompatibleProvidersChanged: (callback: () => void) => () => void
   onModelChanged: (callback: (modelId: string) => void) => () => void
 
@@ -922,17 +914,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     }
   },
 
-  // Groq Fast Text Mode
-  getGroqFastTextMode: () => ipcRenderer.invoke('get-groq-fast-text-mode'),
-  setGroqFastTextMode: (enabled: boolean) => ipcRenderer.invoke('set-groq-fast-text-mode', enabled),
-
   // Demo
   seedDemo: () => ipcRenderer.invoke('seed-demo'),
 
   // Custom Providers
-  saveCustomProvider: (provider: any) => ipcRenderer.invoke('save-custom-provider', provider),
-  getCustomProviders: () => ipcRenderer.invoke('get-custom-providers'),
-  deleteCustomProvider: (id: string) => ipcRenderer.invoke('delete-custom-provider', id),
   getOpenAICompatibleProviders: () => ipcRenderer.invoke('get-openai-compatible-providers'),
   saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) =>
     ipcRenderer.invoke('save-openai-compatible-provider', provider),
@@ -975,14 +960,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on('overlay-mouse-passthrough-changed', subscription)
     return () => {
       ipcRenderer.removeListener('overlay-mouse-passthrough-changed', subscription)
-    }
-  },
-
-  onGroqFastTextChanged: (callback: (enabled: boolean) => void) => {
-    const subscription = (_: any, enabled: boolean) => callback(enabled)
-    ipcRenderer.on('groq-fast-text-changed', subscription)
-    return () => {
-      ipcRenderer.removeListener('groq-fast-text-changed', subscription)
     }
   },
 

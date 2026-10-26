@@ -40,11 +40,6 @@ export function llmChannels() {
     setDefaultModel: (modelId: string) => ipcRenderer.invoke('set-default-model', modelId),
     toggleModelSelector: (coords: { x: number; y: number }) => ipcRenderer.invoke('toggle-model-selector', coords),
     forceRestartOllama: () => ipcRenderer.invoke('force-restart-ollama'),
-    getGroqFastTextMode: () => ipcRenderer.invoke('get-groq-fast-text-mode'),
-    setGroqFastTextMode: (enabled: boolean) => ipcRenderer.invoke('set-groq-fast-text-mode', enabled),
-    saveCustomProvider: (provider: any) => ipcRenderer.invoke('save-custom-provider', provider),
-    getCustomProviders: () => ipcRenderer.invoke('get-custom-providers'),
-    deleteCustomProvider: (id: string) => ipcRenderer.invoke('delete-custom-provider', id),
     getOpenAICompatibleProviders: () => ipcRenderer.invoke('get-openai-compatible-providers'),
     saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) =>
       ipcRenderer.invoke('save-openai-compatible-provider', provider),
@@ -53,13 +48,6 @@ export function llmChannels() {
       ipcRenderer.invoke('fetch-openai-compatible-models', baseUrl, apiKey),
     fetchProviderModels: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey: string) => ipcRenderer.invoke('fetch-provider-models', provider, apiKey),
     setProviderPreferredModel: (provider: 'gemini' | 'groq' | 'openai' | 'claude', modelId: string) => ipcRenderer.invoke('set-provider-preferred-model', provider, modelId),
-    onGroqFastTextChanged: (callback: (enabled: boolean) => void) => {
-      const subscription = (_: any, enabled: boolean) => callback(enabled)
-      ipcRenderer.on('groq-fast-text-changed', subscription)
-      return () => {
-        ipcRenderer.removeListener('groq-fast-text-changed', subscription)
-      }
-    },
     onOpenAICompatibleProvidersChanged: (callback: () => void) => {
       const subscription = () => callback()
       ipcRenderer.on('openai-compatible-providers-changed', subscription)

@@ -456,32 +456,6 @@ export function registerSttHandlers(appState: AppState): void {
     }
   });
 
-  safeHandle("get-groq-fast-text-mode", () => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      return { enabled: llmHelper.getGroqFastTextMode() };
-    } catch (error: any) {
-      return { enabled: false };
-    }
-  });
-
-  // Set Groq Fast Text Mode
-  safeHandle("set-groq-fast-text-mode", (_, enabled: boolean) => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      llmHelper.setGroqFastTextMode(enabled);
-
-      // Broadcast to all windows
-      BrowserWindow.getAllWindows().forEach(win => {
-        win.webContents.send('groq-fast-text-changed', enabled);
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
   safeHandle("set-model", async (_, modelId: string) => {
     try {
       const llmHelper = appState.processingHelper.getLLMHelper();

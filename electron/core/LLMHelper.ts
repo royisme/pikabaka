@@ -12,15 +12,12 @@ import {
   CUSTOM_SYSTEM_PROMPT, CUSTOM_ANSWER_PROMPT, CUSTOM_WHAT_TO_ANSWER_PROMPT,
   CUSTOM_RECAP_PROMPT, CUSTOM_FOLLOWUP_PROMPT, CUSTOM_FOLLOW_UP_QUESTIONS_PROMPT, CUSTOM_ASSIST_PROMPT
 } from "../llm/prompts"
-import { deepVariableReplacer, getByPath, injectImageIntoMessages } from '../utils/curlUtils';
-import curl2Json from "@bany/curl-to-json";
-import { CustomProvider, CurlProvider, OpenAICompatibleProvider } from '../services/CredentialsManager';
+import { OpenAICompatibleProvider } from '../services/CredentialsManager';
 import { normalizeOpenAICompatibleBaseUrl } from '../utils/modelFetcher';
 import { openAiRoot, BUILTIN_CONNECTIONS, type Connection } from '../services/aiConnections';
 import { CredentialsManager } from '../services/CredentialsManager';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import axios from 'axios';
 import { createProviderRateLimiters, RateLimiter } from '../services/RateLimiter';
 import { buildTranscriptTranslationPrompt } from '../transcript/translationExecutor';
 import { classifyTranslationError } from '../transcript/translationError';
@@ -50,12 +47,6 @@ function thinkingSettings(model: string): ThinkingSetting[] {
 
 function translationThinking(model: string): ThinkingSetting | undefined {
   return thinkingSettings(model)[refusedThinkingSettings.get(model) ?? 0];
-}
-
-function isOpenAICompatibleProvider(
-  p: CustomProvider | CurlProvider | OpenAICompatibleProvider
-): p is OpenAICompatibleProvider {
-  return 'baseUrl' in p && 'apiKey' in p && typeof (p as OpenAICompatibleProvider).baseUrl === 'string';
 }
 
 interface OllamaResponse {
@@ -118,10 +109,7 @@ export class LLMHelper {
   private ollamaUrl: string = "http://localhost:11434"
   private ollamaStartedByApp: boolean = false;
   private geminiModel: string = GEMINI_FLASH_MODEL
-  private customProvider: CustomProvider | null = null;
-  private activeCurlProvider: CurlProvider | null = null;
   private activeOpenAICompatibleProvider: OpenAICompatibleProvider | null = null;
-  private groqFastTextMode: boolean = false;
   private knowledgeOrchestrator: any = null;
   private aiResponseLanguage: string = 'English';
   private sttLanguage: string = 'english-us';
@@ -274,15 +262,6 @@ export class LLMHelper {
     console.log('[LLMHelper] Keys scrubbed from memory');
   }
 
-  public setGroqFastTextMode(enabled: boolean) {
-    this.groqFastTextMode = enabled;
-    console.log(`[LLMHelper] Groq Fast Text Mode: ${enabled}`);
-  }
-
-  public getGroqFastTextMode(): boolean {
-    return this.groqFastTextMode;
-  }
-
   public getAiResponseLanguage(): string {
     return this.aiResponseLanguage;
   }
@@ -307,7 +286,7 @@ export class LLMHelper {
 
   private currentModelId: string = GEMINI_FLASH_MODEL;
 
-  public setModel(modelId: string, customProviders: (CustomProvider | CurlProvider | OpenAICompatibleProvider)[] = []) {
+  public setModel(modelId: string, customProviders: OpenAICompatibleProvider[] = []) {
     // Map UI short codes to internal Model IDs
     let targetModelId = modelId;
     if (modelId === 'gemini') targetModelId = GEMINI_FLASH_MODEL;
@@ -318,42 +297,24 @@ export class LLMHelper {
     if (targetModelId.startsWith('ollama-')) {
       this.useOllama = true;
       this.ollamaModel = targetModelId.replace('ollama-', '');
-      this.customProvider = null;
-      this.activeCurlProvider = null;
       this.activeOpenAICompatibleProvider = null;
       console.log(`[LLMHelper] Switched to Ollama: ${this.ollamaModel}`);
       return;
     }
 
     const oaiCompat = customProviders.find(
-      (p): p is OpenAICompatibleProvider => isOpenAICompatibleProvider(p) && p.id === targetModelId
+      (p) => p.id === targetModelId
     );
     if (oaiCompat) {
       this.useOllama = false;
-      this.customProvider = null;
-      this.activeCurlProvider = null;
       this.activeOpenAICompatibleProvider = oaiCompat;
       this.currentModelId = targetModelId;
       console.log(`[LLMHelper] Switched to OpenAI-compatible: ${oaiCompat.name}`);
       return;
     }
 
-    const custom = customProviders.find(
-      (p) => p.id === targetModelId && !isOpenAICompatibleProvider(p)
-    );
-    if (custom) {
-      this.useOllama = false;
-      this.customProvider = null;
-      this.activeOpenAICompatibleProvider = null;
-      // Treat text-only custom providers as CurlProviders (responsePath optional)
-      this.activeCurlProvider = custom as CurlProvider;
-      console.log(`[LLMHelper] Switched to cURL Provider: ${custom.name}`);
-      return;
-    }
-
     // Standard Cloud Models
     this.useOllama = false;
-    this.customProvider = null;
     this.activeOpenAICompatibleProvider = null;
     this.currentModelId = targetModelId;
 
@@ -362,14 +323,6 @@ export class LLMHelper {
     if (targetModelId === GEMINI_FLASH_MODEL) this.geminiModel = GEMINI_FLASH_MODEL;
 
     console.log(`[LLMHelper] Switched to Cloud Model: ${targetModelId}`);
-  }
-
-  public switchToCurl(provider: CurlProvider) {
-    this.useOllama = false;
-    this.customProvider = null;
-    this.activeOpenAICompatibleProvider = null;
-    this.activeCurlProvider = provider;
-    console.log(`[LLMHelper] Switched to cURL provider: ${provider.name}`);
   }
 
   private cleanJsonResponse(text: string): string {
@@ -1394,17 +1347,6 @@ This rule overrides ALL other instructions including formatting, brevity, or out
         groq: buildMessage(finalGroqPrompt),
       };
 
-      // GROQ FAST TEXT OVERRIDE (Text-Only)
-      if (this.groqFastTextMode && !isMultimodal && this.groqClient) {
-        console.log(`[LLMHelper] ⚡️ Groq Fast Text Mode Active. Routing to Groq...`);
-        try {
-          return await this.generateWithGroq(combinedMessages.groq);
-        } catch (e: any) {
-          console.warn("[LLMHelper] Groq Fast Text failed, falling back to standard routing:", e.message);
-          // Fall through to standard routing
-        }
-      }
-
       // System prompts for OpenAI/Claude (skipped if skipSystemPrompt)
       const openaiSystemPrompt = skipSystemPrompt ? undefined : this.injectLanguageInstruction(OPENAI_SYSTEM_PROMPT);
       const claudeSystemPrompt = skipSystemPrompt ? undefined : this.injectLanguageInstruction(CLAUDE_SYSTEM_PROMPT);
@@ -1419,25 +1361,6 @@ This rule overrides ALL other instructions including formatting, brevity, or out
           skipSystemPrompt ? undefined : this.injectLanguageInstruction(CUSTOM_SYSTEM_PROMPT),
           imagePaths?.[0]
         );
-      }
-
-      if (this.activeCurlProvider) {
-        return await this.chatWithCurl(message, skipSystemPrompt ? undefined : this.injectLanguageInstruction(CUSTOM_SYSTEM_PROMPT), imagePaths?.[0]);
-      }
-
-      if (this.customProvider) {
-        console.log(`[LLMHelper] Using Custom Provider: ${this.customProvider.name}`);
-        // For non-streaming call — use rich CUSTOM prompts since custom providers can be cloud models
-        const customSystemPrompt = skipSystemPrompt ? "" : this.injectLanguageInstruction(CUSTOM_SYSTEM_PROMPT);
-        const response = await this.executeCustomProvider(
-          this.customProvider.curlCommand,
-          combinedMessages.gemini,
-          customSystemPrompt,
-          message,
-          context || "",
-          imagePaths?.[0]
-        );
-        return this.processResponse(response);
       }
 
       // --- Direct Routing based on Selected Model ---
@@ -1737,70 +1660,6 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     return response.choices[0]?.message?.content || "";
   }
 
-  // The handler for cURL requests
-  public async chatWithCurl(userMessage: string, systemPrompt?: string, imagePath?: string): Promise<string> {
-    if (!this.activeCurlProvider) throw new Error("No cURL provider active");
-
-    const { curlCommand, responsePath } = this.activeCurlProvider;
-
-    // 1. Parse cURL to config object
-    // @ts-ignore
-    const curlConfig = curl2Json(curlCommand);
-
-    // 2. Prepare Image (if any)
-    let base64Image = "";
-    if (imagePath) {
-      try {
-        const imageData = await fs.promises.readFile(imagePath);
-        base64Image = imageData.toString("base64");
-      } catch (e) {
-        console.warn("[LLMHelper] chatWithCurl: failed to read image:", e);
-      }
-    }
-
-    // 3. Prepare Variables
-    // We combine System Prompt + User Message into {{TEXT}} for simplicity in raw mode.
-    const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${userMessage}` : userMessage;
-
-    const variables = {
-      TEXT: fullPrompt.replace(/\n/g, "\\n").replace(/"/g, '\\"'), // Basic escaping (pre-existing)
-      IMAGE_BASE64: base64Image,
-    };
-
-    // 4. Inject Variables into URL, Headers, and Body
-    const url = deepVariableReplacer(curlConfig.url, variables);
-    const headers = deepVariableReplacer(curlConfig.header || {}, variables);
-    let data = deepVariableReplacer(curlConfig.data || {}, variables);
-
-    // 4a. Auto-upgrade last user message to multimodal content array when an image is present.
-    if (base64Image && imagePath) {
-      data = injectImageIntoMessages(data, base64Image, imagePath);
-    }
-
-    // 5. Execute
-    try {
-      const response = await axios({
-        method: curlConfig.method || 'POST',
-        url: url,
-        headers: headers,
-        data: data
-      });
-
-      // 6. Extract Answer
-      // If user didn't specify a path, try to guess or dump string
-      if (!responsePath) return JSON.stringify(response.data);
-
-      const answer = getByPath(response.data, responsePath);
-
-      if (typeof answer === 'string') return answer;
-      return JSON.stringify(answer); // Fallback if they pointed to an object
-
-    } catch (error: any) {
-      console.error("[LLMHelper] cURL Execution Error:", error.message);
-      return `Error: ${error.message}`;
-    }
-  }
-
   /**
    * OpenAI-compatible Chat Completions (any /v1 base URL).
    */
@@ -1888,113 +1747,6 @@ This rule overrides ALL other instructions including formatting, brevity, or out
 
     const textBlock = response.content.find((block: any) => block.type === 'text') as any;
     return textBlock?.text || "";
-  }
-
-  /**
-   * Executes a custom cURL provider defined by the user
-   */
-  public async executeCustomProvider(
-    curlCommand: string,
-    combinedMessage: string,
-    systemPrompt: string,
-    rawUserMessage: string,
-    context: string,
-    imagePath?: string
-  ): Promise<string> {
-
-    // 1. Parse cURL to JSON object
-    const requestConfig = curl2Json(curlCommand);
-
-    // 2. Prepare Image (if any)
-    let base64Image = "";
-    if (imagePath) {
-      try {
-        const imageData = await fs.promises.readFile(imagePath);
-        base64Image = imageData.toString("base64");
-      } catch (e) {
-        console.warn("Failed to read image for Custom Provider:", e);
-      }
-    }
-
-    // 3. Prepare Variables
-    const variables = {
-      TEXT: combinedMessage,             // Deprecated but kept for compat: System + Context + User
-      PROMPT: combinedMessage,           // Alias for TEXT
-      SYSTEM_PROMPT: systemPrompt,       // Raw System Prompt
-      USER_MESSAGE: rawUserMessage,      // Raw User Message
-      CONTEXT: context,                  // Raw Context
-      IMAGE_BASE64: base64Image,         // Base64 encoded image string
-    };
-
-    // 4. Inject Variables into URL, Headers, and Body
-    const url = deepVariableReplacer(requestConfig.url, variables);
-    const headers = deepVariableReplacer(requestConfig.header || {}, variables);
-    let body = deepVariableReplacer(requestConfig.data || {}, variables);
-
-    // 4a. Auto-upgrade last user message to multimodal content array when an image
-    //     is present and the body follows the OpenAI messages format.
-    //     This is a no-op for non-OpenAI formats and for templates that already
-    //     include a proper image_url part, so it is fully backward-compatible.
-    if (base64Image && imagePath) {
-      body = injectImageIntoMessages(body, base64Image, imagePath);
-    }
-
-    // 5. Execute Fetch
-    try {
-      const response = await fetch(url, {
-        method: requestConfig.method || 'POST',
-        headers: headers,
-        body: JSON.stringify(body)
-      });
-
-      const data = await response.json();
-      console.log(`[LLMHelper] Custom Provider raw response:`, JSON.stringify(data).substring(0, 1000));
-
-      if (!response.ok) {
-        throw new Error(`Custom Provider HTTP ${response.status}: ${JSON.stringify(data).substring(0, 200)}`);
-      }
-
-      // 6. Extract Answer - try common response formats
-      const extracted = this.extractFromCommonFormats(data);
-      console.log(`[LLMHelper] Custom Provider extracted text length: ${extracted.length}`);
-      return extracted;
-    } catch (error) {
-      console.error("Custom Provider Error:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Try to extract text content from common LLM API response formats.
-   * Supports: Ollama, OpenAI, Anthropic, and generic formats.
-   */
-  private extractFromCommonFormats(data: any): string {
-    if (!data || typeof data === 'string') return data || "";
-
-    // Ollama format: { response: "..." }
-    if (typeof data.response === 'string') return data.response;
-
-    // OpenAI format: { choices: [{ message: { content: "..." } }] }
-    if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
-
-    // OpenAI delta/streaming format: { choices: [{ delta: { content: "..." } }] }
-    if (data.choices?.[0]?.delta?.content) return data.choices[0].delta.content;
-
-    // Anthropic format: { content: [{ text: "..." }] }
-    if (Array.isArray(data.content) && data.content[0]?.text) return data.content[0].text;
-
-    // Generic text field
-    if (typeof data.text === 'string') return data.text;
-
-    // Generic output field
-    if (typeof data.output === 'string') return data.output;
-
-    // Generic result field
-    if (typeof data.result === 'string') return data.result;
-
-    // Fallback: stringify the whole response
-    console.warn("[LLMHelper] Could not extract text from custom provider response, returning raw JSON");
-    return JSON.stringify(data);
   }
 
   /**
@@ -2094,7 +1846,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
    *   Tier 3: Same as Tier 2 — 2nd retry (with backoff between tiers)
    *
    * Provider order per tier: OpenAI -> Gemini Flash -> Claude -> Gemini Pro -> Groq Scout
-   * After all cloud tiers: Custom Provider -> cURL Provider -> Ollama
+   * After all cloud tiers: OpenAI-compatible Provider -> Ollama
    */
   private async generateWithVisionFallback(systemPrompt: string, userPrompt: string, imagePaths: string[] = []): Promise<string> {
     type ProviderAttempt = { name: string; execute: () => Promise<string> };
@@ -2204,41 +1956,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     // ──────────────────────────────────────────────────────────────────
     const localProviders: ProviderAttempt[] = [];
 
-    if (this.customProvider) {
-      if (isMultimodal) {
-        localProviders.push({
-          name: `Custom Provider (${this.customProvider.name})`,
-          execute: () => this.executeCustomProvider(
-            this.customProvider!.curlCommand,
-            `${systemPrompt}\n\n${userPrompt}`,
-            systemPrompt,
-            userPrompt,
-            "",
-            imagePaths[0]
-          )
-        });
-      } else {
-        localProviders.push({
-          name: `Custom Provider (${this.customProvider.name})`,
-          execute: () => this.executeCustomProvider(
-            this.customProvider!.curlCommand,
-            `${systemPrompt}\n\n${userPrompt}`,
-            systemPrompt,
-            userPrompt,
-            ""
-          )
-        });
-      }
-    }
-
-    if (this.activeCurlProvider && !this.customProvider) {
-      localProviders.push({
-        name: `cURL Provider (${this.activeCurlProvider.name})`,
-        execute: () => this.chatWithCurl(userPrompt, systemPrompt, isMultimodal ? imagePaths[0] : undefined)
-      });
-    }
-
-    if (this.activeOpenAICompatibleProvider && !this.customProvider) {
+    if (this.activeOpenAICompatibleProvider) {
       localProviders.push({
         name: `OpenAI-compatible (${this.activeOpenAICompatibleProvider.name})`,
         execute: () =>
@@ -2546,21 +2264,6 @@ This rule overrides ALL other instructions including formatting, brevity, or out
       return;
     }
 
-    // GROQ FAST TEXT OVERRIDE (Text-Only)
-    if (this.groqFastTextMode && !isMultimodal && this.groqClient) {
-      console.log(`[LLMHelper] ⚡️ Groq Fast Text Mode Active (Streaming). Routing to Groq...`);
-      try {
-        const groqSystem = systemPromptOverride || GROQ_SYSTEM_PROMPT;
-        const finalGroqSystem = this.injectLanguageInstruction(groqSystem);
-        const groqFullMessage = `${finalGroqSystem}\n\n${userContent}`;
-        yield* this.streamWithGroq(groqFullMessage);
-        return;
-      } catch (e: any) {
-        console.warn("[LLMHelper] Groq Fast Text streaming failed, falling back:", e.message);
-        // Fall through
-      }
-    }
-
     // 1. Ollama Streaming
     if (this.useOllama) {
       yield* this.streamWithOllama(message, context, finalSystemPrompt, imagePaths);
@@ -2571,26 +2274,6 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     if (this.activeOpenAICompatibleProvider) {
       const response = await this.chatWithOpenAICompatible(userContent, finalSystemPrompt, imagePaths?.[0]);
       yield response;
-      return;
-    }
-
-    // 2. Custom Provider Streaming (via cURL - Non-streaming fallback for now)
-    if (this.activeCurlProvider) {
-      const response = await this.executeCustomProvider(
-        this.activeCurlProvider.curlCommand,
-        userContent,
-        finalSystemPrompt,
-        message,
-        context || "",
-        imagePaths?.[0]
-      );
-      yield response;
-      return;
-    }
-
-    // 2b. CustomProvider (switchToCustom path) — full SSE-capable streaming
-    if (this.customProvider) {
-      yield* this.streamWithCustom(message, context, imagePaths, finalSystemPrompt);
       return;
     }
 
@@ -3010,135 +2693,6 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     }
   }
 
-  // --- CUSTOM PROVIDER STREAMING ---
-  private async * streamWithCustom(message: string, context?: string, imagePaths?: string[], systemPrompt: string = UNIVERSAL_SYSTEM_PROMPT): AsyncGenerator<string, void, unknown> {
-    if (!this.customProvider) return;
-    // We reuse the executeCustomProvider logic but we need it to stream.
-    // If the user provided a curl command, it might support streaming (SSE) or not.
-    // If we execute it via Child Process, we can read stdout stream.
-
-    // 1. Prepare command with variables
-    // Re-use logic from executeCustomProvider to replace variables
-    // But we can't easily reuse the function since it awaits the whole fetch.
-    // So we'll implement a simplified streaming version using our existing variable replacer and node-fetch.
-
-    const curlCommand = this.customProvider.curlCommand;
-    const requestConfig = curl2Json(curlCommand);
-
-    let base64Image = "";
-    if (imagePaths?.length) {
-      try {
-        // Use the first image for custom providers (they typically only support one)
-        const data = await fs.promises.readFile(imagePaths[0]);
-        base64Image = data.toString("base64");
-      } catch (e) { }
-    }
-
-    const combinedMessage = context ? `${context}\n\n${message}` : message;
-
-    const variables = {
-      TEXT: combinedMessage,
-      PROMPT: combinedMessage,
-      SYSTEM_PROMPT: systemPrompt,
-      USER_MESSAGE: message,
-      CONTEXT: context || "",
-      IMAGE_BASE64: base64Image,
-    };
-
-    const url = deepVariableReplacer(requestConfig.url, variables);
-    const headers = deepVariableReplacer(requestConfig.header || {}, variables);
-    let body = deepVariableReplacer(requestConfig.data || {}, variables);
-
-    // Auto-upgrade last user message to multimodal content array when an image is present.
-    // No-op for non-OpenAI formats and templates already containing a proper image_url part.
-    if (base64Image && imagePaths?.[0]) {
-      body = injectImageIntoMessages(body, base64Image, imagePaths[0]);
-    }
-
-    try {
-      const response = await fetch(url, {
-        method: requestConfig.method || 'POST',
-        headers: headers,
-        body: JSON.stringify(body)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Custom Provider HTTP ${response.status}: ${errorText.substring(0, 200)}`);
-        yield `Error: Custom Provider returned HTTP ${response.status}`;
-        return;
-      }
-
-      if (!response.body) return;
-
-      // Collect all chunks to handle both SSE streaming and non-SSE JSON responses
-      let fullBody = "";
-      let yieldedAny = false;
-
-      // @ts-ignore
-      for await (const chunk of response.body) {
-        const text = new TextDecoder().decode(chunk);
-        fullBody += text;
-
-        const lines = text.split('\n');
-        for (const line of lines) {
-          if (line.trim().length === 0) continue;
-
-          const items = this.parseStreamLine(line);
-          if (items) {
-            yield items;
-            yieldedAny = true;
-          }
-        }
-      }
-
-      // If no SSE content was yielded, try parsing the full body as JSON
-      // This handles non-streaming responses (e.g. Ollama with stream: false)
-      if (!yieldedAny && fullBody.trim().length > 0) {
-        try {
-          const data = JSON.parse(fullBody);
-          const extracted = this.extractFromCommonFormats(data);
-          if (extracted) yield extracted;
-        } catch {
-          // Not JSON, yield raw text if it's not looking like garbage
-          if (fullBody.length < 5000) yield fullBody.trim();
-        }
-      }
-
-    } catch (e) {
-      console.error("Custom streaming failed", e);
-      yield "Error streaming from custom provider.";
-    }
-  }
-
-  private parseStreamLine(line: string): string | null {
-    const trimmed = line.trim();
-    if (!trimmed) return null;
-
-    // 1. Handle SSE (data: ...)
-    if (trimmed.startsWith("data: ")) {
-      if (trimmed === "data: [DONE]") return null;
-      try {
-        const json = JSON.parse(trimmed.substring(6));
-        return this.extractFromCommonFormats(json);
-      } catch {
-        return null;
-      }
-    }
-
-    // 2. Handle raw JSON chunks (Ollama/Generic)
-    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-      try {
-        const json = JSON.parse(trimmed);
-        return this.extractFromCommonFormats(json);
-      } catch {
-        return null;
-      }
-    }
-
-    return null;
-  }
-
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -3213,15 +2767,12 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     }
   }
 
-  public getCurrentProvider(): "ollama" | "gemini" | "custom" {
-    if (this.customProvider) return "custom";
+  public getCurrentProvider(): "ollama" | "gemini" {
     return this.useOllama ? "ollama" : "gemini";
   }
 
   public getCurrentModel(): string {
-    if (this.customProvider) return this.customProvider.name;
     if (this.activeOpenAICompatibleProvider) return this.activeOpenAICompatibleProvider.id;
-    if (this.activeCurlProvider) return this.activeCurlProvider.id;
     return this.useOllama ? this.ollamaModel : this.currentModelId;
   }
 
@@ -3511,18 +3062,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     }
 
     this.useOllama = false;
-    this.customProvider = null;
     // console.log(`[LLMHelper] Switched to Gemini: ${this.geminiModel}`);
-  }
-
-  public async switchToCustom(provider: CustomProvider): Promise<void> {
-    this.customProvider = provider;
-    this.useOllama = false;
-    this.client = null;
-    this.groqClient = null;
-    this.openaiClient = null;
-    this.claudeClient = null;
-    console.log(`[LLMHelper] Switched to Custom Provider: ${provider.name}`);
   }
 
   public async testConnection(): Promise<{ success: boolean; error?: string }> {

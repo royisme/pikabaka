@@ -6,6 +6,11 @@ The work queue in small steps, one at a time. GitHub issues hold the evidence an
 
 Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR that says `Fixes #N` for its issue.
 
+## AI settings completion (owner-approved dispatch)
+
+- Phase A done: Fast Response Mode and cURL providers removed end to end. Both typechecks and lint exit 0; tests exit 1 only for the missing DOCX fixture. Owner runtime checks remain.
+- Next: Phase B, Connections, three model-use rows and the quick-answers selectors; then Phase C, unused default-model plumbing. No Audio translation or speech-recognition changes.
+
 ## Order
 
 S (rules and tooling) first. U0 (owner runtime check) can happen in parallel at any time. After that, U and R run as two independent tracks; inside a track, go in order.

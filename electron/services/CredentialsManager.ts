@@ -9,19 +9,6 @@ import { randomUUID } from 'node:crypto';
 import { DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT } from '../transcript/translationExecutor';
 import { getCredentialsJsonPath } from './configPaths';
 
-export interface CustomProvider {
-    id: string;
-    name: string;
-    curlCommand: string;
-}
-
-export interface CurlProvider {
-    id: string;
-    name: string;
-    curlCommand: string;
-    responsePath: string; // e.g. "choices[0].message.content"
-}
-
 /** OpenAI-compatible Chat Completions (URL + API key; uses /v1/chat/completions and /v1/models). */
 export interface OpenAICompatibleProvider {
     id: string;
@@ -40,8 +27,6 @@ export interface StoredCredentials {
     openaiApiKey?: string;
     claudeApiKey?: string;
     googleServiceAccountPath?: string;
-    customProviders?: CustomProvider[];
-    curlProviders?: CurlProvider[];
     openaiCompatibleProviders?: OpenAICompatibleProvider[];
     /** Host overrides of the built-in connections (gemini, openai, claude, groq, ollama), by id. */
     connectionBaseUrls?: Record<string, string>;
@@ -148,10 +133,6 @@ export class CredentialsManager {
 
     public getGoogleServiceAccountPath(): string | undefined {
         return this.credentials.googleServiceAccountPath;
-    }
-
-    public getCustomProviders(): CustomProvider[] {
-        return this.credentials.customProviders || [];
     }
 
     public getSttProvider(): 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' {
@@ -504,32 +485,6 @@ export class CredentialsManager {
         console.log(`[CredentialsManager] ${provider} preferred model set to: ${modelId}`);
     }
 
-    public saveCustomProvider(provider: CustomProvider): void {
-        if (!this.credentials.customProviders) {
-            this.credentials.customProviders = [];
-        }
-        // Check if exists, update if so
-        const index = this.credentials.customProviders.findIndex(p => p.id === provider.id);
-        if (index !== -1) {
-            this.credentials.customProviders[index] = provider;
-        } else {
-            this.credentials.customProviders.push(provider);
-        }
-        this.saveCredentials();
-        console.log(`[CredentialsManager] Custom Provider '${provider.name}' saved`);
-    }
-
-    public deleteCustomProvider(id: string): void {
-        if (!this.credentials.customProviders) return;
-        this.credentials.customProviders = this.credentials.customProviders.filter(p => p.id !== id);
-        this.saveCredentials();
-        console.log(`[CredentialsManager] Custom Provider '${id}' deleted`);
-    }
-
-    public getCurlProviders(): CurlProvider[] {
-        return this.credentials.curlProviders || [];
-    }
-
     // ---- Connections: where a model is reached (type, host, key). See aiConnections.ts ----
 
     private builtinKey(id: string): string {
@@ -717,34 +672,9 @@ export class CredentialsManager {
         return this.credentials.openaiCompatibleProviders || [];
     }
 
-    /** All non-standard LLM backends (legacy custom, curl templates, OpenAI-compatible). */
-    public getMergedLlmCustomProviders(): (CustomProvider | CurlProvider | OpenAICompatibleProvider)[] {
-        return [
-            ...(this.credentials.customProviders || []),
-            ...(this.credentials.curlProviders || []),
-            ...(this.credentials.openaiCompatibleProviders || []),
-        ];
-    }
-
-    public saveCurlProvider(provider: CurlProvider): void {
-        if (!this.credentials.curlProviders) {
-            this.credentials.curlProviders = [];
-        }
-        const index = this.credentials.curlProviders.findIndex(p => p.id === provider.id);
-        if (index !== -1) {
-            this.credentials.curlProviders[index] = provider;
-        } else {
-            this.credentials.curlProviders.push(provider);
-        }
-        this.saveCredentials();
-        console.log(`[CredentialsManager] Curl Provider '${provider.name}' saved`);
-    }
-
-    public deleteCurlProvider(id: string): void {
-        if (!this.credentials.curlProviders) return;
-        this.credentials.curlProviders = this.credentials.curlProviders.filter(p => p.id !== id);
-        this.saveCredentials();
-        console.log(`[CredentialsManager] Curl Provider '${id}' deleted`);
+    /** Non-built-in connections retained for legacy model routing. */
+    public getMergedLlmCustomProviders(): OpenAICompatibleProvider[] {
+        return this.getOpenAICompatibleProviders();
     }
 
     public saveOpenAICompatibleProvider(provider: OpenAICompatibleProvider): void {

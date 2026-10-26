@@ -41,9 +41,6 @@ const ModelSelectorWindow = () => {
             // 1. Get Stored Credentials (to know which Cloud providers are active)
             const creds = await window.electronAPI?.getStoredCredentials?.();
 
-            // 2. Custom Providers
-            const customProviders = await window.electronAPI?.getCustomProviders?.() || [];
-
             // 3. Ollama
             let ollamaModels: string[] = [];
             try {
@@ -85,11 +82,6 @@ const ModelSelectorWindow = () => {
                     models.push({ id: pm, name: prettifyModelId(pm), type: 'cloud', provider: prov });
                 }
             }
-
-            // Custom Providers
-            customProviders.forEach((p: any) => {
-                models.push({ id: p.id, name: p.name, type: 'custom' });
-            });
 
             // Ollama
             ollamaModels.forEach((m: string) => {

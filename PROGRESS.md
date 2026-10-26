@@ -15,6 +15,13 @@ Done (code; the rows and the speed have not been checked in a real call)
 
 Not done: the AI Providers page redesign (rows for quick answers and summaries, removing Fast Response Mode, cURL providers and the old default-model plumbing) is with a worker on branch `ai-settings`. Not verified: any of this in a real call.
 
+## AI settings completion: Phase A (branch `ai-settings`)
+
+- Removed Fast Response Mode (runtime flag, both overrides, IPC, both preload surfaces, types, Settings popup and AI settings toggle) and cURL providers (types, stores, handlers, routing, UI, validators). No tests referenced the deleted cURL utilities. OpenAI-compatible connections remain.
+- Checks: renderer tsc 0, Electron tsc 0, tap 1 (only the known missing DOCX fixture), lint 0. Warnings: 1206 to 1147 overall; touched source files 395 to 336, with no file increasing.
+- Effects removed: the popup no longer writes its fast-mode preference on mount or subscribes to its event; AI settings no longer subscribes to or enforces that flag. No replacement effect; no cleanup remains necessary for those removed subscriptions.
+- Owner: confirm both removed features are absent and ordinary connection-based answers still work. No app or real provider was run. Next: Phase B.
+
 ## 2026-10-26: connections apart from what a model is used for (branch `ai-connections`)
 
 Owner feedback: the AI settings mixed providers with jobs, and OpenAI and Claude had no host field; Pika must not be tied to a provider.

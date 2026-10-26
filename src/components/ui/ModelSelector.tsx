@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useQuery } from 'react-query';
-import { ChevronDown, Check, Cloud, Terminal, Monitor, Server } from 'lucide-react';
+import { ChevronDown, Check, Cloud, Monitor, Server } from 'lucide-react';
 import { STANDARD_CLOUD_MODELS, prettifyModelId } from '../../utils/modelUtils';
 import { useWindowEvent } from '../../hooks/useWindowEvent';
 
@@ -9,15 +9,9 @@ interface ModelSelectorProps {
     onSelectModel: (model: string) => void;
 }
 
-interface CustomProvider {
-    id: string;
-    name: string;
-    curlCommand: string;
-}
-
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSelectModel }) => {
     const [isOpen, setIsOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'cloud' | 'custom' | 'local'>('cloud');
+    const [activeTab, setActiveTab] = useState<'cloud' | 'local'>('cloud');
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     // Close on click outside
@@ -32,12 +26,6 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
     );
 
     // Load Data via queries
-    const { data: customProviders = [] } = useQuery<CustomProvider[]>(
-        ['custom-providers'],
-        () => (window.electronAPI?.getCustomProviders() as Promise<CustomProvider[]>) ?? Promise.resolve([]),
-        { enabled: isOpen }
-    );
-
     const { data: ollamaModels = [] } = useQuery<string[]>(
         ['ollama-models'],
         () => (window.electronAPI?.getAvailableOllamaModels() as Promise<string[]>) ?? Promise.resolve([]),
@@ -88,10 +76,6 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
         const cloud = cloudModels.find(m => m.id === model);
         if (cloud) return cloud.name;
 
-        // Check custom providers
-        const custom = customProviders.find(p => p.id === model || p.name === model);
-        if (custom) return custom.name;
-
         return model;
     };
 
@@ -114,12 +98,6 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
                             className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${activeTab === 'cloud' ? 'text-accent-primary bg-bg-item-surface border-t-2 border-t-accent-primary' : 'text-text-secondary hover:text-text-primary'}`}
                         >
                             Cloud
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('custom')}
-                            className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${activeTab === 'custom' ? 'text-accent-primary bg-bg-item-surface border-t-2 border-t-accent-primary' : 'text-text-secondary hover:text-text-primary'}`}
-                        >
-                            Custom
                         </button>
                         <button
                             onClick={() => setActiveTab('local')}
@@ -159,30 +137,6 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
                                             </React.Fragment>
                                         );
                                     })
-                                )}
-                            </div>
-                        )}
-
-                        {/* Custom Models */}
-                        {activeTab === 'custom' && (
-                            <div className="space-y-1">
-                                {customProviders.length === 0 ? (
-                                    <div className="text-center py-6 text-text-tertiary">
-                                        <p className="text-xs mb-2">No custom providers.</p>
-                                        <button className="text-[10px] text-accent-primary hover:underline">Manage in Settings</button>
-                                    </div>
-                                ) : (
-                                    customProviders.map(provider => (
-                                        <ModelOption
-                                            key={provider.id}
-                                            id={provider.id}
-                                            name={provider.name}
-                                            desc="Custom cURL"
-                                            icon={<Terminal size={14} />}
-                                            selected={currentModel === provider.id}
-                                            onSelect={() => handleSelect(provider.id)}
-                                        />
-                                    ))
                                 )}
                             </div>
                         )}

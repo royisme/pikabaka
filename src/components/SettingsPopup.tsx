@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { MessageSquare, Link, Camera, Zap, Heart, User } from 'lucide-react';
+import React, { useState, useLayoutEffect, useRef } from 'react';
+import { MessageSquare, Link, Camera, Heart, User } from 'lucide-react';
 import { useQuery, useQueryClient } from 'react-query';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
@@ -11,17 +11,6 @@ const SettingsPopup = () => {
     const queryClient = useQueryClient();
     const { shortcuts } = useShortcuts();
     const isLightTheme = useResolvedTheme() === 'light';
-
-    // Stored credentials query: auto-refetches on window focus
-    const { data: storedCredentials } = useQuery(['credentials'], () => window.electronAPI?.getStoredCredentials?.());
-    const hasStoredKey: Record<string, boolean> = storedCredentials
-        ? {
-            gemini: storedCredentials.hasGeminiKey,
-            groq: storedCredentials.hasGroqKey,
-            openai: storedCredentials.hasOpenaiKey,
-            claude: storedCredentials.hasClaudeKey
-        }
-        : {};
 
     // Profile status query
     const { data: profileStatus } = useProfileStatus();
@@ -39,23 +28,6 @@ const SettingsPopup = () => {
         queryClient.setQueryData(['undetectable'], newState);
         localStorage.setItem('pika_undetectable', String(newState));
     });
-
-    // Groq fast text: local state, stream via useMainEvent
-    const [useGroqFastText, setUseGroqFastText] = useState(() => {
-        return localStorage.getItem('pika_groq_fast_text') === 'true';
-    });
-    useMainEvent(window.electronAPI?.onGroqFastTextChanged, (enabled: boolean) => {
-        setUseGroqFastText(enabled);
-        localStorage.setItem('pika_groq_fast_text', String(enabled));
-    });
-    // Initial sync of persisted localStorage Groq fast text preference to main process on mount
-    useEffect(() => {
-        try {
-            window.electronAPI?.setGroqFastTextMode?.(useGroqFastText);
-        } catch (e) {
-            console.error(e);
-        }
-    }, []);
 
     // Live transcript: external store via useLocalStorageValue
     const [storedTranscript, setStoredTranscript] = useLocalStorageValue('pika_interviewer_transcript');
@@ -144,34 +116,6 @@ const SettingsPopup = () => {
                     </button>
                 </div>
 
-
-                {/* Groq (Fast Text) Toggle */}
-                <div className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors duration-200 group ${hasStoredKey.groq === false ? 'opacity-50 grayscale cursor-not-allowed' : `${itemHoverClass} cursor-default`}`} title={hasStoredKey.groq === false ? "Requires Groq API Key to be configured in Settings" : ""}>
-                    <div className="flex items-center gap-3">
-                        <Zap
-                            className={`w-4 h-4 transition-colors ${useGroqFastText ? 'text-orange-500' : iconInactiveClass}`}
-                            fill={useGroqFastText ? "currentColor" : "none"}
-                        />
-                        <span className={`text-[12px] font-medium transition-colors ${useGroqFastText ? (isLightTheme ? 'text-slate-950' : 'text-white') : labelInactiveClass}`}>Fast responses</span>
-                    </div>
-                    <button
-                        onClick={() => {
-                            if (hasStoredKey.groq === false) return; // Prevent clicking
-                            const next = !useGroqFastText;
-                            setUseGroqFastText(next);
-                            localStorage.setItem('pika_groq_fast_text', String(next));
-                            try {
-                                window.electronAPI?.setGroqFastTextMode(next);
-                            } catch (e) {
-                                console.error(e);
-                            }
-                        }}
-                        className={`w-[30px] h-[18px] rounded-full p-[1.5px] transition-all duration-300 ease-spring active:scale-[0.92] ${useGroqFastText ? 'bg-orange-500 shadow-[0_2px_10px_rgba(249,115,22,0.3)]' : defaultToggleTrackClass}`}
-                        disabled={hasStoredKey.groq === false}
-                    >
-                        <div className={`w-[15px] h-[15px] rounded-full transition-transform duration-300 ease-spring ${toggleKnobClass} ${useGroqFastText ? 'translate-x-[12px]' : 'translate-x-0'}`} />
-                    </button>
-                </div>
 
                 {/* Interviewer Transcript Toggle */}
                 <div className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors duration-200 group cursor-default ${itemHoverClass}`}>

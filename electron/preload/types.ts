@@ -142,17 +142,10 @@ export interface ElectronAPI {
   // Settings Window
   toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>
 
-  // Groq Fast Text Mode
-  getGroqFastTextMode: () => Promise<{ enabled: boolean }>
-  setGroqFastTextMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>
-
   // Demo
   seedDemo: () => Promise<{ success: boolean }>
 
   // Custom Providers
-  saveCustomProvider: (provider: any) => Promise<{ success: boolean; id?: string; error?: string }>
-  getCustomProviders: () => Promise<any[]>
-  deleteCustomProvider: (id: string) => Promise<{ success: boolean; error?: string }>
   getOpenAICompatibleProviders: () => Promise<Array<{ id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }>>
   saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) => Promise<{ success: boolean; error?: string }>
   deleteOpenAICompatibleProvider: (id: string) => Promise<{ success: boolean; error?: string }>
@@ -196,7 +189,6 @@ export interface ElectronAPI {
 
 
   onUndetectableChanged: (callback: (state: boolean) => void) => () => void
-  onGroqFastTextChanged: (callback: (enabled: boolean) => void) => () => void
   onOpenAICompatibleProvidersChanged: (callback: () => void) => () => void
   onModelChanged: (callback: (modelId: string) => void) => () => void
 
