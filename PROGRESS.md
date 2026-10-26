@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: V8 two-row composer (branch `overlay-composer`)
+
+Done (written by a GPT-6.1 worker through pi, reviewed and merged by the lead)
+- The answer area's bottom is two rows: an action row of fixed height 28px (the primary "What to say", then Clarify, Recap or Ideas, Follow-up) and the input at 36px with Send inside its right edge. From 480px the secondary actions show their words; below it they are 28px icon buttons with names and the primary's key badge is hidden. The row no longer scrolls: at 380px it is 144 + 3 x 28 + 3 x 6 = 246px of the 348 available (from the code, not measured). Height from the code: 8 + 28 + 6 + 36 + 8 = 86px without the screenshot strip.
+- The footer row (model picker, settings, click-through, old Send) and the fake "↵" hint are deleted; the five props only the footer used are removed from `ChatPanel`, `ChatColumn` and the `chatProps` object in `PikaInterface`. The model, settings and click-through live in the top bar's `⋯` menu (V9).
+- Verified: both `tsc --noEmit` checks exit 0; tap passes (no test for this markup). The worker reported exactly the missing git-ignored `.docx` failure in its worktree; here all tests pass.
+- Not verified: how it looks at 380 and 600px; the icon-only buttons' tap size and names; that Send sits inside the input without covering text (the input has a right padding of 2.5rem).
+
 ## 2026-10-26: V9 and V7 the top bar, menu and short language label (branch `overlay-top-bar`)
 
 Done (V9 and V7 together: the bar is where the header controls live)

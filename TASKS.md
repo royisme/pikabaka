@@ -79,7 +79,7 @@ Owner approved on 2026-10-26: the top bar instead of the pill and both zone head
 | V5 | One-line empty states | Q11 | done on branch `empty-states` |
 | V6 | Legibility floor: alpha ranges, no `backdrop-filter`, light muted 0.82, placeholder = muted, `--overlay-action` | unit test: shell alpha at the lowest slider value is at least 0.95 dark and 0.94 light; Q7, Q9 | done on branch `overlay-legibility`; owner checks the lowest slider value over a busy page in both themes |
 | V7 | Header controls as specified: short language label, overflow menu below 480px | Q2 at 380 and 600 | done with V9 on branch `overlay-top-bar` |
-| V8 | Two-row composer | composer at most 86px; every action reachable at 380 without scrolling | not started |
+| V8 | Two-row composer | composer at most 86px; every action reachable at 380 without scrolling | done on branch `overlay-composer` (written by a GPT-6.1 worker through pi, merged by the lead) |
 | V9 | Top bar replaces the pill and both zone headers | Q3 (chrome at most 140px at 420px), Q8 | done on branch `overlay-top-bar` (with V7); owner checks the bar and menu at 380, 600 and 1000px |
 | V10 | Four-size type scale (11, 12, 14, 16) | Q10 grep finds nothing | not started |
 | V11 | Overlay rules and `DESIGN.md` tokens | rules quote Q3, Q6, Q7 | not started |
