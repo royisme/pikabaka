@@ -2,6 +2,18 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: agent platform design, review and task track (branch `agent-platform`)
+
+The owner set the direction: live translation, a complete meeting record and an agent base, with Jev deciding when to offer help (`docs/design-agent-platform.md`). Before this, the overlay, live translation and Electron 44 stack was merged into local `main` (`abfd517`, not pushed; 812 tests, both builds exit 0).
+
+Done
+- `docs/research-pi-durable.md`: pi-durable 1.4.0 tried in `/tmp` under Electron 44 as Node (SQLite storage, a faux-model tool run, close and reopen, idempotent `requestId`). `nodenext` typecheck of `electron/` re-run on the merged `main`: 0 errors. The packages read no `.md`, `.ts` or `.map` file at runtime outside pi-durable's `testing/`.
+- `docs/design-agent-platform.md`: reviewed by GPT-6 Astra through pi (24 findings; every claim about Pika's code was checked and held), then revised. The main changes: `pika.db` is the only record and the agent store does not copy the transcript; approval is enforced inside Pika's own tools; proactive help starts in `log` mode; one owner and a stop sequence for each store; a review log with one outcome per finding.
+- `TASKS.md` track A: 29 tasks with files, tests, dependencies and a worker each.
+- The overlay mockup (interactive, Chinese notes) is in `.pi-runs/mockup/index.html`, outside the repository.
+
+Not verified: the dark overlay of the mockup was looked at once in a browser; the light overlay and phone width were not. Nothing from pi-durable is installed in the repo; no real model, Jev call or packaged build has been exercised. The owner approved the design, the mockup (after two changes: separate grounds and headers for the two areas, live language pickers) and both amendments (D3 folder naming, `transcripts` columns) on 2026-10-26, and approved one recognition language per speaker.
+
 ## 2026-10-26: one theme palette for dark, light and system (branch `electron-upgrade`)
 
 Problem (owner's screenshot): in the light theme the overlay's "..." menu was a dark navy box with dark text. Cause: `[data-theme='light']` redefined only the `overlay-*` and `state-*` tokens. The base family (`--surface*`, `--bg-*`, `--text-*`, `--border-*`, `--primary`, `--secondary`, `--outline*`) had no light values, on `main` too, so the launcher, the settings pages and the meeting views stayed dark in the light theme (a light search pill with light text on a dark page) and 20 files patched it with `isLight ? ... : ...`.
