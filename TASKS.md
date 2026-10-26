@@ -82,7 +82,7 @@ Owner approved on 2026-10-26: the top bar instead of the pill and both zone head
 | V8 | Two-row composer | composer at most 86px; every action reachable at 380 without scrolling | done on branch `overlay-composer` (written by a GPT-6.1 worker through pi, merged by the lead) |
 | V9 | Top bar replaces the pill and both zone headers | Q3 (chrome at most 140px at 420px), Q8 | done on branch `overlay-top-bar` (with V7); owner checks the bar and menu at 380, 600 and 1000px |
 | V10 | Four-size type scale (11, 12, 14, 16) | Q10 grep finds nothing | done on branch `overlay-type-scale` |
-| V11 | Overlay rules and `DESIGN.md` tokens | rules quote Q3, Q6, Q7 | not started |
+| V11 | Overlay rules and `DESIGN.md` tokens | rules quote Q3, Q6, Q7 | done on branch `overlay-rules` (the DESIGN half of S3; PRODUCT.md still open) |
 | V12 | Critique re-run on Q1 to Q14 | every check ticked or filed | after V10 |
 
 ## Owner

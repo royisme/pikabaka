@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: V11 DESIGN.md and overlay rules (branch `overlay-rules`)
+
+Done
+- `DESIGN.md` is written from the tokens and rules that now exist: structure and chrome budget, the surface and token table (checked against the names in `src/index.css`), the legibility floor, the four-size type scale, the audio status shown once, controls, motion and accessibility.
+- `docs/conventions.md` "Overlay UI" now quotes the spec's Q3, Q6 and Q7 (chrome budget, status once, legibility floor), the `overlay-hairline` rule, one filled control and one-line empty states, and the four-size scale replaces the old "9 to 10px labels" line.
+- Not done: `PRODUCT.md` (the other half of S3; needs the owner's input on audience and claims). The "16px lead sentence" row in `DESIGN.md` is a plan for U5, not built.
+
 ## 2026-10-26: V10 four-size type scale (branch `overlay-type-scale`)
 
 Done (mechanical sweep, done by the lead)

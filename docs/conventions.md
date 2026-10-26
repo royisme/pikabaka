@@ -30,14 +30,22 @@ The overlay is read for one to three seconds mid-call. These rules come from the
 **Layout**
 - Controls never move the page. Loading, streaming and errors show on the control itself or in a reserved slot, not as a row that appears and disappears.
 - Check a layout at the 380px minimum and the 600px default overlay width, with long text. Wrap or truncate with `min-w-0`; do not rely on fixed widths.
-- A horizontal action row must stay reachable at 380px. Do not centre an overflowing row.
+- At 380px nothing in the bar or the composer is cut off or needs horizontal scrolling; below 480px labels give way to icons and menus.
 - Interactive elements inside a `draggable-area` need `no-drag`.
 
 **Type and colour**
-- Text the user must read is at least 11px. The existing 9-10px labels are for metadata only. New sizes come from a small scale; do not add another `text-[Npx]`.
+- Type is four sizes: 11px (meta, status, key badges), 12px (source lines, chip and button labels, help text), 14px (translations, answers, input) and 16px (an answer's lead sentence). Nothing to be read is under 11px; do not add another `text-[Npx]`.
 - Use the semantic tokens in `src/index.css` and the Tailwind theme (`text-text-primary`, `text-text-secondary`, `text-text-tertiary`, `border-border-subtle`, `state-success`, `state-danger`, `overlay-*`). Raw palette classes (`text-slate-*`, `bg-red-500`, `text-emerald-400`) are not used in new code. Old code is not rewritten only for this.
 - No gradients as decoration. Intent colours must carry meaning, not variety.
 - Meaning is never carried by colour alone.
+
+**Chrome budget, status, legibility** (`DESIGN.md`, `docs/design-overlay-v2.md` Q3, Q6, Q7)
+- At a 420px window, everything except the transcript and the answers is at most 140px, and each of those two areas keeps at least 112px. A new row of chrome must come out of this budget; the pixel floors are in `src/lib/splitClamp.ts`.
+- The audio status is spelled out in one place (`audioStatus()`): the top-bar chip when the transcript has rows, the transcript area when it has none. Do not add a second banner for the same condition.
+- Panel opacity never goes below the legibility floor (`getOverlayAppearance`: 0.95 dark, 0.94 light); do not add `backdrop-filter` to the overlay, and do not put a transparent band around the panel.
+- A divider uses `overlay-hairline`. `border-border-subtle/NN` generates no CSS; with `border-b` it falls back to the browser's light grey.
+- At most one control is filled with `--overlay-action`; when the one thing to do is elsewhere (fix the audio), the primary action is quiet.
+- An empty area is one line of muted 12px text, without a box.
 
 **Accessibility**
 - Every icon-only button has an accessible name.
