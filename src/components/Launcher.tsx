@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from 'react-query';
 import { AlertCircle, ArrowRight, Briefcase, Calendar, CheckCircle, DownloadCloud, Ghost, Link as LinkIcon, RefreshCw, Zap } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import MeetingDetails from './MeetingDetails';
@@ -9,6 +10,8 @@ import { generateMeetingPDF } from '../utils/pdfGenerator';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useProfileData } from '../hooks/useProfileData';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
+import { useMainEvent } from '../hooks/useMainEvent';
+import { useWindowEvent } from '../hooks/useWindowEvent';
 export interface Meeting {
     id: string; title: string; date: string; duration: string; summary: string;
     detailedSummary?: { actionItems: string[]; keyPoints: string[] };
@@ -16,6 +19,7 @@ export interface Meeting {
     usage?: Array<{ type: 'assist' | 'followup' | 'chat' | 'followup_questions'; timestamp: number; question?: string; answer?: string; items?: string[] }>;
     participants?: unknown[]; participantCount?: number; active?: boolean; time?: string;
 }
+type CalendarEvent = { id: string; title: string; startTime: string; endTime: string; link?: string; source: 'google' };
 interface LauncherProps {
     onStartMeeting: () => void;
     onOpenSettings: (tab?: string) => void;
@@ -32,14 +36,31 @@ const Launcher: React.FC<LauncherProps> = ({
     ollamaPullPercent = 0,
     ollamaPullMessage = '',
 }) => {
-    const [meetings, setMeetings] = useState<Meeting[]>([]);
-    const [isDetectable, setIsDetectable] = useState(false);
-    const [isMeetingActive, setIsMeetingActive] = useState(false);
+    const queryClient = useQueryClient();
+    const { data: meetings = [], refetch: refetchMeetings } = useQuery<Meeting[]>(
+        ['recent-meetings'],
+        () => window.electronAPI?.getRecentMeetings?.() ?? []
+    );
+    const { data: undetectable = false } = useQuery<boolean>(
+        ['undetectable'],
+        async () => (await window.electronAPI?.getUndetectable?.()) ?? false
+    );
+    const isDetectable = !undetectable;
+
+    const { data: isMeetingActive = false } = useQuery<boolean>(
+        ['meeting-active'],
+        async () => (await window.electronAPI?.getMeetingActive?.()) ?? false
+    );
+    const { data: upcomingEvents = [], refetch: refetchEvents } = useQuery<CalendarEvent[]>(
+        ['upcoming-events'],
+        () => window.electronAPI?.getUpcomingEvents?.() ?? [],
+        { refetchInterval: 60000 }
+    );
+
     const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
     const [forwardMeeting, setForwardMeeting] = useState<Meeting | null>(null);
-    const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
     const [isPrepared, setIsPrepared] = useState(false);
-    const [preparedEvent, setPreparedEvent] = useState<any>(null);
+    const [preparedEvent, setPreparedEvent] = useState<CalendarEvent | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [showNotification, setShowNotification] = useState(false);
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -49,20 +70,29 @@ const Launcher: React.FC<LauncherProps> = ({
     const { isShortcutPressed } = useShortcuts();
     const { data: profileData } = useProfileData();
     const isLight = useResolvedTheme() === 'light';
-    const fetchMeetings = () => {
-        window.electronAPI?.getRecentMeetings?.().then(setMeetings).catch(err => console.error('Failed to fetch meetings:', err));
+
+    const updateSelectedMeeting = (meeting: Meeting | null) => {
+        setSelectedMeeting(meeting);
+        onPageChange?.(!meeting && !isGlobalChatOpen);
     };
-    const fetchEvents = () => {
-        window.electronAPI?.getUpcomingEvents?.().then(setUpcomingEvents).catch(err => console.error('Failed to fetch events:', err));
+
+    const updateGlobalChatOpen = (open: boolean) => {
+        setIsGlobalChatOpen(open);
+        onPageChange?.(!selectedMeeting && !open);
     };
+
+    const handleMenuToggle = (id: string | null) => {
+        setActiveMenuId(id);
+        setMenuEntered(false);
+    };
+
     const handleRefresh = async () => {
         setIsRefreshing(true);
         try {
             if (window.electronAPI?.calendarRefresh) {
                 setShowNotification(true);
                 await window.electronAPI.calendarRefresh();
-                fetchEvents();
-                fetchMeetings();
+                await Promise.all([refetchEvents(), refetchMeetings()]);
                 setTimeout(() => setShowNotification(false), 3000);
             } else {
                 console.warn('electronAPI.calendarRefresh not found');
@@ -73,61 +103,48 @@ const Launcher: React.FC<LauncherProps> = ({
             setTimeout(() => setIsRefreshing(false), 500);
         }
     };
+
+    // External seed trigger on mount
     useEffect(() => {
-        let mounted = true;
-        console.log('Launcher mounted');
         window.electronAPI?.seedDemo?.().catch(err => console.error('Failed to seed demo:', err));
-        window.electronAPI?.getUndetectable?.().then((undetectable) => { if (mounted) setIsDetectable(!undetectable); });
-        const removeUndetectableListener = window.electronAPI?.onUndetectableChanged?.((undetectable) => setIsDetectable(!undetectable));
-        fetchMeetings();
-        fetchEvents();
-        window.electronAPI?.getMeetingActive?.().then((active) => { if (mounted) setIsMeetingActive(active); }).catch(() => {});
-        const removeMeetingStateListener = window.electronAPI?.onMeetingStateChanged?.(({ isActive }) => setIsMeetingActive(isActive));
-        const removeMeetingsListener = window.electronAPI?.onMeetingsUpdated?.(() => {
-            console.log('Received meetings-updated event');
-            fetchMeetings();
-        });
-        const interval = setInterval(fetchEvents, 60000);
-        return () => {
-            mounted = false;
-            removeMeetingsListener?.();
-            removeUndetectableListener?.();
-            removeMeetingStateListener?.();
-            clearInterval(interval);
-        };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (isShortcutPressed(e, 'toggleVisibility')) {
-                e.preventDefault();
-                window.electronAPI.toggleWindow();
-            } else if (isShortcutPressed(e, 'moveWindowUp')) {
-                e.preventDefault();
-                window.electronAPI.moveWindowUp?.();
-            } else if (isShortcutPressed(e, 'moveWindowDown')) {
-                e.preventDefault();
-                window.electronAPI.moveWindowDown?.();
-            } else if (isShortcutPressed(e, 'moveWindowLeft')) {
-                e.preventDefault();
-                window.electronAPI.moveWindowLeft?.();
-            } else if (isShortcutPressed(e, 'moveWindowRight')) {
-                e.preventDefault();
-                window.electronAPI.moveWindowRight?.();
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isShortcutPressed]);
-    useEffect(() => setMenuEntered(false), [activeMenuId]);
-    useEffect(() => {
-        const handleClickOutside = () => setActiveMenuId(null);
-        window.addEventListener('click', handleClickOutside);
-        return () => window.removeEventListener('click', handleClickOutside);
-    }, []);
-    useEffect(() => {
-        onPageChange?.(!selectedMeeting && !isGlobalChatOpen);
-    }, [selectedMeeting, isGlobalChatOpen, onPageChange]);
+
+    // Main process event subscriptions
+    useMainEvent(window.electronAPI?.onUndetectableChanged, (val) => {
+        queryClient.setQueryData(['undetectable'], val);
+    });
+    useMainEvent(window.electronAPI?.onMeetingStateChanged, ({ isActive }) => {
+        queryClient.setQueryData(['meeting-active'], isActive);
+    });
+    // onMeetingsUpdated takes a 0-arg callback, so useMainEvent type does not fit; kept as effect
+    useEffect(() => window.electronAPI?.onMeetingsUpdated?.(() => {
+        void refetchMeetings();
+    }), [refetchMeetings]);
+
+    // Window shortcuts
+    useWindowEvent('keydown', (e: KeyboardEvent) => {
+        if (isShortcutPressed(e, 'toggleVisibility')) {
+            e.preventDefault();
+            window.electronAPI.toggleWindow();
+        } else if (isShortcutPressed(e, 'moveWindowUp')) {
+            e.preventDefault();
+            window.electronAPI.moveWindowUp?.();
+        } else if (isShortcutPressed(e, 'moveWindowDown')) {
+            e.preventDefault();
+            window.electronAPI.moveWindowDown?.();
+        } else if (isShortcutPressed(e, 'moveWindowLeft')) {
+            e.preventDefault();
+            window.electronAPI.moveWindowLeft?.();
+        } else if (isShortcutPressed(e, 'moveWindowRight')) {
+            e.preventDefault();
+            window.electronAPI.moveWindowRight?.();
+        }
+    });
+
+    // Close menu on click outside
+    useWindowEvent('click', () => {
+        handleMenuToggle(null);
+    });
     if (!window.electronAPI) {
         return <div className="p-10 text-white">Error: Electron API not initialized. Check preload script.</div>;
     }
@@ -137,9 +154,9 @@ const Launcher: React.FC<LauncherProps> = ({
     });
     const showUpcomingHero = Boolean((isPrepared && preparedEvent) || nextMeeting);
     const toggleDetectable = () => {
-        const newState = !isDetectable;
-        setIsDetectable(newState);
-        window.electronAPI?.setUndetectable(!newState);
+        const nextDetectable = !isDetectable;
+        queryClient.setQueryData(['undetectable'], !nextDetectable);
+        window.electronAPI?.setUndetectable?.(!nextDetectable);
     };
     const handleStartPreparedMeeting = async () => {
         if (!preparedEvent) return;
@@ -164,16 +181,16 @@ const Launcher: React.FC<LauncherProps> = ({
         try {
             const fullMeeting = await window.electronAPI?.getMeetingDetails?.(meeting.id);
             if (fullMeeting) {
-                setSelectedMeeting(fullMeeting);
+                updateSelectedMeeting(fullMeeting);
                 return;
             }
         } catch (err) {
             console.error('[Launcher] Failed to fetch meeting details:', err);
         }
-        setSelectedMeeting(meeting);
+        updateSelectedMeeting(meeting);
     };
     const handleExportMeeting = async (meeting: Meeting) => {
-        setActiveMenuId(null);
+        handleMenuToggle(null);
         try {
             const fullMeeting = await window.electronAPI?.getMeetingDetails?.(meeting.id);
             generateMeetingPDF(fullMeeting || meeting);
@@ -184,16 +201,18 @@ const Launcher: React.FC<LauncherProps> = ({
     };
     const handleDeleteMeeting = async (meeting: Meeting) => {
         const success = await window.electronAPI?.deleteMeeting?.(meeting.id);
-        if (success) setMeetings(prev => prev.filter(item => item.id !== meeting.id));
-        setActiveMenuId(null);
+        if (success) {
+            queryClient.setQueryData<Meeting[]>(['recent-meetings'], (prev = []) => prev.filter(item => item.id !== meeting.id));
+        }
+        handleMenuToggle(null);
     };
     const handleBack = () => {
         setForwardMeeting(selectedMeeting);
-        setSelectedMeeting(null);
+        updateSelectedMeeting(null);
     };
     const handleForward = () => {
         if (forwardMeeting) {
-            setSelectedMeeting(forwardMeeting);
+            updateSelectedMeeting(forwardMeeting);
             setForwardMeeting(null);
         }
     };
@@ -208,11 +227,11 @@ const Launcher: React.FC<LauncherProps> = ({
                 onOpenSettings={() => onOpenSettings()}
                 onAIQuery={(query) => {
                     setSubmittedGlobalQuery(query);
-                    setIsGlobalChatOpen(true);
+                    updateGlobalChatOpen(true);
                 }}
                 onLiteralSearch={(query) => {
                     setSubmittedGlobalQuery(query);
-                    setIsGlobalChatOpen(true);
+                    updateGlobalChatOpen(true);
                 }}
                 onOpenMeetingId={(meetingId) => {
                     const meeting = meetings.find(m => m.id === meetingId);
@@ -311,7 +330,7 @@ const Launcher: React.FC<LauncherProps> = ({
                             )}
                             <main className="custom-scrollbar flex-1 overflow-y-auto bg-bg-primary">
                                 <section className="min-h-full px-8 py-8">
-                                    <MeetingHistorySection meetings={meetings} onOpenMeeting={handleOpenMeeting} onExportMeeting={handleExportMeeting} onDeleteMeeting={handleDeleteMeeting} onStartMeeting={onStartMeeting} activeMenuId={activeMenuId} onMenuToggle={setActiveMenuId} menuEntered={menuEntered} onMenuEnteredChange={setMenuEntered} />
+                                    <MeetingHistorySection meetings={meetings} onOpenMeeting={handleOpenMeeting} onExportMeeting={handleExportMeeting} onDeleteMeeting={handleDeleteMeeting} onStartMeeting={onStartMeeting} activeMenuId={activeMenuId} onMenuToggle={handleMenuToggle} menuEntered={menuEntered} onMenuEnteredChange={setMenuEntered} />
                                 </section>
                             </main>
                         </motion.div>
@@ -326,7 +345,7 @@ const Launcher: React.FC<LauncherProps> = ({
                     </motion.div>
                 )}
             </AnimatePresence>
-            <GlobalChatOverlay isOpen={isGlobalChatOpen} onClose={() => { setIsGlobalChatOpen(false); setSubmittedGlobalQuery(''); }} initialQuery={submittedGlobalQuery} />
+            <GlobalChatOverlay isOpen={isGlobalChatOpen} onClose={() => { updateGlobalChatOpen(false); setSubmittedGlobalQuery(''); }} initialQuery={submittedGlobalQuery} />
         </div>
     );
 };

@@ -5,6 +5,7 @@ import { X, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import pikaIcon from '../../assets/icon.png';
 import { electronChatFetch } from '../lib/electronChatFetch';
+import { useWindowEvent } from '../hooks/useWindowEvent';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -229,15 +230,11 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
         }
     }, [isOpen, setMessages, stop]);
 
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && isOpen) {
-                handleClose();
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen]);
+    useWindowEvent('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && isOpen) {
+            handleClose();
+        }
+    });
 
     const handleBackdropClick = useCallback((e: React.MouseEvent) => {
         if (e.target === e.currentTarget) {

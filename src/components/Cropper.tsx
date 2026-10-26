@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Crosshair } from 'lucide-react';
+import { useMainEvent } from '../hooks/useMainEvent';
+import { useWindowEvent } from '../hooks/useWindowEvent';
+import { useResolvedTheme } from '../hooks/useResolvedTheme';
 
 /**
  * Cropper component provides a visual interface for selecting a screen area.
@@ -18,33 +21,19 @@ const Cropper: React.FC = () => {
     const [startPos, setStartPos] = useState<{ x: number, y: number } | null>(null);
     const [currentPos, setCurrentPos] = useState<{ x: number, y: number } | null>(null);
     const [hudPosition, setHudPosition] = useState<{ x: number, y: number } | null>(null);
-    const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+    const theme = useResolvedTheme();
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const hudRef = useRef<HTMLDivElement>(null);
     // Stores the HUD width once measured; used to calculate centering offset
     const hudWidthRef = useRef<number>(320);
-    // Ref mirrors for startPos/currentPos so window-level handlers can access current values
-    const startPosRef = useRef<{ x: number, y: number } | null>(null);
-    const currentPosRef = useRef<{ x: number, y: number } | null>(null);
+
+    const hudRefCallback = useCallback((node: HTMLDivElement | null) => {
+        if (node && node.offsetWidth > 0) {
+            hudWidthRef.current = node.offsetWidth;
+        }
+    }, []);
 
     const MIN_SELECTION_SIZE = 5;
-
-    // Keep refs in sync with state (needed for window-level mouseup handler)
-    useEffect(() => { startPosRef.current = startPos; }, [startPos]);
-    useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
-
-    // Theme detection
-    useEffect(() => {
-        const detectTheme = () => {
-            const currentTheme = document.documentElement.getAttribute('data-theme') as 'dark' | 'light' || 'dark';
-            setTheme(currentTheme);
-        };
-        detectTheme();
-        const observer = new MutationObserver(detectTheme);
-        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-        return () => observer.disconnect();
-    }, []);
 
     // Commit the selection — used by both div.onMouseUp and window mouseup
     const commitSelection = useCallback((sp: { x: number, y: number } | null, cp: { x: number, y: number } | null) => {
@@ -54,69 +43,38 @@ const Cropper: React.FC = () => {
         const width = Math.abs(cp.x - sp.x);
         const height = Math.abs(cp.y - sp.y);
         if (width > MIN_SELECTION_SIZE && height > MIN_SELECTION_SIZE) {
-            (window as any).electronAPI.cropperConfirmed({ x, y, width, height });
+            window.electronAPI.cropperConfirmed({ x, y, width, height });
         } else {
             setStartPos(null);
             setCurrentPos(null);
         }
     }, []);
 
-    // Reset handler + IPC bootstrap + global event listeners
-    useEffect(() => {
-        // Measure HUD width once it is mounted and visible.
-        // We use ResizeObserver (not MutationObserver on childList) because the HUD
-        // element already contains its children when it first renders — MutationObserver
-        // with childList would never fire after the initial render.
-        let resizeObs: ResizeObserver | null = null;
-        if (hudRef.current) {
-            resizeObs = new ResizeObserver((entries) => {
-                const entry = entries[0];
-                if (entry) {
-                    const w = entry.contentRect.width;
-                    if (w > 0) {
-                        hudWidthRef.current = w;
-                    }
-                }
-            });
-            resizeObs.observe(hudRef.current);
-        }
+    // IPC: listen for main-process reset signal
+    useMainEvent(window.electronAPI?.onResetCropper, (data: { hudPosition: { x: number; y: number } }) => {
+        setStartPos(null);
+        setCurrentPos(null);
+        const halfWidth = hudWidthRef.current / 2;
+        setHudPosition({
+            x: data.hudPosition.x - halfWidth,
+            y: data.hudPosition.y
+        });
+    });
 
-        // IPC: listen for main-process reset signal
-        const cleanupIpc = (window as any).electronAPI.onResetCropper((data: { hudPosition: { x: number; y: number } }) => {
+    // ESC to cancel
+    useWindowEvent('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+            window.electronAPI.cropperCancelled();
             setStartPos(null);
             setCurrentPos(null);
-            const halfWidth = hudWidthRef.current / 2;
-            setHudPosition({
-                x: data.hudPosition.x - halfWidth,
-                y: data.hudPosition.y
-            });
-        });
+        }
+    });
 
-        // ESC to cancel
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                (window as any).electronAPI.cropperCancelled();
-                setStartPos(null);
-                setCurrentPos(null);
-            }
-        };
-
-        // Window-level mouseup: fires even if cursor left the component bounds mid-drag.
-        // This prevents the drag from staying "stuck" if the user releases outside.
-        const handleWindowMouseUp = () => {
-            commitSelection(startPosRef.current, currentPosRef.current);
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('mouseup', handleWindowMouseUp);
-
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-            window.removeEventListener('mouseup', handleWindowMouseUp);
-            cleanupIpc();
-            resizeObs?.disconnect();
-        };
-    }, [commitSelection]);
+    // Window-level mouseup: fires even if cursor left the component bounds mid-drag.
+    // This prevents the drag from staying "stuck" if the user releases outside.
+    useWindowEvent('mouseup', () => {
+        commitSelection(startPos, currentPos);
+    });
 
     const handleMouseDown = (e: React.MouseEvent) => {
         e.preventDefault(); // prevent text selection
@@ -213,7 +171,7 @@ const Cropper: React.FC = () => {
             {/* Clean HUD — shown only when not actively dragging */}
             {!startPos && hudPosition && (
                 <div
-                    ref={hudRef}
+                    ref={hudRefCallback}
                     className="absolute pointer-events-none animate-fade-in-up"
                     style={{
                         left: hudPosition.x,

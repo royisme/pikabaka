@@ -1,8 +1,8 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Heart } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useWindowEvent } from '../hooks/useWindowEvent';
 
 interface SupportToasterProps {
     className?: string;
@@ -10,69 +10,52 @@ interface SupportToasterProps {
 
 export const SupportToaster: React.FC<SupportToasterProps> = ({ className }) => {
     const [isVisible, setIsVisible] = useState(false);
-    const [, setHasDonated] = useState(false);
     const [isButtonHovered, setIsButtonHovered] = useState(false);
+    const clickTimeRef = useRef<number | null>(null);
 
     useEffect(() => {
         let mounted = true;
 
-        const checkStatus = async () => {
-            // Wait 10s before checking
-            await new Promise(resolve => setTimeout(resolve, 10000));
-
+        const timer = setTimeout(async () => {
             try {
                 if (!window.electronAPI?.getDonationStatus) return;
 
                 const status = await window.electronAPI.getDonationStatus();
-                if (mounted) {
-                    setHasDonated(status.hasDonated);
-                    if (status.shouldShow) {
-                        setIsVisible(true);
-                        window.electronAPI.markDonationToastShown();
-                    }
+                if (mounted && status.shouldShow) {
+                    setIsVisible(true);
+                    window.electronAPI.markDonationToastShown();
                 }
             } catch (e) {
                 console.error("Failed to check donation status:", e);
             }
+        }, 10000);
+
+        return () => {
+            mounted = false;
+            clearTimeout(timer);
         };
-
-        checkStatus();
-
-        return () => { mounted = false; };
     }, []);
 
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (!import.meta.env.DEV) return;
-            if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-                e.preventDefault();
-                console.log("Debug: Toggling Donation Toaster");
-                setIsVisible(prev => !prev);
+    useWindowEvent('keydown', (e: KeyboardEvent) => {
+        if (!import.meta.env.DEV) return;
+        if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+            e.preventDefault();
+            console.log("Debug: Toggling Donation Toaster");
+            setIsVisible(prev => !prev);
+        }
+    });
+
+    useWindowEvent('focus', async () => {
+        if (clickTimeRef.current) {
+            const elapsed = Date.now() - clickTimeRef.current;
+            if (elapsed > 20000) { // 20 seconds
+                console.log("User returned from support link after >20s. Presuming donation.");
+                await window.electronAPI?.setDonationComplete();
+                setIsVisible(false);
             }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
-
-    const clickTimeRef = React.useRef<number | null>(null);
-
-    useEffect(() => {
-        const handleFocus = async () => {
-            if (clickTimeRef.current) {
-                const elapsed = Date.now() - clickTimeRef.current;
-                if (elapsed > 20000) { // 20 seconds
-                    console.log("User returned from support link after >20s. Presuming donation.");
-                    await window.electronAPI?.setDonationComplete();
-                    setHasDonated(true);
-                    setIsVisible(false);
-                }
-                clickTimeRef.current = null;
-            }
-        };
-        window.addEventListener('focus', handleFocus);
-        return () => window.removeEventListener('focus', handleFocus);
-    }, []);
+            clickTimeRef.current = null;
+        }
+    });
 
     const handleDismiss = () => {
         setIsVisible(false);
