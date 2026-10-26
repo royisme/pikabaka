@@ -16,7 +16,7 @@ import { deepVariableReplacer, getByPath, injectImageIntoMessages } from '../uti
 import curl2Json from "@bany/curl-to-json";
 import { CustomProvider, CurlProvider, OpenAICompatibleProvider } from '../services/CredentialsManager';
 import { normalizeOpenAICompatibleBaseUrl } from '../utils/modelFetcher';
-import { openAiRoot, BUILTIN_CONNECTIONS } from '../services/aiConnections';
+import { openAiRoot, BUILTIN_CONNECTIONS, type Connection } from '../services/aiConnections';
 import { CredentialsManager } from '../services/CredentialsManager';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -466,6 +466,71 @@ export class LLMHelper {
       stream: false,
     });
     return response.choices[0]?.message?.content || "";
+  }
+
+  /** Quick answers on any connection: its type decides the protocol, its host and key the destination. */
+  private async * streamViaConnectionChat(
+    c: Connection,
+    model: string,
+    systemPrompt: string,
+    userContent: string,
+    imagePaths?: string[]
+  ): AsyncGenerator<string, void, unknown> {
+    const images = await Promise.all((imagePaths ?? []).filter(p => fs.existsSync(p)).map(async p => (await fs.promises.readFile(p)).toString('base64')));
+    if (c.type === 'ollama') {
+      this.ollamaUrl = c.baseUrl;
+      this.ollamaModel = model;
+      yield* this.streamWithOllama(userContent, undefined, systemPrompt, imagePaths);
+      return;
+    }
+    const clients = this.connectionClients(c);
+    if (c.type === 'anthropic') {
+      const stream = await clients.anthropic().messages.stream({
+        model,
+        max_tokens: 8192,
+        system: systemPrompt,
+        messages: [{
+          role: "user",
+          content: [
+            ...images.map(data => ({ type: "image" as const, source: { type: "base64" as const, media_type: "image/png" as const, data } })),
+            { type: "text" as const, text: userContent },
+          ],
+        }],
+      });
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') yield event.delta.text;
+      }
+      return;
+    }
+    if (c.type === 'gemini') {
+      const stream = await clients.gemini().models.generateContentStream({
+        model,
+        config: { systemInstruction: systemPrompt },
+        contents: [{ role: "user", parts: [{ text: userContent }, ...images.map(data => ({ inlineData: { mimeType: "image/png", data } }))] }],
+      });
+      for await (const chunk of stream) {
+        if (chunk.text) yield chunk.text;
+      }
+      return;
+    }
+    const stream = await clients.openai().chat.completions.create({
+      model,
+      stream: true,
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: images.length
+            ? [{ type: "text", text: userContent }, ...images.map(data => ({ type: "image_url" as const, image_url: { url: `data:image/png;base64,${data}` } }))]
+            : userContent,
+        },
+      ],
+      ...(c.baseUrl.includes('api.openai.com') ? { max_completion_tokens: 8192 } : { max_tokens: 8192 }),
+    });
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content;
+      if (content) yield content;
+    }
   }
 
   private async streamViaConnection(
@@ -2426,6 +2491,14 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     const userContent = context
       ? `CONTEXT:\n${context}\n\nUSER QUESTION:\n${message}`
       : message;
+
+    // The connection and model chosen for quick answers (Settings, AI Providers): any host, any model id.
+    const chatUse = CredentialsManager.getInstance().resolveModelUse('chat');
+    if ('connection' in chatUse) {
+      const systemFor = chatUse.connection.id === 'groq' ? GROQ_SYSTEM_PROMPT : chatUse.connection.type === 'anthropic' ? CLAUDE_SYSTEM_PROMPT : OPENAI_SYSTEM_PROMPT;
+      yield* this.streamViaConnectionChat(chatUse.connection, chatUse.model, this.injectLanguageInstruction(systemPromptOverride || systemFor), userContent, imagePaths);
+      return;
+    }
 
     // GROQ FAST TEXT OVERRIDE (Text-Only)
     if (this.groqFastTextMode && !isMultimodal && this.groqClient) {
