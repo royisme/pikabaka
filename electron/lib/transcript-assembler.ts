@@ -701,8 +701,9 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
     return { success: true, translatedText: translatedText || undefined };
   } catch (error: unknown) {
     const reason = classifyTranslationError(error);
-    // Only the reason is logged: a provider's message can echo the transcript.
-    console.warn('[Main] Transcript translation failed:', reason);
+    // Only the reason and the HTTP status are logged: a provider's message can echo the transcript.
+    const status = Number((error as { status?: unknown } | null)?.status);
+    console.warn('[Main] Transcript translation failed:', reason, Number.isFinite(status) ? `(HTTP ${status})` : '');
     logTiming('error', 0);
     if (isSupersededRevision(state.transcriptSegmentRevisions, segmentId, revision)) {
       return { success: false, error: 'superseded by newer revision' };

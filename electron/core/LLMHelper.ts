@@ -27,12 +27,16 @@ import { classifyTranslationError } from '../transcript/translationError';
 import { anthropicDeltas, geminiDeltas, ollamaDeltas, openAIDeltas, streamText } from '../transcript/translationStream';
 const execAsync = promisify(exec);
 
+/** Model ids the host answered 400 to while a thinking setting was sent: typed by the user, so they may not take it. */
+const modelsRejectingThinking = new Set<string>();
+
 /**
  * Translation is a rewrite, not a puzzle: a Gemini model that thinks first answers 5 to 8 seconds late.
  * Gemini 3 takes a thinking level (Pro cannot go below low); 2.5 Flash takes a zero budget.
  * Any other model id is left as it is.
  */
 function translationThinking(model: string): { thinkingConfig: { thinkingLevel?: ThinkingLevel; thinkingBudget?: number } } | undefined {
+  if (modelsRejectingThinking.has(model)) return undefined;
   const id = model.toLowerCase();
   if (id.includes('gemini-3')) return { thinkingConfig: { thinkingLevel: id.includes('pro') ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL } };
   if (id.includes('gemini-2.5-flash')) return { thinkingConfig: { thinkingBudget: 0 } };
@@ -684,6 +688,23 @@ export class LLMHelper {
   }
 
   public async translateTranscriptText(
+    request: TranscriptTranslationRequest,
+    onProgress?: (textSoFar: string) => void
+  ): Promise<string> {
+    try {
+      return await this.translateOnce(request, onProgress);
+    } catch (error) {
+      // A 400 that came while a thinking setting was sent: ask again without it, and do not send it to this model again.
+      const status = Number((error as { status?: unknown } | null)?.status);
+      const model = request.model?.trim() ?? '';
+      if (status !== 400 || !translationThinking(model)) throw error;
+      modelsRejectingThinking.add(model);
+      console.warn('[LLMHelper] The host rejected the thinking setting; translating without it');
+      return this.translateOnce(request, onProgress);
+    }
+  }
+
+  private async translateOnce(
     request: TranscriptTranslationRequest,
     onProgress?: (textSoFar: string) => void
   ): Promise<string> {
