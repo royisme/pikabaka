@@ -68,6 +68,13 @@ export class SonioxStreamingSTT extends EventEmitter {
     private languageCode?: string;
 
     /** Set recognition language hint using ISO-639-1 code */
+    /** The Soniox model; an empty value keeps the default. */
+    private model = 'stt-rt-v4';
+
+    public setModel(model: string): void {
+        if (model.trim()) this.model = model.trim();
+    }
+
     public setRecognitionLanguage(key: string): void {
         const config = RECOGNITION_LANGUAGES[key];
         if (config) {
@@ -186,7 +193,7 @@ export class SonioxStreamingSTT extends EventEmitter {
             // Send initial configuration as first message
             const config: any = {
                 api_key: this.apiKey,
-                model: 'stt-rt-v4',
+                model: this.model,
                 audio_format: 'pcm_s16le',
                 sample_rate: this.sampleRate,
                 num_channels: this.numChannels,

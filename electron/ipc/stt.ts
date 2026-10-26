@@ -1,3 +1,4 @@
+import { fetchSttModels, STT_MODEL_PROVIDERS, type SttModelProvider } from "../utils/sttModels"
 import { BrowserWindow } from "electron"
 import { AppState } from "../main"
 import { AudioDevices } from "../audio/AudioDevices"
@@ -22,6 +23,34 @@ export function registerSttHandlers(appState: AppState): void {
     } catch (error: any) {
       console.error("Error setting STT provider:", error);
       return { success: false, error: error.message };
+    }
+  });
+
+  // The model of a speech service (empty means its default). Applies by rebuilding the recognition streams.
+  safeHandle("set-stt-model", async (_, provider: string, model: string) => {
+    if (!STT_MODEL_PROVIDERS.includes(provider as SttModelProvider) || typeof model !== 'string' || model.length > 200) {
+      return { success: false, error: 'This speech service has no model to choose' };
+    }
+    const { CredentialsManager } = require('../services/CredentialsManager');
+    CredentialsManager.getInstance().setSttModel(provider, model);
+    await appState.reconfigureSttProvider();
+    return { success: true };
+  });
+
+  // What a speech service offers. A key typed but not yet saved is used when given; otherwise the saved one.
+  safeHandle("fetch-stt-models", async (_, provider: string, apiKey?: string) => {
+    if (!STT_MODEL_PROVIDERS.includes(provider as SttModelProvider)) return { success: false, error: 'This speech service has no model list' };
+    try {
+      const { CredentialsManager } = require('../services/CredentialsManager');
+      const cm = CredentialsManager.getInstance();
+      const saved: Record<string, string | undefined> = {
+        groq: cm.getGroqSttApiKey(), openai: cm.getOpenAiSttApiKey(), deepgram: cm.getDeepgramApiKey(),
+        elevenlabs: cm.getElevenLabsApiKey(), soniox: cm.getSonioxApiKey(),
+      };
+      const models = await fetchSttModels(provider as SttModelProvider, (typeof apiKey === 'string' && apiKey.trim()) || saved[provider] || '');
+      return { success: true, models };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
     }
   });
 

@@ -902,6 +902,7 @@ export function registerCoreHandlers(appState: AppState): void {
         googleServiceAccountPath: creds.googleServiceAccountPath || null,
         sttProvider: creds.sttProvider || 'google',
         groqSttModel: creds.groqSttModel || 'whisper-large-v3-turbo',
+        sttModels: creds.sttModels || {},
         hasSttGroqKey: hasKey(creds.groqSttApiKey),
         hasSttOpenaiKey: hasKey(creds.openAiSttApiKey),
         hasDeepgramKey: hasKey(creds.deepgramApiKey),

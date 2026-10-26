@@ -118,6 +118,9 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
     stt = new GoogleSTT();
   }
 
+  const sttModel = CredentialsManager.getInstance().getSttModel(sttProvider);
+  if (sttModel && 'setModel' in stt) stt.setModel(sttModel);
+
   stt.setRecognitionLanguage(sttLanguage);
 
   stt.on('transcript', (segment: { text: string, isFinal: boolean, confidence: number, detectedLanguage?: string, boundary?: boolean }) => {

@@ -1,3 +1,5 @@
+import SttModelPicker, { STT_MODEL_DEFAULTS } from './settings/SttModelPicker';
+import ConnectionModelPicker from './settings/ConnectionModelPicker';
 import WorkspaceSettings from './settings/WorkspaceSettings';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from 'react-query';
@@ -685,16 +687,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         } else if (availableLanguages[key]) {
             setSelectedSttGroup(availableLanguages[key].group);
         }
-        if (window.electronAPI?.setRecognitionLanguage) {
-            await window.electronAPI.setRecognitionLanguage(key);
-        }
+        // Nothing is sent here: the choice is applied when Save is pressed.
     };
 
     const handleUserLanguageChange = async (key: string) => {
         setUserRecognitionLanguage(key);
-        if (window.electronAPI?.setRecognitionLanguage) {
-            await window.electronAPI.setRecognitionLanguage(key, 'user');
-        }
     };
 
     const handleGroupChange = (group: string) => {
@@ -788,7 +785,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     // STT Provider settings
     const [sttProvider, setSttProvider] = useState<'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'>('google');
     const [transcriptAssemblerProfile, setTranscriptAssemblerProfile] = useState<TranscriptAssemblerProfile>('sentence_bias');
-    const [groqSttModel, setGroqSttModel] = useState('whisper-large-v3-turbo');
     const [sttGroqKey, setSttGroqKey] = useState('');
     const [sttOpenaiKey, setSttOpenaiKey] = useState('');
     const [sttDeepgramKey, setSttDeepgramKey] = useState('');
@@ -812,6 +808,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [isSttDropdownOpen, setIsSttDropdownOpen] = useState(false);
     const sttDropdownRef = React.useRef<HTMLDivElement>(null);
     const [transcriptTranslationEnabled, setTranscriptTranslationEnabled] = useState(false);
+    const [transcriptTranslationProvider, setTranscriptTranslationProvider] = useState('ollama');
+    const [transcriptTranslationModel, setTranscriptTranslationModel] = useState('');
     const [transcriptTranslationPrompt, setTranscriptTranslationPrompt] = useState(DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT);
     const [transcriptTranslationDisplayMode, setTranscriptTranslationDisplayMode] = useState<'original' | 'translated' | 'both'>('original');
     const [transcriptTranslationSourceLanguage, setTranscriptTranslationSourceLanguage] = useState('auto');
@@ -839,7 +837,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 const creds = await window.electronAPI?.getStoredCredentials?.();
                 if (creds) {
                     setSttProvider(creds.sttProvider || 'google');
-                    if (creds.groqSttModel) setGroqSttModel(creds.groqSttModel);
+                    setSttModelDraft({ ...(creds.sttModels || {}), groq: creds.groqSttModel || '' });
                     setGoogleServiceAccountPath(creds.googleServiceAccountPath);
                     setHasStoredSttGroqKey(creds.hasSttGroqKey);
                     setHasStoredSttOpenaiKey(creds.hasSttOpenaiKey);
@@ -850,6 +848,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                     setHasStoredIbmWatsonKey(creds.hasIbmWatsonKey);
                     setHasStoredSonioxKey(creds.hasSonioxKey || false);
                     setTranscriptTranslationEnabled(!!creds.transcriptTranslationEnabled);
+                    setTranscriptTranslationProvider(creds.transcriptTranslationProvider || 'ollama');
+                    setTranscriptTranslationModel(creds.transcriptTranslationModel || '');
                     if (typeof creds.transcriptTranslationPrompt === 'string' && creds.transcriptTranslationPrompt.length > 0) {
                         setTranscriptTranslationPrompt(creds.transcriptTranslationPrompt);
                     } else {
@@ -878,17 +878,64 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         if (isOpen) loadSttSettings();
     }, [isOpen]);
 
+    // The speech settings are a draft until Save: provider, model and both languages are applied together
+    // and read back, so the screen shows what the app really holds.
+    const [sttModelDraft, setSttModelDraft] = useState<Record<string, string>>({});
+    const [speechSaving, setSpeechSaving] = useState(false);
+    const [speechResult, setSpeechResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+    const handleSaveSpeechSettings = async () => {
+        const api = window.electronAPI;
+        setSpeechSaving(true);
+        setSpeechResult(null);
+        try {
+            const wantModel = (sttModelDraft[sttProvider] ?? '').trim();
+            if (sttProvider in STT_MODEL_DEFAULTS) {
+                const modelResult = await api.setSttModel(sttProvider, wantModel);
+                if (!modelResult.success) throw new Error(modelResult.error || 'The model was not saved');
+            }
+            // @ts-ignore
+            const providerResult = await api.setSttProvider?.(sttProvider);
+            if (providerResult && !providerResult.success) throw new Error(providerResult.error || 'The service was not saved');
+            await api.setRecognitionLanguage(recognitionLanguage, 'interviewer');
+            await api.setRecognitionLanguage(userRecognitionLanguage || recognitionLanguage, 'user');
+
+            // Read back what the app holds now.
+            const [creds, theirs, yours, running] = await Promise.all([
+                api.getStoredCredentials(),
+                api.getSttLanguage('interviewer'),
+                api.getSttLanguage('user'),
+                api.getMeetingActive().catch(() => false),
+            ]);
+            const heldModel = sttProvider === 'groq' ? creds.groqSttModel : creds.sttModels?.[sttProvider];
+            const matches =
+                creds.sttProvider === sttProvider &&
+                theirs === recognitionLanguage &&
+                yours === (userRecognitionLanguage || recognitionLanguage) &&
+                (!(sttProvider in STT_MODEL_DEFAULTS) || (heldModel || '') === (sttProvider === 'groq' && !wantModel ? 'whisper-large-v3-turbo' : wantModel));
+            const label = (key: string) => availableLanguages[key]?.label ?? key;
+            setSpeechResult(
+                matches
+                    ? {
+                          ok: true,
+                          text: `Saved: ${sttProvider}${sttProvider in STT_MODEL_DEFAULTS ? ` · ${heldModel || 'default model'}` : ''} · their audio ${label(theirs)} · you ${label(yours)}. ${running ? 'The running meeting restarted its recognition with these.' : 'They apply from your next meeting.'}`,
+                      }
+                    : { ok: false, text: 'Saved, but the app reports different values. Close this window and open it again to see what is in effect.' }
+            );
+        } catch (e) {
+            setSpeechResult({ ok: false, text: (e as Error).message || 'Could not save' });
+        } finally {
+            setSpeechSaving(false);
+        }
+    };
+
     const handleSttProviderChange = async (provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => {
         setSttProvider(provider);
         setIsSttDropdownOpen(false);
         setSttTestStatus('idle');
         setSttTestError('');
-        try {
-            // @ts-ignore
-            await window.electronAPI?.setSttProvider?.(provider);
-        } catch (e) {
-            console.error('Failed to set STT provider:', e);
-        }
+        setSpeechResult(null);
+        // Nothing is sent here: the provider is applied when Save is pressed.
         // If switching to a provider that doesn't support multi-language detection
         // and the current STT language is "auto", fall back to a sensible default.
         if (STT_PROVIDERS_WITHOUT_AUTO.has(provider) && recognitionLanguage === 'auto') {
@@ -1070,6 +1117,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         try {
             await window.electronAPI?.setTranscriptTranslationSettings?.({
                 enabled: transcriptTranslationEnabled,
+                provider: transcriptTranslationProvider,
+                model: transcriptTranslationModel,
                 prompt: transcriptTranslationPrompt,
                 displayMode: transcriptTranslationDisplayMode,
                 sourceLanguage: transcriptTranslationSourceLanguage,
@@ -2078,37 +2127,17 @@ Core Skills
                                                 </div>
                                             </div>
 
-                                            {/* Groq Model Selector */}
-                                            {sttProvider === 'groq' && (
-                                                <div className="bg-bg-card rounded-xl border border-border-subtle p-4">
-                                                    <label className="text-xs font-medium text-text-secondary mb-2.5 block">Whisper Model</label>
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        {[
-                                                            { id: 'whisper-large-v3-turbo', label: 'V3 Turbo', desc: 'Fastest' },
-                                                            { id: 'whisper-large-v3', label: 'V3', desc: 'Most Accurate' },
-                                                        ].map((m) => (
-                                                            <button
-                                                                key={m.id}
-                                                                type="button"
-                                                                onClick={async () => {
-                                                                    setGroqSttModel(m.id);
-                                                                    try {
-                                                                        await window.electronAPI.setGroqSttModel(m.id);
-                                                                    } catch (e) {
-                                                                        console.error('Failed to set Groq model:', e);
-                                                                    }
-                                                                }}
-                                                                className={`rounded-lg px-3 py-2.5 text-left transition-all duration-200 ease-in-out active:scale-[0.98] ${groqSttModel === m.id
-                                                                    ? 'bg-blue-600 text-white shadow-md'
-                                                                    : 'bg-bg-input hover:bg-bg-elevated text-text-primary'
-                                                                    }`}
-                                                            >
-                                                                <span className="text-sm font-medium block">{m.label}</span>
-                                                                <span className={`text-[11px] transition-colors ${groqSttModel === m.id ? 'text-white/70' : 'text-text-tertiary'
-                                                                    }`}>{m.desc}</span>
-                                                            </button>
-                                                        ))}
-                                                    </div>
+                                            {/* Model (services that let you choose one) */}
+                                            {sttProvider in STT_MODEL_DEFAULTS && (
+                                                <div className="bg-bg-card rounded-xl border border-border-subtle p-4 space-y-2">
+                                                    <label className="text-xs font-medium text-text-secondary block">Model</label>
+                                                    <SttModelPicker
+                                                        provider={sttProvider}
+                                                        model={sttModelDraft[sttProvider] ?? ''}
+                                                        apiKey={({ groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey, elevenlabs: sttElevenLabsKey, soniox: sttSonioxKey } as Record<string, string>)[sttProvider] ?? ''}
+                                                        onChange={(model) => { setSttModelDraft({ ...sttModelDraft, [sttProvider]: model }); setSpeechResult(null); }}
+                                                    />
+                                                    <p className="text-[10px] text-text-tertiary">Leave empty for the default. The key above is used to fetch the list; a saved key works too.</p>
                                                 </div>
                                             )}
 
@@ -2362,6 +2391,22 @@ Core Skills
                                                     ))}
                                                 </select>
                                             </div>
+
+                                            <div className="space-y-2">
+                                                <div className="flex flex-wrap items-center gap-3">
+                                                    <button
+                                                        onClick={handleSaveSpeechSettings}
+                                                        disabled={speechSaving}
+                                                        className="px-5 py-2.5 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-50 transition-colors"
+                                                    >
+                                                        {speechSaving ? 'Saving...' : 'Save speech settings'}
+                                                    </button>
+                                                    <span className="text-[11px] text-text-tertiary">The service, model and languages above apply when you press Save. A key has its own Save.</span>
+                                                </div>
+                                                {speechResult && (
+                                                    <p className={`text-[11px] ${speechResult.ok ? 'text-state-success' : 'text-state-danger'}`}>{speechResult.text}</p>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -2465,9 +2510,18 @@ Core Skills
                                                 </div>
                                             </div>
 
-                                            <p className="text-[11px] text-text-tertiary">
-                                                The translation model and its connection are chosen under AI Providers, "Where models are used".
-                                            </p>
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-medium text-text-secondary block">Translation model</label>
+                                                <ConnectionModelPicker
+                                                    id="translation"
+                                                    connectionId={transcriptTranslationProvider}
+                                                    model={transcriptTranslationModel}
+                                                    onChange={(next) => { setTranscriptTranslationProvider(next.connectionId); setTranscriptTranslationModel(next.model); }}
+                                                />
+                                                <p className="text-[10px] text-text-tertiary">
+                                                    Connections (any host, any type) are added under AI Providers. A cheap, fast model works well here.
+                                                </p>
+                                            </div>
 
                                             <div className="space-y-1.5">
                                                 <div className="flex items-center justify-between">

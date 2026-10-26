@@ -25,6 +25,8 @@ export class DeepgramStreamingSTT extends EventEmitter {
 
     private sampleRate = 16000;
     private numChannels = 1;
+    /** The Deepgram model; the user can pick another in Settings, Audio. */
+    private model = 'nova-3';
     private languageCode: string | undefined = 'en'; // Default to English; undefined ⇒ multi/auto-detect
 
     private reconnectAttempts = 0;
@@ -50,6 +52,11 @@ export class DeepgramStreamingSTT extends EventEmitter {
     public setAudioChannelCount(count: number): void {
         this.numChannels = count;
         console.log(`[DeepgramStreaming] Channel count set to ${count}`);
+    }
+
+    /** An empty value keeps the default model. */
+    public setModel(model: string): void {
+        if (model.trim()) this.model = model.trim();
     }
 
     /** Set recognition language using ISO-639-1 code */
@@ -157,7 +164,7 @@ export class DeepgramStreamingSTT extends EventEmitter {
 
         const url =
             `wss://api.deepgram.com/v1/listen` +
-            `?model=nova-3` +
+            `?model=${encodeURIComponent(this.model)}` +
             `&encoding=linear16` +
             `&sample_rate=${this.sampleRate}` +
             `&channels=${this.numChannels}` +

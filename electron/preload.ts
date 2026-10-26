@@ -112,6 +112,8 @@ interface ElectronAPI {
   setAzureRegion: (region: string) => Promise<{ success: boolean; error?: string }>
   setIbmWatsonApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   setGroqSttModel: (model: string) => Promise<{ success: boolean; error?: string }>
+  setSttModel: (provider: string, model: string) => Promise<{ success: boolean; error?: string }>
+  fetchSttModels: (provider: string, apiKey?: string) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
   setSonioxApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   testSttConnection: (provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox', apiKey: string, region?: string) => Promise<{ success: boolean; error?: string }>
 
@@ -632,6 +634,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setAzureRegion: (region: string) => ipcRenderer.invoke("set-azure-region", region),
   setIbmWatsonApiKey: (apiKey: string) => ipcRenderer.invoke("set-ibmwatson-api-key", apiKey),
   setGroqSttModel: (model: string) => ipcRenderer.invoke("set-groq-stt-model", model),
+  setSttModel: (provider: string, model: string) => ipcRenderer.invoke("set-stt-model", provider, model),
+  fetchSttModels: (provider: string, apiKey?: string) => ipcRenderer.invoke("fetch-stt-models", provider, apiKey),
   setSonioxApiKey: (apiKey: string) => ipcRenderer.invoke("set-soniox-api-key", apiKey),
   testSttConnection: (provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox', apiKey: string, region?: string) => ipcRenderer.invoke("test-stt-connection", provider, apiKey, region),
 

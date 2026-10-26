@@ -55,6 +55,8 @@ export interface StoredCredentials {
     sttProvider?: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox';
     groqSttApiKey?: string;
     groqSttModel?: string;
+    /** The model chosen for each speech service (deepgram, openai, elevenlabs, soniox); empty means its default. */
+    sttModels?: Record<string, string>;
     openAiSttApiKey?: string;
     deepgramApiKey?: string;
     elevenLabsApiKey?: string;
@@ -156,6 +158,23 @@ export class CredentialsManager {
 
     public getGroqSttApiKey(): string | undefined {
         return this.credentials.groqSttApiKey;
+    }
+
+    public getSttModel(provider: string): string {
+        if (provider === 'groq') return this.getGroqSttModel();
+        return this.credentials.sttModels?.[provider] || '';
+    }
+
+    public setSttModel(provider: string, model: string): void {
+        if (provider === 'groq') {
+            this.setGroqSttModel(model.trim() || 'whisper-large-v3-turbo');
+            return;
+        }
+        const models = { ...(this.credentials.sttModels || {}) };
+        if (model.trim()) models[provider] = model.trim();
+        else delete models[provider];
+        this.credentials.sttModels = Object.keys(models).length ? models : undefined;
+        this.saveCredentials();
     }
 
     public getGroqSttModel(): string {

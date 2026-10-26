@@ -83,6 +83,7 @@ export class OpenAIStreamingSTT extends EventEmitter {
     // WebSocket state
     private ws: WebSocket | null = null;
     private wsModelIndex = 0;           // index into WS_MODELS
+    private preferredModel = '';        // the model chosen in Settings, tried before WS_MODELS
     private wsFailures   = 0;           // consecutive failures for current WS model
     private reconnectAttempts = 0;
     private reconnectTimer: NodeJS.Timeout | null = null;
@@ -119,6 +120,12 @@ export class OpenAIStreamingSTT extends EventEmitter {
     }
 
     // ─── Public Configuration (STTProvider interface) ─────────────────────────
+
+    /** An empty value keeps the built-in order (gpt-4o-transcribe, then gpt-4o-mini-transcribe). */
+    public setModel(model: string): void {
+        this.preferredModel = model.trim();
+    }
+
 
     public setApiKey(apiKey: string): void {
         this.apiKey = apiKey;
@@ -243,7 +250,7 @@ export class OpenAIStreamingSTT extends EventEmitter {
         this.isConnecting  = true;
         this.isSessionReady = false;
 
-        const model: WsModel = WS_MODELS[this.wsModelIndex] ?? WS_MODELS[0];
+        const model = (this.wsModelIndex === 0 && this.preferredModel ? this.preferredModel : WS_MODELS[this.wsModelIndex] ?? WS_MODELS[0]) as WsModel;
         console.log(`[OpenAIStreaming] Connecting WebSocket (model=${model}, attempt=${this.reconnectAttempts + 1})...`);
 
         this.ws = new WebSocket(REALTIME_WS_URL, {
