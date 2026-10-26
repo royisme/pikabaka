@@ -9,6 +9,7 @@ interface SplitterShellProps {
     right: React.ReactNode;
     splitterPosition: number;
     onSplitterChange: (next: number) => void;
+    onSplitterReset: () => void;
     isExpanded: boolean;
     appearance: ReturnType<typeof getOverlayAppearance>;
     overlayPanelClass: string;
@@ -28,6 +29,7 @@ const SplitterShell: React.FC<SplitterShellProps> = ({
     right,
     splitterPosition,
     onSplitterChange,
+    onSplitterReset,
     appearance,
     overlayPanelClass,
 }) => {
@@ -47,6 +49,7 @@ const SplitterShell: React.FC<SplitterShellProps> = ({
                 <ResizableSplitter
                     position={splitterPosition}
                     onPositionChange={onSplitterChange}
+                    onReset={onSplitterReset}
                     orientation="horizontal"
                 />
                 <section className="min-w-0 min-h-0 flex-1 overflow-hidden flex flex-col bg-black/[0.04]">

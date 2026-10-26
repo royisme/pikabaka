@@ -2,6 +2,16 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: U7 overlay height and splitter (branch `overlay-size`, issues #22, #26)
+
+Done
+- The overlay opens at 420px tall (was `max(current, 216)`, and a fresh window is 1px tall, so 216), or at the height the user last left it: a resize is saved to `overlay-size.json` in the user data folder (500 ms after it settles; anything under 200px is not remembered) and read the next time the overlay opens. It never exceeds the screen's work area.
+- The splitter is `no-drag` (so the overlay's drag region should no longer take its mouse events), is a `role="separator"` with a value, is keyboard-resizable (arrow keys, 2% a step, 10% with Shift) and resets on double-click. The 1-second IPC poll for the passthrough state is replaced by the existing change event.
+- The default split is 55% for the transcript while translation is on and 40% otherwise, until the user moves it; the split was written to `localStorage` on every launch before, so a default could never be told from a choice. Double-click on the splitter forgets the user's split.
+- Verified: both `tsc --noEmit` checks exit 0; tap 477 of 477. No new unit test: the window code imports Electron and the splitter change is event wiring.
+- Not verified: everything visible. The opening height; that the splitter now drags on both platforms (U0 was never run, so this was inferred from the Electron drag-region rule, not observed); that `resized` fires on Windows and macOS after a drag; the 55% default with translation on.
+- Not done from the issue: a `min-h` for the message area and collapsing the chips and footer when the window is short. The input and footer stay visible and the answer list gives way first, which seemed the safer failure for a short window; at 420px there is room.
+
 ## 2026-10-26: U8 conversation-area gaps (branch `conversation-gaps`, issue #27)
 
 Done (checklist of #27)

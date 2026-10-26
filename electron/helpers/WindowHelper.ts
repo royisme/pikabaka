@@ -3,12 +3,18 @@ import { BrowserWindow, screen, app, Menu } from "electron"
 import { AppState } from "../main"
 import { KeybindManager } from "../services/KeybindManager"
 import path from "node:path"
+import fs from "node:fs"
 
 const isEnvDev = process.env.NODE_ENV === "development"
 const isPackaged = app.isPackaged;
 const inAppBundle = process.execPath.includes('.app/') || process.execPath.includes('.app\\');
 
 console.log(`[WindowHelper] isEnvDev: ${isEnvDev}, isPackaged: ${isPackaged}, inAppBundle: ${inAppBundle}`);
+
+// Tall enough for the pill, both zones and the input; the old 216px left the answer list with no height.
+const DEFAULT_OVERLAY_HEIGHT = 420
+// A resize below this is not remembered: it is a dragged-to-nothing window, not a chosen size.
+const MIN_SAVED_OVERLAY_HEIGHT = 200
 
 // Force production mode if running as packaged app or inside app bundle
 const isDev = isEnvDev && !isPackaged;
@@ -301,6 +307,8 @@ export class WindowHelper {
     // Listen for overlay close (e.g. Cmd+W). Never truly destroy it — either
     // hide it (during a meeting) or switch back to launcher (between meetings).
     if (this.overlayWindow) {
+      this.overlayWindow.on('resized', () => this.scheduleSaveOverlayHeight());
+
       this.overlayWindow.on('system-context-menu', (e, point) => {
         e.preventDefault();
         if (!this.appState.getUndetectable()) {
@@ -438,6 +446,37 @@ export class WindowHelper {
     }
   }
 
+  // --- Overlay height ---
+
+  private overlayHeightFile(): string {
+    return path.join(app.getPath('userData'), 'overlay-size.json')
+  }
+
+  private readSavedOverlayHeight(): number | null {
+    try {
+      const height = Number(JSON.parse(fs.readFileSync(this.overlayHeightFile(), 'utf-8'))?.height)
+      return Number.isFinite(height) && height >= MIN_SAVED_OVERLAY_HEIGHT ? Math.round(height) : null
+    } catch {
+      return null
+    }
+  }
+
+  private saveOverlayHeightTimer: NodeJS.Timeout | null = null
+
+  /** The user's resize is remembered across launches; a drag fires many events, so write once it settles. */
+  private scheduleSaveOverlayHeight(): void {
+    if (this.saveOverlayHeightTimer) clearTimeout(this.saveOverlayHeightTimer)
+    this.saveOverlayHeightTimer = setTimeout(() => {
+      const height = this.overlayWindow && !this.overlayWindow.isDestroyed() ? this.overlayWindow.getBounds().height : 0
+      if (height < MIN_SAVED_OVERLAY_HEIGHT) return
+      try {
+        fs.writeFileSync(this.overlayHeightFile(), JSON.stringify({ height }))
+      } catch (error) {
+        console.warn('[WindowHelper] Could not save the overlay height:', error)
+      }
+    }, 500)
+  }
+
   // --- Swapping Logic ---
 
   public switchToOverlay(inactive?: boolean): void {
@@ -455,7 +494,11 @@ export class WindowHelper {
       const primaryDisplay = screen.getPrimaryDisplay()
       const workArea = primaryDisplay.workArea;
       const currentBounds = this.overlayWindow.getBounds();
-      const targetHeight = Math.max(currentBounds.height, 216);
+      // A fresh window is 1px tall: open at the height the user left it last time, or a size that has room for an answer.
+      const targetHeight = Math.min(
+        workArea.height,
+        currentBounds.height > 1 ? currentBounds.height : this.readSavedOverlayHeight() ?? DEFAULT_OVERLAY_HEIGHT
+      );
       const overlayWidth = Math.min(600, Math.floor(screen.getPrimaryDisplay().workAreaSize.width * 0.9));
       const overlayX = Math.floor(workArea.x + (workArea.width - overlayWidth) / 2)
       const overlayY = Math.floor(workArea.y + (workArea.height - targetHeight) / 2)
