@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai"
+import { GoogleGenAI, ThinkingLevel } from "@google/genai"
 import Groq from "groq-sdk"
 import OpenAI from "openai"
 import Anthropic from "@anthropic-ai/sdk"
@@ -26,6 +26,18 @@ import { buildTranscriptTranslationPrompt } from '../transcript/translationExecu
 import { classifyTranslationError } from '../transcript/translationError';
 import { anthropicDeltas, geminiDeltas, ollamaDeltas, openAIDeltas, streamText } from '../transcript/translationStream';
 const execAsync = promisify(exec);
+
+/**
+ * Translation is a rewrite, not a puzzle: a Gemini model that thinks first answers 5 to 8 seconds late.
+ * Gemini 3 takes a thinking level (Pro cannot go below low); 2.5 Flash takes a zero budget.
+ * Any other model id is left as it is.
+ */
+function translationThinking(model: string): { thinkingConfig: { thinkingLevel?: ThinkingLevel; thinkingBudget?: number } } | undefined {
+  const id = model.toLowerCase();
+  if (id.includes('gemini-3')) return { thinkingConfig: { thinkingLevel: id.includes('pro') ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL } };
+  if (id.includes('gemini-2.5-flash')) return { thinkingConfig: { thinkingBudget: 0 } };
+  return undefined;
+}
 
 function isOpenAICompatibleProvider(
   p: CustomProvider | CurlProvider | OpenAICompatibleProvider
@@ -455,6 +467,7 @@ export class LLMHelper {
       const response = await clients.gemini().models.generateContent({
         model,
         contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config: translationThinking(model),
       });
       return response.text || "";
     }
@@ -562,6 +575,7 @@ export class LLMHelper {
       const stream = await clients.gemini().models.generateContentStream({
         model,
         contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config: translationThinking(model),
       });
       return streamText(geminiDeltas(stream), onProgress);
     }
@@ -607,6 +621,7 @@ export class LLMHelper {
       const stream = await client.models.generateContentStream({
         model,
         contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+        config: translationThinking(model),
       });
       return streamText(geminiDeltas(stream), onProgress);
     }
@@ -724,6 +739,7 @@ export class LLMHelper {
       const response = await client.models.generateContent({
         model,
         contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+        config: translationThinking(model),
       });
       return (response.text || "").trim();
     }
