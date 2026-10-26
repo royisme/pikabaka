@@ -93,6 +93,15 @@ export function getTranscriptAssemblerThresholds(appState: AppState): Transcript
   return TRANSCRIPT_ASSEMBLER_THRESHOLDS[profile];
 }
 
+/** A result for a revision that is no longer the segment's latest must be dropped. Results without a revision are never superseded. */
+export function isSupersededRevision(
+  latest: ReadonlyMap<string, number>,
+  segmentId: string,
+  revision: number | undefined
+): boolean {
+  return revision !== undefined && latest.get(segmentId) !== revision;
+}
+
 export function emitNativeAudioTranscript(appState: AppState, payload: any): void {
   const helper = appState.getWindowHelper();
   helper.getLauncherWindow()?.webContents.send('native-audio-transcript', payload);
@@ -238,6 +247,8 @@ export function bufferFinalTranscriptChunk(
       };
       state.transcriptTurnBuffers[speaker] = buffer;
       state.lastFlushedTranscriptTurns[speaker] = null;
+      // From here the old revision is superseded: a translation still running for it must not be shown.
+      state.transcriptSegmentRevisions.set(buffer.segmentId, buffer.revision);
     } else if (lf) {
       sealFlushedTranscriptTurn(appState, speaker); // superseded: feed RAG now, clear slot
     }
@@ -501,7 +512,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
   // Each report is the whole translation so far; it only ever grows, so the row can show it as final text.
   const onProgress = (textSoFar: string) => {
     firstTokenAt ??= Date.now();
-    if (revision !== undefined && state.transcriptSegmentRevisions.get(segmentId) !== revision) return;
+    if (isSupersededRevision(state.transcriptSegmentRevisions, segmentId, revision)) return;
     emitNativeAudioTranscript(appState, {
       speaker,
       text,
@@ -551,7 +562,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
 
     logTiming('complete', translatedText.length);
 
-    if (revision !== undefined && state.transcriptSegmentRevisions.get(segmentId) !== revision) {
+    if (isSupersededRevision(state.transcriptSegmentRevisions, segmentId, revision)) {
       return { success: false, error: 'superseded by newer revision' };
     }
 
@@ -591,7 +602,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
     // Only the reason is logged: a provider's message can echo the transcript.
     console.warn('[Main] Transcript translation failed:', reason);
     logTiming('error', 0);
-    if (revision !== undefined && state.transcriptSegmentRevisions.get(segmentId) !== revision) {
+    if (isSupersededRevision(state.transcriptSegmentRevisions, segmentId, revision)) {
       return { success: false, error: 'superseded by newer revision' };
     }
     emitNativeAudioTranscript(appState, {

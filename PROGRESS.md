@@ -2,6 +2,16 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: a reopened turn supersedes its old revision at once (branch `reopen-revision-guard`)
+
+Found by the STT audit for R5 (read-only subagent, then checked in the code)
+- `transcriptSegmentRevisions` was only set when a turn flushed, not when it was reopened. Between the reopen and the next flush, a translation still running for the old revision passed the guard and was shown (and, since the streaming change, its tokens too), replaced only when the new revision flushed.
+
+Done
+- The reopen now records the new revision at once, and the three guard sites use one function, `isSupersededRevision` (tested: older revision dropped, current kept, no revision never superseded, a segment with no recorded revision drops the result as before).
+- Verified: `tsc` electron exit 0; tap 759 of 759. Not verified: the reopen path itself (it needs a reopened turn with a translation in flight; the helper is tested, the assignment is not).
+- Not fixed, listed in the audit: manual retranslate (`translateTranscriptSegment`) sends no revision, so it has no guard; and `recentTranslatedTurns` is overwritten for a reopened segment, changing the context later translations see.
+
 ## 2026-10-26: S2 real lint and CI (branch `lint-and-ci`, issue #35)
 
 Done (S2, issue #35; the owner approved the new dev dependency)

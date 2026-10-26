@@ -4,6 +4,7 @@ import {
   countTranscriptWords,
   mergeTranscriptText,
   endsSentence,
+  isSupersededRevision,
   type TranscriptAssemblerThresholds,
 } from '../electron/lib/transcript-assembler';
 import { buildTranscriptTranslationPrompt } from '../electron/transcript/translationExecutor';
@@ -289,5 +290,14 @@ t.test('upsertTranscriptSegment patch keeps original timestamp', (t) => {
     timestamp: 99999,
   });
   t.equal(patched[0].timestamp, 11111, 'patch keeps original timestamp, ignores event.timestamp');
+  t.end();
+});
+
+t.test('isSupersededRevision drops results for an older revision, and only those', (t) => {
+  const latest = new Map([['seg1', 2]]);
+  t.equal(isSupersededRevision(latest, 'seg1', 1), true, 'older revision');
+  t.equal(isSupersededRevision(latest, 'seg1', 2), false, 'current revision');
+  t.equal(isSupersededRevision(latest, 'seg1', undefined), false, 'no revision is never superseded');
+  t.equal(isSupersededRevision(latest, 'unknown', 1), true, 'a segment with no recorded revision (cleared on reset) drops the result');
   t.end();
 });
