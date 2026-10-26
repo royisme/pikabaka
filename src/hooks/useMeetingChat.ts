@@ -17,6 +17,8 @@ export type Message = {
   isStreaming?: boolean;
   /** A failure message: shown as an error, not as an answer. */
   isError?: boolean;
+  /** What the other party said last, for the "Re:" line of a what-to-say answer. */
+  replyTo?: string;
   hasScreenshot?: boolean;
   screenshotPreview?: string;
   isCode?: boolean;
@@ -42,7 +44,7 @@ type KnowledgeContext = {
 
 type AttachedContext = Array<{ path: string; preview: string }>;
 
-export function useMeetingChat() {
+export function useMeetingChat(options: { getReplyContext?: () => string | undefined } = {}) {
   const [knowledgeContext, setKnowledgeContext] = useState<KnowledgeContext | null>(null);
   const [attachedContext, setAttachedContext] = useState<AttachedContext>([]);
   const [actionButtonMode, setActionButtonMode] = useState<'recap' | 'brainstorm'>('recap');
@@ -492,6 +494,7 @@ export function useMeetingChat() {
 
     console.log('[submitPrompt] entry', { promptText: promptText.slice(0, 60), placeholderIntent, echoPrompt, attachments: currentAttachments.length });
 
+    const replyTo = placeholderIntent === 'what_to_answer' ? options.getReplyContext?.() : undefined;
     const echo = userEchoMessage({ id: Date.now().toString(), promptText, echoPrompt, attachments: currentAttachments });
     if (echo) setSystemMessages((prev) => [...prev, echo]);
 
@@ -504,6 +507,7 @@ export function useMeetingChat() {
           text: '',
           isStreaming: true,
           ...(placeholderIntent ? { intent: placeholderIntent } : {}),
+          ...(replyTo ? { replyTo } : {}),
         },
       ];
       console.log('[submitPrompt] added streaming placeholder, systemMessages count =', next.length);

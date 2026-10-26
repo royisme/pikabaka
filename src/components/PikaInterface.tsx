@@ -15,6 +15,7 @@ import { isNearBottom, nextScrollAction } from '../lib/answerScroll';
 import { toggleOriginal } from '../lib/transcriptDisplay';
 import { audioStatus } from '../lib/audioStatus';
 import { modelLabel } from '../lib/modelLabel';
+import { latestOtherPartyText } from '../lib/answerLead';
 
 interface PikaInterfaceProps { onEndMeeting?: () => void; overlayOpacity?: number; }
 type ScreenshotAttachment = { path: string; preview: string };
@@ -36,7 +37,8 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const { shortcuts, isShortcutPressed } = useShortcuts();
     const transcript = useMeetingTranscript();
     const audio = useMeetingAudio();
-    const chat = useMeetingChat();
+    const replyContextRef = useRef<() => string | undefined>(() => undefined);
+    const chat = useMeetingChat({ getReplyContext: () => replyContextRef.current() });
     const appearance = useMemo(() => getOverlayAppearance(overlayOpacity, isLightTheme ? 'light' : 'dark'), [overlayOpacity, isLightTheme]);
 
     // The split is the user's once they move it. Until then it follows what the zone is for: more room for the
@@ -128,6 +130,8 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
 
     const fixAudio = useCallback(() => { void window.electronAPI.openSettingsSection('audio'); }, []);
     const hasTranscriptRows = transcript.transcriptSegments.length > 0 || transcript.isInterviewerSpeaking;
+
+    replyContextRef.current = () => latestOtherPartyText(transcript.transcriptSegments, transcript.currentInterviewerPartial);
 
     const transcriptRef = useRef(transcript);
     transcriptRef.current = transcript;

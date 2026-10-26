@@ -2,6 +2,7 @@ import React from 'react';
 import type { ShortcutConfig } from '../../hooks/useShortcuts';
 import { KeyBadge } from '../ui/KeyBadge';
 import { answerEmptyHint } from '../../lib/answerEmpty';
+import { splitLead } from '../../lib/answerLead';
 import type { AudioStatusKey } from '../../lib/audioStatus';
 import {
   MessageSquare,
@@ -31,6 +32,8 @@ interface Message {
   text: string;
   isStreaming?: boolean;
   isError?: boolean;
+  /** What the other party said last, for the "Re:" line of a what-to-say answer. */
+  replyTo?: string;
   hasScreenshot?: boolean;
   screenshotPreview?: string;
   isCode?: boolean;
@@ -124,6 +127,63 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     navigator.clipboard.writeText(text).catch(console.error);
   };
 
+  // One code block for every answer layout, with its own Copy: copying the snippet is what the reader wants mid-call.
+  const renderCodeBlock = (key: React.Key, lang: string, code: string) => (
+    <div key={key} className={`my-3 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
+      <div className={`flex items-center justify-between px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
+        <span className={`text-[11px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
+          {!lang || lang === 'text' ? 'code' : lang}
+        </span>
+        <button
+          type="button"
+          onClick={() => handleCopy(code)}
+          aria-label="Copy code"
+          className="inline-flex items-center gap-1 text-[11px] overlay-text-secondary hover:text-text-primary"
+        >
+          <Copy className="w-3 h-3" aria-hidden="true" />
+          <span>Copy</span>
+        </button>
+      </div>
+      <div className="bg-transparent">
+        <SyntaxHighlighter
+          language={lang}
+          style={codeTheme}
+          customStyle={{
+            margin: 0,
+            borderRadius: 0,
+            fontSize: '13px',
+            lineHeight: '1.6',
+            background: 'transparent',
+            padding: '16px',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
+          }}
+          wrapLongLines={true}
+          showLineNumbers={code.split('\n').length > 6}
+          lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1.2em', color: codeLineNumberColor, textAlign: 'right', fontSize: '11px' }}
+        >
+          {code}
+        </SyntaxHighlighter>
+      </div>
+    </div>
+  );
+
+  const renderSayMarkdown = (text: string) => (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm, remarkMath]}
+      rehypePlugins={[rehypeKatex]}
+      components={{
+        p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
+        strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-emerald-700' : 'text-state-success'}`} {...props} />,
+        em: ({ node, ...props }: any) => <em className={`italic ${isLightTheme ? 'text-emerald-700/80' : 'text-emerald-200/80'}`} {...props} />,
+        ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
+        ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
+        li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
+      }}
+    >
+      {text}
+    </ReactMarkdown>
+  );
+
   const renderMessageText = (msg: Message) => {
     if (msg.isNegotiationCoaching && msg.negotiationCoachingData) {
       return (
@@ -158,35 +218,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 if (match) {
                   const lang = match[1] || 'text';
                   const code = match[2].trim();
-                  return (
-                    <div key={i} className={`my-3 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
-                      <div className={`px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
-                        <span className={`text-[11px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
-                          {lang === 'text' ? 'code' : lang}
-                        </span>
-                      </div>
-                      <div className="bg-transparent">
-                        <SyntaxHighlighter
-                          language={lang}
-                          style={codeTheme}
-                          customStyle={{
-                            margin: 0,
-                            borderRadius: 0,
-                            fontSize: '13px',
-                            lineHeight: '1.6',
-                            background: 'transparent',
-                            padding: '16px',
-                            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
-                          }}
-                          wrapLongLines={true}
-                          showLineNumbers={code.split('\n').length > 6}
-                          lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1.2em', color: codeLineNumberColor, textAlign: 'right', fontSize: '11px' }}
-                        >
-                          {code}
-                        </SyntaxHighlighter>
-                      </div>
-                    </div>
-                  );
+                  return renderCodeBlock(i, lang, code);
                 }
               }
               return (
@@ -287,16 +319,21 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
       return (
         <div className={`rounded-lg p-3 my-1 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
+          {msg.replyTo && (
+            <div className="mb-1 truncate text-[11px] overlay-text-muted" title={msg.replyTo}>
+              Re: {msg.replyTo}
+            </div>
+          )}
           <div className="flex items-center gap-2 mb-2 text-state-success font-medium text-[11px] tracking-[0.02em]">
             <span>Say this</span>
           </div>
-          <div className="text-[14px] leading-relaxed overlay-text-primary">
+          <div className="text-sm leading-relaxed overlay-text-primary">
             {parts.map((part, i) => {
               if (part.startsWith('```')) {
                 const match = part.match(/```(\w*)\s+([\s\S]*?)(?:```|$)/);
 
                 if (match || part.startsWith('```')) {
-                  const lang = (match && match[1]) ? match[1] : 'python';
+                  const lang = (match && match[1]) ? match[1] : 'text';
                   let code = '';
 
                   if (match && match[2]) {
@@ -305,55 +342,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     code = part.replace(/^```\w*\s*/, '').replace(/```$/, '').trim();
                   }
 
-                  return (
-                    <div key={i} className={`my-3 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
-                      <div className={`px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
-                        <span className={`text-[11px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
-                          {lang || 'CODE'}
-                        </span>
-                      </div>
-
-                      <div className="bg-transparent">
-                        <SyntaxHighlighter
-                          language={lang}
-                          style={codeTheme}
-                          customStyle={{
-                            margin: 0,
-                            borderRadius: 0,
-                            fontSize: '13px',
-                            lineHeight: '1.6',
-                            background: 'transparent',
-                            padding: '16px',
-                            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
-                          }}
-                          wrapLongLines={true}
-                          showLineNumbers={true}
-                          lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1.2em', color: codeLineNumberColor, textAlign: 'right', fontSize: '11px' }}
-                        >
-                          {code}
-                        </SyntaxHighlighter>
-                      </div>
-                    </div>
-                  );
+                  return renderCodeBlock(i, lang, code);
                 }
               }
+              // The first sentence is what to say: larger than the explanation after it.
+              const { lead, rest } = i === 0 ? splitLead(part) : { lead: '', rest: part };
               return (
-                <div key={i} className="markdown-content">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkMath]}
-                    rehypePlugins={[rehypeKatex]}
-                    components={{
-                      p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
-                      strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-emerald-700' : 'text-state-success'}`} {...props} />,
-                      em: ({ node, ...props }: any) => <em className={`italic ${isLightTheme ? 'text-emerald-700/80' : 'text-emerald-200/80'}`} {...props} />,
-                      ul: ({ node, ...props }: any) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
-                      ol: ({ node, ...props }: any) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
-                      li: ({ node, ...props }: any) => <li className="pl-1" {...props} />,
-                    }}
-                  >
-                    {part}
-                  </ReactMarkdown>
-                </div>
+                <React.Fragment key={i}>
+                  {lead && (
+                    <div className="markdown-content text-base font-medium leading-6 mb-2">{renderSayMarkdown(lead)}</div>
+                  )}
+                  {rest && <div className="markdown-content">{renderSayMarkdown(rest)}</div>}
+                </React.Fragment>
               );
             })}
           </div>

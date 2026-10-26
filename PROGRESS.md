@@ -2,6 +2,15 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: U5 answer card: Re line, lead sentence, code Copy (branch `answer-card`, issue #25)
+
+Done (the live overlay part of #25)
+- A "what to say" answer shows "Re: <what the other party said last>" above its "Say this" label, and its first sentence at 16px / 500 above the explanation at 14px (`splitLead`; while the answer streams and has no sentence end yet, the text so far is the lead). The "Re:" text is the newest final line of the other party (`latestOtherPartyText`, which skips your own speech and falls back to the live partial), stored on the answer when it is requested.
+- One code block renderer for every layout, with its own "Copy" in the block header; no language means plain text ("code"), no longer Python (the "what to say" layout still defaulted to Python and had its own copy of the code block; both now share one).
+- Verified: both `tsc --noEmit` checks exit 0; lint exit 0 (1268 warnings, unchanged); tap passes (12 new assertions: first-sentence split including question marks, full-width stops, a stretch like "e.g." not taken for a sentence, code fences kept whole in the rest, and the reply-context helper).
+- Not done: the other three answer renderers (`MeetingChatOverlay`, `GlobalChatOverlay`, the post-meeting `MeetingDetails`) still render answers themselves; they are other windows with their own layouts and I did not merge them into the overlay's answer component. The intent-label chip for answers other than "Say this" is unchanged. The speaker vocabulary (Interviewer / Them / Me) is still the owner's decision. The automatic suggestions the engine makes on its own have no "Re:" line (only requested "what to say" answers do).
+- Not verified: how the 16px lead reads in the running app at 380 and 600px, and whether the "Re:" line truncates sensibly.
+
 ## 2026-10-26: Stop and Retry (branch `stop-and-retry`, issue #27)
 
 Done (the main-process part of the old "stop and retry" gap in #27)
