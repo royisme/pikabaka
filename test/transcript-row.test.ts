@@ -1,5 +1,5 @@
 import t from 'tap';
-import { hasUsableTranslation, rowSlot, transcriptRowParts } from '../src/lib/transcriptRow';
+import { failureReasonText, hasUsableTranslation, rowSlot, transcriptRowParts } from '../src/lib/transcriptRow';
 import { toggleOriginal } from '../src/lib/transcriptDisplay';
 
 const translated = { sourceText: 'Can we move the call to Friday?', translatedText: '我们能把电话改到周五吗？', translationState: 'complete' as const };
@@ -52,7 +52,7 @@ t.test('the slot exists from the first live words to the finished translation', 
   t.same(rowSlot('live', ctx), { kind: 'live' });
   t.same(rowSlot({ ...pending, ...other }, ctx), { kind: 'translating', elapsedSeconds: null });
   t.same(rowSlot({ ...translated, ...other }, ctx), { kind: 'translation' });
-  t.same(rowSlot({ ...pending, ...other, translationState: 'error' }, ctx), { kind: 'failed' });
+  t.same(rowSlot({ ...pending, ...other, translationState: 'error' }, ctx), { kind: 'failed', reason: undefined });
   for (const slot of [rowSlot('live', ctx), rowSlot({ ...pending, ...other }, ctx), rowSlot({ ...translated, ...other }, ctx)]) {
     t.not(slot, null, 'live, pending and complete all have a slot, so a late translation shifts nothing');
   }
@@ -94,7 +94,7 @@ t.test('a stale translation with no request behind it is hidden, never shown as 
     t.equal(parts.lead, 'See you Monday morning');
   }
   const failed = { ...stale, translationState: 'error' as const, speaker: 'interviewer' as const };
-  t.same(rowSlot(failed, ctx), { kind: 'failed' }, 'a failed redo shows the failure, not the old translation');
+  t.same(rowSlot(failed, ctx), { kind: 'failed', reason: undefined }, 'a failed redo shows the failure, not the old translation');
   t.equal(transcriptRowParts(failed, 'both', false).kind, 'awaiting');
 });
 
@@ -107,4 +107,14 @@ t.test('the header Original toggle flips both and translated, and never writes o
   t.equal(toggleOriginal('both'), 'translated');
   t.equal(toggleOriginal('translated'), 'both');
   t.equal(toggleOriginal('original'), 'both');
+});
+
+t.test('a failure names its reason in a few words', async (t) => {
+  t.equal(rowSlot({ ...pending, ...other, translationState: 'error', translationError: 'timeout' }, ctx)?.kind, 'failed');
+  t.equal(failureReasonText('timeout'), 'timed out');
+  t.equal(failureReasonText('auth'), 'check the API key');
+  t.equal(failureReasonText('rate-limit'), 'rate limited');
+  t.equal(failureReasonText('network'), 'no connection');
+  t.equal(failureReasonText('other'), '');
+  t.equal(failureReasonText(undefined), '');
 });

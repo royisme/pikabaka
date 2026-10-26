@@ -89,6 +89,7 @@ export function useMeetingTranscript() {
               speakerLabel: 'Me',
               timestamp: transcript.timestamp,
               translationState: transcript.translationState,
+              translationError: transcript.translationError,
               detectedLanguage: transcript.detectedLanguage,
               revision: transcript.revision,
             })
@@ -125,6 +126,7 @@ export function useMeetingTranscript() {
             speakerLabel: speakerFromPayload || undefined,
             timestamp: transcript.timestamp,
             translationState: transcript.translationState,
+            translationError: transcript.translationError,
             detectedLanguage: transcript.detectedLanguage,
             revision: transcript.revision,
           })

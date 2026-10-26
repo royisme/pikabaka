@@ -2,6 +2,15 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: T8 error reason on the translation event (branch `translation-error-reason`, epic #38)
+
+Done
+- A failed translation now carries a reason. `classifyTranslationError` (`electron/transcript/translationError.ts`) reduces any error to `timeout`, `auth`, `rate-limit`, `network` or `other` from the status, code, name and message. Only that reason leaves the function: the main process logs the reason alone (it used to log the provider's message, which can echo the request) and sends it on the `native-audio-transcript` event as the optional `translationError`. The `error` return of the manual-translate call is the reason too.
+- The renderer keeps the reason while the state is `error` and clears it on retry. The failed slot reads "Translation failed · timed out" (or "check the API key", "rate limited", "no connection"; nothing extra for `other`).
+- This is the additive IPC payload change the owner approved on 2026-10-26; old readers ignore the field. Types updated in `electron/preload/types.ts` and `src/types/electron.d.ts`.
+- Verified: both `tsc --noEmit` checks exit 0; tap passes (23 new assertions for the classifier, slot reasons and the segment field).
+- Not verified: against real providers. The classifier was written from the error shapes the code expects (HTTP status, Node error codes, `AbortError`, message wording); a real OpenAI, Gemini, Claude, Groq or Ollama failure may land in `other`. Check it by breaking a key and by switching the network off.
+
 ## 2026-10-26: T6 announcer and keyboard (branch `transcript-a11y`, epic #38)
 
 Done

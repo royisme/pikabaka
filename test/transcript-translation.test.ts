@@ -119,3 +119,13 @@ t.test('segments without revisions are never stale', (t) => {
   t.equal(isTranslationStale({ translatedText: undefined, revision: 3, translatedRevision: undefined }), false, 'nothing to be stale');
   t.end();
 });
+
+t.test('translationError is kept only while the state is error', (t) => {
+  const failed = upsertTranscriptSegment([], { final: true, text: 'Hello', segmentId: 's1', translationState: 'error', translationError: 'timeout' });
+  t.equal(failed[0].translationError, 'timeout');
+  const retried = upsertTranscriptSegment(failed, { final: true, text: 'Hello', segmentId: 's1', translationState: 'pending' });
+  t.equal(retried[0].translationError, undefined, 'a retry clears the reason');
+  const ok = upsertTranscriptSegment([], { final: true, text: 'Hi', segmentId: 's2', translationState: 'complete', translationError: 'auth' });
+  t.equal(ok[0].translationError, undefined, 'a reason on a non-error event is ignored');
+  t.end();
+});

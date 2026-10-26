@@ -71,13 +71,26 @@ export type RowSlot =
   | { kind: 'live' }
   /** A translation is on its way; elapsedSeconds is set only once it has been slow for a while. */
   | { kind: 'translating'; elapsedSeconds: number | null }
-  | { kind: 'failed' }
+  | { kind: 'failed'; reason: TranscriptSegment['translationError'] }
   /** The translation itself fills the slot. */
   | { kind: 'translation' }
   | null;
 
 /** A translation is called slow, and its elapsed time shown, after this long. */
 export const SLOW_TRANSLATION_MS = 3000;
+
+const FAILURE_REASON_TEXT: Record<NonNullable<TranscriptSegment['translationError']>, string> = {
+  timeout: 'timed out',
+  auth: 'check the API key',
+  'rate-limit': 'rate limited',
+  network: 'no connection',
+  other: '',
+};
+
+/** The short words after "Translation failed", or an empty string when the reason is unknown. */
+export function failureReasonText(reason: TranscriptSegment['translationError']): string {
+  return reason ? FAILURE_REASON_TEXT[reason] : '';
+}
 
 /**
  * The slot is the line above the source text that holds "Live", then "Translating", then the
@@ -88,7 +101,7 @@ export const SLOW_TRANSLATION_MS = 3000;
 export function rowSlot(
   row:
     | 'live'
-    | (TranslationFields & Pick<TranscriptSegment, 'receivedAt' | 'speaker'>),
+    | (TranslationFields & Pick<TranscriptSegment, 'receivedAt' | 'speaker' | 'translationError'>),
   context: { mode: TranscriptDisplayMode; translationOn: boolean; now: number }
 ): RowSlot {
   if (context.mode === 'original') return null;
@@ -96,7 +109,7 @@ export function rowSlot(
   if (row.speaker === 'user') return null;
   if (hasUsableTranslation(row)) return { kind: 'translation' };
   if (!context.translationOn) return null;
-  if (row.translationState === 'error') return { kind: 'failed' };
+  if (row.translationState === 'error') return { kind: 'failed', reason: row.translationError };
   if (row.translationState !== 'pending') return null;
   const waitedMs = row.receivedAt === undefined ? 0 : context.now - row.receivedAt;
   return { kind: 'translating', elapsedSeconds: waitedMs >= SLOW_TRANSLATION_MS ? Math.floor(waitedMs / 1000) : null };

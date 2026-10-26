@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Languages, TriangleAlert } from 'lucide-react';
 import type { TranscriptDisplayMode, TranscriptSegment } from '../../lib/transcriptSegments';
-import { rowSlot, transcriptRowParts, type RowSlot } from '../../lib/transcriptRow';
+import { failureReasonText, rowSlot, transcriptRowParts, type RowSlot } from '../../lib/transcriptRow';
 import { countNewRows, isNearBottom, nextTranscriptScroll } from '../../lib/answerScroll';
 import { nextAnnouncement } from '../../lib/transcriptAnnounce';
 
@@ -37,7 +37,9 @@ function SlotLine({ slot, onRetry }: { slot: RowSlot; onRetry?: () => void }) {
             {slot.kind === 'failed' && (
                 <>
                     <TriangleAlert className="h-3 w-3 text-state-danger" aria-hidden="true" />
-                    <span className="text-state-danger">Translation failed</span>
+                    <span className="text-state-danger">
+                        {slot.reason && failureReasonText(slot.reason) ? `Translation failed · ${failureReasonText(slot.reason)}` : 'Translation failed'}
+                    </span>
                     {onRetry && (
                         <button
                             type="button"

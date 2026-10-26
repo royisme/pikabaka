@@ -10,6 +10,8 @@ export interface TranscriptSegment {
   detectedLanguage?: string;
   revision?: number;
   speaker?: 'interviewer' | 'user';
+  /** Why the latest translation failed; set only while `translationState` is `error`. */
+  translationError?: 'timeout' | 'auth' | 'rate-limit' | 'network' | 'other';
   /** The `revision` of the source text that `translatedText` translates. */
   translatedRevision?: number;
   /** Renderer clock time at which the latest `pending` event arrived; drives the elapsed time of a slow translation. */
@@ -29,6 +31,7 @@ export interface TranscriptEventForSegment {
   translationState?: 'pending' | 'complete' | 'error' | 'skipped';
   detectedLanguage?: string;
   revision?: number;
+  translationError?: TranscriptSegment['translationError'];
 }
 
 function defaultSpeakerLabelForEvent(event: TranscriptEventForSegment): string {
@@ -83,6 +86,7 @@ export function upsertTranscriptSegment(
         detectedLanguage: event.detectedLanguage || undefined,
         revision: event.revision,
         speaker: event.speaker,
+        translationError: translationState === 'error' ? event.translationError : undefined,
         translatedRevision: event.translatedText?.trim() ? event.revision : undefined,
         receivedAt: translationState === 'pending' ? now : undefined,
       },
@@ -110,6 +114,7 @@ export function upsertTranscriptSegment(
     detectedLanguage: event.detectedLanguage || existing.detectedLanguage,
     revision: event.revision ?? existing.revision,
     speaker: event.speaker ?? existing.speaker,
+    translationError: (event.translationState || existing.translationState) === 'error' ? event.translationError : undefined,
     translatedRevision: event.translatedText?.trim()
       ? (event.revision ?? existing.revision)
       : existing.translatedRevision,

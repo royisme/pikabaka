@@ -1,3 +1,4 @@
+import { classifyTranslationError } from "../transcript/translationError";
 import type { AppState } from "../main"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { isTranscriptTranslationConfigured, isSameLanguage } from "../transcript/translationExecutor"
@@ -540,8 +541,10 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
       revision,
     });
     return { success: true, translatedText: translatedText || undefined };
-  } catch (error: any) {
-    console.warn('[Main] Transcript translation failed:', error?.message || error);
+  } catch (error: unknown) {
+    const reason = classifyTranslationError(error);
+    // Only the reason is logged: a provider's message can echo the transcript.
+    console.warn('[Main] Transcript translation failed:', reason);
     if (revision !== undefined && state.transcriptSegmentRevisions.get(segmentId) !== revision) {
       return { success: false, error: 'superseded by newer revision' };
     }
@@ -556,10 +559,11 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
       confidence,
       displayMode,
       translationState: 'error' as const,
+      translationError: reason,
       speakerLabel,
       detectedLanguage,
       revision,
     });
-    return { success: false, error: error?.message || 'Transcript translation failed' };
+    return { success: false, error: reason };
   }
 }

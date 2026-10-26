@@ -62,7 +62,7 @@ Design: `docs/design-live-translation-ui.md`. The owner wants to use Pika on a p
 | T5 | Zone header controls and status dot (on/off, target language, original toggle) | settings persist through the existing `set-transcript-translation-settings` channel; "Set up translation" opens Settings | #38 | done on branch `transcript-header` (stacked); owner checks at 380px |
 | T6 | Announcer and keyboard (`aria-live` off on the list, one announcement per complete translation, End resumes follow) | VoiceOver reads each complete translation once and no partials | #38 | done on branch `transcript-a11y` (stacked); owner checks with VoiceOver |
 | T7 | Global toggle shortcuts | `Cmd+Alt+O` and `Cmd+Alt+T` work while the overlay is unfocused; Windows defaults chosen on a real keyboard | #38 | owner approved 2026-10-26 (new keybind ids) |
-| T8 | Error reason on the translation event | the slot shows "timeout" or "auth"; logs carry no text | #38 | owner approved 2026-10-26 (additive IPC payload change) |
+| T8 | Error reason on the translation event | the slot shows "timeout" or "auth"; logs carry no text | #38 | done on branch `translation-error-reason` (stacked); owner checks with a wrong key and with the network off |
 | T9 | Streaming tokens in the slot | first token appears within the time measured on #29; a superseded revision writes nothing | #38 | blocked on R1 and R2 |
 | T10 | Committed and preview rendering | reducer test: committed only appends, preview is replaced; owner checks committed text never moves | #38 | blocked on R3 |
 
