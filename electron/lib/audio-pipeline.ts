@@ -1,3 +1,4 @@
+import { EchoFilter } from './echo-filter';
 import { BrowserWindow, systemPreferences } from "electron"
 import type { AppState } from "../main"
 import { SystemAudioCapture } from "../audio/SystemAudioCapture"
@@ -130,6 +131,22 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
 
     const timestamp = Date.now();
     const trimmed = segment.text?.trim();
+
+    // The speakers can be heard by the microphone: a line of "Me" that repeats what the other party's stream
+    // just produced is that audio again, not the user speaking.
+    if (trimmed) {
+      state.echoFilter ??= new EchoFilter();
+      const echoFilter = state.echoFilter as EchoFilter;
+      if (speaker === 'interviewer') {
+        echoFilter.noteOther(trimmed, timestamp);
+      } else if (echoFilter.isEcho(trimmed, timestamp)) {
+        state.echoLinesDropped = (state.echoLinesDropped ?? 0) + 1;
+        if (state.echoLinesDropped % 25 === 1) {
+          console.log(`[Main] Dropped ${state.echoLinesDropped} microphone lines that repeat the other party's audio (the microphone hears the speakers)`);
+        }
+        return;
+      }
+    }
 
     // Boundary-only events (empty text) must not reach intelligence handling
     if (trimmed) {
