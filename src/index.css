@@ -542,6 +542,10 @@ a {
   cursor: default !important;
 }
 
+/* The splitter is interactive inside a no-drag region: keep its resize cursor. */
+.no-drag.cursor-row-resize { cursor: row-resize !important; }
+.no-drag.cursor-col-resize { cursor: col-resize !important; }
+
 /* Explicit cursor class when pointer is explicitly needed */
 .cursor-pointer {
   cursor: pointer;

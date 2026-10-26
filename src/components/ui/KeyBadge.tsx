@@ -36,7 +36,7 @@ export const KeyBadge: React.FC<KeyBadgeProps> = ({ keys, className = '', size =
                             ${textSize}
                             ${mod ? padModifier : padKey}
                             ${onAction
-                                ? 'bg-white/20 text-white'
+                                ? 'bg-black/20 text-white'
                                 : 'overlay-control-surface overlay-text-secondary'
                             }
                             ${mod && isTextModifier ? 'min-w-[28px]' : ''}

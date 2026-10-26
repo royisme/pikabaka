@@ -104,7 +104,7 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
         } ${
           isDragging
             ? 'bg-accent-primary shadow-[0_0_6px_rgba(59,130,246,0.5)]'
-            : 'bg-border-subtle group-hover:bg-accent-primary/60'
+            : 'bg-[var(--overlay-border-soft)] group-hover:bg-[var(--overlay-border)]'
         }`}
       />
     </div>

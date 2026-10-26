@@ -37,14 +37,14 @@ function SlotLine({ slot, onRetry }: { slot: RowSlot; onRetry?: () => void }) {
             {slot.kind === 'failed' && (
                 <>
                     <TriangleAlert className="h-3 w-3 text-state-danger" aria-hidden="true" />
-                    <span className="text-state-danger">
+                    <span className="text-state-danger-strong">
                         {slot.reason && failureReasonText(slot.reason) ? `Translation failed · ${failureReasonText(slot.reason)}` : 'Translation failed'}
                     </span>
                     {onRetry && (
                         <button
                             type="button"
                             onClick={onRetry}
-                            className="rounded-full border border-border-subtle px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-text-primary"
+                            className="rounded-full border border-border-subtle px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-[var(--overlay-text-primary)]"
                         >
                             Retry
                         </button>
@@ -159,7 +159,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                 aria-label="Meeting transcript"
                 className="h-full w-full overflow-y-auto px-4 pt-2 pb-1"
             >
-                <div className="space-y-2.5 pr-0.5">
+                <div className="mx-auto max-w-[680px] space-y-2.5 pr-0.5">
                     {segments.map((seg, index) => {
                         const own = isOwnSpeech(seg);
                         const expanded = expandedId === seg.segmentId;
@@ -181,7 +181,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                         return (
                             <div
                                 key={seg.segmentId}
-                                className={`border-l-2 pl-2 ${newest ? 'border-accent-primary' : 'border-transparent'}`}
+                                className={`border-l-2 pl-2 ${newest ? 'border-[var(--overlay-action)]' : 'border-transparent'}`}
                             >
                                 {showSpeaker && (
                                     <div className="text-[11px] font-medium overlay-text-muted">{seg.speakerLabel}</div>
@@ -218,7 +218,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                                 type="button"
                                                 onClick={() => onTranslateSegment(seg)}
                                                 disabled={seg.translationState === 'pending' || seg.translationState === 'streaming'}
-                                                className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-text-primary disabled:cursor-wait disabled:opacity-70"
+                                                className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-[var(--overlay-text-primary)] disabled:cursor-wait disabled:opacity-70"
                                             >
                                                 <Languages className="h-3 w-3" aria-hidden="true" />
                                                 <span>{parts.hasTranslation ? 'Retranslate' : 'Translate'}</span>

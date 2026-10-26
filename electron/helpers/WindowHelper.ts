@@ -208,8 +208,8 @@ export class WindowHelper {
       width: overlayDefaultWidth,
       height: 1,
       minWidth: 380,
-      // 36px bar + 2px border + 6px splitter + the two zones' floors (112 and 206): below this a zone would clip.
-      minHeight: 360,
+      // 36px bar + 2px border + the two zones' floors (112 and 212, the splitter is inside the second): below this a zone would clip.
+      minHeight: 362,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,

@@ -41,9 +41,13 @@ const PopoverMenu: React.FC<PopoverMenuProps> = ({ label, trigger, items, trigge
             if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
         };
         document.addEventListener('mousedown', close);
-        listRef.current?.querySelector<HTMLElement>('[role^="menuitem"]')?.focus();
+        visibleItems()[0]?.focus();
         return () => document.removeEventListener('mousedown', close);
     }, [open]);
+
+    // Items that a width breakpoint hides have no layout box; arrow keys must skip them.
+    const visibleItems = () =>
+        Array.from(listRef.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? []).filter((item) => item.offsetParent !== null);
 
     const handleKeyDown = (event: React.KeyboardEvent) => {
         if (event.key === 'Escape') {
@@ -54,7 +58,7 @@ const PopoverMenu: React.FC<PopoverMenuProps> = ({ label, trigger, items, trigge
         }
         if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
         event.preventDefault();
-        const entries = Array.from(listRef.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? []);
+        const entries = visibleItems();
         if (entries.length === 0) return;
         const at = entries.indexOf(document.activeElement as HTMLElement);
         const next = event.key === 'ArrowDown' ? (at + 1) % entries.length : (at - 1 + entries.length) % entries.length;
@@ -79,7 +83,7 @@ const PopoverMenu: React.FC<PopoverMenuProps> = ({ label, trigger, items, trigge
                     ref={listRef}
                     role="menu"
                     aria-label={label}
-                    className={`absolute top-full z-50 mt-1 max-h-[60vh] min-w-[200px] overflow-y-auto rounded-xl border overlay-hairline overlay-shell-surface p-1 shadow-lg ${align === 'right' ? 'right-0' : 'left-0'}`}
+                    className={`absolute top-full z-50 mt-1 max-h-[60vh] min-w-[200px] overflow-y-auto rounded-xl border overlay-hairline bg-bg-elevated p-1 shadow-lg ${align === 'right' ? 'right-0' : 'left-0'}`}
                 >
                     {items.map((item) => (
                         <React.Fragment key={item.key}>
@@ -93,7 +97,7 @@ const PopoverMenu: React.FC<PopoverMenuProps> = ({ label, trigger, items, trigge
                                     setOpen(false);
                                     item.onSelect(rect);
                                 }}
-                                className={`flex min-h-[32px] w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs overlay-text-primary hover:bg-white/10 focus-visible:bg-white/10 ${item.className ?? ''}`}
+                                className={`flex min-h-[32px] w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs overlay-text-primary hover:bg-[var(--overlay-chip-hover-bg)] focus-visible:bg-[var(--overlay-chip-hover-bg)] ${item.className ?? ''}`}
                             >
                                 <span aria-hidden="true" className="w-3 shrink-0 text-center">{item.checked ? '✓' : ''}</span>
                                 <span className="min-w-0 flex-1 truncate">{item.label}</span>

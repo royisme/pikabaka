@@ -2,6 +2,26 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: fixes from an independent UI review (branch `ui-review-fixes`)
+
+Done (fixes for an independent read-only review of the UI code against Q1 to Q14 by an Opus subagent; its arithmetic was checked on the points below, and a renderer build confirmed that every new class generates CSS)
+- **Q3, chrome over budget:** the answer list's padding went from 28.8px to the top 8px only; chrome at 420px is now 2 + 36 + 6 + 8 + 86 = 138px (budget 140).
+- **Q4, the "what to say" lead was below the fold at 420px:** the answer no longer sits in a padded bubble inside a bordered card; the "Say this" label and the "Re:" line share one 11px line, and the lead starts about 40px higher.
+- **Q1, an attached screenshot collapsed the answer list:** the strip is one 28px row of 24px thumbnails (remove buttons also appear on keyboard focus, a Clear when there are several) instead of a card of about 115px; the long caption is gone. **Q1 at 380px:** the transcript area's Fix audio block now scrolls inside its zone.
+- **Q4/Q5, the wrong control was filled:** What to say is quiet unless audio is live or there are lines to answer; Fix audio in the bar is filled when lines exist (the transcript area's is filled when they do not), and Send is never filled any more, so one control is filled at a time.
+- **Light theme:** `hover:text-text-primary` (not redefined for light, so it turned near-white on the light panel) is now `hover:text-[var(--overlay-text-primary)]` in all overlay files; Translate and Original show their pressed state (the variants on custom `overlay-*` classes generated nothing); "Say this" and error words use the darker `-strong` colours; the key badge on the action colour is white on `black/20` (6.7:1 by the reviewer's calculation, was 3.4:1); the newest row's accent rule uses the action colour, not the light blue that vanished on the light panel.
+- **The splitter could not be seen or found:** its line was transparent in both themes, its hover colour generated no CSS and `.no-drag` forced the default cursor. It now has a soft line, a stronger one on hover and the resize cursor.
+- **Top bar at 600px (stopped, with lines, translation on):** the right group no longer shrinks (`shrink-0`) and its labels do not wrap, so only the status text truncates.
+- **The ⋯ menu:** an opaque background (text behind it showed through), and arrow keys skip items a width breakpoint hides.
+- **Hidden transcript with no lines:** the bar's chip now carries the status words and Fix audio, which showed nowhere before.
+- **Empty answer line:** with lines on screen "no audio" says "No new sound from the call. You can still ask about what was said." instead of claiming their words are missing.
+- **Q13:** transcript lines and answer bubbles are at most 680px wide.
+- **Hide then reopen:** the renderer reported the collapsed size while the window was closing, which shrank it before it was hidden; that reporting (`updateContentDimensions`) is removed. Together with the earlier fix the overlay reopens at its saved or default height.
+- **Split floors** now count the 6px splitter (answer zone 212px) and the window minimum is 362px.
+- Language trigger's accessible name now includes the current language. `docs/conventions.md` no longer recommends `text-text-primary` and `border-border-subtle` for the overlay and lists the three kinds of class that generate nothing.
+- Verified: both `tsc --noEmit` checks exit 0; lint exit 0 (1268 warnings, the cap); tap 786 of 786; a renderer build shows the new arbitrary-value classes in the CSS (the `-strong` colours, the resize cursor, the opaque menu background, the 680px measure).
+- Not fixed from the review: the newest transcript row keeps its weight and accent while an answer exists (spec state (e); no "answer exists" flag reaches the rows); the composer's action row may overflow by about 6px between 480 and 490px; the unused `isExpanded` prop, `pillStyle`/`transcriptStyle` and `.overlay-pill-surface`/`.overlay-transcript-surface`; code text at 13px; a click on the bar's background not closing an open menu. Still nobody has looked at the running app.
+
 ## 2026-10-26: fixes from an independent logic review (branch `review-fixes`)
 
 Done (fixes for an independent read-only review by an Opus subagent of the logic, IPC and hook changes; every finding below was checked in the code before it was fixed)

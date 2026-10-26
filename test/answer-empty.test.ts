@@ -23,3 +23,10 @@ t.test('hints that name a shortcut say which one', async (t) => {
 t.test('with no audio the hint says What to say needs their words', async (t) => {
   t.match(answerEmptyHint('no-audio').before, /needs their words first/);
 });
+
+t.test('with lines on screen, no audio does not claim their words are missing', async (t) => {
+  const hint = answerEmptyHint('no-audio', true);
+  t.notMatch(hint.before, /needs their words/);
+  t.match(hint.before, /No new sound/);
+  t.equal(answerEmptyHint('listening', true).key, 'whatToAnswer', 'other states are unchanged');
+});

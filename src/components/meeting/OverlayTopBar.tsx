@@ -40,7 +40,7 @@ const DOT_CLASS: Record<AudioStatus['dot'], string> = {
 };
 
 const barButton =
-    'inline-flex h-7 items-center justify-center gap-1 rounded-full border overlay-hairline px-2 text-[11px] font-medium overlay-text-secondary hover:text-text-primary aria-pressed:overlay-text-primary aria-pressed:bg-white/10';
+    'inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded-full border overlay-hairline px-2 text-[11px] font-medium overlay-text-secondary hover:text-[var(--overlay-text-primary)] aria-pressed:text-[var(--overlay-text-primary)] aria-pressed:bg-[var(--overlay-chip-hover-bg)]';
 const iconButton = 'inline-flex h-7 w-7 items-center justify-center rounded-full overlay-icon-surface overlay-text-primary interaction-base interaction-press';
 
 /**
@@ -121,12 +121,12 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
                 )}
             </span>
             {hasRows && status.action === 'fix-audio' && (
-                <button type="button" onClick={onFixAudio} className={`no-drag hidden min-[480px]:inline-flex ${barButton}`}>
+                <button type="button" onClick={onFixAudio} className={`no-drag hidden min-[480px]:inline-flex shrink-0 !border-transparent bg-[var(--overlay-action)] !text-white hover:brightness-95 ${barButton}`}>
                     Fix audio
                 </button>
             )}
 
-            <div className="ml-auto flex items-center gap-1.5">
+            <div className="ml-auto flex shrink-0 items-center gap-1.5">
                 {translationConfigured ? (
                     <>
                         <button
@@ -141,7 +141,7 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
                             <span>Translate</span>
                         </button>
                         <PopoverMenu
-                            label="Translate into"
+                            label={`Translate into ${languageLabel ?? targetLanguage}`}
                             trigger={<span>→ {shortLanguageLabel(targetLanguage, languageLabel)} ▾</span>}
                             triggerClassName={`no-drag ${barButton}`}
                             items={languageItems}

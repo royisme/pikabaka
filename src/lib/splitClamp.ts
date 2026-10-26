@@ -1,11 +1,11 @@
 /**
  * Pixel floors for the two zones of the overlay. They include each zone's fixed chrome, so a zone
  * is never squeezed below the height its own controls need (the answer zone's chips, input and
- * and input are about 94px, plus 112px of answers; the transcript zone keeps 112px, five lines of 20px
+ * and input are about 94px, plus 112px of answers, plus the 6px splitter that is measured with the zones; the transcript zone keeps 112px, five lines of 20px
  * and padding). When the overlay layout changes chrome these numbers change with it.
  */
 export const MIN_TRANSCRIPT_ZONE_PX = 112;
-export const MIN_ANSWER_ZONE_PX = 206;
+export const MIN_ANSWER_ZONE_PX = 212;
 
 /** The split is never closer to an edge than this, whatever the window height. */
 const MIN_PCT = 20;

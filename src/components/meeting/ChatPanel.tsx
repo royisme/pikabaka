@@ -73,6 +73,8 @@ interface ChatPanelProps {
   onRetry?: () => void;
   /** Which audio state the empty answer area should speak for. */
   audioKey?: AudioStatusKey;
+  /** The transcript has lines: an empty answer area must not say the other party's words are missing. */
+  hasTranscriptRows?: boolean;
   /** True when something else is the one thing to do (fix the audio): What to say stays available but quiet. */
   primaryQuiet?: boolean;
   handleClarify: () => void;
@@ -101,6 +103,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   onStop,
   onRetry,
   audioKey = 'off',
+  hasTranscriptRows = false,
   primaryQuiet = false,
   handleClarify,
   handleFollowUpQuestions,
@@ -120,7 +123,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const codeBlockClass = 'overlay-code-block-surface';
   const codeHeaderClass = 'overlay-code-header-surface';
   const codeHeaderTextClass = 'overlay-text-muted';
-  const quickActionClass = 'overlay-chip-surface overlay-text-interactive hover:overlay-text-primary';
+  const quickActionClass = 'overlay-chip-surface overlay-text-interactive hover:text-[var(--overlay-text-primary)]';
   const inputClass = `${isLightTheme ? 'focus:ring-black/10' : 'focus:ring-white/10'} overlay-input-surface overlay-input-text`;
 
   const handleCopy = (text: string) => {
@@ -138,7 +141,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           type="button"
           onClick={() => handleCopy(code)}
           aria-label="Copy code"
-          className="inline-flex items-center gap-1 text-[11px] overlay-text-secondary hover:text-text-primary"
+          className="inline-flex items-center gap-1 text-[11px] overlay-text-secondary hover:text-[var(--overlay-text-primary)]"
         >
           <Copy className="w-3 h-3" aria-hidden="true" />
           <span>Copy</span>
@@ -318,14 +321,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       const parts = msg.text.split(/(```[\s\S]*?(?:```|$))/g);
 
       return (
-        <div className={`rounded-lg p-3 my-1 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
-          {msg.replyTo && (
-            <div className="mb-1 truncate text-[11px] overlay-text-muted" title={msg.replyTo}>
-              Re: {msg.replyTo}
-            </div>
-          )}
-          <div className="flex items-center gap-2 mb-2 text-state-success font-medium text-[11px] tracking-[0.02em]">
-            <span>Say this</span>
+        <div>
+          <div className="mb-1 flex items-center gap-1.5 text-[11px] leading-4 overlay-text-muted">
+            <span className="shrink-0 font-medium text-state-success-strong">Say this</span>
+            {msg.replyTo && <span className="min-w-0 truncate" title={msg.replyTo}>· Re: {msg.replyTo}</span>}
           </div>
           <div className="text-sm leading-relaxed overlay-text-primary">
             {parts.map((part, i) => {
@@ -390,11 +389,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     <div className="flex flex-col h-full">
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-3.5 space-y-2.5 no-drag"
+        className="flex-1 overflow-y-auto px-4 pt-2 pb-0 space-y-2.5 no-drag"
         style={{ scrollbarWidth: 'none' }}
       >
         {messages.length === 0 && !isProcessing && (() => {
-          const hint = answerEmptyHint(audioKey);
+          const hint = answerEmptyHint(audioKey, hasTranscriptRows);
           const keys = hint.key ? shortcuts[hint.key] : [];
           return (
             <p className="flex flex-wrap items-center gap-x-1 pt-1 text-xs leading-[17px] overlay-text-muted">
@@ -408,18 +407,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         {messages.map((msg) => (
           <div key={msg.id} data-message-id={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
             <div className={`
-              ${msg.role === 'user' ? 'max-w-[72.25%] px-[13.6px] py-[10.2px]' : 'max-w-[85%] px-4 py-2.5'} text-[14px] leading-6 relative group whitespace-pre-wrap
+              ${msg.role === 'user' ? 'max-w-[min(72.25%,680px)] px-[13.6px] py-[10.2px]' : msg.intent === 'what_to_answer' ? 'w-full max-w-[680px] px-0 py-1' : 'max-w-[min(85%,680px)] px-4 py-2.5'} text-[14px] leading-6 relative group whitespace-pre-wrap
               ${msg.role === 'user'
                 ? (isLightTheme
                   ? 'bg-blue-500/12 border border-blue-500/25 text-blue-950 rounded-[20px] rounded-tr-[4px] shadow-sm font-medium'
                   : 'bg-blue-500/18 border border-blue-400/30 text-blue-50 rounded-[20px] rounded-tr-[4px] shadow-sm font-medium')
                 : ''
               }
-              ${msg.role === 'system' ? (msg.isError ? 'text-state-danger font-normal' : 'overlay-text-primary font-normal') : ''}
+              ${msg.role === 'system' ? (msg.isError ? 'text-state-danger-strong font-normal' : 'overlay-text-primary font-normal') : ''}
               ${msg.role === 'interviewer' ? 'overlay-text-muted italic pl-0 text-sm' : ''}
             `}>
               {msg.role === 'interviewer' && (
-                <div className="flex items-center gap-1.5 mb-1 text-[11px] font-medium tracking-[0.08em] overlay-text-muted/90">
+                <div className="flex items-center gap-1.5 mb-1 text-[11px] font-medium tracking-[0.08em] overlay-text-muted">
                   Interviewer
                   {msg.isStreaming && <span className="w-1 h-1 bg-state-success rounded-full animate-pulse" />}
                 </div>
@@ -446,7 +445,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 <div className="mt-1.5 flex justify-end">
                   <button
                     onClick={() => handleCopy(msg.text)}
-                    className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-text-primary"
+                    className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-[var(--overlay-text-primary)]"
                   >
                     <Copy className="w-3 h-3" aria-hidden="true" />
                     <span>Copy</span>
@@ -454,7 +453,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   {onRetry && (
                     <button
                       onClick={onRetry}
-                      className="ml-1.5 inline-flex items-center gap-1 rounded-full border overlay-hairline px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-text-primary"
+                      className="ml-1.5 inline-flex items-center gap-1 rounded-full border overlay-hairline px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-[var(--overlay-text-primary)]"
                     >
                       <RefreshCw className="w-3 h-3" aria-hidden="true" />
                       <span>Retry</span>
@@ -544,39 +543,32 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           </button>
         </div>
         {attachedContext.length > 0 && (
-          <div className={`mb-2 rounded-lg p-2 transition-all duration-200 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-medium overlay-text-primary">
-                {attachedContext.length} screenshot{attachedContext.length > 1 ? 's' : ''} attached
-              </span>
+          <div className="mb-1.5 flex h-7 items-center gap-1.5 overflow-hidden" role="group" aria-label={`${attachedContext.length} screenshot${attachedContext.length > 1 ? 's' : ''} attached`}>
+            {attachedContext.map((ctx, idx) => (
+              <div key={ctx.path} className="relative group/thumb shrink-0">
+                <img
+                  src={ctx.preview}
+                  alt={`Screenshot ${idx + 1}`}
+                  className={`h-6 w-auto rounded border ${isLightTheme ? 'border-black/15' : 'border-white/20'}`}
+                />
+                <button
+                  onClick={() => setAttachedContext(prev => prev.filter((_, i) => i !== idx))}
+                  className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-state-danger opacity-0 transition-opacity group-hover/thumb:opacity-100 focus-visible:opacity-100"
+                  aria-label={`Remove screenshot ${idx + 1}`}
+                  title="Remove"
+                >
+                  <X className="w-2.5 h-2.5 text-white" />
+                </button>
+              </div>
+            ))}
+            {attachedContext.length > 1 && (
               <button
                 onClick={() => setAttachedContext([])}
-                className="p-1 rounded-full transition-colors overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive"
-                title="Remove all"
-                style={appearance.iconStyle}
+                className="shrink-0 rounded-full border overlay-hairline px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-[var(--overlay-text-primary)]"
               >
-                <X className="w-3.5 h-3.5" />
+                Clear
               </button>
-            </div>
-            <div className="flex gap-1.5 overflow-x-auto max-w-full pb-1">
-              {attachedContext.map((ctx, idx) => (
-                <div key={ctx.path} className="relative group/thumb flex-shrink-0">
-                  <img
-                    src={ctx.preview}
-                    alt={`Screenshot ${idx + 1}`}
-                    className={`h-10 w-auto rounded border ${isLightTheme ? 'border-black/15' : 'border-white/20'}`}
-                  />
-                  <button
-                    onClick={() => setAttachedContext(prev => prev.filter((_, i) => i !== idx))}
-                    className="absolute -top-1 -right-1 w-4 h-4 bg-state-danger hover:bg-state-danger rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-                    title="Remove"
-                  >
-                    <X className="w-2.5 h-2.5 text-white" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <span className="text-[11px] overlay-text-muted">Type a question and press Enter, or use What to say</span>
+            )}
           </div>
         )}
 
@@ -600,12 +592,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             className={`
               absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center
               interaction-base interaction-press
-              ${inputValue.trim()
-                ? 'bg-[var(--overlay-action)] text-white shadow-lg hover:brightness-95'
-                : 'overlay-icon-surface overlay-text-muted cursor-not-allowed'
-              }
+              overlay-icon-surface
+              ${inputValue.trim() ? 'overlay-text-primary' : 'overlay-text-muted cursor-not-allowed'}
             `}
-            style={inputValue.trim() ? undefined : appearance.iconStyle}
+            style={appearance.iconStyle}
           >
             <ArrowRight className="w-3.5 h-3.5" />
           </button>

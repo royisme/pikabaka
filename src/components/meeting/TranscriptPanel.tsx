@@ -42,7 +42,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                     />
                 ) : (
                     // The one place the audio status is spelled out when there are no rows to show (the header chip then shows only its dot).
-                    <div className="px-4 pt-3 pb-2 no-drag">
+                    <div className="h-full overflow-y-auto px-4 pt-3 pb-2 no-drag">
                         {!showTranscript ? (
                             <p className="text-xs leading-[17px] overlay-text-muted">The transcript is hidden.</p>
                         ) : (

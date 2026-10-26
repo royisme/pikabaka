@@ -11,10 +11,13 @@ export type AnswerEmptyHint = {
  * The one line the empty answer area shows. It says what the area is for in the current audio
  * state, so an empty area is small and tells the reader what will happen.
  */
-export function answerEmptyHint(status: AudioStatusKey): AnswerEmptyHint {
+export function answerEmptyHint(status: AudioStatusKey, hasTranscriptRows = false): AnswerEmptyHint {
   switch (status) {
     case 'no-audio':
-      return { before: 'What to say needs their words first. Type a question to ask anyway.', key: null, after: '' };
+      // With lines already on screen their words are not missing: only new sound is.
+      return hasTranscriptRows
+        ? { before: 'No new sound from the call. You can still ask about what was said.', key: null, after: '' }
+        : { before: 'What to say needs their words first. Type a question to ask anyway.', key: null, after: '' };
     case 'listening':
       return { before: 'When they ask something, press ', key: 'whatToAnswer', after: ' for what to say.' };
     case 'live':

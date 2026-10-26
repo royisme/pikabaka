@@ -28,6 +28,7 @@ interface ChatColumnProps {
     onStop?: () => void;
     onRetry?: () => void;
     audioKey?: AudioStatusKey;
+    hasTranscriptRows?: boolean;
     handleClarify: () => void;
     handleFollowUpQuestions: () => void;
     handleRecap: () => void;
@@ -55,6 +56,7 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
     onStop,
     onRetry,
     audioKey,
+    hasTranscriptRows,
     handleClarify,
     handleFollowUpQuestions,
     handleRecap,
@@ -82,6 +84,7 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
             onStop={onStop}
             onRetry={onRetry}
             audioKey={audioKey}
+            hasTranscriptRows={hasTranscriptRows}
             handleClarify={handleClarify}
             handleFollowUpQuestions={handleFollowUpQuestions}
             handleRecap={handleRecap}
