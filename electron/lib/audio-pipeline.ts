@@ -229,7 +229,8 @@ export function setupSystemAudioPipeline(appState: AppState): void {
     if (!state.microphoneCapture) {
       state.microphoneCapture = new MicrophoneCapture();
       state.microphoneCapture.on('data', (chunk: Buffer) => {
-        state.googleSTT_User?.write(chunk);
+        // Muted: silence of the same length goes on, so the speech service keeps its connection.
+        state.googleSTT_User?.write(state.microphoneMuted ? Buffer.alloc(chunk.length) : chunk);
       });
       state.microphoneCapture.on('speech_ended', () => {
         state.googleSTT_User?.notifySpeechEnded?.();

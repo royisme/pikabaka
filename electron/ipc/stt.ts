@@ -10,6 +10,14 @@ export function registerSttHandlers(appState: AppState): void {
   // STT Provider Management Handlers
   // ==========================================
 
+  // Mute the microphone (for example when the other party is heard through speakers).
+  safeHandle("get-microphone-muted", () => appState.microphoneMuted);
+
+  safeHandle("set-microphone-muted", (_, muted: boolean) => {
+    appState.setMicrophoneMuted(muted === true);
+    return { success: true };
+  });
+
   safeHandle("set-stt-provider", async (_, provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => {
     try {
       const { CredentialsManager } = require('../services/CredentialsManager');

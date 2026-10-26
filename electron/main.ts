@@ -159,6 +159,8 @@ export class AppState {
 
   public hasDebugged: boolean = false
   private isMeetingActive: boolean = false; // Guard for session state leaks
+  /** The microphone is muted by the user: the speech service gets silence instead of the microphone. Not saved; a new meeting starts unmuted. */
+  public microphoneMuted: boolean = false;
   private endingMeeting: Promise<void> | undefined;
   private _isQuitting: boolean = false;
   public _verboseLogging: boolean = false;
@@ -401,6 +403,11 @@ export class AppState {
 
   public setQuitting(value: boolean): void {
     this._isQuitting = value;
+  }
+
+  public setMicrophoneMuted(muted: boolean): void {
+    this.microphoneMuted = muted;
+    this.broadcast('microphone-muted-changed', muted);
   }
 
   private broadcastMeetingState(): void {
@@ -839,6 +846,7 @@ export class AppState {
     }
 
     this.isMeetingActive = true;
+    this.setMicrophoneMuted(false);
     this.resetBufferedTranscriptTurns();
     this.lastSystemAudioChunkAt = null;
     this.lastInterviewerTranscriptAt = null;

@@ -232,6 +232,9 @@ interface ElectronAPI {
 
 
   onUndetectableChanged: (callback: (state: boolean) => void) => () => void
+  getMicrophoneMuted: () => Promise<boolean>
+  setMicrophoneMuted: (muted: boolean) => Promise<{ success: boolean }>
+  onMicrophoneMutedChanged: (callback: (muted: boolean) => void) => () => void
   onOpenAICompatibleProvidersChanged: (callback: () => void) => () => void
   onModelChanged: (callback: (modelId: string) => void) => () => void
 
@@ -932,6 +935,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
   flushDatabase: () => ipcRenderer.invoke('flush-database'),
 
 
+
+  getMicrophoneMuted: () => ipcRenderer.invoke('get-microphone-muted'),
+  setMicrophoneMuted: (muted: boolean) => ipcRenderer.invoke('set-microphone-muted', muted),
+  onMicrophoneMutedChanged: (callback: (muted: boolean) => void) => {
+    const subscription = (_: any, muted: boolean) => callback(muted)
+    ipcRenderer.on('microphone-muted-changed', subscription)
+    return () => {
+      ipcRenderer.removeListener('microphone-muted-changed', subscription)
+    }
+  },
 
   onUndetectableChanged: (callback: (state: boolean) => void) => {
     const subscription = (_: any, state: boolean) => callback(state)

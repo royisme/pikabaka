@@ -252,6 +252,9 @@ export interface ElectronAPI {
   flushDatabase: () => Promise<{ success: boolean }>;
 
   onUndetectableChanged: (callback: (state: boolean) => void) => () => void;
+  getMicrophoneMuted: () => Promise<boolean>;
+  setMicrophoneMuted: (muted: boolean) => Promise<{ success: boolean }>;
+  onMicrophoneMutedChanged: (callback: (muted: boolean) => void) => () => void;
   onOpenAICompatibleProvidersChanged: (callback: () => void) => () => void;
   onModelChanged: (callback: (modelId: string) => void) => () => void;
 

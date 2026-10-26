@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronUp, Languages, MoreHorizontal, Type } from 'lucide-react';
+import { ChevronUp, Languages, Mic, MicOff, MoreHorizontal, Type } from 'lucide-react';
 import PopoverMenu, { type PopoverMenuItem } from '../ui/PopoverMenu';
 import { KeyBadge } from '../ui/KeyBadge';
 import type { AudioStatus } from '../../lib/audioStatus';
@@ -11,6 +11,9 @@ interface OverlayTopBarProps {
     /** True when the transcript area shows rows: then the chip carries the status words; otherwise the area's own line does. */
     hasRows: boolean;
     onFixAudio: () => void;
+    /** The microphone is muted: the other party is still heard and translated, the user's own voice is not sent. */
+    microphoneMuted: boolean;
+    onToggleMicrophoneMute: () => void;
     displayMode: TranscriptDisplayMode;
     translationEnabled: boolean;
     translationConfigured: boolean;
@@ -55,6 +58,8 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
     status,
     hasRows,
     onFixAudio,
+    microphoneMuted,
+    onToggleMicrophoneMute,
     displayMode,
     translationEnabled,
     translationConfigured,
@@ -202,6 +207,16 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
                         Set up translation
                     </button>
                 )}
+                <button
+                    type="button"
+                    aria-pressed={microphoneMuted}
+                    aria-label={microphoneMuted ? 'Unmute microphone' : 'Mute microphone'}
+                    title={microphoneMuted ? 'Microphone muted. Click to unmute' : 'Mute microphone'}
+                    onClick={onToggleMicrophoneMute}
+                    className={`no-drag ${iconButton} ${microphoneMuted ? 'bg-state-danger-soft text-state-danger' : ''}`}
+                >
+                    {microphoneMuted ? <MicOff className="h-4 w-4" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
+                </button>
                 <PopoverMenu
                     label="More"
                     trigger={<MoreHorizontal className="h-4 w-4" aria-hidden="true" />}
