@@ -4,6 +4,7 @@ import path from 'path';
 import { app } from 'electron';
 import fs from 'fs';
 import * as sqliteVec from 'sqlite-vec';
+import * as meetingRecord from './meetingRecord';
 
 // Interfaces for our data objects
 export interface Meeting {
@@ -386,6 +387,13 @@ export class DatabaseManager {
             this.db.pragma('user_version = 10');
         }
 
+        // Version 10 → 11: Persist transcript segments by identity and revision.
+        if (version < 11) {
+            console.log('[DatabaseManager] Applying migration v10 → v11: Add transcript segment identity');
+            meetingRecord.migrateRecordColumns(this.db);
+            this.db.pragma('user_version = 11');
+        }
+
         console.log('[DatabaseManager] Migrations completed.');
     }
 
@@ -506,6 +514,38 @@ export class DatabaseManager {
         return this.resolvedExtPath;
     }
 
+    public createMeeting(meeting: Parameters<typeof meetingRecord.createMeeting>[1]): void {
+        if (!this.db) {
+            console.error('[DatabaseManager] DB not initialized');
+            return;
+        }
+        meetingRecord.createMeeting(this.db, meeting);
+    }
+
+    public upsertSegment(segment: Parameters<typeof meetingRecord.upsertSegment>[1]): boolean {
+        if (!this.db) {
+            console.error('[DatabaseManager] DB not initialized');
+            return false;
+        }
+        return meetingRecord.upsertSegment(this.db, segment);
+    }
+
+    public addInteraction(meetingId: string, usage: NonNullable<Meeting['usage']>[number]): void {
+        if (!this.db) {
+            console.error('[DatabaseManager] DB not initialized');
+            return;
+        }
+        meetingRecord.addInteraction(this.db, meetingId, usage);
+    }
+
+    public completeMeeting(id: string, completion: Parameters<typeof meetingRecord.completeMeeting>[2]): boolean {
+        if (!this.db) {
+            console.error('[DatabaseManager] DB not initialized');
+            return false;
+        }
+        return meetingRecord.completeMeeting(this.db, id, completion);
+    }
+
     public saveMeeting(meeting: Meeting, startTimeMs: number, durationMs: number) {
         if (!this.db) {
             console.error('[DatabaseManager] DB not initialized');
@@ -524,7 +564,7 @@ export class DatabaseManager {
 
         const insertInteraction = this.db.prepare(`
             INSERT INTO ai_interactions (meeting_id, type, timestamp, user_query, ai_response, metadata_json)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (@meeting_id, @type, @timestamp, @user_query, @ai_response, @metadata_json)
         `);
 
         const summaryJson = JSON.stringify({
@@ -561,30 +601,7 @@ export class DatabaseManager {
             // 3. Insert Interactions
             if (meeting.usage) {
                 for (const usage of meeting.usage) {
-                    let metadata = null;
-                    if (usage.items) {
-                        metadata = JSON.stringify(usage.items);
-                    } else if (usage.type === 'followup_questions' && usage.answer) {
-                        // Sometimes answer is the array for questions, or we store it in metadata
-                        // In intelligence manager we pushed: { type: 'followup_questions', answer: fullQuestions }
-                        // Let's store that 'answer' (array) in metadata for this type
-                        if (Array.isArray(usage.answer)) {
-                            metadata = JSON.stringify(usage.answer);
-                        }
-                    }
-
-                    // Normalization
-                    const answerText = Array.isArray(usage.answer) ? null : usage.answer || null;
-                    const queryText = usage.question || null;
-
-                    insertInteraction.run(
-                        meeting.id,
-                        usage.type,
-                        usage.timestamp,
-                        queryText,
-                        answerText,
-                        metadata
-                    );
+                    insertInteraction.run({ meeting_id: meeting.id, ...meetingRecord.interactionRow(usage) });
                 }
             }
         });
