@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from 'react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import ChatColumn from './meeting/ChatColumn';
 import SplitterShell from './meeting/SplitterShell';
@@ -18,6 +19,9 @@ import { toggleOriginal } from '../lib/transcriptDisplay';
 import { audioStatus } from '../lib/audioStatus';
 import { modelLabel } from '../lib/modelLabel';
 import { latestOtherPartyText } from '../lib/answerLead';
+import { useMainEvent } from '../hooks/useMainEvent';
+import { useWindowEvent } from '../hooks/useWindowEvent';
+import { useLocalStorageValue } from '../hooks/useLocalStorageValue';
 
 interface PikaInterfaceProps { onEndMeeting?: () => void; overlayOpacity?: number; }
 type ScreenshotAttachment = { path: string; preview: string };
@@ -25,12 +29,10 @@ type CommandHandlers = { handleWhatToSay: () => void; handleFollowUp: (intent?: 
 type GeneralHandlers = { toggleVisibility: () => void; processScreenshots: () => void; resetCancel: () => Promise<void>; toggleMousePassthrough: () => void; takeScreenshot: () => Promise<void>; selectiveScreenshot: () => Promise<void>; };
 
 const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpacity = getDefaultOverlayOpacity() }) => {
+    const queryClient = useQueryClient();
     const isLightTheme = useResolvedTheme() === 'light';
     const [isExpanded, setIsExpanded] = useState(true);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [splitterPosition, setSplitterPosition] = useState(() => { const parsed = Number(localStorage.getItem('pika_splitter_position') ?? 40); return Number.isFinite(parsed) ? Math.min(80, Math.max(20, parsed)) : 40; });
-    const [isMousePassthrough, setIsMousePassthrough] = useState(false);
-    const [isUndetectable, setIsUndetectable] = useState(false);
     const [currentModel, setCurrentModel] = useState('gemini-3-flash-preview');
     const isStealthRef = useRef(false);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -42,7 +44,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const replyContextRef = useRef<() => string | undefined>(() => undefined);
     const chat = useMeetingChat({ getReplyContext: () => replyContextRef.current() });
     const [proactiveCard, setProactiveCard] = useState<AgentProactiveCard | null>(null);
-    useEffect(() => window.electronAPI?.onAgentProactive?.((card) => setProactiveCard(card)), []);
+    useMainEvent(window.electronAPI?.onAgentProactive, setProactiveCard);
     const askAboutCard = useCallback((card: AgentProactiveCard) => {
         // Pika's suggestion is quoted as Pika's, not as the user's own words.
         chat.setInputValue(`About Pika's suggestion "${card.text}": tell me more.`);
@@ -53,21 +55,79 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
 
     // The split is the user's once they move it. Until then it follows what the zone is for: more room for the
     // transcript while translating, since the translation is what is read first.
-    const splitterIsUserSet = useRef(localStorage.getItem('pika_splitter_position') !== null);
+    const [storedSplitter, setStoredSplitter] = useLocalStorageValue('pika_splitter_position');
     const defaultSplitter = transcript.translationEnabled ? 55 : 40;
-    useEffect(() => { if (!splitterIsUserSet.current) setSplitterPosition(defaultSplitter); }, [defaultSplitter]);
-    const changeSplitter = useCallback((next: number) => { splitterIsUserSet.current = true; localStorage.setItem('pika_splitter_position', String(next)); setSplitterPosition(next); }, []);
-    const resetSplitter = useCallback(() => { splitterIsUserSet.current = false; localStorage.removeItem('pika_splitter_position'); setSplitterPosition(defaultSplitter); }, [defaultSplitter]);
-    useEffect(() => { window.electronAPI?.getDefaultModel?.().then((result: any) => { if (result?.model) { setCurrentModel(result.model); window.electronAPI.setModel(result.model).catch(() => {}); } }).catch((err: any) => console.error('Failed to fetch default model:', err)); }, []);
-    useEffect(() => { const unsubscribe = window.electronAPI?.onModelChanged?.((modelId: string) => setCurrentModel((prev) => (prev === modelId ? prev : modelId))); return () => unsubscribe?.(); }, []);
-    useEffect(() => { window.electronAPI?.getUndetectable?.().then(setIsUndetectable); const unsubscribe = window.electronAPI?.onUndetectableChanged?.(setIsUndetectable); return () => unsubscribe?.(); }, []);
-    useEffect(() => localStorage.setItem('pika_undetectable', String(isUndetectable)), [isUndetectable]);
-    useEffect(() => { window.electronAPI?.getOverlayMousePassthrough?.().then(setIsMousePassthrough).catch(() => {}); const unsubscribe = window.electronAPI?.onOverlayMousePassthroughChanged?.(setIsMousePassthrough); return () => unsubscribe?.(); }, []);
-    useEffect(() => window.electronAPI?.onSettingsVisibilityChange?.(setIsSettingsOpen), []);
-    useEffect(() => { if (isExpanded) { window.electronAPI.showWindow(isStealthRef.current); isStealthRef.current = false; } else setTimeout(() => window.electronAPI.hideWindow(), 400); }, [isExpanded]);
+    const splitterPosition = useMemo(() => {
+        if (storedSplitter === null) return defaultSplitter;
+        const parsed = Number(storedSplitter);
+        return Number.isFinite(parsed) ? Math.min(80, Math.max(20, parsed)) : defaultSplitter;
+    }, [storedSplitter, defaultSplitter]);
+    const changeSplitter = useCallback((next: number) => {
+        setStoredSplitter(String(next));
+    }, [setStoredSplitter]);
+    const resetSplitter = useCallback(() => {
+        setStoredSplitter(null);
+    }, [setStoredSplitter]);
+
+    // Model: reads default model on mount and syncs runtime model to main process
+    useEffect(() => {
+        window.electronAPI?.getDefaultModel?.()
+            .then((result: { model: string }) => {
+                if (result?.model) {
+                    setCurrentModel(result.model);
+                    window.electronAPI.setModel(result.model).catch(() => {});
+                }
+            })
+            .catch((err: unknown) => console.error('Failed to fetch default model:', err));
+    }, []);
+    useMainEvent(window.electronAPI?.onModelChanged, (modelId: string) => {
+        setCurrentModel((prev) => (prev === modelId ? prev : modelId));
+    });
+
+    // Undetectable state: read via query, stream via useMainEvent
+    useQuery<boolean>(
+        ['undetectable'],
+        async () => {
+            const val = (await window.electronAPI?.getUndetectable?.()) ?? false;
+            localStorage.setItem('pika_undetectable', String(val));
+            return val;
+        }
+    );
+    useMainEvent(window.electronAPI?.onUndetectableChanged, (newState: boolean) => {
+        queryClient.setQueryData(['undetectable'], newState);
+        localStorage.setItem('pika_undetectable', String(newState));
+    });
+
+    // Mouse passthrough: read via query, stream via useMainEvent
+    const { data: isMousePassthrough = false } = useQuery<boolean>(
+        ['overlay-mouse-passthrough'],
+        () => window.electronAPI?.getOverlayMousePassthrough?.() ?? Promise.resolve(false)
+    );
+    useMainEvent(window.electronAPI?.onOverlayMousePassthroughChanged, (val: boolean) => {
+        queryClient.setQueryData(['overlay-mouse-passthrough'], val);
+    });
+
+    useMainEvent(window.electronAPI?.onSettingsVisibilityChange, setIsSettingsOpen);
+    useEffect(() => {
+        if (isExpanded) {
+            window.electronAPI.showWindow(isStealthRef.current);
+            isStealthRef.current = false;
+        } else {
+            const timer = setTimeout(() => window.electronAPI.hideWindow(), 400);
+            return () => clearTimeout(timer);
+        }
+    }, [isExpanded]);
     useEffect(() => window.electronAPI?.onToggleExpand?.(() => setIsExpanded((prev) => !prev)), []);
     useEffect(() => window.electronAPI?.onEnsureExpanded?.(() => { isStealthRef.current = true; setIsExpanded(true); }), []);
-    useEffect(() => window.electronAPI?.onSessionReset?.(() => { console.log('[PikaInterface] Resetting session state...'); chat.setSystemMessages([]); chat.setInputValue(''); chat.setAttachedContext([]); audio.setManualTranscript(''); audio.setVoiceInput(''); chat.setIsProcessing(false); }), [chat.setSystemMessages, chat.setInputValue, chat.setAttachedContext, audio.setManualTranscript, audio.setVoiceInput, chat.setIsProcessing]);
+    useEffect(() => window.electronAPI?.onSessionReset?.(() => {
+        console.log('[PikaInterface] Resetting session state...');
+        chat.setSystemMessages([]);
+        chat.setInputValue('');
+        chat.setAttachedContext([]);
+        audio.setManualTranscript('');
+        audio.setVoiceInput('');
+        chat.setIsProcessing(false);
+    }), [chat.setSystemMessages, chat.setInputValue, chat.setAttachedContext, audio.setManualTranscript, audio.setVoiceInput, chat.setIsProcessing]);
 
     const handleScreenshotAttach = useCallback((data: ScreenshotAttachment) => { setIsExpanded(true); chat.setAttachedContext((prev) => (prev.some((s) => s.path === data.path) ? prev : [...prev, data].slice(-5))); }, [chat.setAttachedContext]);
     const shownMessageIdRef = useRef<string | undefined>(undefined);
@@ -96,16 +156,23 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
 
     const handlersRef = useRef<CommandHandlers>(null!);
     handlersRef.current = { handleWhatToSay: chat.handleWhatToSay, handleFollowUp: chat.handleFollowUp, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleAnswerNow, handleClarify: chat.handleClarify, handleCodeHint: chat.handleCodeHint, handleBrainstorm: chat.handleBrainstorm };
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            const h = handlersRef.current;
-            if (isShortcutPressed(e, 'whatToAnswer')) { e.preventDefault(); h.handleWhatToSay(); } else if (isShortcutPressed(e, 'clarify')) { e.preventDefault(); h.handleClarify(); } else if (isShortcutPressed(e, 'followUp')) { e.preventDefault(); h.handleFollowUpQuestions(); }
-            else if (isShortcutPressed(e, 'dynamicAction4')) { e.preventDefault(); chat.actionButtonMode === 'brainstorm' ? h.handleBrainstorm() : h.handleRecap(); } else if (isShortcutPressed(e, 'answer')) { e.preventDefault(); h.handleAnswerNow(); } else if (isShortcutPressed(e, 'codeHint')) { e.preventDefault(); h.handleCodeHint(); }
-            else if (isShortcutPressed(e, 'brainstorm')) { e.preventDefault(); h.handleBrainstorm(); } else if (isShortcutPressed(e, 'scrollUp')) { e.preventDefault(); scrollContainerRef.current?.scrollBy({ top: -100, behavior: 'smooth' }); } else if (isShortcutPressed(e, 'scrollDown')) { e.preventDefault(); scrollContainerRef.current?.scrollBy({ top: 100, behavior: 'smooth' }); }
-            else if (isShortcutPressed(e, 'moveWindowUp') || isShortcutPressed(e, 'moveWindowDown')) e.preventDefault();
-        };
-        window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isShortcutPressed, chat.actionButtonMode]);
+    useWindowEvent('keydown', (e: KeyboardEvent) => {
+        const h = handlersRef.current;
+        if (isShortcutPressed(e, 'whatToAnswer')) { e.preventDefault(); h.handleWhatToSay(); }
+        else if (isShortcutPressed(e, 'clarify')) { e.preventDefault(); h.handleClarify(); }
+        else if (isShortcutPressed(e, 'followUp')) { e.preventDefault(); h.handleFollowUpQuestions(); }
+        else if (isShortcutPressed(e, 'dynamicAction4')) {
+            e.preventDefault();
+            if (chat.actionButtonMode === 'brainstorm') h.handleBrainstorm();
+            else h.handleRecap();
+        }
+        else if (isShortcutPressed(e, 'answer')) { e.preventDefault(); h.handleAnswerNow(); }
+        else if (isShortcutPressed(e, 'codeHint')) { e.preventDefault(); h.handleCodeHint(); }
+        else if (isShortcutPressed(e, 'brainstorm')) { e.preventDefault(); h.handleBrainstorm(); }
+        else if (isShortcutPressed(e, 'scrollUp')) { e.preventDefault(); scrollContainerRef.current?.scrollBy({ top: -100, behavior: 'smooth' }); }
+        else if (isShortcutPressed(e, 'scrollDown')) { e.preventDefault(); scrollContainerRef.current?.scrollBy({ top: 100, behavior: 'smooth' }); }
+        else if (isShortcutPressed(e, 'moveWindowUp') || isShortcutPressed(e, 'moveWindowDown')) e.preventDefault();
+    });
 
     const translateInto = transcript.translationEnabled
         ? transcript.languageOptions.find((option) => option.value === transcript.targetLanguage)?.label
@@ -144,31 +211,63 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     generalHandlersRef.current = {
         toggleVisibility: () => window.electronAPI.toggleWindow(), processScreenshots: chat.handleWhatToSay,
         resetCancel: async () => { if (chat.isProcessing) await chat.stopGeneration(); else { await window.electronAPI.resetIntelligence(); chat.setSystemMessages([]); chat.setAttachedContext([]); chat.setInputValue(''); } },
-        toggleMousePassthrough: () => { const next = !isMousePassthrough; setIsMousePassthrough(next); window.electronAPI?.setOverlayMousePassthrough?.(next); },
+        toggleMousePassthrough: () => {
+            const next = !isMousePassthrough;
+            queryClient.setQueryData(['overlay-mouse-passthrough'], next);
+            window.electronAPI?.setOverlayMousePassthrough?.(next);
+        },
         takeScreenshot: async () => { const data = await window.electronAPI.takeScreenshot().catch((err) => console.error('Error triggering screenshot:', err)); if (data?.path) handleScreenshotAttach(data as ScreenshotAttachment); },
         selectiveScreenshot: async () => { const data = await window.electronAPI.takeSelectiveScreenshot().catch((err) => console.error('Error triggering selective screenshot:', err)); if (data && !data.cancelled && data.path) handleScreenshotAttach(data as ScreenshotAttachment); },
     };
-    useEffect(() => {
-        const handleGeneralKeyDown = (e: KeyboardEvent) => {
-            const target = e.target as HTMLElement; const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable; const h = generalHandlersRef.current;
-            if (isShortcutPressed(e, 'toggleVisibility')) { e.preventDefault(); h.toggleVisibility(); } else if (isShortcutPressed(e, 'processScreenshots') && !isInput) { e.preventDefault(); h.processScreenshots(); } else if (isShortcutPressed(e, 'resetCancel')) { e.preventDefault(); h.resetCancel(); }
-            else if (isShortcutPressed(e, 'takeScreenshot')) { e.preventDefault(); h.takeScreenshot(); } else if (isShortcutPressed(e, 'selectiveScreenshot')) { e.preventDefault(); h.selectiveScreenshot(); } else if (isShortcutPressed(e, 'toggleMousePassthrough')) { e.preventDefault(); h.toggleMousePassthrough(); }
-        };
-        window.addEventListener('keydown', handleGeneralKeyDown); return () => window.removeEventListener('keydown', handleGeneralKeyDown);
-    }, [isShortcutPressed]);
+    useWindowEvent('keydown', (e: KeyboardEvent) => {
+        const target = e.target as HTMLElement;
+        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+        const h = generalHandlersRef.current;
+        if (isShortcutPressed(e, 'toggleVisibility')) { e.preventDefault(); h.toggleVisibility(); }
+        else if (isShortcutPressed(e, 'processScreenshots') && !isInput) { e.preventDefault(); h.processScreenshots(); }
+        else if (isShortcutPressed(e, 'resetCancel')) { e.preventDefault(); void h.resetCancel(); }
+        else if (isShortcutPressed(e, 'takeScreenshot')) { e.preventDefault(); void h.takeScreenshot(); }
+        else if (isShortcutPressed(e, 'selectiveScreenshot')) { e.preventDefault(); void h.selectiveScreenshot(); }
+        else if (isShortcutPressed(e, 'toggleMousePassthrough')) { e.preventDefault(); h.toggleMousePassthrough(); }
+    });
 
-    useEffect(() => window.electronAPI.onCaptureAndProcess?.((data) => { handleScreenshotAttach(data as ScreenshotAttachment); setTimeout(() => handlersRef.current.handleWhatToSay(), 0); }), [handleScreenshotAttach]);
-    useEffect(() => { const cleanups = [window.electronAPI.onScreenshotTaken(handleScreenshotAttach)]; const attachedCleanup = window.electronAPI.onScreenshotAttached?.(handleScreenshotAttach); if (attachedCleanup) cleanups.push(attachedCleanup); return () => cleanups.forEach((fn) => fn()); }, [handleScreenshotAttach]);
+    useMainEvent(window.electronAPI?.onCaptureAndProcess, (data) => {
+        handleScreenshotAttach(data as ScreenshotAttachment);
+        setTimeout(() => handlersRef.current.handleWhatToSay(), 0);
+    });
+    useMainEvent(window.electronAPI?.onScreenshotTaken, handleScreenshotAttach);
+    useMainEvent(window.electronAPI?.onScreenshotAttached, handleScreenshotAttach);
     useEffect(() => window.electronAPI.onSuggestionProcessingStart?.(() => { chat.setIsProcessing(true); setIsExpanded(true); }), [chat.setIsProcessing]);
-    useEffect(() => window.electronAPI.onGlobalShortcut?.(({ action }) => {
-        const h = handlersRef.current; const g = generalHandlersRef.current; isStealthRef.current = true;
-        if (action === 'whatToAnswer') h.handleWhatToSay(); else if (action === 'shorten') h.handleFollowUp('shorten'); else if (action === 'followUp') h.handleFollowUpQuestions(); else if (action === 'recap') h.handleRecap(); else if (action === 'dynamicAction4') chat.actionButtonMode === 'brainstorm' ? h.handleBrainstorm() : h.handleRecap();
-        else if (action === 'answer') h.handleAnswerNow(); else if (action === 'clarify') h.handleClarify(); else if (action === 'codeHint') h.handleCodeHint(); else if (action === 'brainstorm') h.handleBrainstorm(); else if (action === 'scrollUp') scrollContainerRef.current?.scrollBy({ top: -100, behavior: 'smooth' }); else if (action === 'scrollDown') scrollContainerRef.current?.scrollBy({ top: 100, behavior: 'smooth' });
-        else if (action === 'processScreenshots') g.processScreenshots(); else if (action === 'resetCancel') g.resetCancel();
-        else if (action === 'toggleTranslation') { if (transcriptRef.current.translationConfigured) transcriptRef.current.saveTranslationSettings({ enabled: !transcriptRef.current.translationEnabled }); }
-        else if (action === 'toggleOriginal') transcriptRef.current.saveTranslationSettings({ displayMode: toggleOriginal(transcriptRef.current.transcriptDisplayMode) });
+    useMainEvent(window.electronAPI?.onGlobalShortcut, ({ action }) => {
+        const h = handlersRef.current;
+        const g = generalHandlersRef.current;
+        isStealthRef.current = true;
+        if (action === 'whatToAnswer') h.handleWhatToSay();
+        else if (action === 'shorten') h.handleFollowUp('shorten');
+        else if (action === 'followUp') h.handleFollowUpQuestions();
+        else if (action === 'recap') h.handleRecap();
+        else if (action === 'dynamicAction4') {
+            if (chat.actionButtonMode === 'brainstorm') h.handleBrainstorm();
+            else h.handleRecap();
+        }
+        else if (action === 'answer') h.handleAnswerNow();
+        else if (action === 'clarify') h.handleClarify();
+        else if (action === 'codeHint') h.handleCodeHint();
+        else if (action === 'brainstorm') h.handleBrainstorm();
+        else if (action === 'scrollUp') scrollContainerRef.current?.scrollBy({ top: -100, behavior: 'smooth' });
+        else if (action === 'scrollDown') scrollContainerRef.current?.scrollBy({ top: 100, behavior: 'smooth' });
+        else if (action === 'processScreenshots') g.processScreenshots();
+        else if (action === 'resetCancel') void g.resetCancel();
+        else if (action === 'toggleTranslation') {
+            if (transcriptRef.current.translationConfigured) {
+                transcriptRef.current.saveTranslationSettings({ enabled: !transcriptRef.current.translationEnabled });
+            }
+        }
+        else if (action === 'toggleOriginal') {
+            transcriptRef.current.saveTranslationSettings({ displayMode: toggleOriginal(transcriptRef.current.transcriptDisplayMode) });
+        }
         setTimeout(() => { isStealthRef.current = false; }, 500);
-    }), [chat.actionButtonMode]);
+    });
 
     const setMessages = useCallback((updater: React.SetStateAction<Message[]>) => { chat.setSystemMessages((prev) => (typeof updater === 'function' ? (updater as (p: Message[]) => Message[])(prev) : updater)); }, [chat.setSystemMessages]);
     const transcriptProps = { ...transcript, ...audio, appearance, isLightTheme };
