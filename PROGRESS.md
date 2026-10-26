@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: S3 PRODUCT.md draft (branch `product-brief`)
+
+Done (S3, the PRODUCT half; drafted by a Gemini 3.8 worker through pi, then checked against the repo and corrected by the lead)
+- `PRODUCT.md` (61 lines) states what the product is, who uses it and when (each from a named file), the glance-first use, the principles, which README claims the repo does and does not support, what is not built, and six questions for the owner.
+- Corrections made after checking the worker's draft: it had copied the README's "no telemetry runs by default" as a principle, but `initAnalytics()` runs at startup (`src/App.tsx:52`) and injects the Google Tag Manager script even with an empty measurement id (`analytics.service.ts:49,121-123`), so that sentence is marked contradicted pending the owner's check (no network traffic was observed); it called "audio never leaves your device" contradicted although the README qualifies it itself, and called "100% offline" contradicted rather than not evidenced; and its "not built" list was from before S2, Stop and Retry and the answer card, which are done.
+- **Found, not fixed:** the analytics script is injected on every launch while the README promises no default telemetry. That is a privacy claim of a public project; the owner should decide whether to guard or remove the call.
+- Not verified: the six use cases are the README's, not observed; the draft is a proposal until the owner reads it.
+
 ## 2026-10-26: U5 answer card: Re line, lead sentence, code Copy (branch `answer-card`, issue #25)
 
 Done (the live overlay part of #25)

@@ -23,14 +23,15 @@ The overlay is designed for quick glance reading lasting one to three seconds mi
 - **Glance-first**: Mid-call reading lasts one to three seconds, requiring minimal chrome and quiet secondary controls [DESIGN.md, docs/conventions.md].
 - **Answer or newest translation leads**: When an answer is streaming or pinned, the answer is the most prominent element [docs/conventions.md]. When translation is active and no answer exists, the newest translated line from the other party is most prominent [DESIGN.md, docs/conventions.md, docs/design-live-translation-ui.md].
 - **Nothing moves under the reader's eyes**: Layout positions stay stable, reserved slots absorb incoming text, and controls never shift active content [DESIGN.md, docs/conventions.md, docs/design-live-translation-ui.md].
-- **Privacy and bring-your-own-key**: Credentials remain in the OS keychain, no telemetry runs by default, and audio is transmitted only to user-configured cloud providers [README.md, RULES.md, docs/conventions.md, docs/architecture.md].
+- **Privacy and bring-your-own-key**: Credentials remain in the OS keychain and audio goes only to the providers the user configures [README.md, RULES.md, docs/conventions.md, docs/architecture.md]. The README also says "no telemetry runs by default"; see section 5, where the code does not support that sentence.
 - **Never invent data**: The application never outputs fake statistics, scores, synthetic provenance, or fallback AI answers [RULES.md, docs/conventions.md].
 
 ## 5. Claims this project must not make and claims in the README that this brief does not endorse
 - **Windows platform support badge and claim** (`Windows 10/11` and `platform-macOS | Windows` badge): `contradicted by the repo`. Issue #15 records that a Windows build was never released, and window behavior is verified only on macOS [TASKS.md, PROGRESS.md].
 - **Transcription latency under 500 ms** ("under 500 ms" and "Sub-500 ms transcription"): `not evidenced in the repo`. No transcription or translation latency measurements exist in the repository [PROGRESS.md, docs/architecture.md].
-- **"Audio never leaves your device" claim**: `contradicted by the repo`. All supported speech-to-text providers in the architecture require network transmission to external cloud services [docs/architecture.md].
-- **"100% offline option (Ollama)" claim**: `contradicted by the repo`. While Ollama runs local LLM inference, transcription depends on cloud speech-to-text providers because no local STT engine exists in the codebase [docs/architecture.md].
+- **"Audio never leaves your device" (table cell with an asterisk)**: `qualified by the README's own footnote and FAQ` ("only if you choose a cloud STT/LLM provider"); the repo lists only cloud STT providers (`src/config/stt.constants.ts`: google, groq, openai, deepgram, elevenlabs, azure, ibmwatson; `electron/audio/` adds Soniox), so the offline route the footnote describes is `not evidenced in the repo` [README.md, docs/architecture.md].
+- **"100% offline option (Ollama)" and "run completely offline with Ollama"**: `not evidenced in the repo`. Ollama covers the language model; no local speech-to-text engine is among the providers, so a call cannot be transcribed offline today [docs/architecture.md]. The FAQ mentions "a local STT engine (or system-only transcription)"; neither was found.
+- **"No telemetry runs by default" (README line 126)**: `contradicted by the repo`, pending the owner's check. `initAnalytics()` runs at startup (`src/App.tsx:52`) and injects the Google Tag Manager script (`src/lib/analytics/analytics.service.ts:121-123`) even though `GA4_MEASUREMENT_ID` is an empty string (`:49`); there is no guard for the empty id. No network traffic was observed, so what is actually sent is unconfirmed.
 - **Feature comparison table cells regarding Cluely, Granola, and Otter**: `not evidenced in the repo`. The repository contains no empirical tests, benchmarks, or documentation concerning competitor features or limitations [RULES.md].
 - **Hardware requirement numbers** ("4 GB RAM minimum, 8 GB recommended", "16 GB+ for Ollama"): `not evidenced in the repo`. No memory profiling or benchmark evidence exists in the codebase [PROGRESS.md].
 - **Provider speed and suitability assertions** (e.g. Groq "sub-second inference", Claude "best for coding interviews", Gemini "recommended default"): `not evidenced in the repo`. No comparative evaluation data or latency benchmarks exist in the repository [PROGRESS.md, docs/architecture.md].
@@ -42,21 +43,19 @@ The overlay is designed for quick glance reading lasting one to three seconds mi
 - **Dual-channel audio capture (system audio and mic)**: `evidenced`. Verified by native Rust audio capture module implementation [docs/architecture.md].
 
 ## 6. Not in scope / not yet built
-- **Windows distribution package**: A packaged and verified Windows build has not been released [TASKS.md, PROGRESS.md].
-- **16px lead sentence on answers**: Planned under task U5, not yet implemented [PROGRESS.md, TASKS.md].
-- **Unified AnswerCard component**: Shared answer rendering across overlay and post-meeting views remains open under task U5 [TASKS.md, PROGRESS.md].
-- **Streaming answer cancellation and retry**: Main-process cancellation and answer retries are not yet built [TASKS.md, PROGRESS.md].
-- **Entity masking in live translation**: Ported as a module, but deferred and not wired into the translation request path [TASKS.md, PROGRESS.md].
-- **Early translation with committed/preview rendering**: Deferred under tasks R3, R5, and T10 pending stable-prefix tracking [TASKS.md, PROGRESS.md].
-- **Translating own speech ("Me")**: Explicitly excluded; own speech lines remain untranslated source text [docs/design-live-translation-ui.md, TASKS.md].
-- **ESLint ruleset and CI enforcement**: Open under task S2 and awaits owner approval [TASKS.md].
-- **Linux platform support and Wayland capture**: Open roadmap item; not implemented [README.md, TASKS.md].
-- **Native OS vibrancy blur**: Deferred pending stealth and content-protection review [docs/design-overlay-v2.md, TASKS.md].
+- **Windows distribution package**: no Windows build has been released (issue #15) [TASKS.md, PROGRESS.md].
+- **One answer component for every window**: the live overlay's answers have the Re line, the 16px lead and per-block Copy; the chat overlays and the post-meeting view still render answers themselves [TASKS.md, PROGRESS.md].
+- **Entity masking in live translation**: the module exists and is tested but is not in the request path [TASKS.md, PROGRESS.md].
+- **Translating before a turn flushes**: a design note recommends measuring first, then translating at the provider's own boundary; the stable-prefix design is not recommended [docs/design-early-translation.md].
+- **Translating own speech ("Me")**: excluded; own lines stay untranslated source text [docs/design-live-translation-ui.md].
+- **Linux support and Wayland capture**: open roadmap item [README.md].
+- **Native OS vibrancy blur**: deferred pending a stealth and content-protection review [docs/design-overlay-v2.md].
+- **Real-provider verification**: nothing built in the last weeks (streaming translation, Stop and Retry, the audio status, the top bar) has been exercised against a real STT or LLM provider or on Windows [PROGRESS.md].
 
 ## 7. Questions for the owner
 1. Who is the primary target user and what is the primary workflow (live call translation, meeting copilot, or interview rehearsal)?
 2. Should interview prep and assistance remain a headline use case in README.md, given strict interview assistance policies and recent focus on live call translation?
-3. How should the privacy and "audio never leaves your device" claims in README.md be amended, given that transcription currently requires cloud STT providers?
+3. How should the privacy claims in README.md be amended: "audio never leaves your device", "100% offline", and "no telemetry runs by default" (the analytics script is injected at startup)? Should the analytics call be removed or guarded?
 4. Should the Windows platform badge and Windows 10/11 support claims be marked experimental or removed until issue #15 is resolved and a Windows installer is released?
 5. Should the "100% offline option" claim be removed or qualified until a local STT engine is integrated alongside Ollama?
 6. Which speaker vocabulary should be standardized across live overlay and post-meeting views ("Them" vs. "Interviewer", "Me" vs. "User")?
