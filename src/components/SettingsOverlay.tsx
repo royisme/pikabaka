@@ -1,4 +1,3 @@
-import ProactiveHelpSettings from './settings/ProactiveHelpSettings';
 import WorkspaceSettings from './settings/WorkspaceSettings';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from 'react-query';
@@ -813,25 +812,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [isSttDropdownOpen, setIsSttDropdownOpen] = useState(false);
     const sttDropdownRef = React.useRef<HTMLDivElement>(null);
     const [transcriptTranslationEnabled, setTranscriptTranslationEnabled] = useState(false);
-    const [transcriptTranslationProvider, setTranscriptTranslationProvider] = useState<string>('ollama');
-    const [transcriptTranslationModel, setTranscriptTranslationModel] = useState('');
-    const [translationLlmKeyStatus, setTranslationLlmKeyStatus] = useState({
-        gemini: false,
-        groq: false,
-        openai: false,
-        claude: false,
-    });
-    const [translationOpenAICompatFromSettings, setTranslationOpenAICompatFromSettings] = useState<
-        Array<{ id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }>
-    >([]);
     const [transcriptTranslationPrompt, setTranscriptTranslationPrompt] = useState(DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT);
     const [transcriptTranslationDisplayMode, setTranscriptTranslationDisplayMode] = useState<'original' | 'translated' | 'both'>('original');
     const [transcriptTranslationSourceLanguage, setTranscriptTranslationSourceLanguage] = useState('auto');
     const [transcriptTranslationTargetLanguage, setTranscriptTranslationTargetLanguage] = useState('chinese');
     const [translationSettingsSaved, setTranslationSettingsSaved] = useState(false);
-    const [translationModelOptions, setTranslationModelOptions] = useState<{ id: string; label: string }[]>([]);
-    const [translationModelsFetchLoading, setTranslationModelsFetchLoading] = useState(false);
-    const [translationModelsFetchError, setTranslationModelsFetchError] = useState<string | null>(null);
 
     // Close STT dropdown when clicking outside
     useEffect(() => {
@@ -865,8 +850,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                     setHasStoredIbmWatsonKey(creds.hasIbmWatsonKey);
                     setHasStoredSonioxKey(creds.hasSonioxKey || false);
                     setTranscriptTranslationEnabled(!!creds.transcriptTranslationEnabled);
-                    setTranscriptTranslationProvider(creds.transcriptTranslationProvider || 'ollama');
-                    setTranscriptTranslationModel(creds.transcriptTranslationModel || '');
                     if (typeof creds.transcriptTranslationPrompt === 'string' && creds.transcriptTranslationPrompt.length > 0) {
                         setTranscriptTranslationPrompt(creds.transcriptTranslationPrompt);
                     } else {
@@ -883,16 +866,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                             ? creds.transcriptTranslationTargetLanguage
                             : 'chinese'
                     );
-                    setTranslationLlmKeyStatus({
-                        gemini: !!creds.hasGeminiKey,
-                        groq: !!creds.hasGroqKey,
-                        openai: !!creds.hasOpenaiKey,
-                        claude: !!creds.hasClaudeKey,
-                    });
-                }
-                const oaiList = await window.electronAPI?.getOpenAICompatibleProviders?.();
-                if (oaiList) {
-                    setTranslationOpenAICompatFromSettings(oaiList);
                 }
                 const assemblerProfile = await window.electronAPI?.getTranscriptAssemblerProfile?.();
                 if (assemblerProfile) {
@@ -904,51 +877,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         };
         if (isOpen) loadSttSettings();
     }, [isOpen]);
-
-    const translationProviderOptions = useMemo(() => {
-        const o: { value: string; label: string }[] = [];
-        o.push({ value: 'ollama', label: 'Ollama (local)' });
-        if (translationLlmKeyStatus.gemini) o.push({ value: 'gemini', label: 'Gemini' });
-        if (translationLlmKeyStatus.groq) o.push({ value: 'groq', label: 'Groq' });
-        if (translationLlmKeyStatus.openai) o.push({ value: 'openai', label: 'OpenAI' });
-        if (translationLlmKeyStatus.claude) o.push({ value: 'claude', label: 'Claude' });
-        translationOpenAICompatFromSettings.forEach((p) =>
-            o.push({ value: p.id, label: `${p.name} (OpenAI-compatible)` })
-        );
-        return o;
-    }, [translationLlmKeyStatus, translationOpenAICompatFromSettings]);
-
-    useEffect(() => {
-        if (translationProviderOptions.length === 0) return;
-        if (!translationProviderOptions.some((x) => x.value === transcriptTranslationProvider)) {
-            setTranscriptTranslationProvider(translationProviderOptions[0].value);
-        }
-    }, [translationProviderOptions, transcriptTranslationProvider]);
-
-    useEffect(() => {
-        const api = window.electronAPI;
-        if (!api?.onOpenAICompatibleProvidersChanged) return undefined;
-        const unsub = api.onOpenAICompatibleProvidersChanged(async () => {
-            try {
-                const list = await api.getOpenAICompatibleProviders?.();
-                if (list) {
-                    setTranslationOpenAICompatFromSettings(list);
-                }
-                const creds = await api.getStoredCredentials?.();
-                if (creds) {
-                    setTranslationLlmKeyStatus({
-                        gemini: !!creds.hasGeminiKey,
-                        groq: !!creds.hasGroqKey,
-                        openai: !!creds.hasOpenaiKey,
-                        claude: !!creds.hasClaudeKey,
-                    });
-                }
-            } catch {
-                // ignore
-            }
-        });
-        return () => unsub();
-    }, []);
 
     const handleSttProviderChange = async (provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => {
         setSttProvider(provider);
@@ -1138,73 +1066,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         }
     };
 
-    useEffect(() => {
-        setTranslationModelOptions([]);
-        setTranslationModelsFetchError(null);
-    }, [transcriptTranslationProvider]);
-
-    const handleFetchTranslationModels = async () => {
-        setTranslationModelsFetchLoading(true);
-        setTranslationModelsFetchError(null);
-        try {
-            if (transcriptTranslationProvider === 'ollama') {
-                const list = (await window.electronAPI.getAvailableOllamaModels()) ?? [];
-                const opts = list.map((id) => ({ id, label: id }));
-                setTranslationModelOptions(opts);
-                if (opts.length === 0) {
-                    setTranslationModelsFetchError('No local Ollama models found. Pull a model or start Ollama.');
-                } else if (!transcriptTranslationModel.trim()) {
-                    setTranscriptTranslationModel(opts[0].id);
-                }
-            } else if (
-                transcriptTranslationProvider === 'gemini' ||
-                transcriptTranslationProvider === 'groq' ||
-                transcriptTranslationProvider === 'openai' ||
-                transcriptTranslationProvider === 'claude'
-            ) {
-                const p = transcriptTranslationProvider as 'gemini' | 'groq' | 'openai' | 'claude';
-                const result = await window.electronAPI.fetchProviderModels(p, '');
-                if (result?.success && result.models && result.models.length > 0) {
-                    setTranslationModelOptions(result.models);
-                    if (!transcriptTranslationModel.trim()) {
-                        setTranscriptTranslationModel(result.models[0].id);
-                    }
-                } else if (result?.success && (!result.models || result.models.length === 0)) {
-                    setTranslationModelsFetchError('No models returned.');
-                } else {
-                    setTranslationModelsFetchError(result?.error || 'Failed to fetch models');
-                }
-            } else {
-                const ep = translationOpenAICompatFromSettings.find((x) => x.id === transcriptTranslationProvider);
-                if (!ep) {
-                    setTranslationModelsFetchError('This endpoint is not in AI Providers. Add it under AI Providers, then reopen settings.');
-                    return;
-                }
-                const result = await window.electronAPI.fetchOpenAICompatibleModels(ep.baseUrl, ep.apiKey);
-                if (result?.success && result.models && result.models.length > 0) {
-                    setTranslationModelOptions(result.models);
-                    if (!transcriptTranslationModel.trim()) {
-                        setTranscriptTranslationModel(result.models[0].id);
-                    }
-                } else if (result?.success && (!result.models || result.models.length === 0)) {
-                    setTranslationModelsFetchError('No models returned.');
-                } else {
-                    setTranslationModelsFetchError(result?.error || 'Failed to fetch models');
-                }
-            }
-        } catch (e: unknown) {
-            setTranslationModelsFetchError(e instanceof Error ? e.message : 'Failed to fetch models');
-        } finally {
-            setTranslationModelsFetchLoading(false);
-        }
-    };
-
     const handleSaveTranscriptTranslationSettings = async () => {
         try {
             await window.electronAPI?.setTranscriptTranslationSettings?.({
                 enabled: transcriptTranslationEnabled,
-                provider: transcriptTranslationProvider,
-                model: transcriptTranslationModel,
                 prompt: transcriptTranslationPrompt,
                 displayMode: transcriptTranslationDisplayMode,
                 sourceLanguage: transcriptTranslationSourceLanguage,
@@ -2552,24 +2417,6 @@ Core Skills
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 <div className="space-y-1.5">
-                                                    <label className="text-xs font-medium text-text-secondary block">Translation provider</label>
-                                                    <select
-                                                        value={
-                                                            translationProviderOptions.some((x) => x.value === transcriptTranslationProvider)
-                                                                ? transcriptTranslationProvider
-                                                                : translationProviderOptions[0]?.value ?? 'ollama'
-                                                        }
-                                                        onChange={(e) => setTranscriptTranslationProvider(e.target.value)}
-                                                        className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-                                                    >
-                                                        {translationProviderOptions.map((opt) => (
-                                                            <option key={opt.value} value={opt.value}>
-                                                                {opt.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                                <div className="space-y-1.5">
                                                     <label className="text-xs font-medium text-text-secondary block">Display Mode</label>
                                                     <select
                                                         value={transcriptTranslationDisplayMode}
@@ -2618,84 +2465,9 @@ Core Skills
                                                 </div>
                                             </div>
 
-                                            <div className="space-y-1.5">
-                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                    <label className="text-xs font-medium text-text-secondary block">Translation Model</label>
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleFetchTranslationModels}
-                                                        disabled={translationModelsFetchLoading}
-                                                        className="shrink-0 h-9 flex items-center gap-1.5 px-3 rounded-md text-xs font-medium border border-border-subtle bg-bg-input hover:bg-bg-elevated text-text-primary disabled:opacity-50 transition-colors"
-                                                        title={
-                                                            transcriptTranslationProvider === 'ollama'
-                                                                ? 'List models from local Ollama'
-                                                                : transcriptTranslationProvider === 'gemini' ||
-                                                                    transcriptTranslationProvider === 'groq' ||
-                                                                    transcriptTranslationProvider === 'openai' ||
-                                                                    transcriptTranslationProvider === 'claude'
-                                                                  ? 'Uses stored API keys from AI Providers'
-                                                                  : 'Uses the selected OpenAI-compatible endpoint from AI Providers (URL + key)'
-                                                        }
-                                                    >
-                                                        {translationModelsFetchLoading ? (
-                                                            <Loader2 size={12} className="animate-spin" />
-                                                        ) : (
-                                                            <RefreshCw size={12} />
-                                                        )}
-                                                        Fetch Models
-                                                    </button>
-                                                </div>
-                                                {translationModelsFetchError && (
-                                                    <p className="text-[11px] text-state-danger">{translationModelsFetchError}</p>
-                                                )}
-                                                {translationModelOptions.length > 0 && (
-                                                    <select
-                                                        value={
-                                                            translationModelOptions.some((o) => o.id === transcriptTranslationModel)
-                                                                ? transcriptTranslationModel
-                                                                : ''
-                                                        }
-                                                        onChange={(e) => {
-                                                            const v = e.target.value;
-                                                            if (v) setTranscriptTranslationModel(v);
-                                                        }}
-                                                        className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-                                                    >
-                                                        <option value="">Quick pick from list</option>
-                                                        {translationModelOptions.map((m) => (
-                                                            <option key={m.id} value={m.id}>
-                                                                {m.label || m.id}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                )}
-                                                <input
-                                                    type="text"
-                                                    value={transcriptTranslationModel}
-                                                    onChange={(e) => setTranscriptTranslationModel(e.target.value)}
-                                                    placeholder={
-                                                        transcriptTranslationProvider === 'ollama'
-                                                            ? 'e.g. qwen2.5:7b'
-                                                            : transcriptTranslationProvider === 'gemini' ||
-                                                                transcriptTranslationProvider === 'groq' ||
-                                                                transcriptTranslationProvider === 'openai' ||
-                                                                transcriptTranslationProvider === 'claude'
-                                                              ? 'Provider model id'
-                                                              : 'Model id (optional if endpoint has a preferred model)'
-                                                    }
-                                                    className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
-                                                />
-                                                <p className="text-[10px] text-text-tertiary">
-                                                    {transcriptTranslationProvider === 'ollama'
-                                                        ? 'Ollama must be running. Cloud providers use keys from the AI Providers tab.'
-                                                        : transcriptTranslationProvider === 'gemini' ||
-                                                            transcriptTranslationProvider === 'groq' ||
-                                                            transcriptTranslationProvider === 'openai' ||
-                                                            transcriptTranslationProvider === 'claude'
-                                                          ? 'Save API keys under AI Providers before fetching.'
-                                                          : 'OpenAI-compatible endpoints are only listed here after you add them under AI Providers.'}
-                                                </p>
-                                            </div>
+                                            <p className="text-[11px] text-text-tertiary">
+                                                The translation model and its connection are chosen under AI Providers, "Where models are used".
+                                            </p>
 
                                             <div className="space-y-1.5">
                                                 <div className="flex items-center justify-between">
@@ -2726,10 +2498,6 @@ Core Skills
                                             </div>
                                         </div>
                                     </div>
-
-                                    <div className="h-px bg-border-subtle" />
-
-                                    <ProactiveHelpSettings />
 
                                     <div className="h-px bg-border-subtle" />
 

@@ -1,9 +1,11 @@
+import ConnectionsSettings from './ConnectionsSettings';
+import ModelUsesSettings from './ModelUsesSettings';
+import ProactiveHelpSettings from './ProactiveHelpSettings';
 import React, { useState, useEffect } from 'react';
 import * as Select from '@radix-ui/react-select';
 import { Plus, Trash2, Edit2, AlertCircle, CheckCircle, Save, ChevronDown, Check, RefreshCw, Loader2 } from 'lucide-react';
 import { STANDARD_CLOUD_MODELS, prettifyModelId } from '../../utils/modelUtils';
 import { validateCurl } from '../../lib/curl-validator';
-import { ProviderCard } from './ProviderCard';
 
 interface CustomProvider {
     id: string;
@@ -78,17 +80,9 @@ const ModelSelect: React.FC<ModelSelectProps> = ({ value, options, onChange, pla
 
 export const AIProvidersSettings: React.FC = () => {
     // --- Standard Providers ---
-    const [apiKey, setApiKey] = useState('');
-    const [groqApiKey, setGroqApiKey] = useState('');
-    const [openaiApiKey, setOpenaiApiKey] = useState('');
-    const [claudeApiKey, setClaudeApiKey] = useState('');
 
     // Status
-    const [savedStatus, setSavedStatus] = useState<Record<string, boolean>>({});
-    const [savingStatus, setSavingStatus] = useState<Record<string, boolean>>({});
     const [hasStoredKey, setHasStoredKey] = useState<Record<string, boolean>>({});
-    const [testStatus, setTestStatus] = useState<Record<string, 'idle' | 'testing' | 'success' | 'error'>>({});
-    const [testError, setTestError] = useState<Record<string, string>>({});
 
     // --- Custom Providers ---
     const [customProviders, setCustomProviders] = useState<CustomProvider[]>([]);
@@ -100,15 +94,6 @@ export const AIProvidersSettings: React.FC = () => {
     const [curlError, setCurlError] = useState<string | null>(null);
 
     const [openaiCompatibleProviders, setOpenaiCompatibleProviders] = useState<OpenAICompatibleProviderRow[]>([]);
-    const [isEditingOai, setIsEditingOai] = useState(false);
-    const [editingOai, setEditingOai] = useState<OpenAICompatibleProviderRow | null>(null);
-    const [oaiName, setOaiName] = useState('');
-    const [oaiBaseUrl, setOaiBaseUrl] = useState('');
-    const [oaiApiKey, setOaiApiKey] = useState('');
-    const [oaiPreferredModel, setOaiPreferredModel] = useState('');
-    const [oaiModelOptions, setOaiModelOptions] = useState<{ id: string; label: string }[]>([]);
-    const [oaiFetchLoading, setOaiFetchLoading] = useState(false);
-    const [oaiError, setOaiError] = useState<string | null>(null);
 
     // --- Local (Ollama) ---
     const [ollamaModels, setOllamaModels] = useState<string[]>([]);
@@ -121,6 +106,21 @@ export const AIProvidersSettings: React.FC = () => {
 
     // --- Dynamic Model Discovery ---
     const [preferredModels, setPreferredModels] = useState<Record<string, string>>({});
+
+    // A connection changed: what depends on it (which providers have a key, the OpenAI-compatible list) is read again.
+    const [connectionsVersion, setConnectionsVersion] = useState(0);
+    useEffect(() => {
+        if (connectionsVersion === 0) return;
+        const refresh = async () => {
+            // @ts-ignore
+            const creds = await window.electronAPI?.getStoredCredentials?.();
+            if (creds) setHasStoredKey({ gemini: creds.hasGeminiKey, groq: creds.hasGroqKey, openai: creds.hasOpenaiKey, claude: creds.hasClaudeKey });
+            // @ts-ignore
+            const oaiList = await window.electronAPI?.getOpenAICompatibleProviders?.();
+            if (oaiList) setOpenaiCompatibleProviders(oaiList);
+        };
+        void refresh();
+    }, [connectionsVersion]);
 
     // Load Initial Data
     useEffect(() => {
@@ -267,79 +267,6 @@ export const AIProvidersSettings: React.FC = () => {
         }
     };
 
-    const handleSaveKey = async (provider: string, key: string, setter: (val: string) => void) => {
-        if (!key.trim()) return;
-        setSavingStatus(prev => ({ ...prev, [provider]: true }));
-        try {
-            let result;
-            // @ts-ignore
-            if (provider === 'gemini') result = await window.electronAPI.setGeminiApiKey(key);
-            // @ts-ignore
-            if (provider === 'groq') result = await window.electronAPI.setGroqApiKey(key);
-            // @ts-ignore
-            if (provider === 'openai') result = await window.electronAPI.setOpenaiApiKey(key);
-            // @ts-ignore
-            if (provider === 'claude') result = await window.electronAPI.setClaudeApiKey(key);
-
-            if (result && result.success) {
-                setSavedStatus(prev => ({ ...prev, [provider]: true }));
-                setHasStoredKey(prev => ({ ...prev, [provider]: true }));
-                setter('');
-                setTimeout(() => setSavedStatus(prev => ({ ...prev, [provider]: false })), 2000);
-            }
-        } catch (e) {
-            console.error(`Failed to save ${provider} key:`, e);
-        } finally {
-            setSavingStatus(prev => ({ ...prev, [provider]: false }));
-        }
-    };
-
-    const handleRemoveKey = async (provider: string, setter: (val: string) => void) => {
-        if (!confirm(`Are you sure you want to remove the ${provider} API key?`)) return;
-        try {
-            let result;
-            // @ts-ignore
-            if (provider === 'gemini') result = await window.electronAPI.setGeminiApiKey('');
-            // @ts-ignore
-            if (provider === 'groq') result = await window.electronAPI.setGroqApiKey('');
-            // @ts-ignore
-            if (provider === 'openai') result = await window.electronAPI.setOpenaiApiKey('');
-            // @ts-ignore
-            if (provider === 'claude') result = await window.electronAPI.setClaudeApiKey('');
-
-            if (result && result.success) {
-                setHasStoredKey(prev => ({ ...prev, [provider]: false }));
-                setter('');
-            }
-        } catch (e) {
-            console.error(`Failed to remove ${provider} key:`, e);
-        }
-    };
-
-    const handleTestConnection = async (provider: string, key: string) => {
-        // Allow testing if key is provided OR if we have a stored key
-        if (!key.trim() && !hasStoredKey[provider]) {
-            return;
-        }
-        setTestStatus(prev => ({ ...prev, [provider]: 'testing' }));
-        setTestError(prev => ({ ...prev, [provider]: '' }));
-
-        try {
-            // @ts-ignore
-            const result = await window.electronAPI.testLlmConnection(provider, key);
-            if (result.success) {
-                setTestStatus(prev => ({ ...prev, [provider]: 'success' }));
-                setTimeout(() => setTestStatus(prev => ({ ...prev, [provider]: 'idle' })), 3000);
-            } else {
-                setTestStatus(prev => ({ ...prev, [provider]: 'error' }));
-                setTestError(prev => ({ ...prev, [provider]: result.error || 'Connection failed' }));
-            }
-        } catch (e: any) {
-            setTestStatus(prev => ({ ...prev, [provider]: 'error' }));
-            setTestError(prev => ({ ...prev, [provider]: e.message || 'Connection failed' }));
-        }
-    };
-
     // --- Custom Provider Handlers ---
 
     const handleEditProvider = (provider: CustomProvider) => {
@@ -412,91 +339,6 @@ export const AIProvidersSettings: React.FC = () => {
         }
     };
 
-    const handleNewOai = () => {
-        setEditingOai(null);
-        setOaiName('');
-        setOaiBaseUrl('');
-        setOaiApiKey('');
-        setOaiPreferredModel('');
-        setOaiModelOptions([]);
-        setOaiError(null);
-        setIsEditingOai(true);
-    };
-
-    const handleEditOai = (p: OpenAICompatibleProviderRow) => {
-        setEditingOai(p);
-        setOaiName(p.name);
-        setOaiBaseUrl(p.baseUrl);
-        setOaiApiKey(p.apiKey);
-        setOaiPreferredModel(p.preferredModel || '');
-        setOaiModelOptions([]);
-        setOaiError(null);
-        setIsEditingOai(true);
-    };
-
-    const handleSaveOai = async () => {
-        setOaiError(null);
-        if (!oaiName.trim() || !oaiBaseUrl.trim() || !oaiApiKey.trim()) {
-            setOaiError('Name, base URL, and API key are required.');
-            return;
-        }
-        try {
-            const row: OpenAICompatibleProviderRow = {
-                id: editingOai?.id || crypto.randomUUID(),
-                name: oaiName.trim(),
-                baseUrl: oaiBaseUrl.trim(),
-                apiKey: oaiApiKey.trim(),
-                preferredModel: oaiPreferredModel.trim() || undefined,
-            };
-            // @ts-ignore
-            const result = await window.electronAPI?.saveOpenAICompatibleProvider?.(row);
-            if (result?.success) {
-                // @ts-ignore
-                const updated = await window.electronAPI?.getOpenAICompatibleProviders?.();
-                if (updated) setOpenaiCompatibleProviders(updated);
-                setIsEditingOai(false);
-            } else {
-                setOaiError(result?.error || 'Save failed');
-            }
-        } catch (e: any) {
-            setOaiError(e.message);
-        }
-    };
-
-    const handleDeleteOai = async (id: string) => {
-        if (!confirm('Delete this OpenAI-compatible endpoint?')) return;
-        try {
-            // @ts-ignore
-            const result = await window.electronAPI?.deleteOpenAICompatibleProvider?.(id);
-            if (result?.success) {
-                // @ts-ignore
-                const updated = await window.electronAPI?.getOpenAICompatibleProviders?.();
-                if (updated) setOpenaiCompatibleProviders(updated);
-            }
-        } catch (e) {
-            console.error('Failed to delete OpenAI-compatible provider:', e);
-        }
-    };
-
-    const handleFetchOaiModels = async () => {
-        setOaiFetchLoading(true);
-        setOaiError(null);
-        try {
-            // @ts-ignore
-            const res = await window.electronAPI?.fetchOpenAICompatibleModels?.(oaiBaseUrl, oaiApiKey);
-            if (res?.success && res.models?.length) {
-                setOaiModelOptions(res.models);
-                if (!oaiPreferredModel.trim()) setOaiPreferredModel(res.models[0].id);
-            } else {
-                setOaiError(res?.error || 'No models returned');
-            }
-        } catch (e: any) {
-            setOaiError(e.message);
-        } finally {
-            setOaiFetchLoading(false);
-        }
-    };
-
     return (
         <div className="space-y-5 animated fadeIn pb-10">
             {/* Default Model for Chat */}
@@ -524,9 +366,9 @@ export const AIProvidersSettings: React.FC = () => {
                                 }
                             }
                             customProviders.forEach(p => opts.push({ id: p.id, name: p.name }));
-                            openaiCompatibleProviders.forEach(p =>
-                                opts.push({ id: p.id, name: `${p.name} (OpenAI-compatible)` })
-                            );
+                            openaiCompatibleProviders
+                                .filter(p => (p as { type?: string }).type === undefined || (p as { type?: string }).type === 'openai')
+                                .forEach(p => opts.push({ id: p.id, name: `${p.name} (OpenAI-compatible)` }));
                             ollamaModels.forEach(m => opts.push({ id: `ollama-${m}`, name: `${m} (Local)` }));
                             // Ensure current default model always appears
                             if (defaultModel && !opts.find(o => o.id === defaultModel)) {
@@ -576,97 +418,11 @@ export const AIProvidersSettings: React.FC = () => {
                 </div>
             </div>
 
-            {/* Cloud Providers */}
-            <div className="space-y-5">
-                <div>
-                    <h3 className="text-sm font-bold text-text-primary mb-1">Cloud Providers</h3>
-                    <p className="text-xs text-text-secondary mb-2">Add API keys to unlock cloud AI models.</p>
-                </div>
+            <ConnectionsSettings onChanged={() => setConnectionsVersion((v) => v + 1)} />
 
-                <div className="space-y-4">
+            <ModelUsesSettings version={connectionsVersion} />
 
-                    {/* Gemini */}
-                    <ProviderCard
-                        providerId="gemini"
-                        providerName="Gemini"
-                        apiKey={apiKey}
-                        preferredModel={preferredModels.gemini}
-                        hasStoredKey={!!hasStoredKey.gemini}
-                        onKeyChange={setApiKey}
-                        onSaveKey={async () => { await handleSaveKey('gemini', apiKey, setApiKey); }}
-                        onRemoveKey={() => handleRemoveKey('gemini', setApiKey)}
-                        onTestConnection={() => handleTestConnection('gemini', apiKey)}
-                        testStatus={testStatus.gemini || 'idle'}
-                        testError={testError.gemini}
-                        savingStatus={!!savingStatus.gemini}
-                        savedStatus={!!savedStatus.gemini}
-                        keyPlaceholder="AIzaSy..."
-                        keyUrl="https://aistudio.google.com/app/apikey"
-                        onPreferredModelChange={(model) => setPreferredModels(prev => ({ ...prev, gemini: model }))}
-                    />
-
-                    {/* Groq */}
-                    <ProviderCard
-                        providerId="groq"
-                        providerName="Groq"
-                        apiKey={groqApiKey}
-                        preferredModel={preferredModels.groq}
-                        hasStoredKey={!!hasStoredKey.groq}
-                        onKeyChange={setGroqApiKey}
-                        onSaveKey={async () => { await handleSaveKey('groq', groqApiKey, setGroqApiKey); }}
-                        onRemoveKey={() => handleRemoveKey('groq', setGroqApiKey)}
-                        onTestConnection={() => handleTestConnection('groq', groqApiKey)}
-                        testStatus={testStatus.groq || 'idle'}
-                        testError={testError.groq}
-                        savingStatus={!!savingStatus.groq}
-                        savedStatus={!!savedStatus.groq}
-                        keyPlaceholder="gsk_..."
-                        keyUrl="https://console.groq.com/keys"
-                        onPreferredModelChange={(model) => setPreferredModels(prev => ({ ...prev, groq: model }))}
-                    />
-
-                    {/* OpenAI */}
-                    <ProviderCard
-                        providerId="openai"
-                        providerName="OpenAI"
-                        apiKey={openaiApiKey}
-                        preferredModel={preferredModels.openai}
-                        hasStoredKey={!!hasStoredKey.openai}
-                        onKeyChange={setOpenaiApiKey}
-                        onSaveKey={async () => { await handleSaveKey('openai', openaiApiKey, setOpenaiApiKey); }}
-                        onRemoveKey={() => handleRemoveKey('openai', setOpenaiApiKey)}
-                        onTestConnection={() => handleTestConnection('openai', openaiApiKey)}
-                        testStatus={testStatus.openai || 'idle'}
-                        testError={testError.openai}
-                        savingStatus={!!savingStatus.openai}
-                        savedStatus={!!savedStatus.openai}
-                        keyPlaceholder="sk-..."
-                        keyUrl="https://platform.openai.com/api-keys"
-                        onPreferredModelChange={(model) => setPreferredModels(prev => ({ ...prev, openai: model }))}
-                    />
-
-                    {/* Claude */}
-                    <ProviderCard
-                        providerId="claude"
-                        providerName="Claude"
-                        apiKey={claudeApiKey}
-                        preferredModel={preferredModels.claude}
-                        hasStoredKey={!!hasStoredKey.claude}
-                        onKeyChange={setClaudeApiKey}
-                        onSaveKey={async () => { await handleSaveKey('claude', claudeApiKey, setClaudeApiKey); }}
-                        onRemoveKey={() => handleRemoveKey('claude', setClaudeApiKey)}
-                        onTestConnection={() => handleTestConnection('claude', claudeApiKey)}
-                        testStatus={testStatus.claude || 'idle'}
-                        testError={testError.claude}
-                        savingStatus={!!savingStatus.claude}
-                        savedStatus={!!savedStatus.claude}
-                        keyPlaceholder="sk-ant-..."
-                        keyUrl="https://console.anthropic.com/settings/keys"
-                        onPreferredModelChange={(model) => setPreferredModels(prev => ({ ...prev, claude: model }))}
-                    />
-
-                </div>
-            </div>
+            <ProactiveHelpSettings />
 
             {/* Local (Ollama) Providers */}
             <div className="space-y-5">
@@ -746,169 +502,6 @@ export const AIProvidersSettings: React.FC = () => {
                         </div>
                     )}
                 </div>
-            </div>
-
-            {/* OpenAI-compatible endpoints */}
-            <div className="space-y-5">
-                <div className="flex items-center justify-between mb-2">
-                    <div>
-                        <h3 className="text-sm font-bold text-text-primary mb-1">OpenAI-compatible endpoints</h3>
-                        <p className="text-xs text-text-secondary">
-                            Any API that exposes OpenAI Chat Completions (configure base URL and API key; uses the same model list as Fetch Models).
-                        </p>
-                    </div>
-                    {!isEditingOai && (
-                        <button
-                            onClick={handleNewOai}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-bg-input hover:bg-bg-elevated border border-border-subtle rounded-lg text-xs font-medium text-text-primary transition-colors"
-                            type="button"
-                        >
-                            <Plus size={14} /> Add endpoint
-                        </button>
-                    )}
-                </div>
-
-                {isEditingOai ? (
-                    <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle animated fadeIn">
-                        <h4 className="text-sm font-bold text-text-primary mb-4">{editingOai ? 'Edit endpoint' : 'New endpoint'}</h4>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-1">Name</label>
-                                <input
-                                    type="text"
-                                    value={oaiName}
-                                    onChange={(e) => setOaiName(e.target.value)}
-                                    placeholder="My LLM server"
-                                    className="w-full bg-bg-input border border-border-subtle rounded-lg px-4 py-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-1">Base URL</label>
-                                <input
-                                    type="text"
-                                    value={oaiBaseUrl}
-                                    onChange={(e) => setOaiBaseUrl(e.target.value)}
-                                    placeholder="https://api.example.com or http://localhost:1234/v1"
-                                    className="w-full bg-bg-input border border-border-subtle rounded-lg px-4 py-2.5 text-xs font-mono text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-                                />
-                                <p className="text-[10px] text-text-tertiary mt-1">/v1 is appended automatically if missing.</p>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-1">API key</label>
-                                <input
-                                    type="password"
-                                    value={oaiApiKey}
-                                    onChange={(e) => setOaiApiKey(e.target.value)}
-                                    placeholder="sk-..."
-                                    className="w-full bg-bg-input border border-border-subtle rounded-lg px-4 py-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-                                />
-                            </div>
-                            <div className="flex flex-wrap items-end gap-2">
-                                <div className="flex-1 min-w-[140px] space-y-1">
-                                    <label className="block text-xs font-medium text-text-primary uppercase tracking-wide">Preferred model</label>
-                                    {oaiModelOptions.length > 0 && (
-                                        <select
-                                            value={oaiModelOptions.some((m) => m.id === oaiPreferredModel) ? oaiPreferredModel : ''}
-                                            onChange={(e) => setOaiPreferredModel(e.target.value)}
-                                            className="w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-                                        >
-                                            <option value="">Quick pick</option>
-                                            {oaiModelOptions.map((m) => (
-                                                <option key={m.id} value={m.id}>
-                                                    {m.label || m.id}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    )}
-                                    <input
-                                        type="text"
-                                        value={oaiPreferredModel}
-                                        onChange={(e) => setOaiPreferredModel(e.target.value)}
-                                        placeholder="e.g. gpt-4o-mini"
-                                        className="w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-xs font-mono text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-                                    />
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={handleFetchOaiModels}
-                                    disabled={oaiFetchLoading}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-border-subtle bg-bg-input hover:bg-bg-elevated text-text-primary disabled:opacity-50 shrink-0"
-                                >
-                                    {oaiFetchLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                                    Fetch Models
-                                </button>
-                            </div>
-                            {oaiError && (
-                                <div className="flex items-start gap-2 p-3 bg-state-danger-soft border border-state-danger rounded-lg text-state-danger text-xs">
-                                    <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                                    <span>{oaiError}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-end gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEditingOai(false)}
-                                    className="px-4 py-2 rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-input transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleSaveOai}
-                                    className="px-4 py-2 rounded-lg text-xs font-medium bg-accent-primary text-on-primary hover:bg-accent-secondary transition-colors flex items-center gap-2"
-                                >
-                                    <Save size={14} /> Save
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                        {openaiCompatibleProviders.length === 0 ? (
-                            <div className="text-center py-6 bg-bg-item-surface rounded-xl border border-border-subtle border-dashed">
-                                <p className="text-xs text-text-tertiary">No OpenAI-compatible endpoints yet.</p>
-                            </div>
-                        ) : (
-                            openaiCompatibleProviders.map((p) => (
-                                <div
-                                    key={p.id}
-                                    className="bg-bg-item-surface rounded-xl p-4 border border-border-subtle flex items-center justify-between group"
-                                >
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <div className="w-8 h-8 rounded-lg bg-bg-input flex items-center justify-center text-text-secondary font-mono text-xs font-bold shrink-0">
-                                            OAI
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h4 className="text-sm font-medium text-text-primary truncate">{p.name}</h4>
-                                            <p className="text-[10px] text-text-tertiary font-mono truncate">{p.baseUrl}</p>
-                                            {p.preferredModel && (
-                                                <p className="text-[9px] text-text-tertiary font-mono opacity-70 mt-0.5">model: {p.preferredModel}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleEditOai(p)}
-                                            className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors"
-                                            title="Edit"
-                                        >
-                                            <Edit2 size={14} />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleDeleteOai(p.id)}
-                                            className="p-1.5 rounded-lg text-text-secondary hover:text-state-danger hover:bg-state-danger-soft transition-colors"
-                                            title="Delete"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                )}
             </div>
 
             {/* Custom Providers */}
