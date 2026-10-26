@@ -2,6 +2,16 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: `pnpm run dev` fails on Node 26 (branch `node-version-pin`)
+
+Found
+- The owner's `pnpm run dev` printed the lockfile messages and stopped. Cause: pnpm 11 found `node_modules` out of step with the lockfile (no `.modules.yaml`) and ran a full `pnpm install` before the script; under Node 26.10.0 that compiles `better-sqlite3@12.6.2` (no prebuilt binary) and the C++ build fails. Vite never starts. The "pnpm field in package.json is no longer read" warning is separate and harmless today: the lockfile already resolves `caniuse-lite` to the pinned `1.0.30001781`. Moving the override to `pnpm-workspace.yaml` changes the lockfile header and needs a regenerated lockfile, so it was left alone.
+- **My mistake:** to see the failure I ran `pnpm run dev` myself, which did start that install in the owner's checkout (1333 packages linked, native builds attempted, ended with the `better-sqlite3` failure). `RULES.md` forbids exactly this. Afterwards the top level of `node_modules` was unchanged (74 entries, same date), both `tsc` checks and the tap run still passed, but `node_modules/.bin` and `.modules.yaml` are still missing and the native modules are not rebuilt for either Node or Electron. A clean `pnpm install` under Node 22 is still needed.
+
+Done
+- `.node-version` (22), `engines.node` `>=22 <23`, the Node note in `CONTRIBUTING.md` and `docs/development.md`.
+- Not verified: that `pnpm install` succeeds under Node 22 (not run), that pnpm refuses or warns on Node 26 after this change (`--lockfile-only` printed nothing about it), and that `pnpm start` then runs.
+
 ## 2026-10-26: S4 docs hygiene (branch `docs-hygiene`)
 
 Done

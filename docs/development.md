@@ -13,9 +13,13 @@ pnpm is the only package manager (`.npmrc`: `node-linker=hoisted`). CI uses Node
 
 The scripts without `:raw` run `verify` (lint plus test) first.
 
+## Node version
+
+Use Node 22 (`.node-version`, `engines` in `package.json`, and CI). Under Node 26 `pnpm install` cannot finish: `better-sqlite3@12.6.2` has no prebuilt binary for it, so it is compiled with node-gyp and the C++ build fails (`make failed with exit code: 2`). With fnm: `fnm install 22 && fnm use 22` (or `eval "$(fnm env --use-on-cd)"` in the shell profile so the version file is read). `.npmrc` does not set `engine-strict`: it would also apply to every dependency's `engines` field, which has not been checked on Node 22.
+
 ## pnpm caveat
 
-In a checkout where `node_modules` is out of step with the lockfile, pnpm 11 starts an install before running any `pnpm run` or `pnpm exec` script (observed 2026-10-26: `pnpm run lint` began "Packages: +1333" and failed). Do not let that happen unasked. Run the tools through the local binaries instead:
+pnpm 11 checks that `node_modules` matches the lockfile before running any `pnpm run` or `pnpm exec` script, and if it does not (here `node_modules/.modules.yaml` is missing) it runs a full `pnpm install` first, including every dependency's install scripts. That is why `pnpm run dev` printed only "Lockfile is up to date, resolution step is skipped" and then compiled `better-sqlite3` instead of starting Vite. An agent must not trigger that unasked: it rewrites `node_modules` and rebuilds native modules (it happened on 2026-10-26 while diagnosing, see `PROGRESS.md`). Run the tools through the local binaries instead:
 
 ```sh
 node node_modules/typescript/bin/tsc --noEmit
@@ -24,6 +28,8 @@ node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.t
 ```
 
 `eslint` is not declared in `package.json`; the lockfile resolves it only as a peer of `@typescript-eslint/*`, and it is not installed in that checkout. So `pnpm run lint` could not run there, and `verify` (and every script that runs it first: `build`, `electron:dev`, `app:build`) depends on a peer that may be missing (issue #35).
+
+`pnpm run dev` starts Vite only (the renderer in a browser, without `window.electronAPI`). The app is `pnpm start` (`app:dev`).
 
 ## Checks
 
