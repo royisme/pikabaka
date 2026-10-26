@@ -4,6 +4,8 @@ import ChatColumn from './meeting/ChatColumn';
 import SplitterShell from './meeting/SplitterShell';
 import TranscriptColumn from './meeting/TranscriptColumn';
 import OverlayTopBar from './meeting/OverlayTopBar';
+import ProactiveCard from './agent/ProactiveCard';
+import type { AgentProactiveCard } from '../types/electron';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { getDefaultOverlayOpacity, getOverlayAppearance } from '../lib/overlayAppearance';
@@ -38,6 +40,14 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const audio = useMeetingAudio();
     const replyContextRef = useRef<() => string | undefined>(() => undefined);
     const chat = useMeetingChat({ getReplyContext: () => replyContextRef.current() });
+    const [proactiveCard, setProactiveCard] = useState<AgentProactiveCard | null>(null);
+    useEffect(() => window.electronAPI?.onAgentProactive?.((card) => setProactiveCard(card)), []);
+    const askAboutCard = useCallback((card: AgentProactiveCard) => {
+        // Pika's suggestion is quoted as Pika's, not as the user's own words.
+        chat.setInputValue(`About Pika's suggestion "${card.text}": tell me more.`);
+        setProactiveCard(null);
+        textInputRef.current?.focus();
+    }, [chat.setInputValue]);
     const appearance = useMemo(() => getOverlayAppearance(overlayOpacity, isLightTheme ? 'light' : 'dark'), [overlayOpacity, isLightTheme]);
 
     // The split is the user's once they move it. Until then it follows what the zone is for: more room for the
@@ -171,7 +181,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
                         <SplitterShell
                             topBar={<OverlayTopBar status={audioState} hasRows={statusInBar} onFixAudio={fixAudio} displayMode={transcript.transcriptDisplayMode} translationEnabled={transcript.translationEnabled} translationConfigured={transcript.translationConfigured} theirLanguage={transcript.theirLanguage} myLanguage={transcript.myLanguage} targetLanguage={transcript.targetLanguage} languageOptions={transcript.languageOptions} onToggleTranslation={() => transcript.saveTranslationSettings({ enabled: !transcript.translationEnabled })} onChangeSpokenLanguage={transcript.changeSpokenLanguage} onChangeTargetLanguage={(targetLanguage) => transcript.saveTranslationSettings({ targetLanguage })} onToggleOriginal={() => transcript.saveTranslationSettings({ displayMode: toggleOriginal(transcript.transcriptDisplayMode) })} onSetUpTranslation={() => { void window.electronAPI.toggleSettingsWindow(); }} modelName={modelLabel(currentModel)} isMousePassthrough={isMousePassthrough} toggleOriginalKeys={shortcuts.toggleOriginal} toggleTranslationKeys={shortcuts.toggleTranslation} onHide={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} onOpenModelSelector={openModelSelector} onOpenSettings={openSettings} onToggleMousePassthrough={() => generalHandlersRef.current.toggleMousePassthrough()} onOpenLauncher={() => window.electronAPI?.setWindowMode?.('launcher')} />}
                             left={<TranscriptColumn {...transcriptProps} status={audioState} onFixAudio={fixAudio} />}
-                            right={<ChatColumn {...chatProps} />}
+                            right={<div className="relative flex-1 min-h-0 min-w-0 flex flex-col"><ChatColumn {...chatProps} />{proactiveCard && <ProactiveCard card={proactiveCard} onDismiss={() => setProactiveCard(null)} onAskMore={() => askAboutCard(proactiveCard)} />}</div>}
                             splitterPosition={splitterPosition}
                             onSplitterChange={changeSplitter}
                             onSplitterReset={resetSplitter}
