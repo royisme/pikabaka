@@ -31,7 +31,7 @@ Direction: answer first, one primary action, transcript as supporting evidence (
 | U3 | One primary action; Enter sends typed text; dead Stop/Listening branches and unused `isManualRecording` plumbing removed | `Guide me` and `Answer` are one control; the hint matches behaviour; `tsc` finds no leftover reference | #23 | not started |
 | U4 | **Owner decision, then brief:** confirm the answer-first layout and the transcript position (it was placed above the answer on purpose in the 2026-05-06 handoff). Write the shaped brief (impeccable shape) | the owner's choice is recorded on #28; the brief lists the pinned answer card, transcript rows, actions, default height | #28 | blocked on S3 and the owner |
 | U5 | One `AnswerCard` for live and post-meeting views: "Re:" header, intent chip, lead sentence, details, per-code-block copy; the code branch no longer pre-empts the intent | `ChatPanel`, `MeetingChatOverlay`, `GlobalChatOverlay` and `MeetingDetails` use it or are deleted; speaker names match across live and post-meeting | #25 | blocked on U4 |
-| U6 | Transcript as flat rows: last 2-3 lines, live line at full contrast, one scroll container, status as a dot, real speaker label for the partial line | no nested `overflow-y-auto`; no `text-[9px]` or `text-[10px]` left in the transcript for readable text; owner checks it at 380 and 600px | #24 | blocked on U4 |
+| U6 | Transcript as flat rows: last 2-3 lines, live line at full contrast, one scroll container, status as a dot, real speaker label for the partial line | no nested `overflow-y-auto`; no `text-[9px]` or `text-[10px]` left in the transcript for readable text; owner checks it at 380 and 600px | #24 | superseded for the rows by T1 to T3 (the spec's layout); what is left here is the zone's size and position, which waits on U4 |
 | U7 | Default overlay height of at least 420px, persisted; message area `min-h`; chips and footer collapse when short; splitter gets `no-drag`, `role="separator"`, arrow keys and double-click reset | owner confirms on U0's numbers; unit test on the persisted-size clamp | #22, #26 | blocked on U0 and U4 |
 | U8 | The remaining gaps: visible copy and retry, stop a stream, IME guard, chips at 380px, Stop confirm, accessible names, error styling with retry, delete `SuggestionOverlay` and `KeyBadge` or use them | each checkbox on #27 is ticked or struck with a reason | #27 | blocked on U5 |
 | U9 | Collapse the 9 pixel font sizes in the conversation components to a small scale; readable text at least 11px | `grep -c "text-\[[0-9.]*px\]"` over the conversation components drops from 90 and the remaining sizes are on the scale in `DESIGN.md` | #24, #28 | blocked on U6 |
@@ -49,6 +49,23 @@ Direction: port the ideas from the OmniVoice project (`../OmniVoice`, macOS-only
 | R4 | `EntityMasker` in TypeScript with tests (read the OmniVoice source in full first) | mask and restore tests for URL, path, flag, snake_case, filename, backticks and a model that drops placeholders | #32 | not started; independent, can run any time |
 | R5 | **Owner decision:** design note for stable-prefix and early translation against second-pass correction; audit which STT providers send full-replace hypotheses | the note answers the three questions on #33 and the owner has agreed | #33 | blocked on R3 |
 
+## T. Live translation UI for calls (epic #38)
+
+Design: `docs/design-live-translation-ui.md`. The owner wants to use Pika on a phone or video call and read a clear live translation of the other party. Translation first (14px), original beneath (12px); one scroll container; a reserved line per translation. Steps T1 to T6 work with today's non-streaming pipeline; T9 and T10 wait for R2 and R3. T1 to T4 do not need the zone-position decision (U4); they change row internals and scrolling only. They replace U6 for the transcript rows.
+
+| # | Step | Acceptance | Issue | State |
+| --- | --- | --- | --- | --- |
+| T1 | Flat rows, translation first, honour `displayMode` (`RollingTranscript.tsx`) | `translated` hides the source until expanded; `both` puts translation above source; a unit test covers the per-mode choice; no `text-[9px]` or `text-[10px]` left in the file | #36 | not started; owner checks at 380 and 600px |
+| T2 | One scroll container and the transcript follow rule (`nextTranscriptScroll` next to `answerScroll.ts`, jump pill with a count) | no nested `overflow-y-auto`; unit test covers pin, hold, resume | #38 | not started; owner checks on a live call |
+| T3 | Reserved slot and line states: pending with elapsed time, error with Retry, same language, not configured | a late one-line translation moves nothing above it (reducer test plus a hand check) | #38 | not started |
+| T4 | Revision-safe translations (`translatedRevision`) | reopened turn marks the old translation updating, never current | #37 | not started |
+| T5 | Zone header controls and status dot (on/off, target language, original toggle) | settings persist through the existing `set-transcript-translation-settings` channel; "Set up translation" opens Settings | #38 | not started; owner checks at 380px |
+| T6 | Announcer and keyboard (`aria-live` off on the list, one announcement per complete translation, End resumes follow) | VoiceOver reads each complete translation once and no partials | #38 | not started |
+| T7 | Global toggle shortcuts | `Cmd+Alt+O` and `Cmd+Alt+T` work while the overlay is unfocused; Windows defaults chosen on a real keyboard | #38 | **owner approval first** (new keybind ids) |
+| T8 | Error reason on the translation event | the slot shows "timeout" or "auth"; logs carry no text | #38 | **owner approval first** (additive IPC payload change) |
+| T9 | Streaming tokens in the slot | first token appears within the time measured on #29; a superseded revision writes nothing | #38 | blocked on R1 and R2 |
+| T10 | Committed and preview rendering | reducer test: committed only appends, preview is replaced; owner checks committed text never moves | #38 | blocked on R3 |
+
 ## Owner
 
 - Decided 2026-10-26: new branches use the relire naming (no slash, at most three words; existing branches keep their names); docs, issues and PR text are in English; `AGENTS.md` and `CLAUDE.md` stay git-ignored. Persisted shapes are released contracts because 2.2.0 has shipped.
@@ -57,3 +74,4 @@ Direction: port the ideas from the OmniVoice project (`../OmniVoice`, macOS-only
 - Visual acceptance after each U step: overlay at 380 and 600px, light and dark, a streaming answer, a live transcript.
 - Windows: issue #15 says no Windows build has been released. Any step that touches window behaviour is checked on macOS only until that changes, and says so.
 - Real STT and LLM provider checks for R2 and R3 (the agent mocks providers).
+- Live translation spec (T): answer the six open questions in section 11 of `docs/design-live-translation-ui.md` (zone position and size, own-speech translation, 14px check on a real call, global shortcuts, request cost in `original` mode, error reason on the event). The spec also amends the rule "the answer is the most prominent thing": when translation is on and no answer is showing, the newest translation leads. `docs/conventions.md` is not changed until you agree.

@@ -2,6 +2,18 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: live translation UI spec (branch `translation-ui-spec`, epic #38)
+
+Done
+- Design spec written by an Opus subagent: `docs/design-live-translation-ui.md` (no code). Read in full for the build plan, scroll rules and open questions; the claims about current code below were checked in source before filing issues.
+- Found in source: `displayMode` reaches `RollingTranscript` but is never read (#36); the row shows the source as the main line at 13px and the translation below it at 12px italic; a reopened turn keeps the translation of its old text (`transcriptSegments.ts:80`, #37).
+- Filed #36, #37 and the tracking issue #38; `TASKS.md` section T holds the ten steps.
+
+Unverified
+- Everything about how the translation view looks and reads on a real call. The 14px size is an assumption to check.
+- The spec's claim that Chromium scroll anchoring absorbs late translations without moving what the user reads; it has not been tried in this app.
+- The spec's Windows shortcut suggestions (`Ctrl+Shift+F9/F10`).
+
 ## 2026-10-26: U2 no synthetic user bubble (branch `drop-synthetic-bubble`, issue #21)
 
 Done
