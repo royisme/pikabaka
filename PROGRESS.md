@@ -2,6 +2,15 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## Chosen models: Phase 3 (`legacy-keys`)
+
+- Added model-test IPC, live preload/types and Quick answers/Summaries test buttons in the existing Agent-row style. Tests use the displayed draft without saving; an empty Summaries connection inherits the saved Quick answers row. The agent's provider/test path is unchanged.
+- LLMHelper.testModel streams one invented question through streamViaConnectionChat. A windowless collector reports the complete reply, first-token and total times, or the real error class, HTTP status and provider message limited to 300 characters. It redacts the selected key if an authentication error echoes it; no reply/error is logged.
+- Settings clears old test results when a draft changes and prevents edits during the request. The result block reports completion, not each token; no effects, dependencies or persisted settings were added.
+- Windowless tests cover timing, empty/partial failures, error formatting/redaction, draft selection/inheritance and no writes, the fixed question/shared stream, and RAG IPC history/prompt/cancellation. Provider SDKs and Electron boundaries are mocked; no app or real provider ran.
+- Checks: renderer tsc 0, Electron tsc 0, full tap 1 (1236 passing assertions; only the known missing DOCX fixture fails), lint 0. Warnings unchanged: 977 overall, 159 in touched files; no file increases. This phase adds 45 assertions. No uncertain deletion, old-key generation path, dependency change, install or pnpm script.
+- Owner: text-only quick action, screenshot quick action (including a model that rejects images, with no fallback), suggestion button, RAG follow-up/history and Stop, meeting summary, translation, and all three Test buttons. Check saved/unsaved drafts, inherited summary, missing connection/model/key and real host failures, plus narrow Settings and both themes. Packaged builds, real devices and Windows were not exercised.
+
 ## Chosen models: Phase 2 (`legacy-keys`)
 
 - Removed the cached Gemini/Groq/OpenAI/Claude clients, key/env constructor wiring, prefix routing, unused generation/stream/getter/proxy/fallback/Ollama helpers, model version discovery/scheduler, obsolete model fetcher and orphaned rate limiters. Quit still scrubs CredentialsManager; LLMHelper no longer holds key copies.

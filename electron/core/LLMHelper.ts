@@ -11,6 +11,8 @@ import { buildTranscriptTranslationPrompt } from '../transcript/translationExecu
 import { classifyTranslationError } from '../transcript/translationError';
 import { answerLanguageInstruction } from '../llm/answerLanguage';
 import { speakingStyleInstruction } from '../llm/speakingStyle';
+
+import { runModelTest, type ModelTestResult } from '../llm/modelTest';
 import { anthropicDeltas, geminiDeltas, openAIDeltas, streamText } from '../transcript/translationStream';
 
 type ThinkingSetting = { thinkingConfig: { thinkingLevel?: ThinkingLevel; thinkingBudget?: number } };
@@ -185,6 +187,10 @@ export class LLMHelper {
       const content = chunk.choices[0]?.delta?.content;
       if (content) yield content;
     }
+  }
+
+  public testModel(connection: Connection, model: string): Promise<ModelTestResult> {
+    return runModelTest(this.streamViaConnectionChat(connection, model, 'You are a connection test.', 'Reply with the single word: ready'), connection.apiKey);
   }
 
   private async generateViaConnectionChat({ systemPrompt, userContent, imagePaths }: {

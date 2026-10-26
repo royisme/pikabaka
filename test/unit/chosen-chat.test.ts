@@ -110,6 +110,20 @@ t.test('each connection protocol preserves role history and receives the abort s
     }
 });
 
+t.test('the Settings model test uses the same connection stream and only the invented question', async t => {
+    const llm = helper();
+    const connection: Connection = { id: 'invented', name: 'Invented', type: 'openai', baseUrl: 'http://localhost:1234', apiKey: '', builtin: false };
+    const requests: unknown[][] = [];
+    Reflect.set(llm, 'streamViaConnectionChat', async function* (...args: unknown[]) {
+        requests.push(args);
+        yield 'ready';
+    });
+    const result = await llm.testModel(connection, 'exact-unsaved-id');
+    t.equal(result.success, true);
+    t.equal(result.reply, 'ready');
+    t.same(requests, [[connection, 'exact-unsaved-id', 'You are a connection test.', 'Reply with the single word: ready']]);
+});
+
 t.test('translation requires a connection and retains the Gemini thinking-setting 400 fallback', async t => {
     const llm = new LLMHelper();
     const request = { provider: 'connection' as const, model: 'gemini-3-invented-test', prompt: 'Translate the invented text', sourceText: 'Invented example' };

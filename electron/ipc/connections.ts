@@ -44,6 +44,23 @@ export function registerConnectionHandlers(appState: AppState): void {
     }
   })
 
+  // Tests the row as shown without saving it. An inherited summary uses the saved Quick answers row.
+  safeHandle("model-test", async (_, draft: { job: 'chat' | 'summary'; connectionId: string; model: string }) => {
+    if (typeof draft?.connectionId !== 'string' || typeof draft.model !== 'string' ||
+        draft.connectionId.length > 512 || draft.model.length > 512 || (draft.job !== 'chat' && draft.job !== 'summary')) {
+      return { success: false, error: 'Invalid model test' }
+    }
+    const cm = CredentialsManager.getInstance()
+    let connectionId = draft.connectionId.trim()
+    let model = draft.model.trim()
+    if (draft.job === 'summary' && !connectionId) ({ connectionId, model } = cm.getModelUse('chat'))
+    if (!connectionId || !model) return { success: false, error: 'Choose a connection and model in Quick answers or this row' }
+    const connection = cm.resolveConnection(connectionId)
+    if (!connection) return { success: false, error: 'That connection does not exist' }
+    if (!cm.isConnectionReady(connectionId)) return { success: false, error: `No API key is saved for ${connection.name}` }
+    return appState.processingHelper.getLLMHelper().testModel(connection, model)
+  })
+
   safeHandle("agent-model-get", async () => CredentialsManager.getInstance().getAgentUse())
 
   safeHandle("agent-model-set", async (_, use: { connectionId: string; model: string; supportsImages?: boolean }) => {

@@ -84,6 +84,7 @@ interface ElectronAPI {
   aiConnectionDelete: (id: string) => Promise<{ success: boolean }>
   aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
   agentTest: (draft: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; reply?: string; toolCalls?: boolean | null; totalMs?: number; error?: string }>
+  modelTest: (draft: { job: 'chat' | 'summary'; connectionId: string; model: string }) => Promise<{ success: boolean; reply?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
 
   embeddingUseGet: () => Promise<{ connectionId: string; model: string }>
   embeddingUseSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
@@ -582,6 +583,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   aiConnectionDelete: (id: string) => ipcRenderer.invoke("ai-connection-delete", id),
   aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => ipcRenderer.invoke("ai-connection-models", input),
   agentTest: (draft: { connectionId: string; model: string; supportsImages?: boolean }) => ipcRenderer.invoke("agent-test", draft),
+  modelTest: (draft: { job: 'chat' | 'summary'; connectionId: string; model: string }) => ipcRenderer.invoke("model-test", draft),
 
   embeddingUseGet: () => ipcRenderer.invoke("embedding-use-get"),
   embeddingUseSet: (use: { connectionId: string; model: string }) => ipcRenderer.invoke("embedding-use-set", use),
