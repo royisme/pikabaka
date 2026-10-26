@@ -140,7 +140,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       );
     }
 
-    if (msg.isCode || (msg.role === 'system' && msg.text.includes('```'))) {
+    // An answer with its own layout below (what to say, recap, ...) keeps it even when it contains a code fence.
+    const hasOwnLayout = msg.intent === 'shorten' || msg.intent === 'recap' || msg.intent === 'follow_up_questions' || msg.intent === 'what_to_answer';
+    if (msg.isCode || (msg.role === 'system' && !hasOwnLayout && msg.text.includes('```'))) {
       const parts = msg.text.split(/(```[\s\S]*?```)/g);
       return (
         <div className={`rounded-lg p-3 my-1 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
@@ -153,13 +155,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               if (part.startsWith('```')) {
                 const match = part.match(/```(\w+)?\n?([\s\S]*?)```/);
                 if (match) {
-                  const lang = match[1] || 'python';
+                  const lang = match[1] || 'text';
                   const code = match[2].trim();
                   return (
                     <div key={i} className={`my-3 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
                       <div className={`px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
                         <span className={`text-[10px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
-                          {lang || 'CODE'}
+                          {lang === 'text' ? 'code' : lang}
                         </span>
                       </div>
                       <div className="bg-transparent">
@@ -176,7 +178,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
                           }}
                           wrapLongLines={true}
-                          showLineNumbers={true}
+                          showLineNumbers={code.split('\n').length > 6}
                           lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1.2em', color: codeLineNumberColor, textAlign: 'right', fontSize: '11px' }}
                         >
                           {code}

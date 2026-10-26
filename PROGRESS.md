@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: U5 answer rendering, first part (branch `answer-render`, issue #25)
+
+Done (the live overlay part of #25)
+- An answer with its own layout (what to say, recap, follow-up questions, shortened) keeps it when it contains a code fence; before, the fence won and the answer was shown as "Code Solution".
+- A code block with no language is no longer assumed to be Python: it is plain text, labelled "code". Line numbers appear only for blocks over 6 lines, so short snippets keep their width at 380px.
+- Verified: both `tsc --noEmit` checks exit 0; tap passes. No new unit test: the change is a condition in a React render function.
+- Not done (still U5): one answer component shared by the live overlay, the chat overlays and the post-meeting view; the intent chip and lead sentence; the "Re: …" line; one speaker vocabulary (the overlay says "Interviewer", the post-meeting view says "Them"; for a phone call neither is obviously right, so that is the owner's call). Not verified: how the four intent layouts render a fenced block.
+
 ## 2026-10-26: R1 timing, R2 streaming, T9 tokens in the slot (branch `translation-streaming`, issues #29, #30)
 
 Done (covers R1, R2 and T9; R4's module is on the branch below it)
