@@ -1,3 +1,4 @@
+import { BrowserWindow } from "electron"
 import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
 import { CredentialsManager } from "../services/CredentialsManager"
@@ -62,4 +63,24 @@ export function registerConnectionHandlers(appState: AppState): void {
     cm.setAgentUse(use)
     return { success: true }
   })
+
+  // The model of quick answers ("chat") and of meeting summaries ("summary"): a connection and a model id.
+  // An empty connection means "not chosen": quick answers then use the model chosen before connections existed,
+  // and summaries use the quick-answers model.
+  for (const job of ['chat', 'summary'] as const) {
+    safeHandle(`${job}-model-get`, async () => CredentialsManager.getInstance().getModelUse(job))
+
+    safeHandle(`${job}-model-set`, async (_, use: { connectionId: string; model: string }) => {
+      if (typeof use?.connectionId !== 'string' || typeof use.model !== 'string' || use.model.length > 512) return { success: false, error: 'Invalid model' }
+      const cm = CredentialsManager.getInstance()
+      if (use.connectionId && !cm.resolveConnection(use.connectionId)) return { success: false, error: 'That connection does not exist' }
+      cm.setModelUse(job, use)
+      if (job === 'chat') {
+        for (const win of BrowserWindow.getAllWindows()) {
+          if (!win.isDestroyed()) win.webContents.send('model-changed', use.model)
+        }
+      }
+      return { success: true }
+    })
+  }
 }

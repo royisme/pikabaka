@@ -672,41 +672,6 @@ Before generating the script, classify the problem into ONE of these types — t
 `;
 
 // ==========================================
-// GROQ: UTILITY PROMPTS
-// ==========================================
-
-/**
- * GROQ: Title Generation
- * Tuned for Llama 3.3 to be concise and follow instructions
- */
-export const GROQ_TITLE_PROMPT = `Generate a concise 3-6 word title for this meeting context.
-RULES:
-- Output ONLY the title text.
-- No quotes, no markdown, no "Here is the title".
-- Just the raw text.
-`;
-
-/**
- * GROQ: Structured Summary (JSON)
- * Tuned for Llama 3.3 to ensure valid JSON output
- */
-export const GROQ_SUMMARY_JSON_PROMPT = `You are a silent meeting summarizer. Convert this conversation into concise internal meeting notes.
-
-RULES:
-- Do NOT invent information.
-- Sound like a senior PM's internal notes.
-- Calm, neutral, professional.
-- Return ONLY valid JSON.
-
-Response Format (JSON ONLY):
-{
-  "overview": "1-2 sentence description",
-  "keyPoints": ["3-6 specific bullets"],
-  "actionItems": ["specific next steps or empty array"]
-}
-`;
-
-// ==========================================
 // FOLLOW-UP EMAIL PROMPTS
 // ==========================================
 

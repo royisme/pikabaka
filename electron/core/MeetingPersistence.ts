@@ -7,7 +7,6 @@ import { renameMeetingFolder } from '../agent/workspace';
 import { SessionTracker, TranscriptSegment } from './SessionTracker';
 import { LLMHelper } from './LLMHelper';
 import { DatabaseManager, Meeting } from '../db/DatabaseManager';
-import { GROQ_TITLE_PROMPT, GROQ_SUMMARY_JSON_PROMPT } from '../llm';
 const crypto = require('crypto');
 
 function contextFromTranscript(transcript: Array<{ speaker: string; text: string }>): string {
@@ -178,9 +177,7 @@ export class MeetingPersistence {
             // Generate Title (only if not set by calendar)
             if (!metadata || !metadata.title) {
                 const titlePrompt = `Generate a concise 3-6 word title for this meeting context. Output ONLY the title text. Do not use quotes or conversational filler.`;
-                const groqTitlePrompt = GROQ_TITLE_PROMPT;
-
-                const generatedTitle = await this.llmHelper.generateMeetingSummary(titlePrompt, context.substring(0, 5000), groqTitlePrompt);
+                const generatedTitle = await this.llmHelper.generateMeetingSummary(titlePrompt, context.substring(0, 5000));
                 if (generatedTitle) title = generatedTitle.replace(/["*]/g, '').trim();
             }
 
@@ -206,7 +203,7 @@ export class MeetingPersistence {
       "actionItems": ["specific next steps, assigned tasks, or implied follow-ups. If absolutely none found, return empty array"]
     }`;
 
-                const generate = (prompt: string, context: string) => this.llmHelper.generateMeetingSummary(prompt, context, prompt === summaryPrompt ? GROQ_SUMMARY_JSON_PROMPT : prompt);
+                const generate = (prompt: string, context: string) => this.llmHelper.generateMeetingSummary(prompt, context);
                 const summary = await summarizeMeeting(context, generate, summaryPrompt);
                 if (summary) summaryData = summary;
                 else console.error('Failed to produce a meeting summary');

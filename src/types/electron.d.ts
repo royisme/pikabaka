@@ -118,6 +118,10 @@ export interface ElectronAPI {
   aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
   agentModelGet: () => Promise<{ connectionId: string; model: string; supportsImages: boolean }>
   agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; error?: string }>
+  chatModelGet: () => Promise<{ connectionId: string; model: string }>
+  chatModelSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
+  summaryModelGet: () => Promise<{ connectionId: string; model: string }>
+  summaryModelSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string; translatedText?: string }>
 
   // STT Provider Management
