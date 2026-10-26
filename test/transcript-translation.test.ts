@@ -129,3 +129,16 @@ t.test('translationError is kept only while the state is error', (t) => {
   t.equal(ok[0].translationError, undefined, 'a reason on a non-error event is ignored');
   t.end();
 });
+
+t.test('streaming events grow the translation and keep the wait that began at pending', (t) => {
+  const pending = upsertTranscriptSegment([], { final: true, text: 'Hello', segmentId: 's1', translationState: 'pending', revision: 1 }, 1000);
+  const first = upsertTranscriptSegment(pending, { final: true, text: 'Hello', translatedText: 'Bon', segmentId: 's1', translationState: 'streaming', revision: 1 }, 1500);
+  t.equal(first[0].translationState, 'streaming');
+  t.equal(first[0].translatedText, 'Bon');
+  t.equal(first[0].receivedAt, 1000, 'streaming does not restart the clock');
+  const more = upsertTranscriptSegment(first, { final: true, text: 'Hello', translatedText: 'Bonjour', segmentId: 's1', translationState: 'streaming', revision: 1 }, 1600);
+  t.equal(more[0].translatedText, 'Bonjour');
+  t.equal(translationEnabledAfterEvent(false, 'streaming'), true);
+  t.equal(isTranslationStale(more[0]), false);
+  t.end();
+});

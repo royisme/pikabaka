@@ -2,6 +2,17 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: R1 timing, R2 streaming, T9 tokens in the slot (branch `translation-streaming`, issues #29, #30)
+
+Done (covers R1, R2 and T9; R4's module is on the branch below it)
+- **Streaming (R2, T9).** `translateTranscriptText` takes an optional `onProgress`; with it, each of the six providers (OpenAI, Claude, Gemini, Groq, Ollama, OpenAI-compatible) is requested as a stream and read through small adapters in `electron/transcript/translationStream.ts` (OpenAI-shaped chunks, Anthropic `text_delta` events, Gemini chunks, Ollama NDJSON with lines split across chunks and multi-byte characters). The first text is reported at once, later text at most every 80 ms. If a stream fails before any text (an endpoint that cannot stream), the request is made once more without streaming; after text has been shown the failure stands. The main process sends the text so far as `translationState: 'streaming'` events; the row shows it as the translation, in the reserved line, growing downward.
+- **Timing (R1).** Every translation logs one line of numbers: provider, model, flush gap (end of speech to request start), first-token time, total time, source and output length, streamed or not, outcome. No text is logged.
+- **R3 / T10 decision.** A streamed LLM answer is append-only, so what is shown is already committed; a separate preview is only needed when text is translated before its source is final (#33). R3 and T10 stay open for that, not for this.
+- **R4 (the masker module) is ported, not wired.** `electron/transcript/entityMasker.ts` and its 153 tests came from a subagent and were re-run here (all pass), with a smoke test of URL, path, flag, snake_case, CJK-glued flag and a model that reorders or drops a placeholder. It is not in the request path: transcripts are speech, which rarely contains URLs, paths or flags, and masking changes the prompt for every request. Wire it when a real transcript shows the need.
+- Verified: both `tsc --noEmit` checks exit 0; tap 652 of 652 (adapter and timing tests with fake streams; no real provider was called).
+- Not verified: any real provider. The wire formats are written from the SDK types and the documented stream shapes, and the SDK types accept them, but a live OpenAI, Anthropic, Gemini, Groq, Ollama or compatible endpoint was not called; the fallback to non-streaming and the 80 ms throttle have not been seen in the running app. The latency numbers for #29 do not exist yet: run a short call with each provider and read the `[Translation] timing` lines.
+- Known cost: a streaming request sends one IPC event per throttle tick; a long translation is a few dozen events.
+
 ## 2026-10-26: U7 overlay height and splitter (branch `overlay-size`, issues #22, #26)
 
 Done

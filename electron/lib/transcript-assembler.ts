@@ -1,4 +1,5 @@
 import { classifyTranslationError } from "../transcript/translationError";
+import { formatTranslationTiming } from "../transcript/translationStream";
 import type { AppState } from "../main"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { isTranscriptTranslationConfigured, isSameLanguage } from "../transcript/translationExecutor"
@@ -359,6 +360,7 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
       segmentId: buffer.segmentId,
       detectedLanguage: buffer.detectedLanguage,
       revision: buffer.revision,
+      lastSpeechAt: buffer.lastUpdatedAt,
     });
     return;
   }
@@ -390,9 +392,11 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
   forceTranslate?: boolean;
   detectedLanguage?: string;
   revision?: number;
+  /** When the last words of this turn were heard; only used to log how long the flush delay was. */
+  lastSpeechAt?: number;
 }): Promise<{ success: boolean; error?: string; translatedText?: string }> {
   const state = appState as any;
-  const { speaker, text, timestamp, confidence, segmentId, speakerLabel, forceTranslate = false, detectedLanguage, revision } = params;
+  const { speaker, text, timestamp, confidence, segmentId, speakerLabel, forceTranslate = false, detectedLanguage, revision, lastSpeechAt } = params;
   const { CredentialsManager } = require('../services/CredentialsManager');
   const cm = CredentialsManager.getInstance();
   const displayMode = cm.getTranscriptTranslationDisplayMode();
@@ -476,6 +480,45 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
 
   emitNativeAudioTranscript(appState, pendingPayload);
 
+  // Timing is logged as numbers only, never text. firstTokenAt stays null until text arrives.
+  const requestStartedAt = Date.now();
+  let firstTokenAt: number | null = null;
+  const logTiming = (outcome: 'complete' | 'error', outputChars: number) => {
+    const endedAt = Date.now();
+    console.log(formatTranslationTiming({
+      provider: translationProvider,
+      model: effectiveTranslationModel,
+      flushGapMs: lastSpeechAt === undefined ? null : requestStartedAt - lastSpeechAt,
+      firstTokenMs: firstTokenAt === null ? null : firstTokenAt - requestStartedAt,
+      totalMs: endedAt - requestStartedAt,
+      sourceChars: text.length,
+      outputChars,
+      streamed: firstTokenAt !== null,
+      outcome,
+    }));
+  };
+
+  // Each report is the whole translation so far; it only ever grows, so the row can show it as final text.
+  const onProgress = (textSoFar: string) => {
+    firstTokenAt ??= Date.now();
+    if (revision !== undefined && state.transcriptSegmentRevisions.get(segmentId) !== revision) return;
+    emitNativeAudioTranscript(appState, {
+      speaker,
+      text,
+      sourceText: text,
+      translatedText: textSoFar,
+      segmentId,
+      timestamp,
+      final: true,
+      confidence,
+      displayMode,
+      translationState: 'streaming' as const,
+      speakerLabel,
+      detectedLanguage,
+      revision,
+    });
+  };
+
   try {
     const recentTurns = (state.recentTranslatedTurns ?? []) as Array<{ segmentId: string; source: string; translation: string }>;
     const context = recentTurns
@@ -498,13 +541,15 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
         ...baseReq,
         provider: 'openai-compatible',
         openAICompatible: { baseUrl: oaiCompat.baseUrl, apiKey: oaiCompat.apiKey },
-      });
+      }, onProgress);
     } else {
       translatedText = await state.processingHelper.getLLMHelper().translateTranscriptText({
         ...baseReq,
         provider: translationProvider as 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude',
-      });
+      }, onProgress);
     }
+
+    logTiming('complete', translatedText.length);
 
     if (revision !== undefined && state.transcriptSegmentRevisions.get(segmentId) !== revision) {
       return { success: false, error: 'superseded by newer revision' };
@@ -545,6 +590,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
     const reason = classifyTranslationError(error);
     // Only the reason is logged: a provider's message can echo the transcript.
     console.warn('[Main] Transcript translation failed:', reason);
+    logTiming('error', 0);
     if (revision !== undefined && state.transcriptSegmentRevisions.get(segmentId) !== revision) {
       return { success: false, error: 'superseded by newer revision' };
     }

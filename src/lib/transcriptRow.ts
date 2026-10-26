@@ -47,7 +47,8 @@ export function transcriptRowParts(
   const hasTranslation = hasUsableTranslation(segment);
   if (mode === 'original' || !hasTranslation) {
     const waiting =
-      mode !== 'original' && (segment.translationState === 'pending' || segment.translationState === 'error');
+      mode !== 'original' &&
+      (segment.translationState === 'pending' || segment.translationState === 'streaming' || segment.translationState === 'error');
     return {
       kind: waiting ? 'awaiting' : 'source',
       lead: segment.sourceText,
@@ -110,7 +111,7 @@ export function rowSlot(
   if (hasUsableTranslation(row)) return { kind: 'translation' };
   if (!context.translationOn) return null;
   if (row.translationState === 'error') return { kind: 'failed', reason: row.translationError };
-  if (row.translationState !== 'pending') return null;
+  if (row.translationState !== 'pending' && row.translationState !== 'streaming') return null;
   const waitedMs = row.receivedAt === undefined ? 0 : context.now - row.receivedAt;
   return { kind: 'translating', elapsedSeconds: waitedMs >= SLOW_TRANSLATION_MS ? Math.floor(waitedMs / 1000) : null };
 }

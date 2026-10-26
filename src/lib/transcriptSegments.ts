@@ -6,7 +6,7 @@ export interface TranscriptSegment {
   translatedText?: string;
   timestamp: number;
   speakerLabel: string;
-  translationState: 'pending' | 'complete' | 'error' | 'skipped';
+  translationState: 'pending' | 'streaming' | 'complete' | 'error' | 'skipped';
   detectedLanguage?: string;
   revision?: number;
   speaker?: 'interviewer' | 'user';
@@ -28,7 +28,7 @@ export interface TranscriptEventForSegment {
   speaker?: 'interviewer' | 'user';
   speakerLabel?: string;
   timestamp?: number;
-  translationState?: 'pending' | 'complete' | 'error' | 'skipped';
+  translationState?: 'pending' | 'streaming' | 'complete' | 'error' | 'skipped';
   detectedLanguage?: string;
   revision?: number;
   translationError?: TranscriptSegment['translationError'];

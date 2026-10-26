@@ -21,6 +21,8 @@ import { promisify } from 'util';
 import axios from 'axios';
 import { createProviderRateLimiters, RateLimiter } from '../services/RateLimiter';
 import { buildTranscriptTranslationPrompt } from '../transcript/translationExecutor';
+import { classifyTranslationError } from '../transcript/translationError';
+import { anthropicDeltas, geminiDeltas, ollamaDeltas, openAIDeltas, streamText } from '../transcript/translationStream';
 const execAsync = promisify(exec);
 
 function isOpenAICompatibleProvider(
@@ -388,7 +390,99 @@ export class LLMHelper {
     return data.response || "";
   }
 
-  public async translateTranscriptText(request: TranscriptTranslationRequest): Promise<string> {
+  /**
+   * Same request as `translateTranscriptText`, read as a stream. `onProgress` gets the text so far,
+   * throttled, starting with the first text. Text that has been reported is never taken back, so
+   * the stream is append-only.
+   */
+  private async streamTranscriptTranslation(
+    request: TranscriptTranslationRequest,
+    model: string,
+    fullPrompt: string,
+    onProgress: (textSoFar: string) => void
+  ): Promise<string> {
+    if (request.provider === 'ollama') {
+      const url = (request.ollamaUrl || this.ollamaUrl || "http://localhost:11434").trim();
+      const response = await fetch(`${url}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, prompt: fullPrompt, stream: true, options: { temperature: 0.2, top_p: 0.9 } }),
+      });
+      if (!response.ok || !response.body) throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+      return streamText(ollamaDeltas(response.body as unknown as AsyncIterable<Uint8Array>), onProgress);
+    }
+
+    if (request.provider === 'gemini') {
+      if (!this.apiKey) throw new Error("Gemini API key is not configured");
+      const client = new GoogleGenAI({ apiKey: this.apiKey, httpOptions: { apiVersion: "v1alpha" } });
+      const stream = await client.models.generateContentStream({
+        model,
+        contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+      });
+      return streamText(geminiDeltas(stream), onProgress);
+    }
+
+    if (request.provider === 'groq') {
+      if (!this.groqApiKey) throw new Error("Groq API key is not configured");
+      const client = new Groq({ apiKey: this.groqApiKey });
+      const stream = await client.chat.completions.create({
+        model,
+        messages: [{ role: "user", content: fullPrompt }],
+        temperature: 0.2,
+        max_tokens: 4096,
+        stream: true,
+      });
+      return streamText(openAIDeltas(stream), onProgress);
+    }
+
+    if (request.provider === 'openai') {
+      if (!this.openaiApiKey) throw new Error("OpenAI API key is not configured");
+      const client = new OpenAI({ apiKey: this.openaiApiKey });
+      const stream = await client.chat.completions.create({
+        model,
+        messages: [{ role: "user", content: fullPrompt }],
+        temperature: 0.2,
+        max_completion_tokens: 4096,
+        stream: true,
+      });
+      return streamText(openAIDeltas(stream), onProgress);
+    }
+
+    if (request.provider === 'claude') {
+      if (!this.claudeApiKey) throw new Error("Claude API key is not configured");
+      const client = new Anthropic({ apiKey: this.claudeApiKey });
+      const stream = await client.messages.create({
+        model,
+        max_tokens: 4096,
+        messages: [{ role: "user", content: [{ type: "text", text: fullPrompt }] }],
+        stream: true,
+      });
+      return streamText(anthropicDeltas(stream), onProgress);
+    }
+
+    if (request.provider === 'openai-compatible') {
+      const cfg = request.openAICompatible;
+      if (!cfg?.baseUrl?.trim() || !cfg.apiKey?.trim()) {
+        throw new Error("OpenAI-compatible translation: missing base URL or API key (configure under AI Providers)");
+      }
+      const client = new OpenAI({ apiKey: cfg.apiKey, baseURL: normalizeOpenAICompatibleBaseUrl(cfg.baseUrl) });
+      const stream = await client.chat.completions.create({
+        model,
+        messages: [{ role: "user", content: fullPrompt }],
+        temperature: 0.2,
+        max_tokens: 4096,
+        stream: true,
+      });
+      return streamText(openAIDeltas(stream), onProgress);
+    }
+
+    throw new Error(`Unsupported translation provider: ${request.provider}`);
+  }
+
+  public async translateTranscriptText(
+    request: TranscriptTranslationRequest,
+    onProgress?: (textSoFar: string) => void
+  ): Promise<string> {
     const sourceText = request.sourceText?.trim();
     if (!sourceText) return "";
 
@@ -403,6 +497,22 @@ export class LLMHelper {
       detectedLanguageKey: request.detectedLanguageKey,
       context: request.context,
     });
+
+    if (onProgress) {
+      let receivedText = false;
+      try {
+        const streamed = await this.streamTranscriptTranslation(request, model, fullPrompt, (textSoFar) => {
+          receivedText = true;
+          onProgress(textSoFar);
+        });
+        return streamed.trim();
+      } catch (error) {
+        // An endpoint that cannot stream fails before any text: ask once more without streaming.
+        // After text has been shown, a retry would replace it, so the failure stands.
+        if (receivedText) throw error;
+        console.warn('[LLMHelper] Translation stream failed before any text; retrying without streaming:', classifyTranslationError(error));
+      }
+    }
 
     if (request.provider === 'ollama') {
       const url = (request.ollamaUrl || this.ollamaUrl || "http://localhost:11434").trim();

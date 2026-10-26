@@ -217,7 +217,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => onTranslateSegment(seg)}
-                                                disabled={seg.translationState === 'pending'}
+                                                disabled={seg.translationState === 'pending' || seg.translationState === 'streaming'}
                                                 className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-text-primary disabled:cursor-wait disabled:opacity-70"
                                             >
                                                 <Languages className="h-3 w-3" aria-hidden="true" />

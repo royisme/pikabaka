@@ -118,3 +118,14 @@ t.test('a failure names its reason in a few words', async (t) => {
   t.equal(failureReasonText('other'), '');
   t.equal(failureReasonText(undefined), '');
 });
+
+t.test('a streaming translation shows the text so far as the lead, and waits like pending before any text', async (t) => {
+  const streaming = { sourceText: 'Can we move the call to Friday?', translatedText: '我们能把电话', translationState: 'streaming' as const, revision: 1, translatedRevision: 1, speaker: 'interviewer' as const };
+  const parts = transcriptRowParts(streaming, 'both', false);
+  t.equal(parts.kind, 'translation');
+  t.equal(parts.lead, '我们能把电话');
+  t.same(rowSlot(streaming, ctx), { kind: 'translation' }, 'the text fills the slot');
+  const noText = { ...streaming, translatedText: undefined };
+  t.equal(transcriptRowParts(noText, 'both', false).kind, 'awaiting');
+  t.same(rowSlot(noText, ctx), { kind: 'translating', elapsedSeconds: null });
+});

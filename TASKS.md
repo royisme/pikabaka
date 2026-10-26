@@ -43,10 +43,10 @@ Direction: port the ideas from the OmniVoice project (`../OmniVoice`, macOS-only
 
 | # | Step | Acceptance | Issue | State |
 | --- | --- | --- | --- | --- |
-| R1 | Timing logs per segment: source final, request, first token, complete, provider, model. Ids and times only | numbers for two providers are posted on #29 | #29 | not started |
-| R2 | Streaming translation request and token events; `translationState: 'streaming'`; a reopened turn cancels its request | unit test: a superseded `segmentId + revision` writes nothing; providers that cannot stream deliver one chunk | #30 | blocked on R1 |
-| R3 | `committed` plus `preview` event model; the row shows muted preview that disappears when the commit covers it | unit test on the reducer: committed only appends, preview is replaced; committed text never moves | #31 | blocked on R2 |
-| R4 | `EntityMasker` in TypeScript with tests (read the OmniVoice source in full first) | mask and restore tests for URL, path, flag, snake_case, filename, backticks and a model that drops placeholders | #32 | not started; independent, can run any time |
+| R1 | Timing logs per segment: source final, request, first token, complete, provider, model. Ids and times only | numbers for two providers are posted on #29 | #29 | logs landed on branch `translation-streaming`; the numbers for two providers need a real call (owner) |
+| R2 | Streaming translation request and token events; `translationState: 'streaming'`; a reopened turn cancels its request | unit test: a superseded `segmentId + revision` writes nothing; providers that cannot stream deliver one chunk | #30 | done on branch `translation-streaming` (stacked); owner runs a real call per provider |
+| R3 | `committed` plus `preview` event model; the row shows muted preview that disappears when the commit covers it | unit test on the reducer: committed only appends, preview is replaced; committed text never moves | #31 | not needed for streamed LLM text (it is append-only); relevant only for early translation, see R5 |
+| R4 | `EntityMasker` in TypeScript with tests (read the OmniVoice source in full first) | mask and restore tests for URL, path, flag, snake_case, filename, backticks and a model that drops placeholders | #32 | module ported and tested on branch `entity-masker-port`; not wired (speech transcripts rarely contain such entities) |
 | R5 | **Owner decision:** design note for stable-prefix and early translation against second-pass correction; audit which STT providers send full-replace hypotheses | the note answers the three questions on #33 and the owner has agreed | #33 | blocked on R3 |
 
 ## T. Live translation UI for calls (epic #38)
@@ -63,8 +63,8 @@ Design: `docs/design-live-translation-ui.md`. The owner wants to use Pika on a p
 | T6 | Announcer and keyboard (`aria-live` off on the list, one announcement per complete translation, End resumes follow) | VoiceOver reads each complete translation once and no partials | #38 | done on branch `transcript-a11y` (stacked); owner checks with VoiceOver |
 | T7 | Global toggle shortcuts | `Cmd+Alt+O` and `Cmd+Alt+T` work while the overlay is unfocused; Windows defaults chosen on a real keyboard | #38 | done on branch `translation-shortcuts` (stacked); owner checks the shortcuts on macOS and a real Windows keyboard |
 | T8 | Error reason on the translation event | the slot shows "timeout" or "auth"; logs carry no text | #38 | done on branch `translation-error-reason` (stacked); owner checks with a wrong key and with the network off |
-| T9 | Streaming tokens in the slot | first token appears within the time measured on #29; a superseded revision writes nothing | #38 | blocked on R1 and R2 |
-| T10 | Committed and preview rendering | reducer test: committed only appends, preview is replaced; owner checks committed text never moves | #38 | blocked on R3 |
+| T9 | Streaming tokens in the slot | first token appears within the time measured on #29; a superseded revision writes nothing | #38 | done on branch `translation-streaming` with R2 |
+| T10 | Committed and preview rendering | reducer test: committed only appends, preview is replaced; owner checks committed text never moves | #38 | blocked on R5: only early translation produces a preview |
 
 ## Owner
 
