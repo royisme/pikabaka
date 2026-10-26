@@ -19,20 +19,26 @@ export class MeetingPersistence {
 
     /**
      * Creates the meeting's identity and its row before capture starts, so every assembled
-     * transcript line can be written to the record as it happens. Returns the meeting id.
+     * transcript line can be written to the record as it happens. Returns the meeting id, or null
+     * when the row could not be created (the meeting is then saved whole at stop, as before).
      */
-    public startMeeting(metadata?: { title?: string; calendarEventId?: string; source?: 'manual' | 'calendar' } | null): string {
-        const meetingId = crypto.randomUUID();
+    public startMeeting(metadata?: { title?: string; calendarEventId?: string; source?: 'manual' | 'calendar' } | null): string | null {
         const startTime = Date.now();
+        let meetingId: string | null = crypto.randomUUID();
+        try {
+            DatabaseManager.getInstance().createMeeting({
+                id: meetingId!,
+                title: metadata?.title || 'Untitled Session',
+                startTimeMs: startTime,
+                createdAt: new Date(startTime).toISOString(),
+                calendarEventId: metadata?.calendarEventId ?? null,
+                source: metadata?.source ?? 'manual',
+            });
+        } catch (err) {
+            console.error('[MeetingPersistence] Could not create the meeting record:', (err as Error).message);
+            meetingId = null;
+        }
         this.session.startSession(meetingId, startTime);
-        DatabaseManager.getInstance().createMeeting({
-            id: meetingId,
-            title: metadata?.title || 'Untitled Session',
-            startTimeMs: startTime,
-            createdAt: new Date(startTime).toISOString(),
-            calendarEventId: metadata?.calendarEventId ?? null,
-            source: metadata?.source ?? 'manual',
-        });
         return meetingId;
     }
 

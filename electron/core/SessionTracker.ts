@@ -436,7 +436,7 @@ export class SessionTracker {
     }
 
     /** Starts a new session: a new meeting id and the real start time, not the time of the last reset. */
-    startSession(meetingId: string, startTime: number): void {
+    startSession(meetingId: string | null, startTime: number): void {
         this.meetingId = meetingId;
         this.sessionStartTime = startTime;
     }

@@ -839,12 +839,7 @@ export class AppState {
       this.intelligenceManager.setMeetingMetadata(metadata);
     }
     // The meeting row exists before any audio, so each assembled line is saved as it happens.
-    try {
-      this.currentMeetingId = this.intelligenceManager.startMeeting(metadata);
-    } catch (err) {
-      this.currentMeetingId = null;
-      console.error('[Main] Could not create the meeting record:', (err as Error).message);
-    }
+    this.currentMeetingId = this.intelligenceManager.startMeeting(metadata);
 
     // Emit session reset to clear UI state immediately
     this.getWindowHelper().getOverlayWindow()?.webContents.send('session-reset');
