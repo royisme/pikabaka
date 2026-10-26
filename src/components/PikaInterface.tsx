@@ -5,6 +5,7 @@ import SplitterShell from './meeting/SplitterShell';
 import TranscriptColumn from './meeting/TranscriptColumn';
 import OverlayTopBar from './meeting/OverlayTopBar';
 import ProactiveCard from './agent/ProactiveCard';
+import ApprovalDock from './agent/ApprovalDock';
 import type { AgentProactiveCard } from '../types/electron';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
@@ -181,7 +182,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
                         <SplitterShell
                             topBar={<OverlayTopBar status={audioState} hasRows={statusInBar} onFixAudio={fixAudio} displayMode={transcript.transcriptDisplayMode} translationEnabled={transcript.translationEnabled} translationConfigured={transcript.translationConfigured} theirLanguage={transcript.theirLanguage} myLanguage={transcript.myLanguage} targetLanguage={transcript.targetLanguage} languageOptions={transcript.languageOptions} onToggleTranslation={() => transcript.saveTranslationSettings({ enabled: !transcript.translationEnabled })} onChangeSpokenLanguage={transcript.changeSpokenLanguage} onChangeTargetLanguage={(targetLanguage) => transcript.saveTranslationSettings({ targetLanguage })} onToggleOriginal={() => transcript.saveTranslationSettings({ displayMode: toggleOriginal(transcript.transcriptDisplayMode) })} onSetUpTranslation={() => { void window.electronAPI.toggleSettingsWindow(); }} modelName={modelLabel(currentModel)} isMousePassthrough={isMousePassthrough} toggleOriginalKeys={shortcuts.toggleOriginal} toggleTranslationKeys={shortcuts.toggleTranslation} onHide={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} onOpenModelSelector={openModelSelector} onOpenSettings={openSettings} onToggleMousePassthrough={() => generalHandlersRef.current.toggleMousePassthrough()} onOpenLauncher={() => window.electronAPI?.setWindowMode?.('launcher')} />}
                             left={<TranscriptColumn {...transcriptProps} status={audioState} onFixAudio={fixAudio} />}
-                            right={<div className="relative flex-1 min-h-0 min-w-0 flex flex-col"><ChatColumn {...chatProps} />{proactiveCard && <ProactiveCard card={proactiveCard} onDismiss={() => setProactiveCard(null)} onAskMore={() => askAboutCard(proactiveCard)} />}</div>}
+                            right={<div className="relative flex-1 min-h-0 min-w-0 flex flex-col"><ApprovalDock /><div className="flex-1 min-h-0 min-w-0 flex flex-col"><ChatColumn {...chatProps} /></div>{proactiveCard && <ProactiveCard card={proactiveCard} onDismiss={() => setProactiveCard(null)} onAskMore={() => askAboutCard(proactiveCard)} />}</div>}
                             splitterPosition={splitterPosition}
                             onSplitterChange={changeSplitter}
                             onSplitterReset={resetSplitter}

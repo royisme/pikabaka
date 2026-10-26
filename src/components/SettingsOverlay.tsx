@@ -1,4 +1,5 @@
 import ProactiveHelpSettings from './settings/ProactiveHelpSettings';
+import WorkspaceSettings from './settings/WorkspaceSettings';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from 'react-query';
 import packageJson from '../../package.json';
@@ -2729,6 +2730,10 @@ Core Skills
                                     <div className="h-px bg-border-subtle" />
 
                                     <ProactiveHelpSettings />
+
+                                    <div className="h-px bg-border-subtle" />
+
+                                    <WorkspaceSettings />
 
                                     <div className="h-px bg-border-subtle" />
 

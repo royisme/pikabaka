@@ -3,6 +3,8 @@ export interface AgentGateDecision {
   help?: number; kind?: string; kindProbability?: number; latencyMs?: number; outcome: string
 }
 
+export interface AgentApprovalRequest { id: string; meetingId: string; tool: 'bash' | 'write' | 'edit' | 'read'; target: string; detail?: string; folder: string; outside?: boolean }
+export type AgentApprovalEvent = { type: 'requested'; request: AgentApprovalRequest } | { type: 'settled'; id: string; allowed: boolean }
 export interface AgentProactiveCard { id: string; meetingId: string; segmentId: string; kind: string; text: string; time: number }
 
 export interface ElectronAPI {
@@ -101,6 +103,12 @@ export interface ElectronAPI {
   agentGateStatus: () => Promise<{ mode: 'log' | 'on' | 'off'; configured: boolean; state: 'ok' | 'unavailable' | 'unconfigured'; reason?: string; lastDecision?: AgentGateDecision }>
   agentGateLog: () => Promise<AgentGateDecision[]>
   onAgentProactive: (callback: (card: AgentProactiveCard) => void) => () => void
+  agentApprovalsList: () => Promise<AgentApprovalRequest[]>
+  agentApprovalRespond: (payload: { id: string; allowed: boolean }) => Promise<{ success: boolean }>
+  onAgentApproval: (callback: (event: AgentApprovalEvent) => void) => () => void
+  agentWorkspaceGet: () => Promise<{ root: string; error?: string }>
+  agentWorkspacePick: () => Promise<{ canceled: boolean; root?: string; error?: string }>
+  agentWorkspaceClear: () => Promise<{ success: boolean }>
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string; translatedText?: string }>
 
   // STT Provider Management
