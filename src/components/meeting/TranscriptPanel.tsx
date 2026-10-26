@@ -44,8 +44,6 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                         segments={transcriptSegments}
                         partialText={isInterviewerSpeaking ? currentInterviewerPartial : undefined}
                         displayMode={transcriptDisplayMode}
-                        isActive={isInterviewerSpeaking}
-                        surfaceStyle={appearance.transcriptStyle}
                         onTranslateSegment={handleTranslateTranscriptSegment}
                     />
                 ) : (

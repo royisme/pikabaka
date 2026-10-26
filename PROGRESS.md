@@ -2,6 +2,15 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: T1 flat rows, translation first (branch `transcript-rows`, issue #36)
+
+Done
+- `src/lib/transcriptRow.ts`: what a row shows per display mode. `both`: translation (14px) above source (12px, muted). `translated`: translation only, source after a click on the row. `original`: source only. A row whose translation is pending or failed shows the source (12px) under a "Translating…" or "Translation failed [Retry]" line. Own speech ("Me") is one muted 12px source line and is never translated.
+- `RollingTranscript.tsx` rewritten as flat rows: no cards, avatars, gradients, spinners or `text-[9px]`/`[10px]`. The newest other-party row has weight 500 and a 2px accent rule. The live partial is at full contrast (the `opacity-90`/`opacity-80` is gone). Speaker name shows only when the speaker changes. Language, time and Translate/Retranslate appear when a row is expanded; Retry is visible on a failed row. Unused props `isActive` and `surfaceStyle` removed from the component and from `TranscriptPanel`.
+- Verified: both `tsc --noEmit` checks exit 0; tap 385 of 385 (18 new assertions in `test/transcript-row.test.ts`: per-mode choice, expand, pending, error, skipped, same language, blank translation).
+- Not verified: how it looks and reads at 380px and 600px, light and dark; the 14px size on a real call. The scroll code in this file is unchanged (T2); the slot that reserves height for a late translation is T3, so a translation arriving still replaces the "Translating…" line and can change the row height until T3 lands.
+- The default `displayMode` is `both` inside the component, but `useMeetingTranscript` starts with `original` until the saved setting loads, so a user whose saved mode is `original` still sees no translation (that is their setting).
+
 ## 2026-10-26: live translation UI spec (branch `translation-ui-spec`, epic #38)
 
 Done
