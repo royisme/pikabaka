@@ -105,9 +105,12 @@ class ZeroShotClassifier {
                     env.allowRemoteModels = false;
                     env.localModelPath = path.join(process.resourcesPath, 'models');
                 } else {
-                    // Dev mode: allow downloading from HuggingFace Hub
+                    // Dev mode: use the model in the repository's resources folder, and allow downloading it from HuggingFace Hub
+                    // when it is missing. `__dirname` is the compiled output, so the path starts from the app folder.
+                    const modelsDir = path.join(app.getAppPath(), 'resources', 'models');
                     env.allowRemoteModels = true;
-                    env.cacheDir = path.join(__dirname, '../../resources/models');
+                    env.localModelPath = modelsDir;
+                    env.cacheDir = modelsDir;
                 }
 
                 console.log('[IntentClassifier] Loading zero-shot classifier (mobilebert-uncased-mnli)...');
