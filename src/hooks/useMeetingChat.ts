@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
+import { useQuery, useQueryClient } from 'react-query';
 import { electronChatFetch } from '../lib/electronChatFetch';
 import { userEchoMessage } from '../lib/userEcho';
+import { useMainEvent } from './useMainEvent';
 
 /** What the user asked last, so a failed or unwanted answer can be asked again. */
 type LastAction =
@@ -60,10 +62,9 @@ type KnowledgeContext = {
 type AttachedContext = Array<{ path: string; preview: string }>;
 
 export function useMeetingChat(options: { getReplyContext?: () => string | undefined } = {}) {
+  const queryClient = useQueryClient();
   const [knowledgeContext, setKnowledgeContext] = useState<KnowledgeContext | null>(null);
   const [attachedContext, setAttachedContext] = useState<AttachedContext>([]);
-  const [actionButtonMode, setActionButtonMode] = useState<'recap' | 'brainstorm'>('recap');
-  const [conversationContext, setConversationContext] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   // After the user stops an answer, tokens already on their way must not open a new message; the next request clears this.
@@ -82,45 +83,34 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   // systemMessages holds quick-action responses (WhatToSay, Clarify, Recap, etc.)
   const [systemMessages, setSystemMessages] = useState<Message[]>([]);
   const isAgentRunRef = useRef(false);
-  const [isAgentAvailable, setIsAgentAvailable] = useState(false);
   const setSystemMessagesIfLive = useCallback<typeof setSystemMessages>((update) => {
     if (!cancelledRef.current) setSystemMessages(update);
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
-    const checkStatus = async () => {
-      if (!window.electronAPI?.agentStatus) return;
+  const agentStatusQuery = useQuery<boolean>(
+    ['agent-status'],
+    async () => {
+      if (!window.electronAPI?.agentStatus) return false;
       try {
         const res = await window.electronAPI.agentStatus();
-        if (isMounted) setIsAgentAvailable(Boolean(res?.available));
+        return Boolean(res?.available);
       } catch {
-        if (isMounted) setIsAgentAvailable(false);
+        return false;
       }
-    };
-    void checkStatus();
+    }
+  );
+  const isAgentAvailable = agentStatusQuery.data ?? false;
 
-    const unsubscribe = window.electronAPI?.onMeetingStateChanged?.(({ isActive }) => {
-      if (isActive) {
-        void checkStatus();
-      } else {
-        if (isMounted) setIsAgentAvailable(false);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      unsubscribe?.();
-    };
-  }, []);
+  useMainEvent(window.electronAPI?.onMeetingStateChanged, ({ isActive }) => {
+    if (isActive) {
+      void queryClient.invalidateQueries(['agent-status']);
+    } else {
+      queryClient.setQueryData(['agent-status'], false);
+    }
+  });
 
   const knowledgeContextTimeoutRef = useRef<number | null>(null);
-  const conversationContextRef = useRef(conversationContext);
-
-  // Keep ref in sync so DefaultChatTransport body getter always reads latest value
-  useEffect(() => {
-    conversationContextRef.current = conversationContext;
-  }, [conversationContext]);
+  const conversationContextRef = useRef('');
 
   const { messages: chatMessages, sendMessage, status, stop } = useChat({
     transport: new DefaultChatTransport({
@@ -132,19 +122,18 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
 
   const isChatLoading = status === 'submitted' || status === 'streaming';
 
-  useEffect(() => {
-    window.electronAPI?.getActionButtonMode?.()
-      .then((mode) => {
-        if (mode) setActionButtonMode(mode);
-      })
-      .catch(() => {});
+  const actionButtonModeQuery = useQuery<'recap' | 'brainstorm'>(
+    ['action-button-mode'],
+    async () => {
+      const mode = await window.electronAPI?.getActionButtonMode?.();
+      return mode ?? 'recap';
+    }
+  );
+  const actionButtonMode = actionButtonModeQuery.data ?? 'recap';
 
-    const unsubscribe = window.electronAPI?.onActionButtonModeChanged?.((mode) => {
-      setActionButtonMode(mode);
-    });
-
-    return () => unsubscribe?.();
-  }, []);
+  useMainEvent(window.electronAPI?.onActionButtonModeChanged, (mode: 'recap' | 'brainstorm') => {
+    queryClient.setQueryData(['action-button-mode'], mode);
+  });
 
   useEffect(() => {
     if (!window.electronAPI?.onKnowledgeContextUpdate) return;
@@ -182,15 +171,14 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     return [...fromChat, ...systemMessages];
   }, [chatMessages, systemMessages]);
 
-  useEffect(() => {
-    const context = allMessagesForContext
+  const conversationContext = useMemo(() => {
+    return allMessagesForContext
       .filter((m) => m.role !== 'user' || !m.hasScreenshot)
       .map((m) => `${m.role === 'interviewer' ? 'Interviewer' : m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
       .slice(-20)
       .join('\n');
-
-    setConversationContext(context);
   }, [allMessagesForContext]);
+  conversationContextRef.current = conversationContext;
 
   // Merged messages for UI rendering (chat + system quick-action responses)
   const messages = useMemo<Message[]>(() => {
@@ -602,7 +590,6 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
       cleanupToken();
       cleanupFinal();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally empty — these listeners must survive isExpanded changes
 
   const submitPrompt = useCallback(async ({
@@ -848,10 +835,10 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
       try {
         const agentStatus = await window.electronAPI?.agentStatus?.();
         isAvailable = Boolean(agentStatus?.available);
-        setIsAgentAvailable(isAvailable);
+        queryClient.setQueryData(['agent-status'], isAvailable);
       } catch {
         isAvailable = false;
-        setIsAgentAvailable(false);
+        queryClient.setQueryData(['agent-status'], false);
       }
 
       if (isAvailable) {
