@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: V10 four-size type scale (branch `overlay-type-scale`)
+
+Done (mechanical sweep, done by the lead)
+- The overlay's type is four sizes: 11px (meta, status, key badges, labels), 12px (chips, source lines, keyword chips, help text), 14px (translation, answers, input) and, later with U5, 16px for the answer's lead sentence. In `ChatPanel` 10px became 11px (code-block language label, "Interviewer", screenshot label, Role focus and other card titles, the typing hint), 10.5px and 11.5px became 12px, and 13px became 14px (answer bodies and the interviewer message). The rest of the overlay was already on the scale from T1 to T9 and V3 to V9.
+- Verified: `grep -rnE "text-\[(9|10|10\.5|11\.5|13)px\]"` over the overlay files (`src/components/meeting`, `RollingTranscript.tsx`, `KeyBadge.tsx`, `PopoverMenu.tsx`, `PikaInterface.tsx`) finds 0 (spec Q10); both `tsc` checks exit 0. Not covered: `ModelSelector.tsx` (the model list window, 6 uses of 10px) and `ConnectCalendarButton.tsx` (launcher, 3 uses of 13px) are other surfaces and still off the scale.
+- Not verified: how the answers read at 14px (they were 13px, so each line is about 8% wider and wraps earlier at 380px), and the three cards (Role focus, Language to weave in, Good examples) that still use hard-coded dark colours and ignore the theme (listed in the spec as follow-up outside this plan).
+
 ## 2026-10-26: V8 two-row composer (branch `overlay-composer`)
 
 Done (written by a GPT-6.1 worker through pi, reviewed and merged by the lead)

@@ -144,7 +144,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <Code className="w-3.5 h-3.5" />
             <span>Code Solution</span>
           </div>
-          <div className={`space-y-2 text-[13px] leading-relaxed ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
+          <div className={`space-y-2 text-sm leading-relaxed ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             {parts.map((part, i) => {
               if (part.startsWith('```')) {
                 const match = part.match(/```(\w+)?\n?([\s\S]*?)```/);
@@ -154,7 +154,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   return (
                     <div key={i} className={`my-3 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
                       <div className={`px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
-                        <span className={`text-[10px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
+                        <span className={`text-[11px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
                           {lang === 'text' ? 'code' : lang}
                         </span>
                       </div>
@@ -219,7 +219,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <MessageSquare className="w-3.5 h-3.5" />
             <span>Shortened</span>
           </div>
-          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
+          <div className={`text-sm leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
               p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-cyan-800' : 'text-cyan-100'}`} {...props} />,
@@ -240,7 +240,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Recap</span>
           </div>
-          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
+          <div className={`text-sm leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
               p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-indigo-800' : 'text-indigo-100'}`} {...props} />,
@@ -261,7 +261,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <HelpCircle className="w-3.5 h-3.5" />
             <span>Follow-Up Questions</span>
           </div>
-          <div className={`text-[13px] leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
+          <div className={`text-sm leading-relaxed markdown-content ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={{
               p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0" {...props} />,
               strong: ({ node, ...props }: any) => <strong className={`font-bold ${isLightTheme ? 'text-amber-800' : 'text-[#FFF9C4]'}`} {...props} />,
@@ -301,7 +301,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   return (
                     <div key={i} className={`my-3 rounded-xl overflow-hidden border shadow-lg ${codeBlockClass}`} style={appearance.codeBlockStyle}>
                       <div className={`px-3 py-1.5 border-b ${codeHeaderClass}`} style={appearance.codeHeaderStyle}>
-                        <span className={`text-[10px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
+                        <span className={`text-[11px] tracking-[0.12em] font-medium font-mono ${codeHeaderTextClass}`}>
                           {lang || 'CODE'}
                         </span>
                       </div>
@@ -409,16 +409,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 : ''
               }
               ${msg.role === 'system' ? (msg.isError ? 'text-state-danger font-normal' : 'overlay-text-primary font-normal') : ''}
-              ${msg.role === 'interviewer' ? 'overlay-text-muted italic pl-0 text-[13px]' : ''}
+              ${msg.role === 'interviewer' ? 'overlay-text-muted italic pl-0 text-sm' : ''}
             `}>
               {msg.role === 'interviewer' && (
-                <div className="flex items-center gap-1.5 mb-1 text-[10px] font-medium tracking-[0.08em] overlay-text-muted/90">
+                <div className="flex items-center gap-1.5 mb-1 text-[11px] font-medium tracking-[0.08em] overlay-text-muted/90">
                   Interviewer
                   {msg.isStreaming && <span className="w-1 h-1 bg-state-success rounded-full animate-pulse" />}
                 </div>
               )}
               {msg.role === 'user' && msg.hasScreenshot && (
-                <div className={`flex items-center gap-1 text-[10px] opacity-70 mb-1 border-b pb-1 ${isLightTheme ? 'border-black/10' : 'border-white/10'}`}>
+                <div className={`flex items-center gap-1 text-[11px] opacity-70 mb-1 border-b pb-1 ${isLightTheme ? 'border-black/10' : 'border-white/10'}`}>
                   <Image className="w-2.5 h-2.5" />
                   <span>Screenshot attached</span>
                 </div>
@@ -453,13 +453,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         {knowledgeContext && knowledgeContext.matchedJDSignals.length > 0 && (
           <div className="mx-3 mb-2 p-3.5 rounded-2xl border border-white/12 bg-[rgba(10,14,28,0.82)] shadow-[0_10px_28px_rgba(0,0,0,0.18)]">
             <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-[10px] font-semibold text-blue-100/90 tracking-[0.08em]">Role focus</span>
+              <span className="text-[11px] font-semibold text-blue-100/90 tracking-[0.08em]">Role focus</span>
             </div>
             <div className="space-y-1.5">
               {knowledgeContext.matchedJDSignals.slice(0, 5).map((sig, i) => (
                 <div key={i} className="flex items-center gap-2.5">
                   <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-300" />
-                  <span className="text-[11.5px] text-white/88 leading-relaxed">{sig.requirement}</span>
+                  <span className="text-xs text-white/88 leading-relaxed">{sig.requirement}</span>
                   <div className="ml-auto w-8 h-1.5 rounded-full bg-white/10 overflow-hidden shrink-0">
                     <div className="h-full rounded-full bg-blue-300" style={{ width: `${Math.round(sig.relevance * 100)}%` }} />
                   </div>
@@ -473,10 +473,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           <div className="mx-3 mb-3 p-3.5 rounded-2xl border border-white/12 bg-[rgba(10,14,28,0.88)] shadow-[0_10px_28px_rgba(0,0,0,0.2)]">
             {knowledgeContext.mustHitKeywords.length > 0 && (
               <div className="mb-3">
-                <span className="text-[10px] font-semibold text-blue-100/90 tracking-[0.08em]">Language to weave in</span>
+                <span className="text-[11px] font-semibold text-blue-100/90 tracking-[0.08em]">Language to weave in</span>
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                   {knowledgeContext.mustHitKeywords.slice(0, 8).map((kw, i) => (
-                    <span key={i} className="text-[10.5px] font-medium text-blue-50 px-2 py-1 rounded-md bg-blue-400/16 border border-blue-300/20">
+                    <span key={i} className="text-xs font-medium text-blue-50 px-2 py-1 rounded-md bg-blue-400/16 border border-blue-300/20">
                       {kw}
                     </span>
                   ))}
@@ -485,7 +485,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
             {knowledgeContext.resumeEvidence.length > 0 && (
               <div>
-                <span className="text-[10px] font-semibold text-state-success tracking-[0.08em]">Good examples to mention</span>
+                <span className="text-[11px] font-semibold text-state-success tracking-[0.08em]">Good examples to mention</span>
                 <div className="space-y-1.5 mt-1.5">
                   {knowledgeContext.resumeEvidence.slice(0, 3).map((ev, i) => (
                     <div key={i} className="text-[11px] leading-relaxed text-white/80">
@@ -560,7 +560,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 </div>
               ))}
             </div>
-            <span className="text-[10px] overlay-text-muted">Type a question and press Enter, or use What to say</span>
+            <span className="text-[11px] overlay-text-muted">Type a question and press Enter, or use What to say</span>
           </div>
         )}
 
