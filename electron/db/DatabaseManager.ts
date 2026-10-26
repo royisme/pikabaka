@@ -11,6 +11,7 @@ export interface Meeting {
     id: string;
     title: string;
     date: string; // ISO string
+    startTimeMs?: number;
     duration: string;
     summary: string;
     detailedSummary?: {
@@ -761,6 +762,7 @@ export class DatabaseManager {
             id: meetingRow.id,
             title: meetingRow.title,
             date: meetingRow.created_at,
+            startTimeMs: meetingRow.start_time,
             duration: durationStr,
             summary: summaryData.legacySummary || '',
             detailedSummary: summaryData.detailedSummary,
