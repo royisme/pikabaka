@@ -127,7 +127,7 @@ Local data lives in `~/Library/Application Support/Pika` (macOS) or `%APPDATA%\P
 
 ## System Requirements
 
-- macOS 12+ (Apple Silicon or Intel) **or** Windows 10/11.
+- macOS 13+ (Apple Silicon or Intel) **or** Windows 10/11.
 - 4 GB RAM minimum, 8 GB recommended.
 - 16 GB+ if running Ollama locally.
 

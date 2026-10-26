@@ -2,6 +2,31 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: Electron 33 to 44 (branch `electron-upgrade`)
+
+Why 44, not 45: Electron 44 and 45 embed the same Node 24.22 and N-API 10, and every native module loaded on both (Opus checked in `/tmp`). 45.0.0 was five days old with no patch release, and Opus reported (not re-run here) that better-sqlite3 12.11.1 does not compile against it. 44 is supported until Electron 47 (early 2027). Move to 45 after a few patch releases.
+
+Done
+- `electron` 44.9.3 (exact), `better-sqlite3` 13.0.3 (exact), `@types/node` ^24; removed `@electron/rebuild` (and the `electron-rebuild` step in `postinstall`: the N-API binary loads as shipped), `electron-is-dev` and `@types/electron` (nothing imports them), the `yauzl` override and `allowBuilds: electron` (Electron 43+ has no install script), `ia32` from the NSIS target (Electron 44 ships no 32-bit Windows), and `openAsHidden` from `setLoginItemSettings` (removed in 44). README minimum is now macOS 13 (Electron 44 drops macOS 11 and 12; system audio already needed 13).
+- Lockfile regenerated.
+
+Verified (macOS arm64, Node 26.10)
+- `pnpm run verify` exit 0 (807 tests), `build:web:raw` and `build:electron:raw` exit 0.
+- Under `ELECTRON_RUN_AS_NODE` (Node 24.22, ABI 149): `better-sqlite3` 13.0.3 (in-memory table, insert, select), `sqlite-vec` 0.1.7, `sharp` (PNG encode), `onnxruntime-node` and the Rust audio module (7 input devices) all load and work.
+- A smoke start of the built app with a temporary `--user-data-dir` (14 s, then killed): the main process starts, four windows are created, the global shortcuts register, the preload loads, the launcher mounts, `pika.db` is created. I did not look at the windows.
+
+Found, not caused by the upgrade, not fixed
+- `src/components/SettingsPopup.tsx:99,110` calls `window.electronAPI.invoke(...)`, which the preload does not define (`TypeError: R.invoke is not a function` on every Settings mount, caught). Since the first commit. The call wants `setGroqFastTextMode`.
+- The `vec0` migrations in `electron/db/DatabaseManager.ts` (v3 and v4) declare `embedding float` without a dimension; sqlite-vec rejects it (`At least one vector column is required`), the error is caught and the vector store falls back to JS cosine similarity. Same SQL on every version; changing it touches the SQLite schema, so it is the owner's call.
+- `assets/pika.icns` loads as an empty image in `nativeImage` on Electron 33 and on 44 alike (`assets/icon.png` loads), so the warning "Failed to load image" at start is old.
+
+Not verified
+- The stealth behaviour in the running app: content protection against a screen share or the macOS screenshot tool, behaviour on Spaces and full screen, global shortcuts when another app has focus. Opus read Electron's source: the macOS code for these calls is identical in 33.4.11 and 45.0.0, but Electron 45's docs state that apps recording through ScreenCaptureKit can still capture a protected window (a macOS behaviour, not new).
+- A packaged, signed and notarized build (an unsigned `--dir` build of Electron 45 worked in Opus's test; a packaged app of 44 was not launched), Windows and Linux, auto-update, the real SCK audio permission prompt.
+- `better-sqlite3` 13 against a copy of a real `pika.db` (the smoke start used a fresh database).
+
+For the owner: macOS 11 and 12 users can no longer run the app (README updated). `CalendarManager` uses `safeStorage.encryptString` and `decryptString`, which Electron 45 deprecates and 46 removes; nothing to do for 44, but it touches the stored calendar token, so it needs the owner before Electron 46.
+
 ## 2026-10-26: the project installs and runs on the latest Node (branch `node-latest`)
 
 Why Node 22 had been pinned: on Node 26 `better-sqlite3@12.6.2` had no prebuilt binary and its source build failed, so `pnpm install` stopped. The pin was a workaround, not a goal. The owner asked for the latest Node, and Opus planned the change after experiments in `/tmp`; I applied it and re-ran the checks.

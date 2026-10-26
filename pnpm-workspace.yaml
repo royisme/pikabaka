@@ -2,7 +2,6 @@ nodeLinker: hoisted
 allowBuilds:
   better-sqlite3: true
   core-js: true
-  electron: true
   electron-winstaller: true
   esbuild: true
   protobufjs: true
@@ -11,5 +10,3 @@ allowBuilds:
 # The pins that used to sit in package.json's "pnpm" field, which pnpm 11 ignores.
 overrides:
   caniuse-lite: 1.0.30001781
-  # Electron 33's install script unzips with a yauzl that never finishes on Node 26 and leaves an empty dist.
-  yauzl: ^3.2.0

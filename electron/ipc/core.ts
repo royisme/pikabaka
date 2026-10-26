@@ -540,7 +540,6 @@ export function registerCoreHandlers(appState: AppState): void {
   safeHandle("set-open-at-login", async (_, openAtLogin: boolean) => {
     app.setLoginItemSettings({
       openAtLogin,
-      openAsHidden: false,
       path: app.getPath('exe') // Explicitly point to executable for production reliability
     });
     return { success: true };

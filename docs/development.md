@@ -4,7 +4,7 @@ pnpm is the only package manager (`.npmrc`: `node-linker=hoisted`). CI uses Node
 
 ## Run and build
 
-- `pnpm install`: also runs `postinstall` (rebuilds `better-sqlite3` and `sqlite-vec` for Electron, downloads ML models). Owner-run.
+- `pnpm install`: also runs `postinstall` (rebuilds `sharp`, downloads the ML models, checks `sqlite-vec`). Owner-run.
 - `pnpm run app:dev`: Vite on port 5180 plus Electron in development mode.
 - `pnpm run build:web:raw`: `tsc` then `vite build`.
 - `pnpm run build:electron:raw`: `tsc -p electron/tsconfig.json`.
@@ -15,15 +15,14 @@ The scripts without `:raw` run `verify` (lint plus test) first.
 
 ## Node version
 
-Node 22.12 or newer; CI runs the oldest (22) and the newest (26), and `.node-version` is 26. `pnpm install` was verified on Node 26.10 and 22.22 (macOS arm64 only).
+Node 22.12 or newer; Electron is 44.9.3; CI runs the oldest (22) and the newest (26), and `.node-version` is 26. `pnpm install` was verified on Node 26.10 and 22.22 (macOS arm64 only).
 
-The system Node is not the app's Node: the app runs on the Node inside Electron (Electron 33 embeds Node 20.18). The system Node runs the toolchain (pnpm, vite, tsc, tap, electron-rebuild).
+The system Node is not the app's Node: the app runs on the Node inside Electron (Electron 44 embeds Node 24.22, ABI 149, N-API 10). The system Node runs the toolchain (pnpm, vite, tsc, tap). Electron 42 and newer download their binary the first time `electron` runs, not at install: the first `pnpm start` fetches about 300M.
 
 What made Node 26 work, and what to keep in mind:
-- `better-sqlite3` is pinned to 12.11.1. 13.x is faster to install (N-API binaries ship in the package), but its binary needs N-API 10 and crashes Electron 33 on load (found by loading it with `ELECTRON_RUN_AS_NODE`). Move to 13.x together with the Electron upgrade (Electron 40 or newer). `postinstall` rebuilds better-sqlite3 for Electron.
+- `better-sqlite3` is pinned to 13.0.3. Its N-API 10 binary ships in the package and loads in Electron 44 without a rebuild, so `postinstall` has no `electron-rebuild` step. Version 12.11.1 does not compile against Electron 45 (V8 API change); 13 needs Electron 40 or newer.
 - `pnpm-workspace.yaml` carries `nodeLinker: hoisted` and the overrides; pnpm 11 ignores `.npmrc`'s `node-linker` and the `pnpm` field of `package.json`. With the default isolated linker the packaged app lacked sharp's platform package and `onnxruntime-node`.
-- `yauzl` is overridden to `^3.2.0`: Electron 33's install script unzips with a yauzl that never finishes on Node 26 and leaves a 256K `dist` with no Electron binary and no error. After an install, `cat node_modules/electron/path.txt` and `du -sh node_modules/electron/dist` (about 240M) show whether it worked. Drop the override with Electron 40 or newer.
-- `keytar`, `sqlite3`, `tesseract.js` and the old `electron-rebuild` were removed: nothing imports them, and `sqlite3` was the package that pulled in `node-gyp@8.4.1`, which needs Python's `distutils` (gone in Python 3.12 and newer).
+- `keytar`, `sqlite3`, `tesseract.js`, `@electron/rebuild`, `electron-is-dev` and `@types/electron` were removed: nothing imports them, and `sqlite3` was the package that pulled in `node-gyp@8.4.1`, which needs Python's `distutils` (gone in Python 3.12 and newer).
 - Not verified: Windows, Linux, a signed and notarized build.
 
 ## pnpm caveat
