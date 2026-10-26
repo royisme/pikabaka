@@ -50,3 +50,39 @@ export function transcriptRowParts(
     hasTranslation,
   };
 }
+
+export type RowSlot =
+  /** The row is still being spoken. */
+  | { kind: 'live' }
+  /** A translation is on its way; elapsedSeconds is set only once it has been slow for a while. */
+  | { kind: 'translating'; elapsedSeconds: number | null }
+  | { kind: 'failed' }
+  /** The translation itself fills the slot. */
+  | { kind: 'translation' }
+  | null;
+
+/** A translation is called slow, and its elapsed time shown, after this long. */
+export const SLOW_TRANSLATION_MS = 3000;
+
+/**
+ * The slot is the line above the source text that holds "Live", then "Translating", then the
+ * translation. It exists from the first live words, so a translation that arrives late fills a
+ * line that is already there and moves nothing above it. No slot means translation is off, the
+ * display mode is `original`, the row is own speech, or the row was skipped or is the same language.
+ */
+export function rowSlot(
+  row:
+    | 'live'
+    | Pick<TranscriptSegment, 'sourceText' | 'translatedText' | 'translationState' | 'receivedAt' | 'speaker'>,
+  context: { mode: TranscriptDisplayMode; translationOn: boolean; now: number }
+): RowSlot {
+  if (context.mode === 'original') return null;
+  if (row === 'live') return context.translationOn ? { kind: 'live' } : null;
+  if (row.speaker === 'user') return null;
+  if (hasUsableTranslation(row)) return { kind: 'translation' };
+  if (!context.translationOn) return null;
+  if (row.translationState === 'error') return { kind: 'failed' };
+  if (row.translationState !== 'pending') return null;
+  const waitedMs = row.receivedAt === undefined ? 0 : context.now - row.receivedAt;
+  return { kind: 'translating', elapsedSeconds: waitedMs >= SLOW_TRANSLATION_MS ? Math.floor(waitedMs / 1000) : null };
+}

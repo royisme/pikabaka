@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { upsertTranscriptSegment, type TranscriptDisplayMode, type TranscriptSegment } from '../lib/transcriptSegments';
+import { translationEnabledAfterEvent, upsertTranscriptSegment, type TranscriptDisplayMode, type TranscriptSegment } from '../lib/transcriptSegments';
 
 export function useMeetingTranscript() {
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
   const [isInterviewerSpeaking, setIsInterviewerSpeaking] = useState(false);
   const [currentInterviewerPartial, setCurrentInterviewerPartial] = useState('');
   const [transcriptDisplayMode, setTranscriptDisplayMode] = useState<TranscriptDisplayMode>('original');
+  const [translationEnabled, setTranslationEnabled] = useState(false);
   const [showTranscript, setShowTranscript] = useState(() => {
     const stored = localStorage.getItem('pika_interviewer_transcript');
     return stored !== 'false';
@@ -18,6 +19,7 @@ export function useMeetingTranscript() {
         if (settings?.displayMode) {
           setTranscriptDisplayMode(settings.displayMode);
         }
+        setTranslationEnabled(!!settings?.enabled && !!settings.model?.trim());
       })
       .catch(() => {});
   }, []);
@@ -65,6 +67,7 @@ export function useMeetingTranscript() {
           if (transcript.displayMode) {
             setTranscriptDisplayMode(transcript.displayMode);
           }
+          setTranslationEnabled((current) => translationEnabledAfterEvent(current, transcript.translationState));
         }
         return;
       }
@@ -100,6 +103,7 @@ export function useMeetingTranscript() {
         if (transcript.displayMode) {
           setTranscriptDisplayMode(transcript.displayMode);
         }
+        setTranslationEnabled((current) => translationEnabledAfterEvent(current, transcript.translationState));
 
         if (speakingTimeoutRef.current) {
           window.clearTimeout(speakingTimeoutRef.current);
@@ -165,6 +169,7 @@ export function useMeetingTranscript() {
     isInterviewerSpeaking,
     currentInterviewerPartial,
     transcriptDisplayMode,
+    translationEnabled,
     setTranscriptDisplayMode,
     showTranscript,
     setShowTranscript,

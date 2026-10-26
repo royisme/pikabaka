@@ -1,19 +1,20 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Languages } from 'lucide-react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Languages, TriangleAlert } from 'lucide-react';
 import type { TranscriptDisplayMode, TranscriptSegment } from '../../lib/transcriptSegments';
-import { transcriptRowParts } from '../../lib/transcriptRow';
+import { rowSlot, transcriptRowParts, type RowSlot } from '../../lib/transcriptRow';
 import { countNewRows, isNearBottom, nextTranscriptScroll } from '../../lib/answerScroll';
 
 interface TranscriptNotesProps {
     segments: TranscriptSegment[];
     partialText?: string;
     displayMode?: TranscriptDisplayMode;
+    translationOn?: boolean;
     partialSpeakerLabel?: string;
     onTranslateSegment?: (segment: TranscriptSegment) => void;
 }
 
-function isOwnSpeech(label: string): boolean {
-    return /^me$/i.test(label.trim());
+function isOwnSpeech(segment: TranscriptSegment): boolean {
+    return segment.speaker === 'user';
 }
 
 function formatTime(ts: number): string {
@@ -23,10 +24,39 @@ function formatTime(ts: number): string {
     });
 }
 
+/** The reserved line above the source text; 20px, the height of one line of translation. */
+function SlotLine({ slot, onRetry }: { slot: RowSlot; onRetry?: () => void }) {
+    if (!slot || slot.kind === 'translation') return null;
+    return (
+        <div className="flex min-h-[20px] items-center gap-2 text-[11px] overlay-text-muted">
+            {slot.kind === 'live' && <span>◦ Live</span>}
+            {slot.kind === 'translating' && (
+                <span>{slot.elapsedSeconds === null ? 'Translating' : `Translating · ${slot.elapsedSeconds}s`}</span>
+            )}
+            {slot.kind === 'failed' && (
+                <>
+                    <TriangleAlert className="h-3 w-3 text-state-danger" aria-hidden="true" />
+                    <span className="text-state-danger">Translation failed</span>
+                    {onRetry && (
+                        <button
+                            type="button"
+                            onClick={onRetry}
+                            className="rounded-full border border-border-subtle px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-text-primary"
+                        >
+                            Retry
+                        </button>
+                    )}
+                </>
+            )}
+        </div>
+    );
+}
+
 const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
     segments,
     partialText,
     displayMode = 'both',
+    translationOn = false,
     partialSpeakerLabel = 'Interviewer',
     onTranslateSegment,
 }) => {
@@ -41,9 +71,21 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
 
     const partialLabel = useMemo(() => partialSpeakerLabel.trim() || 'Interviewer', [partialSpeakerLabel]);
 
+    // One tick per second, and only while some translation is pending, so a slow one can show its elapsed time.
+    const hasPending = segments.some((segment) => segment.translationState === 'pending');
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        if (!hasPending) return;
+        setNow(Date.now());
+        const timer = window.setInterval(() => setNow(Date.now()), 1000);
+        return () => window.clearInterval(timer);
+    }, [hasPending]);
+
+    const slotContext = { mode: displayMode, translationOn, now };
+
     const newestOtherIndex = useMemo(() => {
         for (let i = segments.length - 1; i >= 0; i--) {
-            if (!isOwnSpeech(segments[i].speakerLabel)) return i;
+            if (!isOwnSpeech(segments[i])) return i;
         }
         return -1;
     }, [segments]);
@@ -91,10 +133,11 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
             >
                 <div className="space-y-2.5 pr-0.5">
                     {segments.map((seg, index) => {
-                        const own = isOwnSpeech(seg.speakerLabel);
+                        const own = isOwnSpeech(seg);
                         const expanded = expandedId === seg.segmentId;
                         // Own speech is never translated: it stays one quiet source line.
                         const parts = transcriptRowParts(seg, own ? 'original' : displayMode, expanded);
+                        const slot = rowSlot(seg, slotContext);
                         const newest = index === newestOtherIndex;
                         const showSpeaker = index === 0 || segments[index - 1].speakerLabel !== seg.speakerLabel;
                         const hasMeta = !!onTranslateSegment || !!seg.detectedLanguage;
@@ -115,26 +158,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                 {showSpeaker && (
                                     <div className="text-[11px] font-medium overlay-text-muted">{seg.speakerLabel}</div>
                                 )}
-                                {parts.kind === 'awaiting' && (
-                                    <div className="flex items-center gap-2 text-[11px] overlay-text-muted">
-                                        {seg.translationState === 'error' ? (
-                                            <>
-                                                <span className="text-state-danger">Translation failed</span>
-                                                {onTranslateSegment && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => onTranslateSegment(seg)}
-                                                        className="rounded-full border border-border-subtle px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-text-primary"
-                                                    >
-                                                        Retry
-                                                    </button>
-                                                )}
-                                            </>
-                                        ) : (
-                                            <span>Translating…</span>
-                                        )}
-                                    </div>
-                                )}
+                                <SlotLine slot={slot} onRetry={onTranslateSegment ? () => onTranslateSegment(seg) : undefined} />
                                 <button
                                     type="button"
                                     aria-expanded={expanded}
@@ -180,8 +204,12 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                             {lastLabel !== partialLabel && (
                                 <div className="text-[11px] font-medium overlay-text-muted">{partialLabel}</div>
                             )}
-                            <div className="text-[11px] overlay-text-muted">Live</div>
-                            <p className="text-xs leading-[17px] overlay-text-primary whitespace-pre-wrap break-words">
+                            <SlotLine slot={rowSlot('live', slotContext)} />
+                            <p
+                                className={`overlay-text-primary whitespace-pre-wrap break-words ${
+                                    rowSlot('live', slotContext) ? 'text-xs leading-[17px]' : 'text-sm leading-5'
+                                }`}
+                            >
                                 {partialText}
                             </p>
                         </div>

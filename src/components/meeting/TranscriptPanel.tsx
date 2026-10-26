@@ -7,6 +7,7 @@ interface TranscriptPanelProps {
     isInterviewerSpeaking: boolean;
     currentInterviewerPartial: string;
     transcriptDisplayMode: TranscriptDisplayMode;
+    translationEnabled: boolean;
     showTranscript: boolean;
     handleTranslateTranscriptSegment: (segment: TranscriptSegment) => void;
     sttStatus: { label: string; toneClass: string; dotClass: string };
@@ -24,6 +25,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
     isInterviewerSpeaking,
     currentInterviewerPartial,
     transcriptDisplayMode,
+    translationEnabled,
     showTranscript,
     handleTranslateTranscriptSegment,
     sttStatus,
@@ -44,6 +46,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                         segments={transcriptSegments}
                         partialText={isInterviewerSpeaking ? currentInterviewerPartial : undefined}
                         displayMode={transcriptDisplayMode}
+                        translationOn={translationEnabled}
                         onTranslateSegment={handleTranslateTranscriptSegment}
                     />
                 ) : (

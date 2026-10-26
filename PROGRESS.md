@@ -2,6 +2,19 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: T3 reserved slot and line states (branch `translation-slot`, epic #38)
+
+Done
+- `rowSlot` (`src/lib/transcriptRow.ts`): the 20px line above the source text exists from the first live words ("◦ Live"), then "Translating" (with "· Ns" once it has waited 3 seconds), then holds the translation; or "Translation failed" with a warning icon and a Retry button. No slot when translation is off, the mode is `original`, the row is own speech, or the row was skipped or is the same language (the same-language collapse is the spec's named exception).
+- `TranscriptSegment` gains `speaker` and `receivedAt` (renderer clock at the latest `pending` event; a reopened turn starts a new wait). Own speech is now identified by `speaker === 'user'`, not by the label "Me".
+- `useMeetingTranscript` returns `translationEnabled`: from the saved settings (enabled and a model set) at start, then from each final event (`skipped` means off, anything else means on). It reaches the rows through `TranscriptColumn` and `TranscriptPanel`.
+- The live partial is 12px with the slot when translation is on, and 14px with no slot when it is off or the mode is `original`, so it keeps its size when it becomes a final row.
+- One timer, 1 tick per second, runs only while some translation is pending.
+- Verified: both `tsc --noEmit` checks exit 0; tap 423 of 423 (30 new assertions: slot present for live, pending and complete; elapsed time from 3s; no slot cases; `receivedAt` and `speaker` in `upsertTranscriptSegment`; `translationEnabledAfterEvent`).
+- Not verified: that a late one-line translation moves nothing above it. The unit tests prove the slot exists in every state and the layout classes were chosen to match (slot `min-h-[20px]`, translation line 20px, source 12px in both); the pixels are the owner's hand check. A translation that wraps to two lines still grows its row downward, by design.
+- Not verified: the "Translating" and "failed" lines in the running app at 380px and 600px; that `translationEnabled` is right when the settings are changed in the Settings window mid-call (it corrects itself on the next final event); an OpenAI-compatible provider with an empty model but a preferred model reads as off until its first event.
+- With translation off the live partial no longer shows a "Live" marker (it would add a line that disappears on final). The header status dot (T5) will carry that.
+
 ## 2026-10-26: T2 one scroll container and the follow rule (branch `transcript-follow`, epic #38)
 
 Done

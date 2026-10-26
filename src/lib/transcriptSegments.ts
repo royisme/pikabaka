@@ -9,6 +9,9 @@ export interface TranscriptSegment {
   translationState: 'pending' | 'complete' | 'error' | 'skipped';
   detectedLanguage?: string;
   revision?: number;
+  speaker?: 'interviewer' | 'user';
+  /** Renderer clock time at which the latest `pending` event arrived; drives the elapsed time of a slow translation. */
+  receivedAt?: number;
 }
 
 export interface TranscriptEventForSegment {
@@ -32,9 +35,18 @@ function defaultSpeakerLabelForEvent(event: TranscriptEventForSegment): string {
   return 'User 1';
 }
 
+/** A `skipped` final means translation is off or not configured; any other state means it is on. */
+export function translationEnabledAfterEvent(
+  current: boolean,
+  state: TranscriptSegment['translationState'] | undefined
+): boolean {
+  return state === undefined ? current : state !== 'skipped';
+}
+
 export function upsertTranscriptSegment(
   segments: TranscriptSegment[],
-  event: TranscriptEventForSegment
+  event: TranscriptEventForSegment,
+  now: number = Date.now()
 ): TranscriptSegment[] {
   if (!event.final || !event.segmentId) {
     return segments;
@@ -61,6 +73,8 @@ export function upsertTranscriptSegment(
         translationState,
         detectedLanguage: event.detectedLanguage || undefined,
         revision: event.revision,
+        speaker: event.speaker,
+        receivedAt: translationState === 'pending' ? now : undefined,
       },
     ];
   }
@@ -85,6 +99,8 @@ export function upsertTranscriptSegment(
     translationState: event.translationState || existing.translationState,
     detectedLanguage: event.detectedLanguage || existing.detectedLanguage,
     revision: event.revision ?? existing.revision,
+    speaker: event.speaker ?? existing.speaker,
+    receivedAt: event.translationState === 'pending' ? now : existing.receivedAt,
   };
   return updated;
 }

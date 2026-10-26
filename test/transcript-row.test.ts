@@ -1,5 +1,5 @@
 import t from 'tap';
-import { hasUsableTranslation, transcriptRowParts } from '../src/lib/transcriptRow';
+import { hasUsableTranslation, rowSlot, transcriptRowParts } from '../src/lib/transcriptRow';
 
 const translated = { sourceText: 'Can we move the call to Friday?', translatedText: '我们能把电话改到周五吗？', translationState: 'complete' as const };
 const pending = { sourceText: 'Can we move the call to Friday?', translatedText: undefined, translationState: 'pending' as const };
@@ -41,4 +41,36 @@ t.test('skipped and same-language rows show the source as the lead', async (t) =
   t.equal(hasUsableTranslation(same), false);
   t.equal(transcriptRowParts(same, 'both', false).kind, 'source');
   t.equal(transcriptRowParts({ ...same, translatedText: '   ' }, 'both', false).hasTranslation, false, 'blank translation');
+});
+
+const ctx = { mode: 'both' as const, translationOn: true, now: 100_000 };
+const other = { speaker: 'interviewer' as const, receivedAt: 100_000 - 1000 };
+
+t.test('the slot exists from the first live words to the finished translation', async (t) => {
+  t.same(rowSlot('live', ctx), { kind: 'live' });
+  t.same(rowSlot({ ...pending, ...other }, ctx), { kind: 'translating', elapsedSeconds: null });
+  t.same(rowSlot({ ...translated, ...other }, ctx), { kind: 'translation' });
+  t.same(rowSlot({ ...pending, ...other, translationState: 'error' }, ctx), { kind: 'failed' });
+  for (const slot of [rowSlot('live', ctx), rowSlot({ ...pending, ...other }, ctx), rowSlot({ ...translated, ...other }, ctx)]) {
+    t.not(slot, null, 'live, pending and complete all have a slot, so a late translation shifts nothing');
+  }
+});
+
+t.test('elapsed time appears only after the translation has been slow for 3 seconds', async (t) => {
+  const at = (ms: number) => rowSlot({ ...pending, speaker: 'interviewer', receivedAt: ctx.now - ms }, ctx);
+  t.same(at(2999), { kind: 'translating', elapsedSeconds: null });
+  t.same(at(3000), { kind: 'translating', elapsedSeconds: 3 });
+  t.same(at(4900), { kind: 'translating', elapsedSeconds: 4 });
+  t.same(rowSlot({ ...pending, speaker: 'interviewer' }, ctx), { kind: 'translating', elapsedSeconds: null }, 'no arrival time yet');
+});
+
+t.test('no slot when translation is off, the mode is original, or the row is own speech or skipped', async (t) => {
+  t.equal(rowSlot('live', { ...ctx, translationOn: false }), null);
+  t.equal(rowSlot({ ...pending, ...other }, { ...ctx, translationOn: false }), null);
+  t.equal(rowSlot('live', { ...ctx, mode: 'original' }), null);
+  t.equal(rowSlot({ ...translated, ...other }, { ...ctx, mode: 'original' }), null);
+  t.equal(rowSlot({ ...pending, speaker: 'user' }, ctx), null, 'own speech');
+  t.equal(rowSlot({ ...pending, ...other, translationState: 'skipped' }, ctx), null);
+  const same = { sourceText: 'Sounds good', translatedText: 'Sounds good', translationState: 'complete' as const, ...other };
+  t.equal(rowSlot(same, ctx), null, 'same language collapses the slot');
 });
