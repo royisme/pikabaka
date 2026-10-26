@@ -16,6 +16,8 @@ import {
   X,
   Copy,
   Code,
+  Monitor,
+  Crop,
 } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight, vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -58,6 +60,8 @@ interface KnowledgeContext {
 }
 
 interface ChatPanelProps {
+  onCaptureScreen?: () => void;
+  onCaptureArea?: () => void;
   messages: Message[];
   knowledgeContext: KnowledgeContext | null;
   attachedContext: Array<{ path: string; preview: string }>;
@@ -91,6 +95,8 @@ interface ChatPanelProps {
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = ({
+  onCaptureScreen,
+  onCaptureArea,
   messages,
   knowledgeContext,
   attachedContext,
@@ -541,6 +547,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           <button onClick={handleFollowUpQuestions} aria-label="Follow-up" title="Follow-up" className={`flex h-7 w-7 min-[480px]:w-auto items-center justify-center gap-1.5 min-[480px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
             <HelpCircle className="w-3 h-3 opacity-65" /> <span className="hidden min-[480px]:inline">Follow-up</span>
           </button>
+          {onCaptureScreen && (
+            <button onClick={onCaptureScreen} aria-label="Screenshot" title={`Screenshot of the screen, attached to your next question${shortcuts.takeScreenshot.length ? ` (${shortcuts.takeScreenshot.join('+')})` : ''}`} className={`ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press ${quickActionClass}`} style={appearance.chipStyle}>
+              <Monitor className="w-3 h-3 opacity-65" aria-hidden="true" />
+            </button>
+          )}
+          {onCaptureArea && (
+            <button onClick={onCaptureArea} aria-label="Select area" title={`Screenshot of a selected area${shortcuts.selectiveScreenshot.length ? ` (${shortcuts.selectiveScreenshot.join('+')})` : ''}`} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press ${quickActionClass}`} style={appearance.chipStyle}>
+              <Crop className="w-3 h-3 opacity-65" aria-hidden="true" />
+            </button>
+          )}
         </div>
         {attachedContext.length > 0 && (
           <div className="mb-1.5 flex h-7 items-center gap-1.5 overflow-hidden" role="group" aria-label={`${attachedContext.length} screenshot${attachedContext.length > 1 ? 's' : ''} attached`}>

@@ -15,6 +15,9 @@ type KnowledgeContext = {
 type AttachedContext = Array<{ path: string; preview: string }>;
 
 interface ChatColumnProps {
+    /** Take a screenshot of the whole screen, or of an area, and attach it to the next question. */
+    onCaptureScreen?: () => void;
+    onCaptureArea?: () => void;
     messages: Message[];
     knowledgeContext: KnowledgeContext | null;
     attachedContext: AttachedContext;
@@ -43,6 +46,8 @@ interface ChatColumnProps {
 }
 
 const ChatColumn: React.FC<ChatColumnProps> = ({
+    onCaptureScreen,
+    onCaptureArea,
     messages,
     knowledgeContext,
     attachedContext,
@@ -72,6 +77,8 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
     return (
         <ChatPanel
             messages={messages}
+            onCaptureScreen={onCaptureScreen}
+            onCaptureArea={onCaptureArea}
             knowledgeContext={knowledgeContext}
             attachedContext={attachedContext}
             setAttachedContext={setAttachedContext}
