@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import UpdateModal from './UpdateModal';
+import { useMainEvent } from '../hooks/useMainEvent';
+import { useWindowEvent } from '../hooks/useWindowEvent';
 
 const UpdateBanner: React.FC = () => {
     const [updateInfo, setUpdateInfo] = useState<any>(null);
@@ -10,76 +12,61 @@ const UpdateBanner: React.FC = () => {
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [instructionsArch, setInstructionsArch] = useState<'arm64' | 'x64' | null>(null);
 
-    useEffect(() => {
-        // Listen for update available
-        const unsubAvailable = window.electronAPI.onUpdateAvailable((info: any) => {
-            console.log('[UpdateBanner] Update available:', info);
-            setUpdateInfo(info);
-            setErrorMessage(null);
-            setStatus('idle'); // Reset from any prior error/state before showing update info
-            // If parsed notes are included in the info object (from our backend change)
-            if (info.parsedNotes) {
-                setParsedNotes(info.parsedNotes);
-            }
-            setIsVisible(true);
-        });
+    // Listen for update available
+    useMainEvent(window.electronAPI?.onUpdateAvailable, (info) => {
+        console.log('[UpdateBanner] Update available:', info);
+        setUpdateInfo(info);
+        setErrorMessage(null);
+        setStatus('idle'); // Reset from any prior error/state before showing update info
+        if (info?.parsedNotes) {
+            setParsedNotes(info.parsedNotes);
+        }
+        setIsVisible(true);
+    });
 
-        // Listen for download progress
-        const unsubProgress = window.electronAPI.onDownloadProgress((progressObj) => {
-            // Ensure modal is visible if download starts
-            setIsVisible(true);
-            setStatus('downloading');
-            setDownloadProgress(progressObj.percent);
-        });
+    // Listen for download progress
+    useMainEvent(window.electronAPI?.onDownloadProgress, (progressObj) => {
+        setIsVisible(true);
+        setStatus('downloading');
+        setDownloadProgress(progressObj.percent);
+    });
 
-        // Listen for update-downloaded event
-        const unsubDownloaded = window.electronAPI.onUpdateDownloaded((info) => {
-            console.log('[UpdateBanner] Update downloaded:', info);
-            setUpdateInfo(info); // Update info again just in case
-            if (info.parsedNotes) setParsedNotes(info.parsedNotes);
+    // Listen for update-downloaded event
+    useMainEvent(window.electronAPI?.onUpdateDownloaded, (info) => {
+        console.log('[UpdateBanner] Update downloaded:', info);
+        setUpdateInfo(info); // Update info again just in case
+        if (info?.parsedNotes) setParsedNotes(info.parsedNotes);
 
-            setStatus('ready');
-            setIsVisible(true);
-        });
+        setStatus('ready');
+        setIsVisible(true);
+    });
 
-        // Listen for update errors
-        const unsubError = window.electronAPI.onUpdateError((err: string) => {
-            console.error('[UpdateBanner] Update error:', err);
-            setStatus('error');
-            setErrorMessage(err);
-        });
-
-        return () => {
-            unsubAvailable();
-            unsubProgress();
-            unsubDownloaded();
-            unsubError();
-        };
-    }, []);
+    // Listen for update errors
+    useMainEvent(window.electronAPI?.onUpdateError, (err: string) => {
+        console.error('[UpdateBanner] Update error:', err);
+        setStatus('error');
+        setErrorMessage(err);
+    });
 
     // Demo/Test mode: Press Cmd+I to trigger backend test-fetch or Cmd+J for UI mock
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (!import.meta.env.DEV) return;
-            
-            if (e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'i') {
-                e.preventDefault();
-                console.log("[UpdateBanner] Cmd+I pressed: Triggering Test Release Fetch...");
-                window.electronAPI.testReleaseFetch().catch(console.error);
-            }
-            
-            if (e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'j') {
-                e.preventDefault();
-                console.log("[UpdateBanner] Cmd+J pressed: Triggering Instruction UI mock...");
-                setUpdateInfo({ version: '2.0.8' });
-                setParsedNotes({ summary: 'Test Update', fullBody: 'Testing', sections: [{ title: 'Notes', items: ['UI Test'] }] });
-                setStatus('idle');
-                setIsVisible(true);
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
+    useWindowEvent('keydown', (e: KeyboardEvent) => {
+        if (!import.meta.env.DEV) return;
+
+        if (e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'i') {
+            e.preventDefault();
+            console.log("[UpdateBanner] Cmd+I pressed: Triggering Test Release Fetch...");
+            window.electronAPI.testReleaseFetch().catch(console.error);
+        }
+
+        if (e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'j') {
+            e.preventDefault();
+            console.log("[UpdateBanner] Cmd+J pressed: Triggering Instruction UI mock...");
+            setUpdateInfo({ version: '2.0.8' });
+            setParsedNotes({ summary: 'Test Update', fullBody: 'Testing', sections: [{ title: 'Notes', items: ['UI Test'] }] });
+            setStatus('idle');
+            setIsVisible(true);
+        }
+    });
 
     const handleInstall = async () => {
         if (window.electronAPI.platform === 'darwin') {

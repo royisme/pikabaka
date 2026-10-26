@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { useQuery } from 'react-query';
 import { ChevronDown, Check, Cloud, Terminal, Monitor, Server } from 'lucide-react';
 import { STANDARD_CLOUD_MODELS, prettifyModelId } from '../../utils/modelUtils';
+import { useWindowEvent } from '../../hooks/useWindowEvent';
 
 interface ModelSelectorProps {
     currentModel: string;
@@ -16,55 +18,51 @@ interface CustomProvider {
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSelectModel }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'cloud' | 'custom' | 'local'>('cloud');
-    const [ollamaModels, setOllamaModels] = useState<string[]>([]);
-    const [customProviders, setCustomProviders] = useState<CustomProvider[]>([]);
-    const [cloudModels, setCloudModels] = useState<{ id: string; name: string; desc: string; provider: string }[]>([]);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     // Close on click outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
+    useWindowEvent(
+        'mousedown',
+        (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+        },
+        'document'
+    );
 
-    // Load Data
-    useEffect(() => {
-        if (!isOpen) return;
+    // Load Data via queries
+    const { data: customProviders = [] } = useQuery<CustomProvider[]>(
+        ['custom-providers'],
+        () => (window.electronAPI?.getCustomProviders() as Promise<CustomProvider[]>) ?? Promise.resolve([]),
+        { enabled: isOpen }
+    );
 
-        const loadData = async () => {
-            try {
-                // Load Custom
-                const custom = await window.electronAPI?.getCustomProviders() as CustomProvider[];
-                if (custom) setCustomProviders(custom);
+    const { data: ollamaModels = [] } = useQuery<string[]>(
+        ['ollama-models'],
+        () => (window.electronAPI?.getAvailableOllamaModels() as Promise<string[]>) ?? Promise.resolve([]),
+        { enabled: isOpen }
+    );
 
-                // Load Ollama
-                const local = await window.electronAPI?.getAvailableOllamaModels() as string[];
-                if (local) setOllamaModels(local);
+    const { data: creds } = useQuery(
+        ['stored-credentials'],
+        () => window.electronAPI?.getStoredCredentials?.(),
+        { enabled: isOpen }
+    );
 
-                // Build dynamic cloud models from credentials
-                // @ts-ignore
-                const creds = await window.electronAPI?.getStoredCredentials?.();
-                const cModels: { id: string; name: string; desc: string; provider: string }[] = [];
-                for (const [prov, cfg] of Object.entries(STANDARD_CLOUD_MODELS)) {
-                    if (!cfg.hasKeyCheck(creds)) continue;
-                    cfg.ids.forEach((id, i) => cModels.push({ id, name: cfg.names[i], desc: cfg.descs[i], provider: prov }));
-                    const pm = creds?.[cfg.pmKey];
-                    if (pm && !cfg.ids.includes(pm)) {
-                        cModels.push({ id: pm, name: prettifyModelId(pm), desc: `${prov.charAt(0).toUpperCase() + prov.slice(1)} • Preferred`, provider: prov });
-                    }
-                }
-                setCloudModels(cModels);
-            } catch (e) {
-                console.error("Failed to load models:", e);
+    const cloudModels = useMemo(() => {
+        if (!creds) return [];
+        const cModels: { id: string; name: string; desc: string; provider: string }[] = [];
+        for (const [prov, cfg] of Object.entries(STANDARD_CLOUD_MODELS)) {
+            if (!cfg.hasKeyCheck(creds)) continue;
+            cfg.ids.forEach((id, i) => cModels.push({ id, name: cfg.names[i], desc: cfg.descs[i], provider: prov }));
+            const pm = creds?.[cfg.pmKey];
+            if (pm && !cfg.ids.includes(pm)) {
+                cModels.push({ id: pm, name: prettifyModelId(pm), desc: `${prov.charAt(0).toUpperCase() + prov.slice(1)} • Preferred`, provider: prov });
             }
-        };
-        loadData();
-    }, [isOpen]);
+        }
+        return cModels;
+    }, [creds]);
 
     const handleSelect = (model: string) => {
         // For custom/local, we might need to pass an ID or specific format

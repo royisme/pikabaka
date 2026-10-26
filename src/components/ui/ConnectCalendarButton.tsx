@@ -1,43 +1,58 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { ArrowRight, Loader, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useMutation, useQuery, useQueryClient } from 'react-query';
 
 interface ConnectCalendarButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: 'default' | 'dark';
     onConnect?: () => void;
 }
 
-const ConnectCalendarButton: React.FC<ConnectCalendarButtonProps> = ({ className = '', variant = 'default', ...props }) => {
-    const [loading, setLoading] = useState(false);
-    const [connected, setConnected] = useState(false);
+const ConnectCalendarButton: React.FC<ConnectCalendarButtonProps> = ({ className = '', variant: _variant = 'default', ...props }) => {
+    void _variant;
+    const queryClient = useQueryClient();
+    const onConnectRef = useRef(props.onConnect);
+    onConnectRef.current = props.onConnect;
 
-    useEffect(() => {
-        if (window.electronAPI) {
-            window.electronAPI.getCalendarStatus().then(status => {
-                setConnected(status.connected);
-                if (status.connected) {
-                    props.onConnect?.();
+    const { data: calendarStatus } = useQuery<{ connected: boolean }>(
+        ['calendar-status'],
+        () => window.electronAPI.getCalendarStatus(),
+        {
+            enabled: !!window.electronAPI,
+            onSuccess: (status) => {
+                if (status?.connected) {
+                    onConnectRef.current?.();
                 }
-            });
+            },
         }
-    }, []);
+    );
+
+    const connected = calendarStatus?.connected ?? false;
+
+    const connectMutation = useMutation(
+        async () => {
+            return await window.electronAPI.calendarConnect();
+        },
+        {
+            onSuccess: (res) => {
+                if (res?.success) {
+                    queryClient.setQueryData(['calendar-status'], { connected: true });
+                    onConnectRef.current?.();
+                }
+            },
+            onError: (err) => {
+                console.error(err);
+            },
+        }
+    );
+
+    const loading = connectMutation.isLoading;
 
     const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
         if (props.onClick) props.onClick(e);
         if (connected) return; // For now no disconnect here
 
-        setLoading(true);
-        try {
-            const res = await window.electronAPI.calendarConnect();
-            if (res.success) {
-                setConnected(true);
-                props.onConnect?.();
-            }
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
+        connectMutation.mutate();
     };
 
     if (connected) {

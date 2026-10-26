@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from 'react-query';
+import { useMainEvent } from '../../hooks/useMainEvent';
 
 interface ResizableSplitterProps {
   position: number;
@@ -21,17 +23,19 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const splitterRef = useRef<HTMLDivElement>(null);
   const priorPassthroughRef = useRef<boolean>(false);
-  const passthroughCacheRef = useRef<boolean>(false);
+  const queryClient = useQueryClient();
 
-  // Cache passthrough state so we can synchronously read it on mousedown
-  useEffect(() => {
-    void window.electronAPI?.getOverlayMousePassthrough?.().then((val: boolean) => {
-      passthroughCacheRef.current = val;
-    });
-    return window.electronAPI?.onOverlayMousePassthroughChanged?.((val: boolean) => {
-      passthroughCacheRef.current = val;
-    });
-  }, []);
+  const { data: passthrough = false } = useQuery<boolean>(
+    ['overlay-mouse-passthrough'],
+    () => window.electronAPI?.getOverlayMousePassthrough?.() ?? Promise.resolve(false)
+  );
+
+  useMainEvent(
+    window.electronAPI?.onOverlayMousePassthroughChanged,
+    (val: boolean) => {
+      queryClient.setQueryData(['overlay-mouse-passthrough'], val);
+    }
+  );
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     const step = e.shiftKey ? 10 : 2;
@@ -45,10 +49,10 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     // Save cached passthrough state before disabling for drag
-    priorPassthroughRef.current = passthroughCacheRef.current;
+    priorPassthroughRef.current = queryClient.getQueryData<boolean>(['overlay-mouse-passthrough']) ?? passthrough;
     window.electronAPI?.setOverlayMousePassthrough?.(false);
     setIsDragging(true);
-  }, []);
+  }, [passthrough, queryClient]);
 
   useEffect(() => {
     if (!isDragging) return;

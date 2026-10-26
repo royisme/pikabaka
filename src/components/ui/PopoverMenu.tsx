@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useWindowEvent } from '../../hooks/useWindowEvent';
 
 export interface PopoverMenuItem {
     key: string;
@@ -35,14 +36,17 @@ const PopoverMenu: React.FC<PopoverMenuProps> = ({ label, trigger, items, trigge
     const triggerRef = useRef<HTMLButtonElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (!open) return;
-        const close = (event: MouseEvent) => {
+    useWindowEvent(
+        'mousedown',
+        (event) => {
+            if (!open) return;
             if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-        };
-        document.addEventListener('mousedown', close);
-        visibleItems()[0]?.focus();
-        return () => document.removeEventListener('mousedown', close);
+        },
+        'document'
+    );
+
+    useEffect(() => {
+        if (open) visibleItems()[0]?.focus();
     }, [open]);
 
     // Items that a width breakpoint hides have no layout box; arrow keys must skip them.
