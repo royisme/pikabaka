@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## Chosen models: Phase 1 (`legacy-keys`)
+
+- Interactive generation, JSON tasks, suggestions and screenshot analysis collect the Quick answers connection stream; streaming entry points and RAG use the same path. Failures propagate instead of trying another provider or returning an apology.
+- Meeting chat retains role-separated history (including an assistant-ending history) and its abort signal. The optional trailing stream options carry history, signal and a verbatim-prompt flag so RAG retains its existing prompts without knowledge-mode or language additions. All three connection SDKs receive cancellation; missing image files fail instead of silently becoming text-only.
+- Windowless regression tests mock provider SDKs; Google's auth dependency cannot load on Node 26 because it references removed SlowBuffer. No app or real provider ran. Legacy translation and now-unused provider-client infrastructure remain for Phase 2.
+- Checks: renderer tsc 0, Electron tsc 0, full tap 1 (1185 passing assertions; only the known missing DOCX fixture fails), lint 0. Warnings: 1098 to 1081 overall; touched files 76 to 59, no file increases. No uncertain deletion.
+- Owner: check text-only and screenshot quick actions, suggestions and RAG chat, including follow-up history and Stop. Summaries, translation and all three model test buttons require owner runtime acceptance after the remaining phases.
+
 ## 2026-10-26: calendar feature removed (branch `drop-calendar`, A7.1)
 
 - Removed the service, OAuth/token code, reminders, six IPC handlers, both preload surfaces/types, connection button, launcher events/preparation UI and follow-up attendee suggestions. Meeting-list refresh, manual start, transcript email lookup and the email modal remain. No calendar-only credential lived in `CredentialsManager`; STT credentials stay unchanged.

@@ -259,67 +259,6 @@ export function registerRagHandlers(appState: AppState): void {
     activeChatStreams.set(requestId, abortController);
 
     try {
-      const cm = CredentialsManager.getInstance();
-      const use = cm.resolveModelUse('chat');
-      if ('error' in use) throw new Error(use.error);
-      const currentModel = use.model;
-
-      // Build provider model using AI SDK based on model prefix
-      const { streamText } = await import('ai');
-      let providerModel: any;
-
-      if (currentModel.startsWith('gemini-')) {
-        const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
-        const apiKey = cm.getGeminiApiKey();
-        if (!apiKey) throw new Error('Gemini API key not configured');
-        const google = createGoogleGenerativeAI({ apiKey });
-        providerModel = google(currentModel);
-
-      } else if (currentModel.startsWith('gpt-') || currentModel.startsWith('o1') || currentModel.startsWith('o3') || currentModel.startsWith('o4')) {
-        const { createOpenAI } = await import('@ai-sdk/openai');
-        const apiKey = cm.getOpenaiApiKey();
-        if (!apiKey) throw new Error('OpenAI API key not configured');
-        const openai = createOpenAI({ apiKey });
-        providerModel = openai(currentModel);
-
-      } else if (currentModel.startsWith('claude-')) {
-        const { createAnthropic } = await import('@ai-sdk/anthropic');
-        const apiKey = cm.getClaudeApiKey();
-        if (!apiKey) throw new Error('Anthropic API key not configured');
-        const anthropic = createAnthropic({ apiKey });
-        providerModel = anthropic(currentModel);
-
-      } else if (currentModel.startsWith('llama-') || currentModel.startsWith('groq-') || currentModel.startsWith('mixtral') || currentModel.startsWith('whisper')) {
-        const { createGroq } = await import('@ai-sdk/groq');
-        const apiKey = cm.getGroqApiKey();
-        if (!apiKey) throw new Error('Groq API key not configured');
-        const groq = createGroq({ apiKey });
-        providerModel = groq(currentModel);
-
-      } else if (currentModel.startsWith('ollama-') || currentModel.startsWith('ollama:')) {
-        const { createOpenAI } = await import('@ai-sdk/openai');
-        const ollamaModelName = currentModel.replace(/^ollama[-:]/, '');
-        const openai = createOpenAI({ baseURL: 'http://localhost:11434/v1', apiKey: 'ollama' });
-        providerModel = openai(ollamaModelName);
-
-      } else {
-        // Try OpenAI-compatible custom providers
-        const compatProviders = cm.getOpenAICompatibleProviders() as Array<{ id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }>;
-        const matchedProvider = compatProviders.find((p: { id: string; preferredModel?: string }) => p.preferredModel === currentModel || p.id === currentModel);
-        if (matchedProvider) {
-          const { createOpenAI } = await import('@ai-sdk/openai');
-          const openai = createOpenAI({ baseURL: matchedProvider.baseUrl, apiKey: matchedProvider.apiKey });
-          providerModel = openai(matchedProvider.preferredModel || currentModel);
-        } else {
-          // Fallback: attempt as Gemini
-          const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
-          const apiKey = cm.getGeminiApiKey();
-          if (!apiKey) throw new Error(`No provider matched for model: ${currentModel}`);
-          const google = createGoogleGenerativeAI({ apiKey });
-          providerModel = google('gemini-2.0-flash');
-        }
-      }
-
       let meetingContext = context ?? '';
       if (!meetingContext && meetingId) {
         const meeting = DatabaseManager.getInstance().getMeetingDetails(meetingId);
@@ -348,14 +287,15 @@ export function registerRagHandlers(appState: AppState): void {
 
 ${meetingContext || ''}`;
 
-      const result = streamText({
-        model: providerModel,
-        system: systemPrompt,
-        messages: messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-        abortSignal: abortController.signal,
-      });
+      const llmHelper = appState.processingHelper.getLLMHelper();
+      const lastMessage = messages[messages.length - 1];
+      const endsWithUser = lastMessage.role === 'user';
+      const stream = llmHelper.streamChat(
+        endsWithUser ? lastMessage.content : undefined, undefined, undefined, systemPrompt,
+        { history: endsWithUser ? messages.slice(0, -1) : messages, signal: abortController.signal, verbatimPrompt: true }
+      );
 
-      for await (const chunk of result.textStream) {
+      for await (const chunk of stream) {
         if (abortController.signal.aborted) break;
         sender.send('chat:stream-chunk', { requestId, chunk });
       }
@@ -368,7 +308,7 @@ ${meetingContext || ''}`;
 
     } catch (error: any) {
       if (error.name !== 'AbortError') {
-        console.error('[chat:stream-meeting] Error:', error);
+        console.error('[chat:stream-meeting] Request failed');
         sender.send('chat:stream-error', { requestId, error: error.message || 'Unknown error' });
       }
       return { success: false, error: error.message };
