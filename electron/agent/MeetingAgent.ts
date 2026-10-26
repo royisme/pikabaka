@@ -9,10 +9,12 @@ import type { MeetingToolDeps } from './tools/meetingTools';
 import { loadAgentRuntime } from './loader';
 import { meetingContext, MEETING_INSTRUCTIONS } from './context';
 import { createMeetingTools } from './tools/meetingTools';
+import { createLocalTools, type LocalToolDeps } from './tools/localTools';
 import { gateLogFile } from './gateLog';
 
 export interface AgentDeps extends MeetingToolDeps {
   userDataDir: string;
+  local: LocalToolDeps;
   getModelConfigSource(): ModelConfigSource;
 }
 export type MeetingAgentEvent = { meetingId: string } & (
@@ -125,6 +127,7 @@ export class MeetingAgent {
     const storage = await runtime.sqlite.openNodeSqliteStorage(this.file(meetingId));
     const registry = runtime.durable.createRegistry();
     const tools = createMeetingTools(runtime, meetingId, this.deps);
+    const localTools = createLocalTools(runtime, meetingId, this.deps.local);
     const images = runtime.durable.defineExtension({ name: 'meeting.images', tools: [tools.screenshot] });
     const emptyModels = runtime.models.createModels();
     let owned: OwnedStore | undefined;
@@ -150,7 +153,7 @@ export class MeetingAgent {
     };
     registry.install(runtime.durable.defineExtension({
       name: 'meeting.chat',
-      tools: tools.transcript,
+      tools: [...tools.transcript, ...localTools],
       sections: [runtime.durable.section('meeting', () => MEETING_INSTRUCTIONS, { tag: false })],
       hooks: [runtime.durable.hook(runtime.durable.GenerationTask, {
         beforeRequest: meetingContext(meetingId, this.deps.recentSegments, runtime),
@@ -263,6 +266,7 @@ export class MeetingAgent {
   }
 
   async abort(meetingId: string): Promise<void> {
+    this.deps.local.broker.denyAll(meetingId);
     const slot = this.stores.get(meetingId);
     if (!slot || slot.closing) return;
     const store = await slot.opening;
@@ -305,6 +309,7 @@ export class MeetingAgent {
   stop(meetingId: string): Promise<void> { return this.stopWithin(meetingId, 3000); }
 
   private stopWithin(meetingId: string, timeoutMs: number): Promise<void> {
+    this.deps.local.broker.denyAll(meetingId);
     this.stopped.add(meetingId);
     const slot = this.stores.get(meetingId);
     if (!slot) return Promise.resolve();

@@ -64,6 +64,8 @@ export interface StoredCredentials {
     /** Recognition language key (RECOGNITION_LANGUAGES) or 'auto' */
     transcriptTranslationSourceLanguage?: string;
     transcriptTranslationTargetLanguage?: string;
+    /** The one folder the agent's commands run under (a folder per day and per meeting inside it). */
+    agentWorkspaceRoot?: string;
     // Proactive help: the decision model (a System One classifier) behind the gate
     agentGateMode?: 'log' | 'on' | 'off';
     agentGateModel?: string;
@@ -189,6 +191,16 @@ export class CredentialsManager {
     // The language the user speaks; follows the other party's language until set on its own.
     public getSttLanguageUser(): string {
         return this.credentials.sttLanguageUser || this.getSttLanguage();
+    }
+
+    public getAgentWorkspaceRoot(): string {
+        return this.credentials.agentWorkspaceRoot || '';
+    }
+
+    public setAgentWorkspaceRoot(root: string): void {
+        this.credentials.agentWorkspaceRoot = root.trim() || undefined;
+        this.saveCredentials();
+        console.log('[CredentialsManager] Agent workspace root updated');
     }
 
     public getAgentGateMode(): 'log' | 'on' | 'off' {

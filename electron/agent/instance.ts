@@ -9,10 +9,14 @@ import { resolveAgentModel, createGateClassify } from './models';
 import { Gate, type GateClassify, type GateDecision } from './gate';
 import { runAssist, type AssistCard } from './assist';
 import { randomUUID } from 'node:crypto';
+import { ApprovalBroker } from './approval';
 import { appendGateDecision } from './gateLog';
 import { reportAgentError } from './MeetingAgent';
 
 let instance: MeetingAgent | undefined;
+const broker = new ApprovalBroker();
+
+export function getApprovalBroker(): ApprovalBroker { return broker; }
 
 export function getMeetingAgent(): MeetingAgent {
   if (instance) return instance;
@@ -20,6 +24,12 @@ export function getMeetingAgent(): MeetingAgent {
   let vectorStore: VectorStore | undefined;
   instance = new MeetingAgent({
     userDataDir: app.getPath('userData'),
+    local: {
+      broker,
+      getRoot: () => CredentialsManager.getInstance().getAgentWorkspaceRoot(),
+      getStartTimeMs: meetingId => DatabaseManager.getInstance().getMeetingDetails(meetingId)?.startTimeMs ?? Date.now(),
+      dataDir: app.getPath('userData'),
+    },
     getModelConfigSource: () => ({ resolve: () => resolveAgentModel(state.processingHelper.getLLMHelper(), CredentialsManager.getInstance()) }),
     recentSegments: (id, sinceMs) => DatabaseManager.getInstance().getRecentSegments(id, sinceMs),
     searchSegments: (id, query, limit) => DatabaseManager.getInstance().searchSegments(id, query, limit),

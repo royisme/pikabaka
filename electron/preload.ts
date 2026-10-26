@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron"
 
 // Types for the exposed Electron API
+interface AgentApprovalRequest { id: string; meetingId: string; tool: 'bash' | 'write' | 'edit' | 'read'; target: string; detail?: string; folder: string; outside?: boolean }
+type AgentApprovalEvent = { type: 'requested'; request: AgentApprovalRequest } | { type: 'settled'; id: string; allowed: boolean }
 interface AgentProactiveCard { id: string; meetingId: string; segmentId: string; kind: string; text: string; time: number }
 interface AgentGateDecision {
   time: number; meetingId: string; segmentId: string; revision: number; model: string; threshold: number; cooldownSeconds: number
@@ -72,6 +74,12 @@ interface ElectronAPI {
   agentGateStatus: () => Promise<{ mode: 'log' | 'on' | 'off'; configured: boolean; state: 'ok' | 'unavailable' | 'unconfigured'; reason?: string; lastDecision?: AgentGateDecision }>
   agentGateLog: () => Promise<AgentGateDecision[]>
   onAgentProactive: (callback: (card: AgentProactiveCard) => void) => () => void
+  agentApprovalsList: () => Promise<AgentApprovalRequest[]>
+  agentApprovalRespond: (payload: { id: string; allowed: boolean }) => Promise<{ success: boolean }>
+  onAgentApproval: (callback: (event: AgentApprovalEvent) => void) => () => void
+  agentWorkspaceGet: () => Promise<{ root: string; error?: string }>
+  agentWorkspacePick: () => Promise<{ canceled: boolean; root?: string; error?: string }>
+  agentWorkspaceClear: () => Promise<{ success: boolean }>
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string }>
 
   // STT Provider Management
@@ -568,6 +576,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("agent-proactive", subscription)
     return () => { ipcRenderer.removeListener("agent-proactive", subscription) }
   },
+  agentApprovalsList: () => ipcRenderer.invoke("agent-approvals-list"),
+  agentApprovalRespond: (payload: { id: string; allowed: boolean }) => ipcRenderer.invoke("agent-approval-respond", payload),
+  onAgentApproval: (callback: (event: AgentApprovalEvent) => void) => {
+    const subscription = (_: any, event: AgentApprovalEvent) => callback(event)
+    ipcRenderer.on("agent-approval", subscription)
+    return () => { ipcRenderer.removeListener("agent-approval", subscription) }
+  },
+  agentWorkspaceGet: () => ipcRenderer.invoke("agent-workspace-get"),
+  agentWorkspacePick: () => ipcRenderer.invoke("agent-workspace-pick"),
+  agentWorkspaceClear: () => ipcRenderer.invoke("agent-workspace-clear"),
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) =>
     ipcRenderer.invoke("translate-transcript-segment", segment),
 

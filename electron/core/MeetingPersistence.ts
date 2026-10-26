@@ -3,6 +3,7 @@
 // Extracted from IntelligenceManager to decouple DB operations from LLM orchestration.
 
 import { summarizeMeeting } from './meetingSummary';
+import { renameMeetingFolder } from '../agent/workspace';
 import { SessionTracker, TranscriptSegment } from './SessionTracker';
 import { LLMHelper } from './LLMHelper';
 import { DatabaseManager, Meeting } from '../db/DatabaseManager';
@@ -251,6 +252,9 @@ export class MeetingPersistence {
                     source
                 });
             }
+
+            // The meeting folder carries the title from now on (renamed once; a missing folder is fine).
+            void renameMeetingFolder(meetingId, title).catch(() => {});
 
             // Metadata was already snapshotted before session.reset() — nothing to clear here.
 
