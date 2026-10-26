@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: U2 no synthetic user bubble (branch `drop-synthetic-bubble`, issue #21)
+
+Done
+- `src/lib/userEcho.ts`: a typed prompt is echoed as the user turn; a quick action echoes nothing, or only the attached screenshot (empty text) when one is attached. `submitPrompt` now takes `echoPrompt` (default true) instead of `addUserMessage`; what-to-say passes false; code hint and brainstorm use the same helper, so their fixed sentences ("Give me a code hint for this", "Brainstorm with this context") are gone too.
+- Verified: both `tsc --noEmit` checks exit 0; tap 367 of 367 (8 new assertions in `test/user-echo.test.ts`).
+- Not verified: how it looks. A screenshot-only bubble still renders the "Screenshot attached" label with a rule under it and no text; check it in the running app. The "Re: ..." line from #21 is not done; it moved to U5.
+- Clarify, recap, follow-up questions and brainstorm without a screenshot never added a bubble (they use their own IPC channels); only what-to-say went through `submitPrompt` with the default.
+
 ## 2026-10-26: U1 scroll-follow (branch `fix-scroll-follow`, issue #20)
 
 Done

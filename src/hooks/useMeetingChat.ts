@@ -3,6 +3,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { electronChatFetch } from '../lib/electronChatFetch';
 import { analytics } from '../lib/analytics/analytics.service';
+import { userEchoMessage } from '../lib/userEcho';
 
 export type Message = {
   id: string;
@@ -451,7 +452,7 @@ export function useMeetingChat() {
     userText,
     attachments,
     clearAttachments = true,
-    addUserMessage = true,
+    echoPrompt = true,
     placeholderIntent,
     skipRag = false,
     streamOptions,
@@ -459,7 +460,8 @@ export function useMeetingChat() {
     userText: string;
     attachments?: Array<{ path: string; preview: string }>;
     clearAttachments?: boolean;
-    addUserMessage?: boolean;
+    /** False for a quick action: the prompt text is the app's, not the user's, so it is not shown. */
+    echoPrompt?: boolean;
     placeholderIntent?: string;
     skipRag?: boolean;
     streamOptions?: { skipSystemPrompt?: boolean };
@@ -471,24 +473,10 @@ export function useMeetingChat() {
     if (!promptText && currentAttachments.length === 0) return;
     if (clearAttachments) setAttachedContext([]);
 
-    console.log('[submitPrompt] entry', { promptText: promptText.slice(0, 60), placeholderIntent, addUserMessage, attachments: currentAttachments.length });
+    console.log('[submitPrompt] entry', { promptText: promptText.slice(0, 60), placeholderIntent, echoPrompt, attachments: currentAttachments.length });
 
-    if (addUserMessage) {
-      setSystemMessages((prev) => {
-        const next = [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            role: 'user' as const,
-            text: promptText,
-            hasScreenshot: currentAttachments.length > 0,
-            screenshotPreview: currentAttachments[0]?.preview,
-          },
-        ];
-        console.log('[submitPrompt] added user msg, systemMessages count =', next.length);
-        return next;
-      });
-    }
+    const echo = userEchoMessage({ id: Date.now().toString(), promptText, echoPrompt, attachments: currentAttachments });
+    if (echo) setSystemMessages((prev) => [...prev, echo]);
 
     setSystemMessages((prev) => {
       const next = [
@@ -547,6 +535,7 @@ export function useMeetingChat() {
         ? 'What should I say about this?'
         : 'What should I say in response to the latest interviewer context?',
       placeholderIntent: 'what_to_answer',
+      echoPrompt: false,
     });
   }, [submitPrompt, attachedContext.length]);
 
@@ -572,16 +561,8 @@ export function useMeetingChat() {
     const currentAttachments = attachedContext;
     if (currentAttachments.length > 0) {
       setAttachedContext([]);
-      setSystemMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          role: 'user',
-          text: 'Give me a code hint for this',
-          hasScreenshot: true,
-          screenshotPreview: currentAttachments[0].preview,
-        },
-      ]);
+      const echo = userEchoMessage({ id: Date.now().toString(), promptText: '', echoPrompt: false, attachments: currentAttachments });
+      if (echo) setSystemMessages((prev) => [...prev, echo]);
     }
 
     try {
@@ -635,16 +616,8 @@ export function useMeetingChat() {
 
     if (currentAttachments.length > 0) {
       setAttachedContext([]);
-      setSystemMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          role: 'user',
-          text: 'Brainstorm with this context',
-          hasScreenshot: true,
-          screenshotPreview: currentAttachments[0].preview,
-        },
-      ]);
+      const echo = userEchoMessage({ id: Date.now().toString(), promptText: '', echoPrompt: false, attachments: currentAttachments });
+      if (echo) setSystemMessages((prev) => [...prev, echo]);
     }
 
     try {
