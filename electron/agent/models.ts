@@ -56,6 +56,16 @@ export async function createAgentModels(credentials: Credentials): Promise<Model
   return models;
 }
 
+// Pika lets the user pick any model of a provider; the agent runs the picked model when pi-ai knows it,
+// otherwise that provider's default, so a key is all that decides whether the agent works.
+function providerOf(id: string): 'google' | 'groq' | 'openai' | 'anthropic' | undefined {
+  if (id.startsWith('gemini-') || id.startsWith('models/')) return 'google';
+  if (id.startsWith('claude-')) return 'anthropic';
+  if (id.startsWith('gpt-') || id.startsWith('o1-') || id.startsWith('o3-') || id.includes('openai')) return 'openai';
+  if (id.startsWith('llama-') || id.startsWith('mixtral-') || id.startsWith('gemma-')) return 'groq';
+  return undefined;
+}
+
 export async function resolveAgentModel(
   llmHelper: Pick<LLMHelper, 'getCurrentModel' | 'isUsingOllama'>,
   credentials?: CredentialsManager,
@@ -65,12 +75,14 @@ export async function resolveAgentModel(
   const id = llmHelper.getCurrentModel();
   const cm = credentials ?? (await import('../services/CredentialsManager.js')).CredentialsManager.getInstance();
   if (cm.getMergedLlmCustomProviders().some(provider => provider.id === id)) return unsupported;
-  const entry = AGENT_MODELS.find(entry => entry.pikaModel === id);
-  if (!entry?.supportsTools) return unsupported;
-  const credential = await createAgentCredentialStore(cm).read(entry.provider);
+  const provider = providerOf(id);
+  const fallback = AGENT_MODELS.find(entry => entry.provider === provider);
+  if (!provider || !fallback?.supportsTools) return unsupported;
+  const credential = await createAgentCredentialStore(cm).read(provider);
   if (credential?.type !== 'api_key' || !credential.key) return { ok: false, reason: 'API key not configured for the agent' };
   const models = await createAgentModels(cm);
-  const catalogModel: Model<Api> | undefined = models.getModel(entry.provider, entry.modelId);
+  const modelId = models.getModel(provider, id) ? id : fallback.modelId;
+  const catalogModel: Model<Api> | undefined = models.getModel(provider, modelId);
   if (!catalogModel) return unsupported;
-  return { ok: true, model: { models, ref: { provider: entry.provider, modelId: entry.modelId }, supportsImages: entry.supportsImages } };
+  return { ok: true, model: { models, ref: { provider, modelId }, supportsImages: fallback.supportsImages } };
 }
