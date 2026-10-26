@@ -2,10 +2,12 @@ import ConnectionsSettings from './ConnectionsSettings';
 import ModelUsesSettings from './ModelUsesSettings';
 import ProactiveHelpSettings from './ProactiveHelpSettings';
 import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from 'react-query';
 import * as Select from '@radix-ui/react-select';
-import { Plus, Trash2, Edit2, AlertCircle, CheckCircle, Save, ChevronDown, Check, RefreshCw, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Edit2, AlertCircle, CheckCircle, Save, ChevronDown, Check, RefreshCw } from 'lucide-react';
 import { STANDARD_CLOUD_MODELS, prettifyModelId } from '../../utils/modelUtils';
 import { validateCurl } from '../../lib/curl-validator';
+import { useMainEvent } from '../../hooks/useMainEvent';
 
 interface CustomProvider {
     id: string;
@@ -79,13 +81,24 @@ const ModelSelect: React.FC<ModelSelectProps> = ({ value, options, onChange, pla
 };
 
 export const AIProvidersSettings: React.FC = () => {
-    // --- Standard Providers ---
+    const queryClient = useQueryClient();
 
-    // Status
-    const [hasStoredKey, setHasStoredKey] = useState<Record<string, boolean>>({});
+    // --- Standard Providers ---
+    const { data: creds } = useQuery(['credentials'], () => window.electronAPI?.getStoredCredentials?.());
+    const hasStoredKey: Record<string, boolean> = creds
+        ? {
+            gemini: !!creds.hasGeminiKey,
+            groq: !!creds.hasGroqKey,
+            openai: !!creds.hasOpenaiKey,
+            claude: !!creds.hasClaudeKey
+        }
+        : {};
 
     // --- Custom Providers ---
-    const [customProviders, setCustomProviders] = useState<CustomProvider[]>([]);
+    const { data: customProviders = [] } = useQuery<CustomProvider[]>(
+        ['custom-providers'],
+        () => window.electronAPI?.getCustomProviders?.() ?? Promise.resolve([])
+    );
     const [isEditingCustom, setIsEditingCustom] = useState(false);
     const [editingProvider, setEditingProvider] = useState<CustomProvider | null>(null);
     const [customName, setCustomName] = useState('');
@@ -93,7 +106,11 @@ export const AIProvidersSettings: React.FC = () => {
     const [customResponsePath, setCustomResponsePath] = useState('');
     const [curlError, setCurlError] = useState<string | null>(null);
 
-    const [openaiCompatibleProviders, setOpenaiCompatibleProviders] = useState<OpenAICompatibleProviderRow[]>([]);
+    // --- OpenAI Compatible Providers ---
+    const { data: openaiCompatibleProviders = [] } = useQuery<OpenAICompatibleProviderRow[]>(
+        ['openai-compatible-providers'],
+        () => window.electronAPI?.getOpenAICompatibleProviders?.() ?? Promise.resolve([])
+    );
 
     // --- Local (Ollama) ---
     const [ollamaModels, setOllamaModels] = useState<string[]>([]);
@@ -101,95 +118,53 @@ export const AIProvidersSettings: React.FC = () => {
     const [isRefreshingOllama, setIsRefreshingOllama] = useState(false);
 
     // --- Default Model ---
-    const [defaultModel, setDefaultModel] = useState<string>('gemini-3.1-flash-lite-preview');
-    const [fastResponseMode, setFastResponseMode] = useState(false);
+    const defaultModelQuery = useQuery(
+        ['default-model'],
+        async () => {
+            const result = await window.electronAPI?.getDefaultModel?.();
+            return result?.model;
+        }
+    );
+    const defaultModel = defaultModelQuery.data ?? 'gemini-3.1-flash-lite-preview';
+
+    // --- Groq Fast Text Mode ---
+    const fastModeQuery = useQuery(
+        ['groq-fast-text'],
+        async () => {
+            const fastMode = await window.electronAPI?.getGroqFastTextMode?.();
+            return fastMode?.enabled ?? false;
+        }
+    );
+    const fastResponseMode = fastModeQuery.data ?? false;
+
+    useMainEvent(window.electronAPI?.onGroqFastTextChanged, (enabled: boolean) => {
+        queryClient.setQueryData(['groq-fast-text'], enabled);
+        localStorage.setItem('pika_groq_fast_text', String(enabled));
+    });
 
     // --- Dynamic Model Discovery ---
-    const [preferredModels, setPreferredModels] = useState<Record<string, string>>({});
+    const preferredModels: Record<string, string> = {};
+    if (creds?.geminiPreferredModel) preferredModels.gemini = creds.geminiPreferredModel;
+    if (creds?.groqPreferredModel) preferredModels.groq = creds.groqPreferredModel;
+    if (creds?.openaiPreferredModel) preferredModels.openai = creds.openaiPreferredModel;
+    if (creds?.claudePreferredModel) preferredModels.claude = creds.claudePreferredModel;
 
     // A connection changed: what depends on it (which providers have a key, the OpenAI-compatible list) is read again.
     const refreshAfterConnectionChange = async () => {
-        // @ts-ignore
-        const creds = await window.electronAPI?.getStoredCredentials?.();
-        if (creds) setHasStoredKey({ gemini: creds.hasGeminiKey, groq: creds.hasGroqKey, openai: creds.hasOpenaiKey, claude: creds.hasClaudeKey });
-        // @ts-ignore
-        const oaiList = await window.electronAPI?.getOpenAICompatibleProviders?.();
-        if (oaiList) setOpenaiCompatibleProviders(oaiList);
+        await Promise.all([
+            queryClient.invalidateQueries(['credentials']),
+            queryClient.invalidateQueries(['openai-compatible-providers']),
+        ]);
     };
-
-    // Load Initial Data
-    useEffect(() => {
-        const loadCredentials = async () => {
-            try {                // @ts-ignore
-                const fastMode = await window.electronAPI?.getGroqFastTextMode();
-                if (fastMode) setFastResponseMode(fastMode.enabled);
-
-                // @ts-ignore
-                const creds = await window.electronAPI?.getStoredCredentials?.();
-                if (creds) {
-                    setHasStoredKey({
-                        gemini: creds.hasGeminiKey,
-                        groq: creds.hasGroqKey,
-                        openai: creds.hasOpenaiKey,
-                        claude: creds.hasClaudeKey
-                    });
-                    // Load preferred models
-                    const pm: Record<string, string> = {};
-                    if (creds.geminiPreferredModel) pm.gemini = creds.geminiPreferredModel;
-                    if (creds.groqPreferredModel) pm.groq = creds.groqPreferredModel;
-                    if (creds.openaiPreferredModel) pm.openai = creds.openaiPreferredModel;
-                    if (creds.claudePreferredModel) pm.claude = creds.claudePreferredModel;
-                    setPreferredModels(pm);
-                }
-
-                // @ts-ignore
-                const custom = await window.electronAPI?.getCustomProviders();
-                if (custom) {
-                    setCustomProviders(custom);
-                }
-
-                // @ts-ignore
-                const oaiList = await window.electronAPI?.getOpenAICompatibleProviders?.();
-                if (oaiList) {
-                    setOpenaiCompatibleProviders(oaiList);
-                }
-
-                // Load persisted default model
-                // @ts-ignore
-                const result = await window.electronAPI?.getDefaultModel();
-                if (result && result.model) {
-                    setDefaultModel(result.model);
-                }
-
-                // Check Ollama
-                checkOllama();
-
-            } catch (e) {
-                console.error("Failed to load settings:", e);
-            }
-        };
-        loadCredentials();
-
-        // Listen for changes from other windows (2-way sync)
-        if (window.electronAPI?.onGroqFastTextChanged) {
-            // @ts-ignore
-            const unsubscribe = window.electronAPI.onGroqFastTextChanged((enabled: boolean) => {
-                setFastResponseMode(enabled);
-                localStorage.setItem('pika_groq_fast_text', String(enabled));
-            });
-            return () => unsubscribe();
-        }
-    }, []);
 
     // Effect to enforce fast mode disabled if no Groq key
     useEffect(() => {
-        if (!hasStoredKey.groq && fastResponseMode) {
-            setFastResponseMode(false);
+        if (creds && !hasStoredKey.groq && fastResponseMode) {
+            queryClient.setQueryData(['groq-fast-text'], false);
             localStorage.setItem('pika_groq_fast_text', 'false');
-            // @ts-ignore
-            window.electronAPI?.setGroqFastTextMode(false);
+            window.electronAPI?.setGroqFastTextMode?.(false);
         }
-    }, [hasStoredKey.groq, fastResponseMode]);
+    }, [creds, hasStoredKey.groq, fastResponseMode, queryClient]);
 
     // Poll for Ollama status every 3 seconds requesting smart start on mount
     useEffect(() => {
@@ -307,9 +282,7 @@ export const AIProvidersSettings: React.FC = () => {
             const result = await window.electronAPI.saveCustomProvider(newProvider);
             if (result.success) {
                 // Refresh list
-                // @ts-ignore
-                const updated = await window.electronAPI.getCustomProviders();
-                setCustomProviders(updated);
+                await queryClient.invalidateQueries(['custom-providers']);
                 setIsEditingCustom(false);
             } else {
                 setCurlError(result.error ?? null);
@@ -325,9 +298,7 @@ export const AIProvidersSettings: React.FC = () => {
             // @ts-ignore
             const result = await window.electronAPI.deleteCustomProvider(id);
             if (result.success) {
-                // @ts-ignore
-                const updated = await window.electronAPI.getCustomProviders();
-                setCustomProviders(updated);
+                await queryClient.invalidateQueries(['custom-providers']);
             }
         } catch (e) {
             console.error("Failed to delete provider:", e);
@@ -372,9 +343,8 @@ export const AIProvidersSettings: React.FC = () => {
                             return opts;
                         })()}
                         onChange={(val) => {
-                            setDefaultModel(val);
-                            // @ts-ignore - persist as default + update runtime + broadcast
-                            window.electronAPI?.setDefaultModel(val).catch(console.error);
+                            queryClient.setQueryData(['default-model'], val);
+                            window.electronAPI?.setDefaultModel?.(val).catch(console.error);
                         }}
                     />
                 </div>
@@ -401,10 +371,9 @@ export const AIProvidersSettings: React.FC = () => {
                                 return;
                             }
                             const newState = !fastResponseMode;
-                            setFastResponseMode(newState);
+                            queryClient.setQueryData(['groq-fast-text'], newState);
                             localStorage.setItem('pika_groq_fast_text', String(newState));
-                            // @ts-ignore
-                            await window.electronAPI?.setGroqFastTextMode(newState);
+                            await window.electronAPI?.setGroqFastTextMode?.(newState);
                         }}
                         className={`w-11 h-6 rounded-full relative transition-colors ${!hasStoredKey.groq ? 'cursor-not-allowed bg-bg-toggle-switch' : fastResponseMode ? 'bg-state-warning' : 'bg-bg-toggle-switch border border-border-muted'}`}
                     >
