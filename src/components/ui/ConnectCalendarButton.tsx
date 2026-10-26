@@ -19,6 +19,9 @@ const ConnectCalendarButton: React.FC<ConnectCalendarButtonProps> = ({ className
         () => window.electronAPI.getCalendarStatus(),
         {
             enabled: !!window.electronAPI,
+            // The parent was told once when the button first saw a connected calendar; a refetch (window focus) must not tell it again.
+            refetchOnWindowFocus: false,
+            staleTime: Infinity,
             onSuccess: (status) => {
                 if (status?.connected) {
                     onConnectRef.current?.();

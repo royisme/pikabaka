@@ -29,7 +29,10 @@ const InterviewPrepContent: React.FC<InterviewPrepPanelProps> = ({
       const result = await window.electronAPI.knowledgeGeneratePrep(jdId);
       if (!result?.success) throw new Error(result?.error || 'Failed to generate prep');
       return result.data as InterviewPrepData;
-    }
+    },
+    // Generating prep is an AI call: it runs once when the panel opens (the panel's key resets it), never again on
+    // window focus or by itself on failure; the Retry button asks again.
+    { staleTime: Infinity, cacheTime: 0, refetchOnWindowFocus: false, retry: false }
   );
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set([0]));
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
