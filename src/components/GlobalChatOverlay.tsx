@@ -3,6 +3,7 @@ import { useStreamBuffer } from '../hooks/useStreamBuffer';
 import { X, Copy, Check, ArrowUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import pikaIcon from '../../assets/icon.png';
+import { useWindowEvent } from '../hooks/useWindowEvent';
 
 // ============================================
 // Types
@@ -148,15 +149,11 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
     }, [initialQuery]);
 
     // ESC key handler
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && isOpen) {
-                onClose();
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, onClose]);
+    useWindowEvent('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && isOpen) {
+            onClose();
+        }
+    });
 
     // Click outside handler
     const handleBackdropClick = useCallback((e: React.MouseEvent) => {

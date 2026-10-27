@@ -1,3 +1,4 @@
+import { EchoFilter } from './echo-filter';
 import { BrowserWindow, systemPreferences } from "electron"
 import type { AppState } from "../main"
 import { SystemAudioCapture } from "../audio/SystemAudioCapture"
@@ -13,7 +14,10 @@ import {
   bufferFinalTranscriptChunk,
   emitNativeAudioTranscript,
   emitTranscriptWithTranslation,
+  getBufferedTranscriptText,
   handleSpeakerSpeechEnded,
+  mergeTranscriptText,
+  noteTranscriptActivity,
   normalizeTranscriptText,
 } from "./transcript-assembler"
 
@@ -49,7 +53,9 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
   const state = appState as any;
   const { CredentialsManager } = require('../services/CredentialsManager');
   const sttProvider = CredentialsManager.getInstance().getSttProvider();
-  const sttLanguage = CredentialsManager.getInstance().getSttLanguage();
+  const sttLanguage = speaker === 'user'
+    ? CredentialsManager.getInstance().getSttLanguageUser()
+    : CredentialsManager.getInstance().getSttLanguage();
 
   let stt: STTProvider;
 
@@ -116,6 +122,9 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
     stt = new GoogleSTT();
   }
 
+  const sttModel = CredentialsManager.getInstance().getSttModel(sttProvider);
+  if (sttModel && 'setModel' in stt) stt.setModel(sttModel);
+
   stt.setRecognitionLanguage(sttLanguage);
 
   stt.on('transcript', (segment: { text: string, isFinal: boolean, confidence: number, detectedLanguage?: string, boundary?: boolean }) => {
@@ -125,6 +134,22 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
 
     const timestamp = Date.now();
     const trimmed = segment.text?.trim();
+
+    // The speakers can be heard by the microphone: a line of "Me" that repeats what the other party's stream
+    // just produced is that audio again, not the user speaking.
+    if (trimmed) {
+      state.echoFilter ??= new EchoFilter();
+      const echoFilter = state.echoFilter as EchoFilter;
+      if (speaker === 'interviewer') {
+        echoFilter.noteOther(trimmed, timestamp);
+      } else if (echoFilter.isEcho(trimmed, timestamp)) {
+        state.echoLinesDropped = (state.echoLinesDropped ?? 0) + 1;
+        if (state.echoLinesDropped % 25 === 1) {
+          console.log(`[Main] Dropped ${state.echoLinesDropped} microphone lines that repeat the other party's audio (the microphone hears the speakers)`);
+        }
+        return;
+      }
+    }
 
     // Boundary-only events (empty text) must not reach intelligence handling
     if (trimmed) {
@@ -149,10 +174,13 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
         handleSpeakerSpeechEnded(appState, speaker);
       }
     } else if (trimmed) {
+      noteTranscriptActivity(appState, speaker, timestamp);
+      // Final words that are not in a row yet come first, so none of what was said disappears from the live line.
+      const liveText = mergeTranscriptText(appState, getBufferedTranscriptText(appState, speaker), segment.text);
       emitNativeAudioTranscript(appState, {
         speaker,
-        text: segment.text,
-        sourceText: segment.text,
+        text: liveText,
+        sourceText: liveText,
         translatedText: undefined,
         timestamp,
         final: segment.isFinal,
@@ -201,7 +229,8 @@ export function setupSystemAudioPipeline(appState: AppState): void {
     if (!state.microphoneCapture) {
       state.microphoneCapture = new MicrophoneCapture();
       state.microphoneCapture.on('data', (chunk: Buffer) => {
-        state.googleSTT_User?.write(chunk);
+        // Muted: silence of the same length goes on, so the speech service keeps its connection.
+        state.googleSTT_User?.write(state.microphoneMuted ? Buffer.alloc(chunk.length) : chunk);
       });
       state.microphoneCapture.on('speech_ended', () => {
         state.googleSTT_User?.notifySpeechEnded?.();
@@ -350,6 +379,8 @@ export async function translateTranscriptSegment(appState: AppState, segment: {
     segmentId: segment.segmentId,
     speakerLabel: segment.speakerLabel,
     forceTranslate: true,
+    // The turn's current revision: without it a later reopen could not supersede this request.
+    revision: appState.transcriptSegmentRevisions.get(segment.segmentId),
   });
 }
 

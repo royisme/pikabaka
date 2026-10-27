@@ -112,7 +112,7 @@ export function buildFollowUpEmailPromptInput(input: FollowUpEmailInput): string
 }
 
 /**
- * Parse attendee name from calendar data or transcript
+ * Parse recipient name from a full name or email
  * Extracts first name from full name or email
  */
 export function extractRecipientName(attendeeInfo: string): string {

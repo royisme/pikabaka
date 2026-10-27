@@ -1,6 +1,7 @@
 import { app } from "electron"
-import { safeHandle, broadcastOpenAICompatibleProvidersChanged } from "./safeHandle"
+import { safeHandle } from "./safeHandle"
 import { AppState } from "../main"
+import { cancelActiveRagQueries } from "./rag"
 import { DatabaseManager } from "../db/DatabaseManager"
 import * as path from "path"
 import { RECOGNITION_LANGUAGES, AI_RESPONSE_LANGUAGES } from "../config/languages"
@@ -79,9 +80,11 @@ export function registerCoreHandlers(appState: AppState): void {
     return { success: true };
   });
 
-  safeHandle("get-stt-language", async () => {
+  safeHandle("get-stt-language", async (_, speaker?: 'interviewer' | 'user') => {
     const { CredentialsManager } = require('../services/CredentialsManager');
-    return CredentialsManager.getInstance().getSttLanguage();
+    return speaker === 'user'
+      ? CredentialsManager.getInstance().getSttLanguageUser()
+      : CredentialsManager.getInstance().getSttLanguage();
   });
 
   safeHandle("get-ai-response-language", async () => {
@@ -281,12 +284,10 @@ export function registerCoreHandlers(appState: AppState): void {
     try {
       const result = await appState.processingHelper.getLLMHelper().chatWithGemini(message, imagePaths, context, options?.skipSystemPrompt);
 
-      console.log(`[IPC] gemini - chat response: `, result ? result.substring(0, 50) : "(empty)");
-
       // Don't process empty responses
       if (!result || result.trim().length === 0) {
         console.warn("[IPC] Empty response from LLM, not updating IntelligenceManager");
-        return "I apologize, but I couldn't generate a response. Please try again.";
+        throw new Error('The quick answers model returned no text');
       }
 
       // Sync with IntelligenceManager so Follow-Up/Recap work
@@ -305,7 +306,6 @@ export function registerCoreHandlers(appState: AppState): void {
       // 2. Add assistant response and set as last message
       console.log(`[IPC] Updating IntelligenceManager with assistant message...`);
       intelligenceManager.addAssistantMessage(result);
-      console.log(`[IPC] Updated IntelligenceManager.Last message: `, intelligenceManager.getLastAssistantMessage()?.substring(0, 50));
 
       // Log Usage
       intelligenceManager.logUsage('chat', message, result);
@@ -322,7 +322,7 @@ export function registerCoreHandlers(appState: AppState): void {
   // Each new invocation increments the ID; any in-flight iteration bails as soon as it detects
   // that a newer stream has taken over.
 
-  safeHandle("gemini-chat-stream", async (event, message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean }) => {
+  safeHandle("gemini-chat-stream", async (event, message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean; ragMiss?: boolean }) => {
     try {
       console.log("[IPC] gemini-chat-stream started using LLMHelper.streamChat");
       const llmHelper = appState.processingHelper.getLLMHelper();
@@ -341,12 +341,11 @@ export function registerCoreHandlers(appState: AppState): void {
 
       let fullResponse = "";
 
-      // Context Injection for "Answer" button (100s rolling window)
+      // Context Injection for "Answer" button (100s rolling window; 10 minutes when the record had nothing for the question)
       if (!context) {
-        // User requested 100 seconds of context for the answer button
         // Logic: If no explicit context provided (like from manual override), auto-inject from IntelligenceManager
         try {
-          const autoContext = intelligenceManager.getFormattedContext(100);
+          const autoContext = intelligenceManager.getFormattedContext(options?.ragMiss ? 600 : 100);
           if (autoContext && autoContext.trim().length > 0) {
             context = autoContext;
             console.log(`[IPC] Auto - injected 100s context for gemini - chat - stream(${context.length} chars)`);
@@ -354,6 +353,12 @@ export function registerCoreHandlers(appState: AppState): void {
         } catch (ctxErr) {
           console.warn("[IPC] Failed to auto-inject context:", ctxErr);
         }
+      }
+
+      // Nothing in the meeting record or the user's materials matched: tell the model, so it neither pretends it
+      // looked something up nor makes up facts about the user, and answers as an expert would.
+      if (options?.ragMiss) {
+        context = `[No passage of the meeting record or the user's own materials matched this question. Answer from the conversation below and as an expert in the field would, with best practice and the reasoning behind it. Do not invent facts about the user (employers, projects, numbers, events that happened to them); speak about how you would approach it.]\n\n${context ?? ''}`;
       }
 
       try {
@@ -383,7 +388,7 @@ export function registerCoreHandlers(appState: AppState): void {
         }
 
       } catch (streamError: any) {
-        console.error("[IPC] Streaming error:", streamError);
+        console.error("[IPC] Streaming request failed");
         if (_chatStreamId === myStreamId) {
           event.sender.send("gemini-stream-error", streamError.message || "Unknown streaming error");
         }
@@ -392,7 +397,7 @@ export function registerCoreHandlers(appState: AppState): void {
       return null; // Return null as data is sent via events
 
     } catch (error: any) {
-      console.error("[IPC] Error in gemini-chat-stream setup:", error);
+      console.error("[IPC] Chat stream setup failed");
       throw error;
     }
   });
@@ -474,9 +479,27 @@ export function registerCoreHandlers(appState: AppState): void {
     return appState.getWindowHelper().isMainWindowMaximized();
   });
 
+  // Stop the answer being generated: the engine's streams and the chat stream both end at their next token.
+  safeHandle("cancel-generation", () => {
+    appState.getIntelligenceManager().cancelGeneration()
+    cancelActiveRagQueries()
+    _chatStreamId++
+    return { success: true }
+  })
+
   // Settings Window
   safeHandle("toggle-settings-window", (event, { x, y } = {}) => {
     appState.settingsWindowHelper.toggleWindow(x, y)
+  })
+
+  // The quick settings popup has no audio section; the full settings live in the launcher window. Opening
+  // them for a section does not switch window mode, so a running meeting keeps its overlay.
+  safeHandle("open-settings-section", (_event, section: string) => {
+    const launcher = appState.getWindowHelper().getLauncherWindow()
+    if (!launcher || launcher.isDestroyed()) return { success: false }
+    launcher.webContents.send('open-settings-section', { section })
+    appState.getWindowHelper().showLauncherAlongside()
+    return { success: true }
   })
 
   safeHandle("close-settings-window", () => {
@@ -521,7 +544,6 @@ export function registerCoreHandlers(appState: AppState): void {
   safeHandle("set-open-at-login", async (_, openAtLogin: boolean) => {
     app.setLoginItemSettings({
       openAtLogin,
-      openAsHidden: false,
       path: app.getPath('exe') // Explicitly point to executable for production reliability
     });
     return { success: true };
@@ -545,69 +567,6 @@ export function registerCoreHandlers(appState: AppState): void {
     return process.arch;
   });
 
-  // LLM Model Management Handlers
-  safeHandle("get-current-llm-config", async () => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      return {
-        provider: llmHelper.getCurrentProvider(),
-        model: llmHelper.getCurrentModel(),
-        isOllama: llmHelper.isUsingOllama()
-      };
-    } catch (error: any) {
-      // console.error("Error getting current LLM config:", error);
-      throw error;
-    }
-  });
-
-  safeHandle("get-available-ollama-models", async () => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      const models = await llmHelper.getOllamaModels();
-      return models;
-    } catch (error: any) {
-      // console.error("Error getting Ollama models:", error);
-      throw error;
-    }
-  });
-
-  safeHandle("switch-to-ollama", async (_, model?: string, url?: string) => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      await llmHelper.switchToOllama(model, url);
-      return { success: true };
-    } catch (error: any) {
-      // console.error("Error switching to Ollama:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle("force-restart-ollama", async () => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      const success = await llmHelper.forceRestartOllama();
-      return { success };
-    } catch (error: any) {
-      console.error("Error force restarting Ollama:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle('restart-ollama', async () => {
-    try {
-      // First try to kill it if it's running
-      await appState.processingHelper.getLLMHelper().forceRestartOllama();
-
-      // The forceRestartOllama now calls OllamaManager.getInstance().init() internally
-      // so we don't need to do it again here.
-
-      return true;
-    } catch (error: any) {
-      console.error("[IPC restart-ollama] Failed to restart:", error);
-      return false;
-    }
-  });
-
   safeHandle("ensure-ollama-running", async () => {
     try {
       const { OllamaManager } = require('../services/OllamaManager');
@@ -615,253 +574,6 @@ export function registerCoreHandlers(appState: AppState): void {
       return { success: true };
     } catch (error: any) {
       return { success: false, message: error.message };
-    }
-  });
-
-  safeHandle("switch-to-gemini", async (_, apiKey?: string, modelId?: string) => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      await llmHelper.switchToGemini(apiKey, modelId);
-
-      // Persist API key if provided
-      if (apiKey) {
-        const { CredentialsManager } = require('../services/CredentialsManager');
-        CredentialsManager.getInstance().setGeminiApiKey(apiKey);
-      }
-
-      return { success: true };
-    } catch (error: any) {
-      // console.error("Error switching to Gemini:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Dedicated API key setters (for Settings UI Save buttons)
-  safeHandle("set-gemini-api-key", async (_, apiKey: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      CredentialsManager.getInstance().setGeminiApiKey(apiKey);
-
-      // Also update the LLMHelper immediately
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      llmHelper.setApiKey(apiKey);
-
-      // CQ-06 fix: cancel any in-flight LLM stream before swapping LLM clients.
-      // Use resetEngine() (NOT reset()) so session transcript is preserved mid-meeting.
-      // initializeLLMs() now also calls engine.reset() internally for double-safety.
-      appState.getIntelligenceManager().resetEngine();
-      // Re-init IntelligenceManager
-      appState.getIntelligenceManager().initializeLLMs();
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error saving Gemini API key:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle("set-groq-api-key", async (_, apiKey: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      CredentialsManager.getInstance().setGroqApiKey(apiKey);
-
-      // Also update the LLMHelper immediately
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      llmHelper.setGroqApiKey(apiKey);
-
-      // CQ-06 fix: cancel in-flight stream before re-init (engine only, not session)
-      appState.getIntelligenceManager().resetEngine();
-      // Re-init IntelligenceManager
-      appState.getIntelligenceManager().initializeLLMs();
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error saving Groq API key:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle("set-openai-api-key", async (_, apiKey: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      CredentialsManager.getInstance().setOpenaiApiKey(apiKey);
-
-      // Also update the LLMHelper immediately
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      llmHelper.setOpenaiApiKey(apiKey);
-
-      // CQ-06 fix: cancel in-flight stream before re-init (engine only, not session)
-      appState.getIntelligenceManager().resetEngine();
-      // Re-init IntelligenceManager
-      appState.getIntelligenceManager().initializeLLMs();
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error saving OpenAI API key:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle("set-claude-api-key", async (_, apiKey: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      CredentialsManager.getInstance().setClaudeApiKey(apiKey);
-
-      // Also update the LLMHelper immediately
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      llmHelper.setClaudeApiKey(apiKey);
-
-      // CQ-06 fix: cancel in-flight stream before re-init (engine only, not session)
-      appState.getIntelligenceManager().resetEngine();
-      // Re-init IntelligenceManager
-      appState.getIntelligenceManager().initializeLLMs();
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error saving Claude API key:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Custom Provider Handlers
-  safeHandle("get-custom-providers", async () => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      const cm = CredentialsManager.getInstance();
-      // Merge new Curl Providers with legacy Custom Providers
-      // New ones take precedence if IDs conflict (though unlikely as UUIDs)
-      const curlProviders = cm.getCurlProviders();
-      const legacyProviders = cm.getCustomProviders() || [];
-      return [...curlProviders, ...legacyProviders];
-    } catch (error: any) {
-      console.error("Error getting custom providers:", error);
-      return [];
-    }
-  });
-
-  safeHandle("save-custom-provider", async (_, provider: unknown) => {
-    try {
-      // SECURITY FIX (P1-2): Validate provider payload shape before persisting.
-      // Prevents malformed/malicious renderer data from polluting CredentialsManager.
-      if (
-        typeof provider !== 'object' || provider === null ||
-        typeof (provider as any).id !== 'string' ||
-        typeof (provider as any).name !== 'string' ||
-        typeof (provider as any).curlCommand !== 'string'
-      ) {
-        console.error('[IPC] save-custom-provider: invalid payload shape', typeof provider);
-        return { success: false, error: 'Invalid provider payload' };
-      }
-
-      const curlCmd: string = (provider as any).curlCommand;
-      // Require {{TEXT}} so the app always has a defined injection point for the user prompt.
-      // We do NOT require the string to start with 'curl' — curlCommand is a template field,
-      // not necessarily a raw CLI string, and over-constraining it would break valid providers.
-      if (!curlCmd.includes('{{TEXT}}')) {
-        return { success: false, error: 'curlCommand must contain {{TEXT}} placeholder for the prompt' };
-      }
-
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      // Save as CurlProvider (supports responsePath)
-      CredentialsManager.getInstance().saveCurlProvider(provider);
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error saving custom provider:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle("delete-custom-provider", async (_, id: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      const cm = CredentialsManager.getInstance();
-      cm.deleteCurlProvider(id);
-      cm.deleteCustomProvider(id);
-      cm.deleteOpenAICompatibleProvider(id);
-      broadcastOpenAICompatibleProvidersChanged();
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error deleting custom provider:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle("switch-to-custom-provider", async (_, providerId: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      const cm = CredentialsManager.getInstance();
-      const merged = cm.getMergedLlmCustomProviders();
-      const provider = merged.find((p: { id: string }) => p.id === providerId);
-
-      if (!provider) {
-        throw new Error("Provider not found");
-      }
-
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      llmHelper.setModel(providerId, merged);
-
-      appState.getIntelligenceManager().initializeLLMs();
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error switching to custom provider:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-
-  // cURL Provider Handlers
-  safeHandle("get-curl-providers", async () => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      return CredentialsManager.getInstance().getCurlProviders();
-    } catch (error: any) {
-      console.error("Error getting curl providers:", error);
-      return [];
-    }
-  });
-
-  safeHandle("save-curl-provider", async (_, provider: any) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      CredentialsManager.getInstance().saveCurlProvider(provider);
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error saving curl provider:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle("delete-curl-provider", async (_, id: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      CredentialsManager.getInstance().deleteCurlProvider(id);
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error deleting curl provider:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle("switch-to-curl-provider", async (_, providerId: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      const provider = CredentialsManager.getInstance().getCurlProviders().find((p: any) => p.id === providerId);
-
-      if (!provider) {
-        throw new Error("Provider not found");
-      }
-
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      await llmHelper.switchToCurl(provider);
-
-      // Re-init IntelligenceManager (optional, but good for consistency)
-      appState.getIntelligenceManager().initializeLLMs();
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error switching to curl provider:", error);
-      return { success: false, error: error.message };
     }
   });
 
@@ -882,6 +594,7 @@ export function registerCoreHandlers(appState: AppState): void {
         googleServiceAccountPath: creds.googleServiceAccountPath || null,
         sttProvider: creds.sttProvider || 'google',
         groqSttModel: creds.groqSttModel || 'whisper-large-v3-turbo',
+        sttModels: creds.sttModels || {},
         hasSttGroqKey: hasKey(creds.groqSttApiKey),
         hasSttOpenaiKey: hasKey(creds.openAiSttApiKey),
         hasDeepgramKey: hasKey(creds.deepgramApiKey),

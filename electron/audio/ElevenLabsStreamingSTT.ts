@@ -57,6 +57,13 @@ export class ElevenLabsStreamingSTT extends EventEmitter {
     public setAudioChannelCount(_count: number): void {}
 
     /** Recognition language - maps Pika key to ISO-639-1 for ElevenLabs */
+    /** The ElevenLabs model; an empty value keeps the default. */
+    private model = 'scribe_v2_realtime';
+
+    public setModel(model: string): void {
+        if (model.trim()) this.model = model.trim();
+    }
+
     public setRecognitionLanguage(key: string): void {
         const config = RECOGNITION_LANGUAGES[key];
         if (config) {
@@ -202,7 +209,7 @@ export class ElevenLabsStreamingSTT extends EventEmitter {
         console.log(`[ElevenLabsStreaming] Connecting... key=${this.apiKey?.slice(0, 8)}...`);
 
         // raw WebSocket URL with parameters
-        let url = `${ELEVENLABS_WS_URL}?model_id=scribe_v2_realtime&include_timestamps=true&sample_rate=${this.targetSampleRate}`;
+        let url = `${ELEVENLABS_WS_URL}?model_id=${encodeURIComponent(this.model)}&include_timestamps=true&sample_rate=${this.targetSampleRate}`;
         
         // Add language hints to prevent regional language hallucinations
         if (this.languageCode) {

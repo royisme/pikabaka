@@ -25,7 +25,8 @@ export class WhatToAnswerLLM {
         intentResult?: IntentResult,
         imagePaths?: string[]
     ): AsyncGenerator<string> {
-        try {
+        // A failure is not caught here: the engine reports the real reason, and no answer is made up.
+        {
             // Build a rich message context
             // Note: We can't easily inject the complex temporal/intent logic into universal prompt *variables* 
             // but we can prepend it to the message.
@@ -56,10 +57,6 @@ ANSWER SHAPE: ${intentResult.answerShape}
             // We should use UNIVERSAL_WHAT_TO_ANSWER_PROMPT as override
 
             yield* this.llmHelper.streamChat(fullMessage, imagePaths, undefined, UNIVERSAL_WHAT_TO_ANSWER_PROMPT);
-
-        } catch (error) {
-            console.error("[WhatToAnswerLLM] Stream failed:", error);
-            yield "Could you repeat that? I want to make sure I address your question properly.";
         }
     }
 }

@@ -1,3 +1,8 @@
+import { classifyTranslationError } from "../transcript/translationError";
+import { formatTranslationTiming } from "../transcript/translationStream";
+import { splitAtLastSentence } from "../transcript/sentences";
+import { ParagraphQueue } from "../transcript/paragraphs";
+import { SpeculativeTranslations } from "../transcript/speculativeTranslation";
 import type { AppState } from "../main"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { isTranscriptTranslationConfigured, isSameLanguage } from "../transcript/translationExecutor"
@@ -13,6 +18,8 @@ export interface BufferedTranscriptTurn {
   flushTimer: NodeJS.Timeout | null;
   detectedLanguage?: string;
   revision: number;
+  /** When the speech provider last reported words that are not final yet: the speaker is still talking. */
+  lastActivityAt?: number;
 }
 
 export interface FlushedTranscriptTurn {
@@ -37,9 +44,6 @@ export interface TranscriptAssemblerThresholds {
   fragmentFlushDelayMs: number;
   speechEndedSentenceFlushMs: number;
   speechEndedFragmentFlushMs: number;
-  /** Minimum word count before a sentence-ending can trigger the shorter flush delay.
-   *  Segments with fewer words use fragmentFlushDelayMs even if they end with punctuation. */
-  minWordsBeforeSentenceFlush: number;
   maxTurnDurationMs: number;
   /** How long (from lastUpdatedAt) a flushed non-sentence-final turn stays reopenable. */
   reopenWindowMs: number;
@@ -54,7 +58,6 @@ const TRANSCRIPT_ASSEMBLER_THRESHOLDS: Record<TranscriptAssemblerProfile, Transc
     fragmentFlushDelayMs: 2600,
     speechEndedSentenceFlushMs: 260,
     speechEndedFragmentFlushMs: 1100,
-    minWordsBeforeSentenceFlush: 18,
     maxTurnDurationMs: 0,
     reopenWindowMs: 6500,
   },
@@ -64,7 +67,6 @@ const TRANSCRIPT_ASSEMBLER_THRESHOLDS: Record<TranscriptAssemblerProfile, Transc
     fragmentFlushDelayMs: 1450,
     speechEndedSentenceFlushMs: 120,
     speechEndedFragmentFlushMs: 500,
-    minWordsBeforeSentenceFlush: 8,
     maxTurnDurationMs: 0,
     reopenWindowMs: 4000,
   },
@@ -74,7 +76,6 @@ const TRANSCRIPT_ASSEMBLER_THRESHOLDS: Record<TranscriptAssemblerProfile, Transc
     fragmentFlushDelayMs: 5000,
     speechEndedSentenceFlushMs: 400,
     speechEndedFragmentFlushMs: 1500,
-    minWordsBeforeSentenceFlush: 10,
     maxTurnDurationMs: 30000,
     reopenWindowMs: 9500,
   },
@@ -89,6 +90,15 @@ export function getTranscriptAssemblerThresholds(appState: AppState): Transcript
     ? appState.transcriptAssemblerProfile
     : DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE;
   return TRANSCRIPT_ASSEMBLER_THRESHOLDS[profile];
+}
+
+/** A result for a revision that is no longer the segment's latest must be dropped. Results without a revision are never superseded. */
+export function isSupersededRevision(
+  latest: ReadonlyMap<string, number>,
+  segmentId: string,
+  revision: number | undefined
+): boolean {
+  return revision !== undefined && latest.get(segmentId) !== revision;
 }
 
 export function emitNativeAudioTranscript(appState: AppState, payload: any): void {
@@ -196,9 +206,46 @@ export function scheduleBufferedTranscriptFlush(appState: AppState, speaker: Tra
   if (buffer.flushTimer) {
     clearTimeout(buffer.flushTimer);
   }
-  buffer.flushTimer = setTimeout(() => {
-    void flushBufferedTranscriptTurn(appState, speaker);
-  }, delayMs);
+  buffer.flushTimer = setTimeout(() => flushWhenQuiet(appState, speaker), delayMs);
+}
+
+/** The turn holds a finished sentence: it cannot grow any more, so it is shown soon. */
+function hasFinishedSentence(text: string): boolean {
+  return splitAtLastSentence(text).finished !== '';
+}
+
+/** While the speaker is still talking, a turn that stops mid-sentence is held rather than flushed. */
+const SPEAKING_HOLD_MS = 1500;
+const SPEAKING_RECHECK_MS = 500;
+/** A turn is never held longer than this, for speech that has no punctuation. */
+const MAX_HOLD_MS = 20000;
+
+function flushWhenQuiet(appState: AppState, speaker: TranscriptSpeaker): void {
+  const buffer = (appState as any).transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
+  if (!buffer) return;
+  const now = Date.now();
+  const speaking = now - (buffer.lastActivityAt ?? 0) < SPEAKING_HOLD_MS;
+  // Only a turn with no finished sentence yet is held: with one, the flush shows it and carries the rest on.
+  if (speaking && !splitAtLastSentence(buffer.text).finished && now - buffer.startedAt < MAX_HOLD_MS) {
+    scheduleBufferedTranscriptFlush(appState, speaker, SPEAKING_RECHECK_MS);
+    return;
+  }
+  void flushBufferedTranscriptTurn(appState, speaker);
+}
+
+/** Words that are not final yet were heard: the turn being assembled is still going on. */
+export function noteTranscriptActivity(appState: AppState, speaker: TranscriptSpeaker, timestamp: number): void {
+  const buffer = (appState as any).transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
+  if (!buffer) return;
+  buffer.lastActivityAt = timestamp;
+  // The silence that ends a turn is counted from the last words heard, not from the last final.
+  buffer.lastUpdatedAt = Math.max(buffer.lastUpdatedAt, timestamp);
+}
+
+/** The words of the turn being assembled, which are final but not yet in a row. */
+export function getBufferedTranscriptText(appState: AppState, speaker: TranscriptSpeaker): string {
+  const buffer = (appState as any).transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
+  return buffer ? normalizeTranscriptText(appState, buffer.text) : '';
 }
 
 export function bufferFinalTranscriptChunk(
@@ -216,13 +263,14 @@ export function bufferFinalTranscriptChunk(
 
   let buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   if (buffer && timestamp - buffer.lastUpdatedAt > thresholds.maxSilenceBeforeNewTurnMs) {
-    void flushBufferedTranscriptTurn(appState, speaker);
+    void flushBufferedTranscriptTurn(appState, speaker, { all: true });
     buffer = null;
   }
 
   if (buffer && thresholds.maxTurnDurationMs > 0 && timestamp - buffer.startedAt > thresholds.maxTurnDurationMs) {
     void flushBufferedTranscriptTurn(appState, speaker);
-    buffer = null;
+    // The unfinished sentence at the end stays behind as the turn that goes on.
+    buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   }
 
   if (!buffer) {
@@ -236,6 +284,8 @@ export function bufferFinalTranscriptChunk(
       };
       state.transcriptTurnBuffers[speaker] = buffer;
       state.lastFlushedTranscriptTurns[speaker] = null;
+      // From here the old revision is superseded: a translation still running for it must not be shown.
+      state.transcriptSegmentRevisions.set(buffer.segmentId, buffer.revision);
     } else if (lf) {
       sealFlushedTranscriptTurn(appState, speaker); // superseded: feed RAG now, clear slot
     }
@@ -260,8 +310,7 @@ export function bufferFinalTranscriptChunk(
     if (detectedLanguage) buffer.detectedLanguage = detectedLanguage;
   }
 
-  const wordCount = countTranscriptWords(appState, buffer.text);
-  const isSentenceComplete = endsSentence(appState, buffer.text) && wordCount >= thresholds.minWordsBeforeSentenceFlush;
+  const isSentenceComplete = hasFinishedSentence(buffer.text);
   const flushDelayMs = isSentenceComplete
     ? thresholds.sentenceFlushDelayMs
     : thresholds.fragmentFlushDelayMs;
@@ -273,8 +322,7 @@ export function handleSpeakerSpeechEnded(appState: AppState, speaker: Transcript
   const buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   if (!buffer) return;
   const thresholds = getTranscriptAssemblerThresholds(appState);
-  const wordCount = countTranscriptWords(appState, buffer.text);
-  const isSentenceComplete = endsSentence(appState, buffer.text) && wordCount >= thresholds.minWordsBeforeSentenceFlush;
+  const isSentenceComplete = hasFinishedSentence(buffer.text);
   scheduleBufferedTranscriptFlush(
     appState,
     speaker,
@@ -282,12 +330,22 @@ export function handleSpeakerSpeechEnded(appState: AppState, speaker: Transcript
       ? thresholds.speechEndedSentenceFlushMs
       : thresholds.speechEndedFragmentFlushMs
   );
+  // Only the other party is translated. Start the request now, ahead of the flush that is scheduled above.
+  if (speaker === 'interviewer') startSpeculativeTranslation(appState, buffer);
+}
+
+/** Writes one assembled turn to the meeting record. The write is synchronous, before any translation is awaited. */
+function recordTranscriptTurn(appState: AppState, speaker: TranscriptSpeaker, turn: Pick<BufferedTranscriptTurn, 'segmentId' | 'revision' | 'startedAt'>, text: string): void {
+  appState.recordTranscriptSegment({ segmentId: turn.segmentId, revision: turn.revision, speaker, text, timestampMs: turn.startedAt });
 }
 
 export function resetBufferedTranscriptTurns(appState: AppState): void {
   const state = appState as any;
   for (const speaker of Object.keys(state.transcriptTurnBuffers) as TranscriptSpeaker[]) {
     const buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
+    // A turn still being assembled is written as it stands, so stopping or reconfiguring audio loses nothing.
+    const pendingText = buffer ? normalizeTranscriptText(appState, buffer.text) : '';
+    if (buffer && pendingText) recordTranscriptTurn(appState, speaker, buffer, pendingText);
     if (buffer?.flushTimer) {
       clearTimeout(buffer.flushTimer);
     }
@@ -296,9 +354,18 @@ export function resetBufferedTranscriptTurns(appState: AppState): void {
   }
   state.transcriptSegmentRevisions.clear();
   state.recentTranslatedTurns.length = 0;
+  speculativeTranslations.clear();
+  speculatedTurns.clear();
+  paragraphQueue.clear();
+  if (paragraphTimer) clearTimeout(paragraphTimer);
+  paragraphTimer = null;
 }
 
-export async function flushBufferedTranscriptTurn(appState: AppState, speaker: TranscriptSpeaker): Promise<void> {
+/**
+ * Writes and shows the turn up to its last finished sentence. The unfinished sentence after it is
+ * carried into a new turn, so a row never ends in the middle of a sentence; `all` flushes everything.
+ */
+export async function flushBufferedTranscriptTurn(appState: AppState, speaker: TranscriptSpeaker, options?: { all?: boolean }): Promise<void> {
   const state = appState as any;
   const buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   if (!buffer) return;
@@ -308,15 +375,35 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
   }
   state.transcriptTurnBuffers[speaker] = null;
 
-  const text = normalizeTranscriptText(appState, buffer.text);
+  let text = normalizeTranscriptText(appState, buffer.text);
   if (!text) return;
+
+  const thresholds = getTranscriptAssemblerThresholds(appState);
+  if (!options?.all) {
+    const { finished, rest } = splitAtLastSentence(text);
+    if (finished && rest) {
+      text = finished;
+      state.transcriptTurnBuffers[speaker] = {
+        segmentId: createTranscriptSegmentId(appState, speaker, buffer.lastUpdatedAt),
+        startedAt: buffer.lastUpdatedAt,
+        lastUpdatedAt: buffer.lastUpdatedAt,
+        confidence: buffer.confidence,
+        text: rest,
+        flushTimer: null,
+        detectedLanguage: buffer.detectedLanguage,
+        revision: 1,
+        lastActivityAt: buffer.lastActivityAt,
+      } satisfies BufferedTranscriptTurn;
+      scheduleBufferedTranscriptFlush(appState, speaker, thresholds.fragmentFlushDelayMs);
+    }
+  }
 
   const timestamp = buffer.startedAt || Date.now();
   const confidence = buffer.confidence || 0;
-  const thresholds = getTranscriptAssemblerThresholds(appState);
   const endedSentence = endsSentence(appState, text);
 
   state.transcriptSegmentRevisions.set(buffer.segmentId, buffer.revision);
+  recordTranscriptTurn(appState, speaker, buffer, text);
 
   if (endedSentence) {
     if (state.ragManager) {
@@ -350,6 +437,7 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
   }
 
   if (speaker === 'interviewer') {
+    noteParagraphRow(appState, buffer.segmentId, buffer.revision, text);
     await emitTranscriptWithTranslation(appState, {
       speaker,
       text,
@@ -358,6 +446,7 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
       segmentId: buffer.segmentId,
       detectedLanguage: buffer.detectedLanguage,
       revision: buffer.revision,
+      lastSpeechAt: buffer.lastUpdatedAt,
     });
     return;
   }
@@ -379,6 +468,110 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
   });
 }
 
+/**
+ * Translations started at the speech provider's end-of-utterance signal, before the turn flushes, so
+ * the request is already running when the flush asks for it. See `startSpeculativeTranslation`.
+ */
+const speculativeTranslations = new SpeculativeTranslations();
+
+type TranslationConfig = {
+  displayMode: 'original' | 'translated' | 'both';
+  provider: string;
+  model: string;
+  prompt: string;
+  sourceLanguageKey: string;
+  targetLanguageKey: string;
+  /** The connection chosen for translation (any type and host), when it exists and can be used. */
+  connection?: { type: 'openai' | 'anthropic' | 'gemini'; baseUrl: string; apiKey: string };
+  isConfigured: boolean;
+};
+
+/** `override` is a setting that is shown but not saved yet: the translation test runs on it. */
+function resolveTranslationConfig(
+  forceTranslate: boolean,
+  override?: { provider?: string; model?: string; prompt?: string; targetLanguage?: string }
+): TranslationConfig {
+  const { CredentialsManager } = require('../services/CredentialsManager');
+  const cm = CredentialsManager.getInstance();
+  const provider: string = override?.provider ?? cm.getTranscriptTranslationProvider();
+  const model: string = (override?.model ?? cm.getTranscriptTranslationModel()).trim();
+  const prompt: string = override?.prompt ?? cm.getTranscriptTranslationPrompt();
+  const resolved = cm.resolveConnection(provider);
+  const connection = resolved && cm.isConnectionReady(provider) ? { type: resolved.type, baseUrl: resolved.baseUrl, apiKey: resolved.apiKey } : undefined;
+  const shouldTranslate = forceTranslate ? true : cm.getTranscriptTranslationEnabled();
+  return {
+    displayMode: cm.getTranscriptTranslationDisplayMode(),
+    provider,
+    model,
+    prompt,
+    sourceLanguageKey: cm.getTranscriptTranslationSourceLanguage(),
+    targetLanguageKey: override?.targetLanguage ?? cm.getTranscriptTranslationTargetLanguage(),
+    connection,
+    isConfigured: isTranscriptTranslationConfigured(shouldTranslate, model, prompt) && !!connection,
+  };
+}
+
+/** The text is already in the language it would be translated into. */
+function isSameAsTarget(config: TranslationConfig, detectedLanguage?: string): boolean {
+  const effectiveSource =
+    detectedLanguage || (config.sourceLanguageKey && config.sourceLanguageKey !== 'auto' ? config.sourceLanguageKey : undefined);
+  return !!effectiveSource && isSameLanguage(effectiveSource, config.targetLanguageKey);
+}
+
+/** One translation request for a turn, with the two previous translated turns as context. */
+function runTranslationRequest(
+  appState: AppState,
+  config: TranslationConfig,
+  turn: { text: string; segmentId: string; detectedLanguage?: string; noContext?: boolean },
+  onProgress: (textSoFar: string) => void
+): Promise<string> {
+  const state = appState as any;
+  const recentTurns = turn.noContext ? [] : ((state.recentTranslatedTurns ?? []) as Array<{ segmentId: string; source: string; translation: string }>);
+  const context = recentTurns
+    .filter((t) => t.segmentId !== turn.segmentId)
+    .slice(-2)
+    .map((t) => ({ source: t.source, translation: t.translation }));
+  const baseReq = {
+    model: config.model,
+    prompt: config.prompt,
+    sourceText: turn.text,
+    sourceLanguageKey: config.sourceLanguageKey,
+    targetLanguageKey: config.targetLanguageKey,
+    detectedLanguageKey: turn.detectedLanguage,
+    context: context.length > 0 ? context : undefined,
+  };
+  const llm = state.processingHelper.getLLMHelper();
+  return llm.translateTranscriptText({ ...baseReq, provider: 'connection', connection: config.connection }, onProgress);
+}
+
+/** A turn this short is not worth a request that may be thrown away. */
+const MIN_WORDS_TO_SPECULATE = 3;
+
+/** Turns (segment and revision) that already had a speculative request: a turn gets at most one. */
+const speculatedTurns = new Set<string>();
+
+/**
+ * Called when the speech provider says the utterance ended. The turn flushes a moment later; the
+ * translation is started now so that, when the text has not changed by then, the flush finds it
+ * already running. If more words arrive or the turn is merged, the flush makes its own request
+ * and this one is discarded (the revision guard also drops anything for a superseded revision).
+ */
+function startSpeculativeTranslation(appState: AppState, buffer: BufferedTranscriptTurn): void {
+  const whole = normalizeTranscriptText(appState, buffer.text);
+  // Only up to the last finished sentence: that is what the flush will show, and the rest is carried on.
+  const text = splitAtLastSentence(whole).finished || whole;
+  if (countTranscriptWords(appState, text) < MIN_WORDS_TO_SPECULATE) return;
+  const config = resolveTranslationConfig(false);
+  if (!config.isConfigured || isSameAsTarget(config, buffer.detectedLanguage)) return;
+  const turnKey = `${buffer.segmentId}:${buffer.revision}`;
+  if (speculatedTurns.has(turnKey)) return;
+  speculatedTurns.add(turnKey);
+  if (speculatedTurns.size > 64) speculatedTurns.delete(speculatedTurns.values().next().value as string);
+  speculativeTranslations.start(buffer.segmentId, text, (onProgress) =>
+    runTranslationRequest(appState, config, { text, segmentId: buffer.segmentId, detectedLanguage: buffer.detectedLanguage }, onProgress)
+  );
+}
+
 export async function emitTranscriptWithTranslation(appState: AppState, params: {
   speaker: TranscriptSpeaker;
   text: string;
@@ -389,26 +582,14 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
   forceTranslate?: boolean;
   detectedLanguage?: string;
   revision?: number;
+  /** When the last words of this turn were heard; only used to log how long the flush delay was. */
+  lastSpeechAt?: number;
 }): Promise<{ success: boolean; error?: string; translatedText?: string }> {
   const state = appState as any;
-  const { speaker, text, timestamp, confidence, segmentId, speakerLabel, forceTranslate = false, detectedLanguage, revision } = params;
-  const { CredentialsManager } = require('../services/CredentialsManager');
-  const cm = CredentialsManager.getInstance();
-  const displayMode = cm.getTranscriptTranslationDisplayMode();
-  const translationEnabled = cm.getTranscriptTranslationEnabled();
-  const translationModelRaw = cm.getTranscriptTranslationModel();
-  const translationProvider = cm.getTranscriptTranslationProvider();
-  const translationPrompt = cm.getTranscriptTranslationPrompt();
-  const standardProviders = new Set(['ollama', 'gemini', 'groq', 'openai', 'claude']);
-  const oaiCompat = cm.getOpenAICompatibleProviders().find(
-    (p: { id: string }) => p.id === translationProvider
-  );
-  const effectiveTranslationModel =
-    translationModelRaw.trim() || (oaiCompat?.preferredModel?.trim() ?? '');
-  const shouldTranslate = forceTranslate ? true : translationEnabled;
-  const isTranslationConfigured =
-    isTranscriptTranslationConfigured(shouldTranslate, effectiveTranslationModel, translationPrompt) &&
-    (standardProviders.has(translationProvider) ? true : !!oaiCompat);
+  const { speaker, text, timestamp, confidence, segmentId, speakerLabel, forceTranslate = false, detectedLanguage, revision, lastSpeechAt } = params;
+  const config = resolveTranslationConfig(forceTranslate);
+  const { displayMode, provider: translationProvider, model: effectiveTranslationModel } = config;
+  const isTranslationConfigured = config.isConfigured;
 
   const pendingPayload: {
     speaker: TranscriptSpeaker;
@@ -450,10 +631,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
       : { success: true };
   }
 
-  const targetLanguageKey = cm.getTranscriptTranslationTargetLanguage();
-  const sourceLanguageKey = cm.getTranscriptTranslationSourceLanguage();
-  const effectiveSource = detectedLanguage || (sourceLanguageKey && sourceLanguageKey !== 'auto' ? sourceLanguageKey : undefined);
-  if (effectiveSource && isSameLanguage(effectiveSource, targetLanguageKey)) {
+  if (isSameAsTarget(config, detectedLanguage)) {
     const translatedPayloadText = displayMode === 'translated' ? text : text;
     emitNativeAudioTranscript(appState, {
       speaker,
@@ -475,37 +653,63 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
 
   emitNativeAudioTranscript(appState, pendingPayload);
 
+  // Timing is logged as numbers only, never text. firstTokenAt stays null until text arrives.
+  let requestStartedAt = Date.now();
+  let firstTokenAt: number | null = null;
+  let speculative = false;
+  const logTiming = (outcome: 'complete' | 'error', outputChars: number) => {
+    const endedAt = Date.now();
+    console.log(formatTranslationTiming({
+      provider: translationProvider,
+      model: effectiveTranslationModel,
+      flushGapMs: lastSpeechAt === undefined ? null : requestStartedAt - lastSpeechAt,
+      firstTokenMs: firstTokenAt === null ? null : firstTokenAt - requestStartedAt,
+      totalMs: endedAt - requestStartedAt,
+      sourceChars: text.length,
+      outputChars,
+      streamed: firstTokenAt !== null,
+      speculative,
+      outcome,
+    }));
+  };
+
+  // Each report is the whole translation so far; it only ever grows, so the row can show it as final text.
+  const onProgress = (textSoFar: string) => {
+    firstTokenAt ??= Date.now();
+    if (isSupersededRevision(state.transcriptSegmentRevisions, segmentId, revision)) return;
+    emitNativeAudioTranscript(appState, {
+      speaker,
+      text,
+      sourceText: text,
+      translatedText: textSoFar,
+      segmentId,
+      timestamp,
+      final: true,
+      confidence,
+      displayMode,
+      translationState: 'streaming' as const,
+      speakerLabel,
+      detectedLanguage,
+      revision,
+    });
+  };
+
   try {
     const recentTurns = (state.recentTranslatedTurns ?? []) as Array<{ segmentId: string; source: string; translation: string }>;
-    const context = recentTurns
-      .filter((t) => t.segmentId !== segmentId)
-      .slice(-2)
-      .map((t) => ({ source: t.source, translation: t.translation }));
-    const baseReq = {
-      model: effectiveTranslationModel,
-      prompt: translationPrompt,
-      sourceText: text,
-      ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434",
-      sourceLanguageKey,
-      targetLanguageKey,
-      detectedLanguageKey: detectedLanguage,
-      context: context.length > 0 ? context : undefined,
-    };
-    let translatedText: string;
-    if (oaiCompat && !standardProviders.has(translationProvider)) {
-      translatedText = await state.processingHelper.getLLMHelper().translateTranscriptText({
-        ...baseReq,
-        provider: 'openai-compatible',
-        openAICompatible: { baseUrl: oaiCompat.baseUrl, apiKey: oaiCompat.apiKey },
-      });
-    } else {
-      translatedText = await state.processingHelper.getLLMHelper().translateTranscriptText({
-        ...baseReq,
-        provider: translationProvider as 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude',
-      });
+    // A request started at the provider's end-of-utterance signal may already be running for exactly this text.
+    const claimed = forceTranslate ? null : speculativeTranslations.claim(segmentId, text);
+    if (claimed) {
+      speculative = true;
+      requestStartedAt = claimed.startedAt;
+      firstTokenAt = claimed.firstTextAt;
     }
+    const translatedText = claimed
+      ? await claimed.follow(onProgress)
+      : await runTranslationRequest(appState, config, { text, segmentId, detectedLanguage }, onProgress);
 
-    if (revision !== undefined && state.transcriptSegmentRevisions.get(segmentId) !== revision) {
+    logTiming('complete', translatedText.length);
+
+    if (isSupersededRevision(state.transcriptSegmentRevisions, segmentId, revision)) {
       return { success: false, error: 'superseded by newer revision' };
     }
 
@@ -540,9 +744,13 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
       revision,
     });
     return { success: true, translatedText: translatedText || undefined };
-  } catch (error: any) {
-    console.warn('[Main] Transcript translation failed:', error?.message || error);
-    if (revision !== undefined && state.transcriptSegmentRevisions.get(segmentId) !== revision) {
+  } catch (error: unknown) {
+    const reason = classifyTranslationError(error);
+    // Only the reason and the HTTP status are logged: a provider's message can echo the transcript.
+    const status = Number((error as { status?: unknown } | null)?.status);
+    console.warn('[Main] Transcript translation failed:', reason, Number.isFinite(status) ? `(HTTP ${status})` : '');
+    logTiming('error', 0);
+    if (isSupersededRevision(state.transcriptSegmentRevisions, segmentId, revision)) {
       return { success: false, error: 'superseded by newer revision' };
     }
     emitNativeAudioTranscript(appState, {
@@ -556,10 +764,113 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
       confidence,
       displayMode,
       translationState: 'error' as const,
+      translationError: reason,
       speakerLabel,
       detectedLanguage,
       revision,
     });
-    return { success: false, error: error?.message || 'Transcript translation failed' };
+    return { success: false, error: reason };
+  }
+}
+
+/** The two sentences the translation test sends: invented, and in a language other than the target. */
+const TEST_SENTENCES = {
+  english: 'Could you walk me through how the billing service handles a failed payment? I want to be sure we never charge a customer twice.',
+  chinese: '我们下周把新的价格方案发给您，您看这样安排可以吗？如果需要调整，请直接告诉我。',
+};
+
+/**
+ * Translates a fixed sample with the settings as they are shown (saved or not), through the same
+ * request path a meeting uses, and reports the speed. Nothing is stored or shown in a meeting.
+ */
+export async function testTranslation(
+  appState: AppState,
+  draft: { provider: string; model: string; prompt?: string; targetLanguage: string }
+): Promise<{ success: boolean; sample: string; translatedText?: string; firstTokenMs?: number; totalMs?: number; error?: string }> {
+  const config = resolveTranslationConfig(true, draft);
+  const sample = isSameLanguage('english', config.targetLanguageKey) ? TEST_SENTENCES.chinese : TEST_SENTENCES.english;
+  if (!config.model) return { success: false, sample, error: 'Choose a translation model first.' };
+  if (!config.prompt.trim()) return { success: false, sample, error: 'The translation prompt is empty.' };
+  const startedAt = Date.now();
+  let firstTokenAt: number | null = null;
+  try {
+    const translatedText = await runTranslationRequest(appState, config, { text: sample, segmentId: 'translation-test' }, () => {
+      firstTokenAt ??= Date.now();
+    });
+    const endedAt = Date.now();
+    if (!translatedText.trim()) return { success: false, sample, totalMs: endedAt - startedAt, error: 'The model answered with no text.' };
+    return { success: true, sample, translatedText, firstTokenMs: firstTokenAt === null ? undefined : firstTokenAt - startedAt, totalMs: endedAt - startedAt };
+  } catch (error: unknown) {
+    // The sample is invented, so a provider's message is safe to show; it says why the model cannot be used.
+    const message = error instanceof Error ? error.message : String(error);
+    const status = Number((error as { status?: unknown } | null)?.status);
+    return {
+      success: false,
+      sample,
+      totalMs: Date.now() - startedAt,
+      error: `${classifyTranslationError(error)}${Number.isFinite(status) ? ` (HTTP ${status})` : ''}: ${message.replace(/\s+/g, ' ').slice(0, 240)}`,
+    };
+  }
+}
+
+const paragraphQueue = new ParagraphQueue();
+let paragraphTimer: NodeJS.Timeout | null = null;
+const PARAGRAPH_CHECK_MS = 15_000;
+
+function noteParagraphRow(appState: AppState, segmentId: string, revision: number, text: string): void {
+  paragraphQueue.note(segmentId, revision, text, Date.now());
+  if (paragraphTimer) return;
+  paragraphTimer = setTimeout(() => {
+    paragraphTimer = null;
+    void joinParagraph(appState);
+  }, PARAGRAPH_CHECK_MS);
+}
+
+/**
+ * The second pass. Sentences translated one by one miss what came before them, so the rows of the
+ * last minute are joined into one paragraph and translated again as a whole. The paragraph then
+ * replaces those rows on screen; the meeting record keeps the sentences as they were said.
+ */
+async function joinParagraph(appState: AppState): Promise<void> {
+  const state = appState as any;
+  const rows = paragraphQueue.takeDue(Date.now());
+  if (paragraphQueue.size() > 0) {
+    paragraphTimer = setTimeout(() => {
+      paragraphTimer = null;
+      void joinParagraph(appState);
+    }, PARAGRAPH_CHECK_MS);
+  }
+  if (!rows) return;
+  const config = resolveTranslationConfig(false);
+  if (!config.isConfigured || isSameAsTarget(config)) return;
+  const sourceText = rows.map((row) => row.text).join(' ');
+  const segmentId = `para_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const startedAt = Date.now();
+  try {
+    const translatedText = (await runTranslationRequest(appState, config, { text: sourceText, segmentId, noContext: true }, () => undefined)).trim();
+    console.log(formatTranslationTiming({
+      provider: config.provider, model: config.model, flushGapMs: null, firstTokenMs: null, totalMs: Date.now() - startedAt,
+      sourceChars: sourceText.length, outputChars: translatedText.length, streamed: false, speculative: false, outcome: 'complete',
+    }));
+    // A row that was reopened while this ran now says something else: leave the sentences as they are.
+    if (!translatedText || rows.some((row) => isSupersededRevision(state.transcriptSegmentRevisions, row.segmentId, row.revision))) return;
+    const displayMode = CredentialsManager.getInstance().getTranscriptTranslationDisplayMode();
+    emitNativeAudioTranscript(appState, {
+      speaker: 'interviewer',
+      text: displayMode === 'translated' ? translatedText : sourceText,
+      sourceText,
+      translatedText,
+      segmentId,
+      replaces: rows.map((row) => row.segmentId),
+      timestamp: Date.now(),
+      final: true,
+      confidence: 1,
+      displayMode,
+      translationState: 'complete' as const,
+      revision: 1,
+    });
+  } catch (error: unknown) {
+    // The sentences stay as they are, each with its own translation.
+    console.warn('[Main] Paragraph translation failed:', classifyTranslationError(error));
   }
 }

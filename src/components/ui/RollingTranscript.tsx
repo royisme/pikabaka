@@ -1,45 +1,21 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Globe, Languages, Loader2 } from 'lucide-react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Languages, TriangleAlert } from 'lucide-react';
 import type { TranscriptDisplayMode, TranscriptSegment } from '../../lib/transcriptSegments';
+import { failureReasonText, rowSlot, transcriptRowParts, type RowSlot } from '../../lib/transcriptRow';
+import { countNewRows, isNearBottom, nextTranscriptScroll } from '../../lib/answerScroll';
+import { nextAnnouncement } from '../../lib/transcriptAnnounce';
 
 interface TranscriptNotesProps {
     segments: TranscriptSegment[];
     partialText?: string;
     displayMode?: TranscriptDisplayMode;
-    isActive?: boolean;
-    surfaceStyle?: React.CSSProperties;
+    translationOn?: boolean;
     partialSpeakerLabel?: string;
     onTranslateSegment?: (segment: TranscriptSegment) => void;
 }
 
-const AVATAR_PALETTE = [
-    'bg-sky-500/25 text-sky-100 ring-1 ring-sky-400/35',
-    'bg-emerald-500/25 text-emerald-100 ring-1 ring-emerald-400/35',
-    'bg-amber-500/25 text-amber-100 ring-1 ring-amber-400/35',
-    'bg-rose-500/25 text-rose-100 ring-1 ring-rose-400/35',
-    'bg-violet-500/25 text-violet-100 ring-1 ring-violet-400/35',
-    'bg-cyan-500/25 text-cyan-100 ring-1 ring-cyan-400/35',
-];
-
-function paletteIndexForLabel(label: string): number {
-    let h = 0;
-    for (let i = 0; i < label.length; i++) {
-        h = (h << 5) - h + label.charCodeAt(i);
-        h |= 0;
-    }
-    return Math.abs(h) % AVATAR_PALETTE.length;
-}
-
-function avatarAbbrev(label: string): string {
-    const u = label.trim();
-    if (!u) return '?';
-    if (/^me$/i.test(u)) return 'Me';
-    const userNum = /^user\s*(\d+)$/i.exec(u);
-    if (userNum) return `U${userNum[1]}`;
-    const sNum = /^s(\d+)$/i.exec(u);
-    if (sNum) return `S${sNum[1]}`;
-    if (u.length <= 4) return u.toUpperCase();
-    return u.slice(0, 2).toUpperCase();
+function isOwnSpeech(segment: TranscriptSegment): boolean {
+    return segment.speaker === 'user';
 }
 
 function formatTime(ts: number): string {
@@ -49,25 +25,32 @@ function formatTime(ts: number): string {
     });
 }
 
-function SpeakerAvatar({
-    label,
-    pulsing,
-}: {
-    label: string;
-    pulsing?: boolean;
-}) {
-    const idx = paletteIndexForLabel(label);
-    const ring = pulsing ? ' ring-2 ring-emerald-400/60 animate-pulse' : '';
+/** The reserved line above the source text; 20px, the height of one line of translation. */
+function SlotLine({ slot, onRetry }: { slot: RowSlot; onRetry?: () => void }) {
+    if (!slot || slot.kind === 'translation') return null;
     return (
-        <div
-            className={[
-                'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold leading-none tracking-tight',
-                AVATAR_PALETTE[idx],
-                ring,
-            ].join(' ')}
-            aria-hidden="true"
-        >
-            {avatarAbbrev(label)}
+        <div className="flex min-h-[20px] items-center gap-2 text-[11px] overlay-text-muted">
+            {slot.kind === 'live' && <span>◦ Live</span>}
+            {slot.kind === 'translating' && (
+                <span>{slot.elapsedSeconds === null ? 'Translating' : `Translating · ${slot.elapsedSeconds}s`}</span>
+            )}
+            {slot.kind === 'failed' && (
+                <>
+                    <TriangleAlert className="h-3 w-3 text-state-danger" aria-hidden="true" />
+                    <span className="text-state-danger-strong">
+                        {slot.reason && failureReasonText(slot.reason) ? `Translation failed · ${failureReasonText(slot.reason)}` : 'Translation failed'}
+                    </span>
+                    {onRetry && (
+                        <button
+                            type="button"
+                            onClick={onRetry}
+                            className="rounded-full border border-border-subtle px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-[var(--overlay-text-primary)]"
+                        >
+                            Retry
+                        </button>
+                    )}
+                </>
+            )}
         </div>
     );
 }
@@ -75,178 +58,218 @@ function SpeakerAvatar({
 const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
     segments,
     partialText,
-    isActive = false,
-    surfaceStyle,
+    displayMode = 'both',
+    translationOn = false,
     partialSpeakerLabel = 'Interviewer',
     onTranslateSegment,
 }) => {
-    const bottomRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [userScrolled, setUserScrolled] = useState(false);
+    // Following is read from scroll events, not measured after a render: by then new content has
+    // already grown the list and the reader would look as if they had scrolled up.
+    const followingRef = useRef(true);
+    const [rowsWhenFollowStopped, setRowsWhenFollowStopped] = useState<number | null>(null);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
 
     const hasContent = segments.length > 0 || !!partialText;
 
     const partialLabel = useMemo(() => partialSpeakerLabel.trim() || 'Interviewer', [partialSpeakerLabel]);
 
+    // One tick per second, and only while some translation is pending, so a slow one can show its elapsed time.
+    const hasPending = segments.some((segment) => segment.translationState === 'pending');
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        if (!hasPending) return;
+        setNow(Date.now());
+        const timer = window.setInterval(() => setNow(Date.now()), 1000);
+        return () => window.clearInterval(timer);
+    }, [hasPending]);
+
+    const slotContext = { mode: displayMode, translationOn, now };
+
+    // Screen readers hear each finished translation once. The list itself is not a live region.
+    const announcedRef = useRef<Set<string> | null>(null);
+    const [announcement, setAnnouncement] = useState('');
+    useEffect(() => {
+        const first = announcedRef.current === null;
+        const announced = (announcedRef.current ??= new Set<string>());
+        const next = nextAnnouncement(segments, announced);
+        if (!next) return;
+        next.keys.forEach((key) => announced.add(key));
+        // What is already on screen when the list first appears is not read out.
+        if (!first) setAnnouncement(next.text);
+    }, [segments]);
+
+    const newestOtherIndex = useMemo(() => {
+        for (let i = segments.length - 1; i >= 0; i--) {
+            if (!isOwnSpeech(segments[i])) return i;
+        }
+        return -1;
+    }, [segments]);
+
     const contentSignature = segments.reduce(
         (acc, s) => acc + s.sourceText.length + (s.translatedText?.length ?? 0), 0);
 
-    useEffect(() => {
-        if (!userScrolled && bottomRef.current) {
-            bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    useLayoutEffect(() => {
+        const el = containerRef.current;
+        if (el && nextTranscriptScroll({ following: followingRef.current, contentChanged: true }) === 'pin') {
+            el.scrollTop = el.scrollHeight;
         }
-    }, [segments.length, contentSignature, partialText, userScrolled]);
+    }, [segments.length, contentSignature, partialText, expandedId]);
 
     const handleScroll = () => {
         const el = containerRef.current;
         if (!el) return;
-        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 32;
-        setUserScrolled(!atBottom);
+        const near = isNearBottom(el);
+        followingRef.current = near;
+        setRowsWhenFollowStopped((stopped) => (near ? null : stopped ?? segments.length));
     };
+
+    // Enter on the focused list opens or closes the newest other-party row. The arrow, Page and
+    // Home/End keys are the browser's own for a focused scroller; reaching the bottom resumes following.
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key !== 'Enter' || event.target !== event.currentTarget || newestOtherIndex < 0) return;
+        event.preventDefault();
+        const id = segments[newestOtherIndex].segmentId;
+        setExpandedId((current) => (current === id ? null : id));
+    };
+
+    const jumpToLatest = () => {
+        const el = containerRef.current;
+        if (!el) return;
+        followingRef.current = true;
+        setRowsWhenFollowStopped(null);
+        el.scrollTop = el.scrollHeight;
+    };
+
+    const newRows = countNewRows(segments.length, rowsWhenFollowStopped);
 
     if (!hasContent) return null;
 
+    const lastLabel = segments.length > 0 ? segments[segments.length - 1].speakerLabel : undefined;
+
     return (
-        <div className="px-4 pt-2 pb-1 no-drag">
+        <div className="relative h-full min-h-0 no-drag">
             <div
                 ref={containerRef}
                 onScroll={handleScroll}
-                aria-live="polite"
+                onKeyDown={handleKeyDown}
+                role="log"
+                aria-live="off"
+                tabIndex={0}
                 aria-label="Meeting transcript"
-                className="w-full min-h-[80px] max-h-[280px] overflow-y-auto"
+                className="h-full w-full overflow-y-auto px-4 pt-2 pb-1"
             >
-                <div className="space-y-3 pr-0.5">
-                    {segments.map((seg) => {
-                        const hasTranslation =
-                            !!seg.translatedText && seg.translatedText.trim() !== '' && seg.translatedText !== seg.sourceText;
-                        const isTranslationPending = seg.translationState === 'pending';
-                        const showTranslation = hasTranslation;
+                <div className="mx-auto max-w-[680px] space-y-2.5 pr-0.5">
+                    {segments.map((seg, index) => {
+                        const own = isOwnSpeech(seg);
+                        const expanded = expandedId === seg.segmentId;
+                        // Own speech is never translated: it stays one quiet source line.
+                        const parts = transcriptRowParts(seg, own ? 'original' : displayMode, expanded);
+                        const slot = rowSlot(seg, slotContext);
+                        const newest = index === newestOtherIndex;
+                        const showSpeaker = index === 0 || segments[index - 1].speakerLabel !== seg.speakerLabel;
+                        const hasMeta = !!onTranslateSegment || !!seg.detectedLanguage;
+
+                        const leadClass = own
+                            ? 'text-xs leading-[17px] overlay-text-muted'
+                            : parts.kind === 'awaiting'
+                              ? 'text-xs leading-[17px] overlay-text-secondary'
+                              : parts.kind === 'translation' && (!newest || parts.updating)
+                                ? 'text-sm leading-5 overlay-text-secondary'
+                                : `text-sm leading-5 overlay-text-primary${newest ? ' font-medium' : ''}`;
 
                         return (
-                            <div key={seg.segmentId} className="flex items-start gap-2.5">
-                                <SpeakerAvatar label={seg.speakerLabel} />
-                                <div className="min-w-0 flex-1">
-                                    <div className="mb-1 flex items-center justify-between gap-2">
-                                        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0">
-                                            <span className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
-                                                {seg.speakerLabel}
+                            <div
+                                key={seg.segmentId}
+                                className={`border-l-2 pl-2 ${newest ? 'border-[var(--overlay-action)]' : 'border-transparent'}`}
+                            >
+                                {showSpeaker && (
+                                    <div className="text-[11px] font-medium overlay-text-muted">{seg.speakerLabel}</div>
+                                )}
+                                <SlotLine slot={slot} onRetry={onTranslateSegment ? () => onTranslateSegment(seg) : undefined} />
+                                <button
+                                    type="button"
+                                    aria-expanded={expanded}
+                                    onClick={() => setExpandedId(expanded ? null : seg.segmentId)}
+                                    className="block w-full text-left"
+                                >
+                                    <span className={`block whitespace-pre-wrap break-words ${leadClass}${parts.updating && parts.translationBelow === null ? ' opacity-70' : ''}`}>
+                                        {parts.lead}
+                                        {parts.updating && parts.translationBelow === null && <span className="ml-1 text-[11px] overlay-text-muted"> · updating</span>}
+                                    </span>
+                                    {parts.translationBelow !== null && (
+                                        <span className={`block text-xs leading-[17px] overlay-text-secondary whitespace-pre-wrap break-words${parts.updating ? ' opacity-70' : ''}`}>
+                                            {parts.translationBelow}
+                                            {parts.updating && <span className="ml-1 text-[11px] overlay-text-muted"> · updating</span>}
+                                        </span>
+                                    )}
+                                    {parts.sourceBelow !== null && (
+                                        <span className="block text-xs leading-[17px] overlay-text-muted whitespace-pre-wrap break-words">
+                                            {parts.sourceBelow}
+                                        </span>
+                                    )}
+                                </button>
+                                {expanded && hasMeta && (
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] overlay-text-muted">
+                                        {seg.detectedLanguage && (
+                                            <span className="font-mono uppercase" title={`Detected language: ${seg.detectedLanguage}`}>
+                                                {seg.detectedLanguage}
                                             </span>
-                                            {seg.detectedLanguage && (
-                                                <span
-                                                    className="rounded-sm border border-border-subtle px-1 py-0 text-[9px] font-mono uppercase tracking-wider text-text-tertiary"
-                                                    title={`Detected language: ${seg.detectedLanguage}`}
-                                                >
-                                                    {seg.detectedLanguage}
-                                                </span>
-                                            )}
-                                            <time
-                                                className="text-[9px] tabular-nums text-text-tertiary"
-                                                dateTime={new Date(seg.timestamp).toISOString()}
-                                            >
-                                                {formatTime(seg.timestamp)}
-                                            </time>
-                                        </div>
+                                        )}
+                                        <time className="tabular-nums" dateTime={new Date(seg.timestamp).toISOString()}>
+                                            {formatTime(seg.timestamp)}
+                                        </time>
                                         {onTranslateSegment && (
                                             <button
                                                 type="button"
                                                 onClick={() => onTranslateSegment(seg)}
-                                                disabled={isTranslationPending}
-                                                className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2 py-1 text-[10px] text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary disabled:cursor-wait disabled:opacity-70"
+                                                disabled={seg.translationState === 'pending' || seg.translationState === 'streaming'}
+                                                className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2 py-0.5 text-[11px] overlay-text-secondary hover:text-[var(--overlay-text-primary)] disabled:cursor-wait disabled:opacity-70"
                                             >
-                                                {isTranslationPending ? (
-                                                    <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-                                                ) : (
-                                                    <Languages className="h-3 w-3" aria-hidden="true" />
-                                                )}
-                                                <span>{hasTranslation ? 'Retranslate' : 'Translate'}</span>
+                                                <Languages className="h-3 w-3" aria-hidden="true" />
+                                                <span>{parts.hasTranslation ? 'Retranslate' : 'Translate'}</span>
                                             </button>
                                         )}
                                     </div>
-                                    <div
-                                        className="rounded-2xl border border-border-subtle px-4 py-3 shadow-sm overlay-transcript-surface"
-                                        style={surfaceStyle}
-                                    >
-                                        <p className="overlay-text-primary text-[13px] leading-[1.55] whitespace-pre-wrap break-words">
-                                            {seg.sourceText}
-                                        </p>
-                                        {showTranslation && (
-                                            <>
-                                                <div className="my-2.5 h-px bg-border-subtle/60" />
-                                                <div className="flex gap-2">
-                                                    <Globe
-                                                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-state-info"
-                                                        strokeWidth={2}
-                                                        aria-hidden="true"
-                                                    />
-                                                    <p className="overlay-text-secondary min-w-0 flex-1 text-[12px] italic leading-[1.55] whitespace-pre-wrap break-words">
-                                                        {seg.translatedText}
-                                                    </p>
-                                                </div>
-                                            </>
-                                        )}
-                                        {!showTranslation && isTranslationPending && (
-                                            <div className="mt-2 flex items-center gap-2 text-[11px] text-text-tertiary">
-                                                <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-                                                <span>Translating...</span>
-                                            </div>
-                                        )}
-                                        {seg.translationState === 'error' && !showTranslation && (
-                                            <div className="mt-2 text-[11px] text-amber-300">
-                                                Translation failed. Try again.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         );
                     })}
 
                     {partialText && (
-                        <div className="flex items-start gap-2.5 opacity-90">
-                            <SpeakerAvatar label={partialLabel} pulsing={isActive} />
-                            <div className="min-w-0 flex-1">
-                                <div className="mb-1 flex flex-wrap items-baseline gap-x-2">
-                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
-                                        {partialLabel}
-                                    </span>
-                                    <span className="text-[9px] text-text-tertiary">Live</span>
-                                </div>
-                                <div
-                                    className="rounded-2xl border border-border-subtle/80 px-4 py-3 overlay-transcript-surface"
-                                    style={surfaceStyle}
-                                >
-                                    <p className="overlay-text-primary text-[13px] leading-[1.55] whitespace-pre-wrap break-words opacity-80">
-                                        {partialText}
-                                    </p>
-                                </div>
-                            </div>
+                        <div className="border-l-2 border-transparent pl-2">
+                            {lastLabel !== partialLabel && (
+                                <div className="text-[11px] font-medium overlay-text-muted">{partialLabel}</div>
+                            )}
+                            <SlotLine slot={rowSlot('live', slotContext)} />
+                            <p
+                                className={`overlay-text-primary whitespace-pre-wrap break-words ${
+                                    rowSlot('live', slotContext) ? 'text-xs leading-[17px]' : 'text-sm leading-5'
+                                }`}
+                            >
+                                {partialText}
+                            </p>
                         </div>
                     )}
-
-                    <div ref={bottomRef} className="h-px" />
                 </div>
             </div>
 
-            {userScrolled && (
+            <div className="sr-only" aria-live="polite" aria-atomic="true">
+                {announcement}
+            </div>
+
+            {rowsWhenFollowStopped !== null && (
                 <button
                     type="button"
-                    aria-label="Scroll to latest"
-                    onClick={() => {
-                        setUserScrolled(false);
-                        bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                    }}
-                    className="mt-1 ml-auto flex items-center gap-1 text-[10px] text-text-tertiary hover:text-text-secondary transition-colors"
+                    aria-label={newRows > 0 ? `Jump to latest, ${newRows} new ${newRows === 1 ? 'line' : 'lines'}` : 'Jump to latest'}
+                    onClick={jumpToLatest}
+                    className="absolute bottom-2 right-3 flex items-center gap-1 rounded-full border border-border-subtle px-2.5 py-1 text-[11px] font-medium overlay-text-primary overlay-subtle-surface"
                 >
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                        <path
-                            d="M5 2v6M2 6l3 3 3-3"
-                            stroke="currentColor"
-                            strokeWidth="1.2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-                    </svg>
-                    Jump to latest
+                    <span aria-hidden="true">↓</span>
+                    <span aria-hidden="true">
+                        {newRows > 0 ? newRows : 'Latest'}
+                        {newRows > 0 && <span className="hidden min-[480px]:inline"> new</span>}
+                    </span>
                 </button>
             )}
         </div>

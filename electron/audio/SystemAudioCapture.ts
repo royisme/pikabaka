@@ -39,6 +39,25 @@ export class SystemAudioCapture extends EventEmitter {
     /**
      * Start capturing audio
      */
+    private sampleWindowStart = 0;
+    private samplesInWindow = 0;
+
+    /**
+     * Every 5 seconds, logs how many mono samples per second really arrive (counts only). With a 48000 Hz capture a
+     * healthy stream is about 48000 or less (silence is trimmed); a steady 24000 means samples are being lost.
+     */
+    private countSamples(samples: number): void {
+        const now = Date.now();
+        if (this.sampleWindowStart === 0) this.sampleWindowStart = now;
+        this.samplesInWindow += samples;
+        if (now - this.sampleWindowStart >= 5000) {
+            const perSecond = Math.round((this.samplesInWindow * 1000) / (now - this.sampleWindowStart));
+            console.log(`[SystemAudioCapture] ${perSecond} samples/s reach the speech service (capture rate ${this.detectedSampleRate ?? 'unknown'} Hz)`);
+            this.sampleWindowStart = now;
+            this.samplesInWindow = 0;
+        }
+    }
+
     public start(): void {
         if (this.isRecording) return;
 
@@ -75,6 +94,7 @@ export class SystemAudioCapture extends EventEmitter {
                 }
                 if (chunk && chunk.length > 0) {
                     const buffer = Buffer.from(chunk);
+                    this.countSamples(buffer.length / 2);
                     this.emit('data', buffer);
                 }
             }, (err: Error | null, _ended: boolean) => {

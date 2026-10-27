@@ -23,28 +23,7 @@ export class ProcessingHelper {
   constructor(appState: AppState) {
     this.appState = appState
 
-    // Check if user wants to use Ollama
-    const useOllama = process.env.USE_OLLAMA === "true"
-    const ollamaModel = process.env.OLLAMA_MODEL // Don't set default here, let LLMHelper auto-detect
-    const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434"
-
-    if (useOllama) {
-      // console.log("[ProcessingHelper] Initializing with Ollama")
-      this.llmHelper = new LLMHelper(undefined, true, ollamaModel, ollamaUrl)
-    } else {
-      // Try environment first (for development)
-      let apiKey = process.env.GEMINI_API_KEY
-      let groqApiKey = process.env.GROQ_API_KEY
-      let openaiApiKey = process.env.OPENAI_API_KEY
-      let claudeApiKey = process.env.CLAUDE_API_KEY
-
-      // Allow initializing without key (will be loaded in loadStoredCredentials or via Settings)
-      if (!apiKey) {
-        console.warn("[ProcessingHelper] GEMINI_API_KEY not found in env. Will try CredentialsManager after ready.")
-      }
-
-      this.llmHelper = new LLMHelper(apiKey, false, undefined, undefined, groqApiKey, openaiApiKey, claudeApiKey)
-    }
+    this.llmHelper = new LLMHelper()
   }
 
   /**
@@ -55,30 +34,7 @@ export class ProcessingHelper {
     const credManager = CredentialsManager.getInstance();
 
     const geminiKey = credManager.getGeminiApiKey();
-    const groqKey = credManager.getGroqApiKey();
     const openaiKey = credManager.getOpenaiApiKey();
-    const claudeKey = credManager.getClaudeApiKey();
-
-    if (geminiKey) {
-      console.log("[ProcessingHelper] Loading stored Gemini API Key from CredentialsManager");
-      this.llmHelper.setApiKey(geminiKey);
-    }
-
-    if (groqKey) {
-      console.log("[ProcessingHelper] Loading stored Groq API Key from CredentialsManager");
-      this.llmHelper.setGroqApiKey(groqKey);
-    }
-
-    if (openaiKey) {
-      console.log("[ProcessingHelper] Loading stored OpenAI API Key from CredentialsManager");
-      this.llmHelper.setOpenaiApiKey(openaiKey);
-    }
-
-    if (claudeKey) {
-      console.log("[ProcessingHelper] Loading stored Claude API Key from CredentialsManager");
-      this.llmHelper.setClaudeApiKey(claudeKey);
-    }
-
     // CRITICAL: Re-initialize IntelligenceManager now that keys are loaded
     // This fixes the issue where buttons don't work in production because of late key loading
     this.appState.getIntelligenceManager().initializeLLMs();
@@ -104,19 +60,6 @@ export class ProcessingHelper {
 
       // CRITICAL: Cleanup stale queue items to prevent "Chunk not found" errors
       ragManager.cleanupStaleQueueItems();
-    }
-
-    // Initialize self-improving model version manager (background, non-blocking)
-    this.llmHelper.initModelVersionManager().catch(err => {
-      console.warn('[ProcessingHelper] ModelVersionManager initialization failed (non-critical):', err.message);
-    });
-
-    // NEW: Load Default Model Config
-    const defaultModel = credManager.getDefaultModel();
-    if (defaultModel) {
-      console.log(`[ProcessingHelper] Loading stored Default Model: ${defaultModel}`);
-      const allProviders = credManager.getMergedLlmCustomProviders();
-      this.llmHelper.setModel(defaultModel, allProviders);
     }
 
     // Load Languages

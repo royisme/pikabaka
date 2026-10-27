@@ -22,7 +22,12 @@ import {
   JDListItem,
   InterviewPrepData,
 } from './types';
-import { buildContextEnhancementPrompt, buildIntroResponsePrompt } from './prompts';
+import { buildContextEnhancementPrompt, buildIntroResponsePrompt, buildNoMatchPrompt } from './prompts';
+
+/** The least cosine similarity at which a passage of the user's materials counts as about the question. */
+const MIN_MATCH_SCORE = 0.3;
+/** The notes the user writes about themselves: at most this many characters. */
+const NOTES_MAX_LENGTH = 20_000;
 
 export class KnowledgeOrchestrator {
   private db: KnowledgeDatabaseManager;
@@ -166,7 +171,34 @@ export class KnowledgeOrchestrator {
   }
 
   isKnowledgeMode(): boolean {
-    return this.knowledgeMode && this.db.getDocumentByType(DocType.RESUME) !== null;
+    return this.knowledgeMode && (this.db.getDocumentByType(DocType.RESUME) !== null || this.getNotes() !== '');
+  }
+
+  /** What the user wrote about themselves, one fact per line; empty when nothing is saved. */
+  getNotes(): string {
+    return this.db.getDocumentByType(DocType.NOTES)?.raw_text ?? '';
+  }
+
+  /**
+   * Saves the notes as a document of their own: each line becomes a passage that is embedded, so a
+   * question about it finds it the way it finds the resume. An empty text removes them.
+   */
+  setNotes(text: string): void {
+    const clean = text.replace(/\r\n?/g, '\n').trim().slice(0, NOTES_MAX_LENGTH);
+    this.vectorStore.clearEmbeddings(DocType.NOTES);
+    if (!clean) {
+      this.db.deleteDocumentsByType(DocType.NOTES);
+      return;
+    }
+    const docId = this.db.upsertDocument(DocType.NOTES, 'notes.txt', clean, null);
+    const chunks = clean.split('\n').map((line) => line.trim()).filter((line) => line.length >= 8)
+      .flatMap((line) => (line.length > 800 ? this.splitLongSection(line, 600) : [line]))
+      .map((line) => ({ text: line, metadata: { docType: DocType.NOTES, section: 'notes' } }));
+    const chunkIds = this.db.saveChunks(docId, chunks);
+    if (this.embedFn && chunkIds.length > 0) {
+      void this.embedChunksBackground(chunkIds.map((id, index) => ({ id, text: chunks[index].text })));
+    }
+    this.knowledgeMode = true;
   }
 
   deleteDocumentsByType(docType: DocType): void {
@@ -448,9 +480,12 @@ export class KnowledgeOrchestrator {
         }
       }
 
+      let searchedWithoutMatch = false;
       if (this.embedQueryFn && this.vectorStore.hasEmbeddings()) {
         const queryEmbedding = await this.embedQueryFn(message);
-        const results = this.vectorStore.searchSimilar(queryEmbedding, 5);
+        // Below this similarity a passage is not about the question: it is dropped, not sent as "background".
+        const results = this.vectorStore.searchSimilar(queryEmbedding, 5).filter((result) => result.score >= MIN_MATCH_SCORE);
+        searchedWithoutMatch = results.length === 0;
 
         if (results.length > 0) {
           const profile = this.getProfileData();
@@ -483,6 +518,17 @@ export class KnowledgeOrchestrator {
       }
 
       const profile = this.getProfileData();
+      if (searchedWithoutMatch) {
+        const identitySummary = profile
+          ? `${profile.identity.name}, ${profile.experience?.[0]?.role || ''} with ${profile.totalExperienceYears} years of experience`
+          : 'the candidate';
+        return {
+          knowledgeMiss: true,
+          systemPromptInjection: buildNoMatchPrompt(message, identitySummary, this.depthScorer.getDepthInstruction()),
+          contextBlock: '',
+          ...(profile ? this.getJDEnhancement(message, profile) : {}),
+        };
+      }
       if (profile) {
         const identitySummary = `${profile.identity.name}, ${profile.experience?.[0]?.role || ''} with ${profile.totalExperienceYears} years of experience. Skills: ${profile.skills.slice(0, 10).join(', ')}`;
         const jdEnhancement = this.getJDEnhancement(message, profile);

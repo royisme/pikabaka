@@ -1,5 +1,6 @@
 import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
+import { testTranslation } from "../lib/transcript-assembler"
 
 export function registerTranslationHandlers(appState: AppState): void {
   safeHandle("get-transcript-translation-settings", async () => {
@@ -59,5 +60,13 @@ export function registerTranslationHandlers(appState: AppState): void {
     timestamp?: number;
   }) => {
     return appState.translateTranscriptSegment(segment);
+  });
+
+  // Runs a sample through the settings as shown (saved or not) and reports the speed.
+  safeHandle("test-transcript-translation", async (_, draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => {
+    if (typeof draft?.provider !== 'string' || typeof draft?.model !== 'string' || typeof draft?.targetLanguage !== 'string') {
+      return { success: false, sample: '', error: 'Choose a model and a target language first.' };
+    }
+    return testTranslation(appState, draft);
   });
 }

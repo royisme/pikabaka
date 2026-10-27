@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Heart, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 import packageJson from '../../package.json';
+import { useWindowEvent } from '../hooks/useWindowEvent';
 
-interface AboutSectionProps { }
+export type AboutSectionProps = Record<string, never>;
 
 const BMC_URL = 'https://buymeacoffee.com/royisme';
 
@@ -27,20 +28,15 @@ export const AboutSection: React.FC<AboutSectionProps> = () => {
     const donationClickTimeRef = useRef<number | null>(null);
     const [isHovered, setIsHovered] = useState(false);
 
-    useEffect(() => {
-        const handleFocus = async () => {
-            if (donationClickTimeRef.current) {
-                const elapsed = Date.now() - donationClickTimeRef.current;
-                if (elapsed > 20000) {
-                    await window.electronAPI?.setDonationComplete();
-                }
-                donationClickTimeRef.current = null;
+    useWindowEvent('focus', async () => {
+        if (donationClickTimeRef.current) {
+            const elapsed = Date.now() - donationClickTimeRef.current;
+            if (elapsed > 20000) {
+                await window.electronAPI?.setDonationComplete();
             }
-        };
-
-        window.addEventListener('focus', handleFocus);
-        return () => window.removeEventListener('focus', handleFocus);
-    }, []);
+            donationClickTimeRef.current = null;
+        }
+    });
 
     const handleOpenLink = (e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>, url: string) => {
         e.preventDefault();

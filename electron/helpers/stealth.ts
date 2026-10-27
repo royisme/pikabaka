@@ -219,8 +219,8 @@ export function _applyDisguise(appState: AppState, mode: 'terminal' | 'settings'
       appName = "Pika";
       if (isMac) {
         iconPath = app.isPackaged
-          ? path.join(process.resourcesPath, "assets", "pika.icns")
-          : path.join(app.getAppPath(), "assets/pika.icns");
+          ? path.join(process.resourcesPath, "assets", "icon.png")
+          : path.join(app.getAppPath(), "assets/icon.png");
       } else if (isWin) {
         iconPath = app.isPackaged
           ? path.join(process.resourcesPath, "assets/icons/win/icon.ico")

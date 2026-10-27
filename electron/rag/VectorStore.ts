@@ -553,11 +553,10 @@ export class VectorStore {
      * Delete embeddings for meetings to prep for re-indexer
      */
     deleteEmbeddingsForMeetings(providerName: string): string[] {
-        // Find incompatible meetings
+        // Include completed meetings that have never received embeddings.
         const rows = this.db.prepare(`
-            SELECT id FROM meetings 
-            WHERE embedding_provider IS NOT NULL 
-            AND embedding_provider != ?
+            SELECT id FROM meetings
+            WHERE (embedding_provider IS NULL OR embedding_provider != ?)
             AND is_processed = 1
         `).all(providerName) as any[];
 

@@ -35,7 +35,10 @@ import { SystemAudioCapture } from "./audio/SystemAudioCapture"
 import { MicrophoneCapture } from "./audio/MicrophoneCapture"
 import { ThemeManager } from "./helpers/ThemeManager"
 import { RAGManager } from "./rag/RAGManager"
+import { buildEmbeddingConfig } from "./rag/embeddingConfig"
 import { DatabaseManager } from "./db/DatabaseManager"
+import { getMeetingAgent, getGate, refreshGate } from './agent/instance'
+import { type MeetingAgent, reportAgentError } from './agent/MeetingAgent'
 import { warmupIntentClassifier } from "./llm"
 import {
   setupAutoUpdater as setupAutoUpdaterFn,
@@ -157,6 +160,9 @@ export class AppState {
 
   public hasDebugged: boolean = false
   private isMeetingActive: boolean = false; // Guard for session state leaks
+  /** The microphone is muted by the user: the speech service gets silence instead of the microphone. Not saved; a new meeting starts unmuted. */
+  public microphoneMuted: boolean = false;
+  private endingMeeting: Promise<void> | undefined;
   private _isQuitting: boolean = false;
   public _verboseLogging: boolean = false;
   public _disguiseTimers: NodeJS.Timeout[] = []; // Track forceUpdate timeouts
@@ -284,7 +290,9 @@ export class AppState {
           actionId === 'chat:brainstorm' ||
           actionId === 'chat:dynamicAction4' ||
           actionId === 'chat:scrollUp' ||
-          actionId === 'chat:scrollDown'
+          actionId === 'chat:scrollDown' ||
+          actionId === 'translation:toggle' ||
+          actionId === 'translation:toggle-original'
         ) {
           const actionMap: Record<string, string> = {
             'chat:whatToAnswer': 'whatToAnswer',
@@ -296,6 +304,8 @@ export class AppState {
             'chat:dynamicAction4': 'dynamicAction4',
             'chat:scrollUp': 'scrollUp',
             'chat:scrollDown': 'scrollDown',
+            'translation:toggle': 'toggleTranslation',
+            'translation:toggle-original': 'toggleOriginal',
           };
           const action = actionMap[actionId];
           // Send to all windows without focusing — stealth operation
@@ -396,6 +406,11 @@ export class AppState {
     this._isQuitting = value;
   }
 
+  public setMicrophoneMuted(muted: boolean): void {
+    this.microphoneMuted = muted;
+    this.broadcast('microphone-muted-changed', muted);
+  }
+
   private broadcastMeetingState(): void {
     this.broadcast('meeting-state-changed', { isActive: this.isMeetingActive });
   }
@@ -417,13 +432,7 @@ export class AppState {
           // Re-resolve the embedding provider given that Ollama might now be available
           if (this.ragManager) {
              console.log('[AppState] Ollama model ready, re-evaluating RAG pipeline provider');
-             const { CredentialsManager } = require('./services/CredentialsManager');
-             const cm = CredentialsManager.getInstance();
-             this.ragManager.initializeEmbeddings({
-                openaiKey: cm.getOpenaiApiKey() || process.env.OPENAI_API_KEY || undefined,
-                geminiKey: cm.getGeminiApiKey() || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || undefined,
-                ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434"
-             });
+             await this.ragManager.initializeEmbeddings(buildEmbeddingConfig());
           }
         }
       } catch (err) {
@@ -438,18 +447,11 @@ export class AppState {
       const sqliteDb = db.getDb();
 
       if (sqliteDb) {
-        const { CredentialsManager } = require('./services/CredentialsManager');
-        const cm = CredentialsManager.getInstance();
-        const openaiKey = cm.getOpenaiApiKey() || process.env.OPENAI_API_KEY;
-        const geminiKey = cm.getGeminiApiKey() || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
-        
         this.ragManager = new RAGManager({ 
             db: sqliteDb, 
             dbPath: db.getDbPath(),
             extPath: db.getExtPath(),
-            openaiKey,
-            geminiKey,
-            ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434'
+            ...buildEmbeddingConfig()
         });
         this.ragManager.setLLMHelper(this.processingHelper.getLLMHelper());
         console.log('[AppState] RAGManager initialized');
@@ -593,6 +595,23 @@ export class AppState {
 
   public resetBufferedTranscriptTurns(): void {
     resetBufferedTranscriptTurnsFn(this)
+  }
+
+  /** The meeting the assembled transcript is written to; null between meetings. */
+  private currentMeetingId: string | null = null;
+
+  public getCurrentMeetingId(): string | null { return this.currentMeetingId; }
+
+  public recordTranscriptSegment(segment: { segmentId: string; revision: number; speaker: TranscriptSpeaker; text: string; timestampMs: number }): void {
+    if (!this.currentMeetingId) return;
+    try {
+      const written = DatabaseManager.getInstance().upsertSegment({ meetingId: this.currentMeetingId, ...segment });
+      if (written && segment.speaker === 'interviewer') {
+        getGate().onSegment({ meetingId: this.currentMeetingId, segmentId: segment.segmentId, revision: segment.revision });
+      }
+    } catch (err) {
+      console.error('[Main] Failed to record a transcript segment:', (err as Error).message);
+    }
   }
 
   public async flushBufferedTranscriptTurn(speaker: TranscriptSpeaker): Promise<void> {
@@ -805,6 +824,7 @@ export class AppState {
   }
 
   public async startMeeting(metadata?: any): Promise<void> {
+    await this.endingMeeting;
     console.log('[Main] Starting Meeting...', metadata);
 
     if (!(await ensureMacMicrophoneAccess('meeting start'))) {
@@ -814,6 +834,7 @@ export class AppState {
     }
 
     this.isMeetingActive = true;
+    this.setMicrophoneMuted(false);
     this.resetBufferedTranscriptTurns();
     this.lastSystemAudioChunkAt = null;
     this.lastInterviewerTranscriptAt = null;
@@ -821,6 +842,12 @@ export class AppState {
     this.broadcastMeetingState();
     if (metadata) {
       this.intelligenceManager.setMeetingMetadata(metadata);
+    }
+    // The meeting row exists before any audio, so each assembled line is saved as it happens.
+    this.currentMeetingId = this.intelligenceManager.startMeeting(metadata);
+    if (this.currentMeetingId) {
+      void this.getMeetingAgent().open(this.currentMeetingId).catch(error => reportAgentError(error));
+      void refreshGate();
     }
 
     // Emit session reset to clear UI state immediately
@@ -880,8 +907,13 @@ export class AppState {
     }, 0); // Defer to next event loop tick — ensures IPC response reaches renderer before audio init
   }
 
-  public async endMeeting(): Promise<void> {
+  public endMeeting(): Promise<void> {
+    return this.endingMeeting ??= this.finishMeeting().finally(() => { this.endingMeeting = undefined; });
+  }
+
+  private async finishMeeting(): Promise<void> {
     console.log('[Main] Ending Meeting...');
+    const stoppedAtMs = Date.now();
     this.isMeetingActive = false; // Block new data immediately
     this.broadcastMeetingState();
 
@@ -905,21 +937,15 @@ export class AppState {
     // Capture the meetingId NOW so the background IIFE uses a deterministic ID
     // rather than getRecentMeetings(1) which could return a different meeting if the
     // user starts a new session before background processing finishes.
-    const meetingId = await this.intelligenceManager.stopMeeting();
-
-    // Revert to Default Model — synchronous, no blocking I/O
-    try {
-      const { CredentialsManager } = require('./services/CredentialsManager');
-      const cm = CredentialsManager.getInstance();
-      const defaultModel = cm.getDefaultModel();
-      const all = cm.getMergedLlmCustomProviders();
-      console.log(`[Main] Reverting model to default: ${defaultModel}`);
-      this.processingHelper.getLLMHelper().setModel(defaultModel, all);
-      BrowserWindow.getAllWindows().forEach(win => {
-        if (!win.isDestroyed()) win.webContents.send('model-changed', defaultModel);
-      });
-    } catch (e) {
-      console.error('[Main] Failed to revert model:', e);
+    const agentMeetingId = this.currentMeetingId;
+    if (agentMeetingId) {
+      getGate().stop(agentMeetingId);
+      await this.getMeetingAgent().stop(agentMeetingId).catch(error => reportAgentError(error, agentMeetingId));
+    }
+    const meetingId = await this.intelligenceManager.stopMeeting(stoppedAtMs);
+    this.currentMeetingId = null;
+    if (agentMeetingId && !meetingId) {
+      await this.getMeetingAgent().deleteStore(agentMeetingId).catch(error => reportAgentError(error, agentMeetingId));
     }
 
     // ─── Background post-processing ──────────────────────────────────────────
@@ -1093,12 +1119,17 @@ export class AppState {
     }
   }
 
-  public setRecognitionLanguage(key: string): void {
-    console.log(`[AppState] Setting recognition language to: ${key}`);
+  // Each speaker has its own recognition language; only that speaker's stream restarts.
+  public setRecognitionLanguage(key: string, speaker: 'interviewer' | 'user' = 'interviewer'): void {
+    console.log(`[AppState] Setting ${speaker} recognition language to: ${key}`);
     const { CredentialsManager } = require('./services/CredentialsManager');
+    if (speaker === 'user') {
+      CredentialsManager.getInstance().setSttLanguageUser(key);
+      this.googleSTT_User?.setRecognitionLanguage(key);
+      return;
+    }
     CredentialsManager.getInstance().setSttLanguage(key);
     this.googleSTT?.setRecognitionLanguage(key);
-    this.googleSTT_User?.setRecognitionLanguage(key);
     this.processingHelper.getLLMHelper().setSttLanguage(key);
   }
 
@@ -1125,6 +1156,8 @@ export class AppState {
   public getThemeManager(): ThemeManager {
     return this.themeManager
   }
+
+  public getMeetingAgent(): MeetingAgent { return getMeetingAgent(); }
 
   public getRAGManager(): RAGManager | null {
     return this.ragManager;

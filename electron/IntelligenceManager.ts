@@ -201,8 +201,12 @@ export class IntelligenceManager extends EventEmitter {
     // Meeting Lifecycle (delegates to persistence)
     // ============================================
 
-    async stopMeeting(): Promise<string | null> {
-        return this.persistence.stopMeeting();
+    startMeeting(metadata?: any): string | null {
+        return this.persistence.startMeeting(metadata);
+    }
+
+    async stopMeeting(stoppedAtMs: number = Date.now()): Promise<string | null> {
+        return this.persistence.stopMeeting(stoppedAtMs);
     }
 
     async recoverUnprocessedMeetings(): Promise<void> {
@@ -221,6 +225,11 @@ export class IntelligenceManager extends EventEmitter {
      */
     resetEngine(): void {
         this.engine.reset();
+    }
+
+    /** Stops the answer being generated, keeping the session. */
+    cancelGeneration(): void {
+        this.engine.cancelGeneration();
     }
 
     reset(): void {

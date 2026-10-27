@@ -48,14 +48,15 @@ export class SessionTracker {
     // Meeting metadata
     private currentMeetingMetadata: {
         title?: string;
-        calendarEventId?: string;
-        source?: 'manual' | 'calendar';
     } | null = null;
 
     // Full Session Tracking (Persisted)
     private fullTranscript: TranscriptSegment[] = [];
     private fullUsage: any[] = []; // UsageInteraction
     private sessionStartTime: number = Date.now();
+    // The meeting this session records into; set when the meeting starts, cleared by reset().
+    private meetingId: string | null = null;
+    private usageRecorder: ((meetingId: string, usage: any) => void) | null = null;
 
     // Rolling summarization: epoch summaries preserve early context when arrays are compacted
     private static readonly MAX_EPOCH_SUMMARIES = 5;
@@ -85,6 +86,10 @@ export class SessionTracker {
 
     public setRecapLLM(recapLLM: RecapLLM | null): void {
         this.recapLLM = recapLLM;
+    }
+
+    public setUsageRecorder(recorder: ((meetingId: string, usage: any) => void) | null): void {
+        this.usageRecorder = recorder;
     }
 
     public setMeetingMetadata(metadata: any): void {
@@ -121,7 +126,7 @@ export class SessionTracker {
             this.detectedCodingQuestion = trimmed;
             this.codingQuestionSource = source;
             this.codingQuestionSetAt = now;
-            console.log(`[SessionTracker] Coding question stored (source: ${source}): "${trimmed.substring(0, 80)}..."`);
+            console.log(`[SessionTracker] Coding question stored (source: ${source})`);
             return;
         }
 
@@ -130,7 +135,7 @@ export class SessionTracker {
             this.detectedCodingQuestion = trimmed;
             this.codingQuestionSource = source;
             this.codingQuestionSetAt = now;
-            console.log(`[SessionTracker] Coding question updated via screenshot: "${trimmed.substring(0, 80)}..."`);
+            console.log('[SessionTracker] Coding question updated via screenshot');
             return;
         }
 
@@ -143,7 +148,7 @@ export class SessionTracker {
             this.detectedCodingQuestion = trimmed;
             this.codingQuestionSource = source;
             this.codingQuestionSetAt = now;
-            console.log(`[SessionTracker] Coding question updated via transcript (prev was ${this.codingQuestionSource}, stale=${isStale}): "${trimmed.substring(0, 80)}..."`);
+            console.log(`[SessionTracker] Coding question updated via transcript (stale=${isStale})`);
         } else {
             console.log(`[SessionTracker] Transcript question ignored — screenshot question is recent (< ${SessionTracker.SCREENSHOT_STALE_MS / 1000}s)`);
         }
@@ -235,7 +240,7 @@ export class SessionTracker {
      * Add assistant-generated message to context
      */
     addAssistantMessage(text: string): void {
-        console.log(`[SessionTracker] addAssistantMessage called with:`, text.substring(0, 50));
+        console.log('[SessionTracker] addAssistantMessage called');
 
         // Pika-style filtering
         if (!text) return;
@@ -297,12 +302,12 @@ export class SessionTracker {
         // Track interim segments for interviewer to prevent data loss on stop
         if (segment.speaker === 'user') {
             if (isVerboseLogging() && (Math.random() < 0.05 || segment.final)) {
-                console.log(`[SessionTracker] RX User Segment: Final=${segment.final} Text="${segment.text.substring(0, 50)}..."`);
+                console.log(`[SessionTracker] RX User Segment: Final=${segment.final}`);
             }
         }
         if (segment.speaker === 'interviewer') {
             if (isVerboseLogging() && (Math.random() < 0.05 || segment.final)) {
-                console.log(`[SessionTracker] RX Interviewer Segment: Final=${segment.final} Text="${segment.text.substring(0, 50)}..."`);
+                console.log(`[SessionTracker] RX Interviewer Segment: Final=${segment.final}`);
             }
 
             if (!segment.final) {
@@ -429,6 +434,16 @@ export class SessionTracker {
         return this.sessionStartTime;
     }
 
+    getMeetingId(): string | null {
+        return this.meetingId;
+    }
+
+    /** Starts a new session: a new meeting id and the real start time, not the time of the last reset. */
+    startSession(meetingId: string | null, startTime: number): void {
+        this.meetingId = meetingId;
+        this.sessionStartTime = startTime;
+    }
+
     // ============================================
     // Usage Tracking
     // ============================================
@@ -446,17 +461,24 @@ export class SessionTracker {
      * Public method to log usage from external sources (e.g. IPC direct chat)
      */
     logUsage(type: string, question: string, answer: string): void {
-        this.fullUsage.push({
-            type,
-            timestamp: Date.now(),
-            question,
-            answer
-        });
+        const entry = { type, timestamp: Date.now(), question, answer };
+        this.fullUsage.push(entry);
+        this.recordUsage(entry);
     }
 
     pushUsage(entry: any): void {
         this.fullUsage.push(entry);
         this.capUsageArray();
+        this.recordUsage(entry);
+    }
+
+    private recordUsage(entry: any): void {
+        if (!this.meetingId || !this.usageRecorder) return;
+        try {
+            this.usageRecorder(this.meetingId, entry);
+        } catch (error) {
+            console.error('[SessionTracker] Failed to record interaction:', (error as Error).message);
+        }
     }
 
     // ============================================
@@ -468,7 +490,7 @@ export class SessionTracker {
      */
     flushInterimTranscript(): void {
         if (this.lastInterimInterviewer) {
-            console.log('[SessionTracker] Force-saving pending interim transcript:', this.lastInterimInterviewer.text);
+            console.log('[SessionTracker] Force-saving pending interim transcript');
             const finalSegment = { ...this.lastInterimInterviewer, final: true };
             this.addTranscript(finalSegment);
             this.lastInterimInterviewer = null;
@@ -485,6 +507,7 @@ export class SessionTracker {
         this.fullUsage = [];
         this.transcriptEpochSummaries = [];
         this.sessionStartTime = Date.now();
+        this.meetingId = null;
         this.lastAssistantMessage = null;
         this.assistantResponseHistory = [];
         this.lastInterimInterviewer = null;

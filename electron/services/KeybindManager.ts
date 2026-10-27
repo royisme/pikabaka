@@ -10,6 +10,11 @@ export interface KeybindConfig {
     defaultAccelerator: string;
 }
 
+// Ctrl+Alt is AltGr on many Windows keyboard layouts and can swallow typed characters, so the
+// Windows defaults avoid it. Both are rebindable in Settings.
+const TOGGLE_TRANSLATION_DEFAULT = process.platform === 'win32' ? 'Control+Shift+F9' : 'CommandOrControl+Alt+T';
+const TOGGLE_ORIGINAL_DEFAULT = process.platform === 'win32' ? 'Control+Shift+F10' : 'CommandOrControl+Alt+O';
+
 export const DEFAULT_KEYBINDS: KeybindConfig[] = [
     // General
     { id: 'general:toggle-visibility', label: 'Toggle Visibility', accelerator: 'CommandOrControl+B', isGlobal: true, defaultAccelerator: 'CommandOrControl+B' },
@@ -30,6 +35,10 @@ export const DEFAULT_KEYBINDS: KeybindConfig[] = [
     { id: 'chat:brainstorm', label: 'Brainstorm Approaches', accelerator: 'CommandOrControl+7', isGlobal: true, defaultAccelerator: 'CommandOrControl+7' },
     { id: 'chat:scrollUp', label: 'Scroll Up', accelerator: 'CommandOrControl+Up', isGlobal: true, defaultAccelerator: 'CommandOrControl+Up' },
     { id: 'chat:scrollDown', label: 'Scroll Down', accelerator: 'CommandOrControl+Down', isGlobal: true, defaultAccelerator: 'CommandOrControl+Down' },
+
+    // Live translation - global, so the reader can switch it mid-call without focusing Pika
+    { id: 'translation:toggle', label: 'Toggle Translation', accelerator: TOGGLE_TRANSLATION_DEFAULT, isGlobal: true, defaultAccelerator: TOGGLE_TRANSLATION_DEFAULT },
+    { id: 'translation:toggle-original', label: 'Toggle Original Text', accelerator: TOGGLE_ORIGINAL_DEFAULT, isGlobal: true, defaultAccelerator: TOGGLE_ORIGINAL_DEFAULT },
 
     // Window Movement - Global shortcuts (stealth window positioning)
     { id: 'window:move-up', label: 'Move Window Up', accelerator: 'CommandOrControl+Shift+Up', isGlobal: true, defaultAccelerator: 'CommandOrControl+Shift+Up' },

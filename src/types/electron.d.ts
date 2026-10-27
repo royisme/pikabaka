@@ -1,3 +1,14 @@
+export interface AgentGateDecision {
+  time: number; meetingId: string; segmentId: string; revision: number; model: string; threshold: number; cooldownSeconds: number
+  help?: number; kind?: string; kindProbability?: number; latencyMs?: number; outcome: string
+}
+
+export type AiConnectionType = 'openai' | 'anthropic' | 'gemini'
+export interface AiConnectionView { id: string; name: string; type: AiConnectionType; baseUrl: string; customBaseUrl: boolean; hasApiKey: boolean; builtin: boolean }
+export interface AgentApprovalRequest { id: string; meetingId: string; tool: 'bash' | 'write' | 'edit' | 'read'; target: string; detail?: string; folder: string; outside?: boolean }
+export type AgentApprovalEvent = { type: 'requested'; request: AgentApprovalRequest } | { type: 'settled'; id: string; allowed: boolean }
+export interface AgentProactiveCard { id: string; meetingId: string; segmentId: string; kind: string; text: string; time: number }
+
 export interface ElectronAPI {
   updateContentDimensions: (dimensions: {
     width: number
@@ -67,26 +78,44 @@ export interface ElectronAPI {
   openPrivacySettings: (type: 'microphone' | 'screen') => Promise<{ success: boolean }>
   onSettingsVisibilityChange: (callback: (isVisible: boolean) => void) => () => void
   toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>
+  openSettingsSection: (section: string) => Promise<{ success: boolean }>
+  onOpenSettingsSection: (callback: (data: { section: string }) => void) => () => void
   closeSettingsWindow: () => Promise<void>
   toggleAdvancedSettings: () => Promise<void>
   closeAdvancedSettings: () => Promise<void>
-
-  // LLM Model Management
-  getCurrentLlmConfig: () => Promise<{ provider: "ollama" | "gemini"; model: string; isOllama: boolean }>
-  getAvailableOllamaModels: () => Promise<string[]>
-  switchToOllama: (model?: string, url?: string) => Promise<{ success: boolean; error?: string }>
-  switchToGemini: (apiKey?: string, modelId?: string) => Promise<{ success: boolean; error?: string }>
-  testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey?: string) => Promise<{ success: boolean; error?: string }>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
-
-  // API Key Management
-  setGeminiApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setGroqApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setOpenaiApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setClaudeApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  getStoredCredentials: () => Promise<{ hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; groqSttModel?: string; hasSonioxKey?: boolean; hasTavilyKey?: boolean; transcriptTranslationEnabled?: boolean; transcriptTranslationProvider?: string; transcriptTranslationModel?: string; transcriptTranslationPrompt?: string; transcriptTranslationDisplayMode?: 'original' | 'translated' | 'both'; transcriptTranslationSourceLanguage?: string; transcriptTranslationTargetLanguage?: string; geminiPreferredModel?: string; groqPreferredModel?: string; openaiPreferredModel?: string; claudePreferredModel?: string }>
+  getStoredCredentials: () => Promise<{ hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; groqSttModel?: string; sttModels?: Record<string, string>; hasSonioxKey?: boolean; hasTavilyKey?: boolean; transcriptTranslationEnabled?: boolean; transcriptTranslationProvider?: string; transcriptTranslationModel?: string; transcriptTranslationPrompt?: string; transcriptTranslationDisplayMode?: 'original' | 'translated' | 'both'; transcriptTranslationSourceLanguage?: string; transcriptTranslationTargetLanguage?: string; geminiPreferredModel?: string; groqPreferredModel?: string; openaiPreferredModel?: string; claudePreferredModel?: string }>
+  testTranscriptTranslation: (draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => Promise<{ success: boolean; sample: string; translatedText?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
   getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both'; sourceLanguage: string; targetLanguage: string }>
   setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both'; sourceLanguage?: string; targetLanguage?: string }) => Promise<{ success: boolean }>
+  agentGateGetSettings: () => Promise<{ mode: 'log' | 'on' | 'off'; model: string; baseUrl: string; hasApiKey: boolean; threshold: number; cooldownSeconds: number }>
+  agentGateSetSettings: (settings: { mode?: 'log' | 'on' | 'off'; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }) => Promise<{ success: boolean; error?: string }>
+  agentGateStatus: () => Promise<{ mode: 'log' | 'on' | 'off'; configured: boolean; state: 'ok' | 'unavailable' | 'unconfigured'; reason?: string; lastDecision?: AgentGateDecision }>
+  agentGateLog: () => Promise<AgentGateDecision[]>
+  onAgentProactive: (callback: (card: AgentProactiveCard) => void) => () => void
+  agentApprovalsList: () => Promise<AgentApprovalRequest[]>
+  agentApprovalRespond: (payload: { id: string; allowed: boolean }) => Promise<{ success: boolean }>
+  onAgentApproval: (callback: (event: AgentApprovalEvent) => void) => () => void
+  agentWorkspaceGet: () => Promise<{ root: string; error?: string }>
+  agentWorkspacePick: () => Promise<{ canceled: boolean; root?: string; error?: string }>
+  agentWorkspaceClear: () => Promise<{ success: boolean }>
+  aiConnectionsList: () => Promise<AiConnectionView[]>
+  aiConnectionSave: (input: { id?: string; name?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; id?: string; error?: string }>
+  aiConnectionDelete: (id: string) => Promise<{ success: boolean }>
+  aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
+  agentTest: (draft: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; reply?: string; toolCalls?: boolean | null; totalMs?: number; error?: string }>
+  modelTest: (draft: { job: 'chat' | 'summary'; connectionId: string; model: string }) => Promise<{ success: boolean; reply?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
+
+  embeddingUseGet: () => Promise<{ connectionId: string; model: string }>
+  embeddingUseSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
+  embeddingStatus: () => Promise<{ providerName: string | null; dimensions: number | null; usingSelected: boolean; selectedLabel: string | null; incompatible: number }>
+  agentGateTest: (draft: { model?: string; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; help?: number; kind?: string; latencyMs?: number; error?: string }>
+  agentModelGet: () => Promise<{ connectionId: string; model: string; supportsImages: boolean }>
+  agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; error?: string }>
+  chatModelGet: () => Promise<{ connectionId: string; model: string }>
+  chatModelSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
+  summaryModelGet: () => Promise<{ connectionId: string; model: string }>
+  summaryModelSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string; translatedText?: string }>
 
   // STT Provider Management
@@ -102,11 +131,13 @@ export interface ElectronAPI {
   setAzureRegion: (region: string) => Promise<{ success: boolean; error?: string }>
   setIbmWatsonApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   setGroqSttModel: (model: string) => Promise<{ success: boolean; error?: string }>
+  setSttModel: (provider: string, model: string) => Promise<{ success: boolean; error?: string }>
+  fetchSttModels: (provider: string, apiKey?: string) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
   setSonioxApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   testSttConnection: (provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox', apiKey: string, region?: string) => Promise<{ success: boolean; error?: string }>
 
   // Native Audio Service Events
-  onNativeAudioTranscript: (callback: (transcript: { speaker: string; text: string; final: boolean; timestamp?: number; confidence?: number; segmentId?: string; sourceText?: string; translatedText?: string; translationState?: 'pending' | 'complete' | 'error' | 'skipped'; displayMode?: 'original' | 'translated' | 'both'; speakerLabel?: string; detectedLanguage?: string; revision?: number }) => void) => () => void
+  onNativeAudioTranscript: (callback: (transcript: { speaker: string; text: string; final: boolean; timestamp?: number; confidence?: number; segmentId?: string; sourceText?: string; translatedText?: string; translationState?: 'pending' | 'streaming' | 'complete' | 'error' | 'skipped'; translationError?: 'timeout' | 'auth' | 'rate-limit' | 'network' | 'other'; displayMode?: 'original' | 'translated' | 'both'; speakerLabel?: string; detectedLanguage?: string; revision?: number; replaces?: string[] }) => void) => () => void
   onNativeAudioSuggestion: (callback: (suggestion: { context: string; lastQuestion: string; confidence: number }) => void) => () => void
   onNativeAudioConnected: (callback: () => void) => () => void
   onNativeAudioDisconnected: (callback: () => void) => () => void
@@ -116,11 +147,15 @@ export interface ElectronAPI {
   generateSuggestion: (context: string, lastQuestion: string) => Promise<{ suggestion: string }>
   getInputDevices: () => Promise<Array<{ id: string; name: string }>>
   getOutputDevices: () => Promise<Array<{ id: string; name: string }>>
-  setRecognitionLanguage: (key: string) => Promise<{ success: boolean; error?: string }>
+  setRecognitionLanguage: (key: string, speaker?: 'interviewer' | 'user') => Promise<{ success: boolean; error?: string }>
   getAiResponseLanguages: () => Promise<Array<{ label: string; code: string }>>
   setAiResponseLanguage: (language: string) => Promise<{ success: boolean; error?: string }>
-  getSttLanguage: () => Promise<string>
+  getSttLanguage: (speaker?: 'interviewer' | 'user') => Promise<string>
   getAiResponseLanguage: () => Promise<string>
+  getAnswerStyle: () => Promise<string>
+  profileGetNotes: () => Promise<string>
+  profileSetNotes: (text: string) => Promise<{ success: boolean; error?: string }>
+  setAnswerStyle: (style: string) => Promise<{ success: boolean; error?: string }>
 
   getNativeAudioStatus: () => Promise<{
     connected: boolean;
@@ -182,41 +217,24 @@ export interface ElectronAPI {
   onSessionReset: (callback: () => void) => () => void;
 
   // Streaming listeners
-  streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean }) => Promise<void>
+  streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean; ragMiss?: boolean }) => Promise<void>
+  cancelGeneration: () => Promise<{ success: boolean }>
   onGeminiStreamToken: (callback: (token: string) => void) => () => void
   onGeminiStreamDone: (callback: () => void) => () => void
   onGeminiStreamError: (callback: (error: string) => void) => () => void;
 
   // Model Management
-  getDefaultModel: () => Promise<{ model: string }>;
-  setModel: (modelId: string) => Promise<{ success: boolean; error?: string }>;
-  setDefaultModel: (modelId: string) => Promise<{ success: boolean; error?: string }>;
   toggleModelSelector: (coords: { x: number; y: number }) => Promise<void>;
-  forceRestartOllama: () => Promise<void>;
 
   // Settings Window
   toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>;
 
-  // Groq Fast Text Mode
-  getGroqFastTextMode: () => Promise<{ enabled: boolean }>;
-  setGroqFastTextMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
-
   // Demo
   seedDemo: () => Promise<{ success: boolean }>;
-
-  // Custom Providers
-  saveCustomProvider: (provider: any) => Promise<{ success: boolean; id?: string; error?: string }>;
-  getCustomProviders: () => Promise<any[]>;
-  deleteCustomProvider: (id: string) => Promise<{ success: boolean; error?: string }>;
-  getOpenAICompatibleProviders: () => Promise<Array<{ id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }>>;
-  saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) => Promise<{ success: boolean; error?: string }>;
-  deleteOpenAICompatibleProvider: (id: string) => Promise<{ success: boolean; error?: string }>;
-  fetchOpenAICompatibleModels: (baseUrl: string, apiKey: string) => Promise<{ success: boolean; models?: { id: string; label: string }[]; error?: string }>;
 
   // Follow-up Email
   generateFollowupEmail: (input: any) => Promise<string>;
   extractEmailsFromTranscript: (transcript: Array<{ text: string }>) => Promise<string[]>;
-  getCalendarAttendees: (eventId: string) => Promise<Array<{ email: string; name: string }>>;
   openMailto: (params: { to: string; subject: string; body: string }) => Promise<{ success: boolean; error?: string }>;
 
   // Audio Test
@@ -228,8 +246,9 @@ export interface ElectronAPI {
   flushDatabase: () => Promise<{ success: boolean }>;
 
   onUndetectableChanged: (callback: (state: boolean) => void) => () => void;
-  onGroqFastTextChanged: (callback: (enabled: boolean) => void) => () => void;
-  onOpenAICompatibleProvidersChanged: (callback: () => void) => () => void;
+  getMicrophoneMuted: () => Promise<boolean>;
+  setMicrophoneMuted: (muted: boolean) => Promise<{ success: boolean }>;
+  onMicrophoneMutedChanged: (callback: (muted: boolean) => void) => () => void;
   onModelChanged: (callback: (modelId: string) => void) => () => void;
 
   onOllamaPullProgress: (callback: (data: { status: string; percent: number }) => void) => () => void;
@@ -239,19 +258,12 @@ export interface ElectronAPI {
 
   // Provider Compatibility
   onIncompatibleProviderWarning: (callback: (data: { count: number, oldProvider: string, newProvider: string }) => void) => () => void;
-  reindexIncompatibleMeetings: () => Promise<void>;
+  reindexIncompatibleMeetings: () => Promise<{ success: boolean; error?: string }>;
 
   // Theme API
   getThemeMode: () => Promise<{ mode: 'system' | 'light' | 'dark', resolved: 'light' | 'dark' }>
   setThemeMode: (mode: 'system' | 'light' | 'dark') => Promise<void>
   onThemeChanged: (callback: (data: { mode: 'system' | 'light' | 'dark', resolved: 'light' | 'dark' }) => void) => () => void
-
-  // Calendar
-  calendarConnect: () => Promise<{ success: boolean; error?: string }>
-  calendarDisconnect: () => Promise<{ success: boolean; error?: string }>
-  getCalendarStatus: () => Promise<{ connected: boolean; email?: string }>
-  getUpcomingEvents: () => Promise<Array<{ id: string; title: string; startTime: string; endTime: string; link?: string; source: 'google' }>>
-  calendarRefresh: () => Promise<{ success: boolean; error?: string }>
 
   // Auto-Update
   onUpdateAvailable: (callback: (info: any) => void) => () => void
@@ -316,10 +328,6 @@ export interface ElectronAPI {
   // Tavily Search API
   setTavilyApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
 
-  // Dynamic Model Discovery
-  fetchProviderModels: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey: string) => Promise<{ success: boolean; models?: { id: string; label: string }[]; error?: string }>
-  setProviderPreferredModel: (provider: 'gemini' | 'groq' | 'openai' | 'claude', modelId: string) => Promise<void>
-
   // License Management
   licenseActivate: (key: string) => Promise<{ success: boolean; error?: string }>
   licenseCheckPremium: () => Promise<boolean>
@@ -349,9 +357,47 @@ export interface ElectronAPI {
   cropperCancelled: () => void;
   onResetCropper: (callback: (data: { hudPosition: { x: number; y: number } }) => void) => () => void;
 
+  // Agent API
+  agentStatus: () => Promise<AgentStatus>;
+  agentSubmit: (payload: AgentSubmitPayload) => Promise<AgentSubmitResult>;
+  agentAbort: () => Promise<{ success: boolean }>;
+  agentGetThread: () => Promise<AgentThreadLine[]>;
+  onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
+
   // Platform
   platform: NodeJS.Platform;
 }
+
+export type MeetingAgentEvent = { meetingId: string } & (
+  | { type: 'run_started' | 'run_settled' }
+  | { type: 'text_delta' | 'text_final'; text: string }
+  | { type: 'tool_started' | 'tool_finished'; toolName: string }
+  | { type: 'run_failed'; errorClass: string }
+);
+export type AgentEvent = MeetingAgentEvent;
+
+export interface AgentThreadLine {
+  id: string;
+  role: 'user' | 'assistant' | 'tool';
+  text: string;
+}
+export type ThreadLine = AgentThreadLine;
+
+export interface AgentStatus {
+  meetingActive: boolean;
+  available: boolean;
+  reason?: string;
+}
+
+export interface AgentSubmitPayload {
+  text: string;
+  mode?: 'followup' | 'steer';
+  requestId?: string;
+}
+
+export type AgentSubmitResult =
+  | { ok: true; requestId: string }
+  | { ok: false; reason: string };
 
 declare global {
   interface Window {

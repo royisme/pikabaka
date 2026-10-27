@@ -160,13 +160,11 @@ extern "C" fn proc(
 
     if let Some(view) = av::AudioPcmBuf::with_buf_list_no_copy(&ctx.format, input_data, None) {
         if let Some(data) = view.data_f32_at(0) {
-            let buffer_channels = input_data.buffers[0].number_channels;
-            let actual_ch = if buffer_channels > 1 {
-                buffer_channels
-            } else {
-                2
-            };
-            push_audio(ctx, data, actual_ch);
+            // The buffer says how many channels it holds: trust it. Averaging pairs of a mono stream
+            // halves the sample count, which plays back at twice the speed an octave higher.
+            let buffer_channels = input_data.buffers[0].number_channels.max(1);
+            log_first_callback(input_data.number_buffers, buffer_channels, input_data.buffers[0].data_bytes_size, ctx.channels);
+            push_audio(ctx, data, buffer_channels);
         }
     } else if ctx.format.common_format() == av::audio::CommonFormat::PcmF32 {
         let first_buffer = &input_data.buffers[0];
@@ -177,20 +175,27 @@ extern "C" fn proc(
             let data =
                 unsafe { std::slice::from_raw_parts(first_buffer.data as *const f32, float_count) };
 
-            // BUGFIX: macOS CoreAudio Tap notoriously ignores mono ASBD requests
-            // and secretly returns interleaved stereo (L,R,L,R).
-            let buffer_channels = first_buffer.number_channels;
-            let actual_ch = if buffer_channels > 1 {
-                buffer_channels
-            } else {
-                2
-            };
+            // The buffer says how many channels it holds: trust it (see above).
+            let buffer_channels = first_buffer.number_channels.max(1);
+            log_first_callback(input_data.number_buffers, buffer_channels, first_buffer.data_bytes_size, ctx.channels);
 
-            push_audio(ctx, data, actual_ch);
+            push_audio(ctx, data, buffer_channels);
         }
     }
 
     os::Status::NO_ERR
+}
+
+/// Logs once, from the first callback, what the tap really delivers: counts only, never audio.
+fn log_first_callback(buffers: u32, buffer_channels: u32, bytes: u32, format_channels: impl std::fmt::Debug) {
+    use std::sync::atomic::AtomicBool;
+    static LOGGED: AtomicBool = AtomicBool::new(false);
+    if !LOGGED.swap(true, Ordering::Relaxed) {
+        eprintln!(
+            "[CoreAudioTap] First callback: buffers={}, buffer_channels={}, bytes={}, format_channels={:?}",
+            buffers, buffer_channels, bytes, format_channels
+        );
+    }
 }
 
 #[inline(always)]

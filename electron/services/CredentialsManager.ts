@@ -3,27 +3,18 @@
  * Uses plaintext JSON in the userData directory.
  */
 
+import { BUILTIN_CONNECTIONS, CONNECTION_TYPES, connectionNeedsKey, isBuiltinConnection, normalizeBaseUrl, type Connection, type ConnectionType, type ConnectionView } from './aiConnections';
 import fs from 'fs';
+import { randomUUID } from 'node:crypto';
 import { DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT } from '../transcript/translationExecutor';
 import { getCredentialsJsonPath } from './configPaths';
-
-export interface CustomProvider {
-    id: string;
-    name: string;
-    curlCommand: string;
-}
-
-export interface CurlProvider {
-    id: string;
-    name: string;
-    curlCommand: string;
-    responsePath: string; // e.g. "choices[0].message.content"
-}
 
 /** OpenAI-compatible Chat Completions (URL + API key; uses /v1/chat/completions and /v1/models). */
 export interface OpenAICompatibleProvider {
     id: string;
     name: string;
+    /** The wire protocol. Missing means `openai`, which is what every entry saved before types was. */
+    type?: ConnectionType;
     baseUrl: string;
     apiKey: string;
     /** Model id for chat/completions (set via Fetch Models or manually). */
@@ -36,14 +27,29 @@ export interface StoredCredentials {
     openaiApiKey?: string;
     claudeApiKey?: string;
     googleServiceAccountPath?: string;
-    customProviders?: CustomProvider[];
-    curlProviders?: CurlProvider[];
     openaiCompatibleProviders?: OpenAICompatibleProvider[];
-    defaultModel?: string;
+    /** Host overrides of the built-in connections (gemini, openai, claude, groq), by id. */
+    connectionBaseUrls?: Record<string, string>;
+    /** Quick answers and chat: a connection and an exact model id. Unset means not chosen. */
+    chatConnectionId?: string;
+    chatModel?: string;
+    /** Meeting summaries and titles. Unset means the same as quick answers. */
+    summaryConnectionId?: string;
+    summaryModel?: string;
+    /** Search embeddings. An empty connection keeps automatic provider selection. */
+    embeddingConnectionId?: string;
+    embeddingModel?: string;
+    /** The agent's own model: a connection and a model id, chosen apart from the chat model. */
+    agentConnectionId?: string;
+    agentModel?: string;
+    /** Whether that model reads images (unknown for a model Pika has not been told about). */
+    agentModelImages?: boolean;
     // STT Provider settings
     sttProvider?: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox';
     groqSttApiKey?: string;
     groqSttModel?: string;
+    /** The model chosen for each speech service (deepgram, openai, elevenlabs, soniox); empty means its default. */
+    sttModels?: Record<string, string>;
     openAiSttApiKey?: string;
     deepgramApiKey?: string;
     elevenLabsApiKey?: string;
@@ -53,9 +59,12 @@ export interface StoredCredentials {
     ibmWatsonRegion?: string;
     sonioxApiKey?: string;
     sttLanguage?: string;
+    sttLanguageUser?: string;
     aiResponseLanguage?: string;
+    /** How answers sound (a manner of speaking, free text). Unset means the default style. */
+    answerStyle?: string;
     transcriptTranslationEnabled?: boolean;
-    /** `ollama` | `gemini` | `groq` | `openai` | `claude` | OpenAI-compatible provider id from AI Providers */
+    /** Connection id from AI Providers. An unknown or removed id is not configured. */
     transcriptTranslationProvider?: string;
     transcriptTranslationModel?: string;
     transcriptTranslationPrompt?: string;
@@ -63,6 +72,15 @@ export interface StoredCredentials {
     /** Recognition language key (RECOGNITION_LANGUAGES) or 'auto' */
     transcriptTranslationSourceLanguage?: string;
     transcriptTranslationTargetLanguage?: string;
+    /** The one folder the agent's commands run under (a folder per day and per meeting inside it). */
+    agentWorkspaceRoot?: string;
+    // Proactive help: the decision model (a System One classifier) behind the gate
+    agentGateMode?: 'log' | 'on' | 'off';
+    agentGateModel?: string;
+    agentGateBaseUrl?: string;
+    agentGateApiKey?: string;
+    agentGateThreshold?: number;
+    agentGateCooldownSeconds?: number;
     // Tavily Search
     tavilyApiKey?: string;
     // Dynamic Model Discovery – preferred models per provider
@@ -121,10 +139,6 @@ export class CredentialsManager {
         return this.credentials.googleServiceAccountPath;
     }
 
-    public getCustomProviders(): CustomProvider[] {
-        return this.credentials.customProviders || [];
-    }
-
     public getSttProvider(): 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' {
         return this.credentials.sttProvider || 'google';
     }
@@ -135,6 +149,23 @@ export class CredentialsManager {
 
     public getGroqSttApiKey(): string | undefined {
         return this.credentials.groqSttApiKey;
+    }
+
+    public getSttModel(provider: string): string {
+        if (provider === 'groq') return this.getGroqSttModel();
+        return this.credentials.sttModels?.[provider] || '';
+    }
+
+    public setSttModel(provider: string, model: string): void {
+        if (provider === 'groq') {
+            this.setGroqSttModel(model.trim() || 'whisper-large-v3-turbo');
+            return;
+        }
+        const models = { ...(this.credentials.sttModels || {}) };
+        if (model.trim()) models[provider] = model.trim();
+        else delete models[provider];
+        this.credentials.sttModels = Object.keys(models).length ? models : undefined;
+        this.saveCredentials();
     }
 
     public getGroqSttModel(): string {
@@ -173,8 +204,79 @@ export class CredentialsManager {
         return this.credentials.tavilyApiKey;
     }
 
+    // The language of the other party's audio. Before per-speaker languages this was the only one.
     public getSttLanguage(): string {
         return this.credentials.sttLanguage || 'english-us';
+    }
+
+    // The language the user speaks; follows the other party's language until set on its own.
+    public getSttLanguageUser(): string {
+        return this.credentials.sttLanguageUser || this.getSttLanguage();
+    }
+
+    public getAgentWorkspaceRoot(): string {
+        return this.credentials.agentWorkspaceRoot || '';
+    }
+
+    public setAgentWorkspaceRoot(root: string): void {
+        this.credentials.agentWorkspaceRoot = root.trim() || undefined;
+        this.saveCredentials();
+        console.log('[CredentialsManager] Agent workspace root updated');
+    }
+
+    public getAgentGateMode(): 'log' | 'on' | 'off' {
+        const mode = this.credentials.agentGateMode;
+        // Unset means on: once a decision model is set, a question puts a card on screen without a click.
+        return mode === 'log' || mode === 'off' ? mode : 'on';
+    }
+
+    public getAgentGateModel(): string {
+        return this.credentials.agentGateModel || '';
+    }
+
+    public getAgentGateBaseUrl(): string {
+        return this.credentials.agentGateBaseUrl || '';
+    }
+
+    public getAgentGateApiKey(): string {
+        return this.credentials.agentGateApiKey || '';
+    }
+
+    public getAgentGateThreshold(): number {
+        const value = this.credentials.agentGateThreshold;
+        return typeof value === 'number' && value >= 0 && value <= 1 ? value : 0.7;
+    }
+
+    public getAgentGateCooldownSeconds(): number {
+        const value = this.credentials.agentGateCooldownSeconds;
+        return typeof value === 'number' && value >= 0 ? value : 120;
+    }
+
+    public setAgentGateSettings(settings: {
+        mode?: 'log' | 'on' | 'off';
+        model?: string;
+        baseUrl?: string;
+        apiKey?: string;
+        threshold?: number;
+        cooldownSeconds?: number;
+    }): void {
+        if (settings.mode !== undefined) this.credentials.agentGateMode = settings.mode;
+        if (settings.model !== undefined) this.credentials.agentGateModel = settings.model.trim() || undefined;
+        if (settings.baseUrl !== undefined) this.credentials.agentGateBaseUrl = settings.baseUrl.trim() || undefined;
+        if (settings.apiKey !== undefined) this.credentials.agentGateApiKey = settings.apiKey.trim() || undefined;
+        if (settings.threshold !== undefined) this.credentials.agentGateThreshold = settings.threshold;
+        if (settings.cooldownSeconds !== undefined) this.credentials.agentGateCooldownSeconds = settings.cooldownSeconds;
+        this.saveCredentials();
+        console.log('[CredentialsManager] Proactive help settings updated');
+    }
+
+    public getAnswerStyle(): string {
+        return this.credentials.answerStyle || '';
+    }
+
+    public setAnswerStyle(style: string): void {
+        this.credentials.answerStyle = style.trim().slice(0, 200) || undefined;
+        this.saveCredentials();
     }
 
     public getAiResponseLanguage(): string {
@@ -217,9 +319,6 @@ export class CredentialsManager {
         this.credentials.transcriptTranslationTargetLanguage = key;
         this.saveCredentials();
     }
-    public getDefaultModel(): string {
-        return this.credentials.defaultModel || 'gemini-3.1-flash-lite-preview';
-    }
 
     public getAllCredentials(): StoredCredentials {
         return { ...this.credentials };
@@ -228,30 +327,6 @@ export class CredentialsManager {
     // =========================================================================
     // Setters (auto-save)
     // =========================================================================
-
-    public setGeminiApiKey(key: string): void {
-        this.credentials.geminiApiKey = key;
-        this.saveCredentials();
-        console.log('[CredentialsManager] Gemini API Key updated');
-    }
-
-    public setGroqApiKey(key: string): void {
-        this.credentials.groqApiKey = key;
-        this.saveCredentials();
-        console.log('[CredentialsManager] Groq API Key updated');
-    }
-
-    public setOpenaiApiKey(key: string): void {
-        this.credentials.openaiApiKey = key;
-        this.saveCredentials();
-        console.log('[CredentialsManager] OpenAI API Key updated');
-    }
-
-    public setClaudeApiKey(key: string): void {
-        this.credentials.claudeApiKey = key;
-        this.saveCredentials();
-        console.log('[CredentialsManager] Claude API Key updated');
-    }
 
     public setGoogleServiceAccountPath(filePath: string): void {
         this.credentials.googleServiceAccountPath = filePath;
@@ -338,6 +413,12 @@ export class CredentialsManager {
         console.log(`[CredentialsManager] STT Language set to: ${language}`);
     }
 
+    public setSttLanguageUser(language: string): void {
+        this.credentials.sttLanguageUser = language;
+        this.saveCredentials();
+        console.log(`[CredentialsManager] STT Language (user) set to: ${language}`);
+    }
+
     public setAiResponseLanguage(language: string): void {
         this.credentials.aiResponseLanguage = language;
         this.saveCredentials();
@@ -373,103 +454,192 @@ export class CredentialsManager {
         this.saveCredentials();
         console.log(`[CredentialsManager] Transcript Translation Display Mode set to: ${mode}`);
     }
-    public setDefaultModel(model: string): void {
-        this.credentials.defaultModel = model;
-        this.saveCredentials();
-        console.log(`[CredentialsManager] Default Model set to: ${model}`);
-    }
 
-    public getPreferredModel(provider: 'gemini' | 'groq' | 'openai' | 'claude'): string | undefined {
-        const key = `${provider}PreferredModel` as keyof StoredCredentials;
-        return this.credentials[key] as string | undefined;
-    }
+    // ---- Connections: where a model is reached (type, host, key). See aiConnections.ts ----
 
-    public setPreferredModel(provider: 'gemini' | 'groq' | 'openai' | 'claude', modelId: string): void {
-        const key = `${provider}PreferredModel` as keyof StoredCredentials;
-        (this.credentials as any)[key] = modelId;
-        this.saveCredentials();
-        console.log(`[CredentialsManager] ${provider} preferred model set to: ${modelId}`);
-    }
-
-    public saveCustomProvider(provider: CustomProvider): void {
-        if (!this.credentials.customProviders) {
-            this.credentials.customProviders = [];
+    private builtinKey(id: string): string {
+        switch (id) {
+            case 'gemini': return this.credentials.geminiApiKey || '';
+            case 'groq': return this.credentials.groqApiKey || '';
+            case 'openai': return this.credentials.openaiApiKey || '';
+            case 'claude': return this.credentials.claudeApiKey || '';
+            default: return '';
         }
-        // Check if exists, update if so
-        const index = this.credentials.customProviders.findIndex(p => p.id === provider.id);
-        if (index !== -1) {
-            this.credentials.customProviders[index] = provider;
+    }
+
+    /** The connection with its key (main process only), or undefined for an unknown id. */
+    public resolveConnection(id: string): Connection | undefined {
+        const builtin = BUILTIN_CONNECTIONS.find(c => c.id === id);
+        if (builtin) {
+            const override = this.credentials.connectionBaseUrls?.[id];
+            return {
+                id,
+                name: builtin.name,
+                type: builtin.type,
+                baseUrl: normalizeBaseUrl(override) ?? builtin.defaultBaseUrl,
+                apiKey: this.builtinKey(id),
+                builtin: true,
+            };
+        }
+        const custom = this.getOpenAICompatibleProviders().find(p => p.id === id);
+        if (!custom) return undefined;
+        return {
+            id,
+            name: custom.name,
+            type: custom.type && CONNECTION_TYPES.includes(custom.type) ? custom.type : 'openai',
+            baseUrl: normalizeBaseUrl(custom.baseUrl) ?? custom.baseUrl,
+            apiKey: custom.apiKey || '',
+            builtin: false,
+        };
+    }
+
+    /** Every connection, built-in ones first, for the settings screen: no key leaves the main process. */
+    public listConnections(): ConnectionView[] {
+        const ids = [...BUILTIN_CONNECTIONS.map(c => c.id as string), ...this.getOpenAICompatibleProviders().map(p => p.id)];
+        return ids.flatMap(id => {
+            const connection = this.resolveConnection(id);
+            if (!connection) return [];
+            const builtin = BUILTIN_CONNECTIONS.find(c => c.id === id);
+            return [{
+                id,
+                name: connection.name,
+                type: connection.type,
+                baseUrl: connection.baseUrl,
+                customBaseUrl: !!builtin && connection.baseUrl !== builtin.defaultBaseUrl,
+                hasApiKey: connection.apiKey !== '',
+                builtin: !!builtin,
+            }];
+        });
+    }
+
+    /** Whether the connection can be used as it is: a key where one is needed. */
+    public isConnectionReady(id: string): boolean {
+        const connection = this.resolveConnection(id);
+        return !!connection && (connection.apiKey !== '' || !connectionNeedsKey(connection.baseUrl));
+    }
+
+    /**
+     * Saves a connection. A built-in one takes a key and a host override (empty means the default);
+     * a custom one takes a name, a type and a host. A missing `apiKey` leaves the stored key as it is.
+     * Returns the id, or the reason it was refused.
+     */
+    public saveConnection(input: { id?: string; name?: string; type?: ConnectionType; baseUrl?: string; apiKey?: string }): { id: string } | { error: string } {
+        const baseUrl = (input.baseUrl ?? '').trim();
+        if (baseUrl && !normalizeBaseUrl(baseUrl)) return { error: 'The host must be an http or https address without a query or credentials' };
+        if (input.id && isBuiltinConnection(input.id)) {
+            const id = input.id;
+            const overrides = { ...(this.credentials.connectionBaseUrls || {}) };
+            if (baseUrl) overrides[id] = normalizeBaseUrl(baseUrl)!;
+            else delete overrides[id];
+            this.credentials.connectionBaseUrls = Object.keys(overrides).length ? overrides : undefined;
+            if (input.apiKey !== undefined) {
+                const key = input.apiKey.trim();
+                if (id === 'gemini') this.credentials.geminiApiKey = key || undefined;
+                else if (id === 'groq') this.credentials.groqApiKey = key || undefined;
+                else if (id === 'openai') this.credentials.openaiApiKey = key || undefined;
+                else if (id === 'claude') this.credentials.claudeApiKey = key || undefined;
+            }
+            this.saveCredentials();
+            return { id };
+        }
+        const name = (input.name ?? '').trim();
+        if (!name || name.length > 80) return { error: 'Give the connection a name' };
+        if (!input.type || !CONNECTION_TYPES.includes(input.type)) return { error: 'Choose a type' };
+        if (!baseUrl) return { error: 'A custom connection needs a host' };
+        const list = this.credentials.openaiCompatibleProviders || (this.credentials.openaiCompatibleProviders = []);
+        const existing = input.id ? list.find(p => p.id === input.id) : undefined;
+        if (input.id && !existing) return { error: 'That connection does not exist' };
+        const entry: OpenAICompatibleProvider = {
+            id: existing?.id ?? `conn-${randomUUID().slice(0, 8)}`,
+            name,
+            type: input.type,
+            baseUrl: normalizeBaseUrl(baseUrl)!,
+            apiKey: input.apiKey === undefined ? existing?.apiKey ?? '' : input.apiKey.trim(),
+            ...(existing?.preferredModel ? { preferredModel: existing.preferredModel } : {}),
+        };
+        if (existing) list[list.indexOf(existing)] = entry;
+        else list.push(entry);
+        this.saveCredentials();
+        return { id: entry.id };
+    }
+
+    public deleteConnection(id: string): boolean {
+        if (isBuiltinConnection(id) || !this.credentials.openaiCompatibleProviders) return false;
+        const before = this.credentials.openaiCompatibleProviders.length;
+        this.credentials.openaiCompatibleProviders = this.credentials.openaiCompatibleProviders.filter(p => p.id !== id);
+        if (this.credentials.agentConnectionId === id) this.credentials.agentConnectionId = undefined;
+        this.saveCredentials();
+        return this.credentials.openaiCompatibleProviders.length !== before;
+    }
+
+    public getModelUse(job: 'chat' | 'summary'): { connectionId: string; model: string } {
+        return job === 'chat'
+            ? { connectionId: this.credentials.chatConnectionId || '', model: this.credentials.chatModel || '' }
+            : { connectionId: this.credentials.summaryConnectionId || '', model: this.credentials.summaryModel || '' };
+    }
+
+    public setModelUse(job: 'chat' | 'summary', use: { connectionId: string; model: string }): void {
+        const connectionId = use.connectionId.trim() || undefined;
+        const model = use.model.trim() || undefined;
+        if (job === 'chat') {
+            this.credentials.chatConnectionId = connectionId;
+            this.credentials.chatModel = model;
         } else {
-            this.credentials.customProviders.push(provider);
+            this.credentials.summaryConnectionId = connectionId;
+            this.credentials.summaryModel = model;
         }
         this.saveCredentials();
-        console.log(`[CredentialsManager] Custom Provider '${provider.name}' saved`);
     }
 
-    public deleteCustomProvider(id: string): void {
-        if (!this.credentials.customProviders) return;
-        this.credentials.customProviders = this.credentials.customProviders.filter(p => p.id !== id);
+    public getEmbeddingUse(): { connectionId: string; model: string } {
+        return { connectionId: this.credentials.embeddingConnectionId || '', model: this.credentials.embeddingModel || '' };
+    }
+
+    public setEmbeddingUse(use: { connectionId: string; model: string }): void {
+        if (typeof use?.connectionId !== 'string' || typeof use.model !== 'string' || use.connectionId.length > 512 || use.model.length > 512) {
+            throw new Error('Invalid embedding model');
+        }
+        const connectionId = use.connectionId.trim();
+        const model = use.model.trim();
+        if (connectionId) {
+            const connection = this.resolveConnection(connectionId);
+            if (!connection) throw new Error('That connection does not exist');
+            if (connection.type !== 'openai' && connection.type !== 'gemini') throw new Error('Embeddings require an OpenAI-type or Gemini-type connection; Anthropic has no embeddings API');
+            if (!model) throw new Error('Choose an embedding model id');
+        }
+        this.credentials.embeddingConnectionId = connectionId || undefined;
+        this.credentials.embeddingModel = connectionId ? model : undefined;
         this.saveCredentials();
-        console.log(`[CredentialsManager] Custom Provider '${id}' deleted`);
     }
 
-    public getCurlProviders(): CurlProvider[] {
-        return this.credentials.curlProviders || [];
+    /** Summaries and the agent inherit quick answers only when their own connection is empty. */
+    public resolveModelUse(job: 'chat' | 'summary' | 'agent'): { connection: Connection; model: string } | { error: string } {
+        let use = job === 'agent' ? this.getAgentUse() : this.getModelUse(job);
+        if (!use.connectionId && job !== 'chat') use = this.getModelUse('chat');
+        if (!use.connectionId || !use.model) return { error: 'Choose the quick answers model in Settings, AI Providers' };
+        const connection = this.resolveConnection(use.connectionId);
+        if (!connection) return { error: 'The connection chosen for this job no longer exists' };
+        if (!connection.apiKey && connectionNeedsKey(connection.baseUrl)) return { error: `No API key is saved for ${connection.name}` };
+        return { connection, model: use.model };
+    }
+
+    public getAgentUse(): { connectionId: string; model: string; supportsImages: boolean } {
+        return {
+            connectionId: this.credentials.agentConnectionId || '',
+            model: this.credentials.agentModel || '',
+            supportsImages: this.credentials.agentModelImages === true,
+        };
+    }
+
+    public setAgentUse(use: { connectionId: string; model: string; supportsImages?: boolean }): void {
+        this.credentials.agentConnectionId = use.connectionId.trim() || undefined;
+        this.credentials.agentModel = use.model.trim() || undefined;
+        this.credentials.agentModelImages = use.supportsImages === true ? true : undefined;
+        this.saveCredentials();
     }
 
     public getOpenAICompatibleProviders(): OpenAICompatibleProvider[] {
-        return this.credentials.openaiCompatibleProviders || [];
-    }
-
-    /** All non-standard LLM backends (legacy custom, curl templates, OpenAI-compatible). */
-    public getMergedLlmCustomProviders(): (CustomProvider | CurlProvider | OpenAICompatibleProvider)[] {
-        return [
-            ...(this.credentials.customProviders || []),
-            ...(this.credentials.curlProviders || []),
-            ...(this.credentials.openaiCompatibleProviders || []),
-        ];
-    }
-
-    public saveCurlProvider(provider: CurlProvider): void {
-        if (!this.credentials.curlProviders) {
-            this.credentials.curlProviders = [];
-        }
-        const index = this.credentials.curlProviders.findIndex(p => p.id === provider.id);
-        if (index !== -1) {
-            this.credentials.curlProviders[index] = provider;
-        } else {
-            this.credentials.curlProviders.push(provider);
-        }
-        this.saveCredentials();
-        console.log(`[CredentialsManager] Curl Provider '${provider.name}' saved`);
-    }
-
-    public deleteCurlProvider(id: string): void {
-        if (!this.credentials.curlProviders) return;
-        this.credentials.curlProviders = this.credentials.curlProviders.filter(p => p.id !== id);
-        this.saveCredentials();
-        console.log(`[CredentialsManager] Curl Provider '${id}' deleted`);
-    }
-
-    public saveOpenAICompatibleProvider(provider: OpenAICompatibleProvider): void {
-        if (!this.credentials.openaiCompatibleProviders) {
-            this.credentials.openaiCompatibleProviders = [];
-        }
-        const index = this.credentials.openaiCompatibleProviders.findIndex(p => p.id === provider.id);
-        if (index !== -1) {
-            this.credentials.openaiCompatibleProviders[index] = provider;
-        } else {
-            this.credentials.openaiCompatibleProviders.push(provider);
-        }
-        this.saveCredentials();
-        console.log(`[CredentialsManager] OpenAI-compatible provider '${provider.name}' saved`);
-    }
-
-    public deleteOpenAICompatibleProvider(id: string): void {
-        if (!this.credentials.openaiCompatibleProviders) return;
-        this.credentials.openaiCompatibleProviders = this.credentials.openaiCompatibleProviders.filter(p => p.id !== id);
-        this.saveCredentials();
-        console.log(`[CredentialsManager] OpenAI-compatible provider '${id}' deleted`);
+        return (this.credentials.openaiCompatibleProviders || []).filter(p => p.type === undefined || CONNECTION_TYPES.includes(p.type));
     }
 
     public clearAll(): void {

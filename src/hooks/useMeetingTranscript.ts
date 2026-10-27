@@ -1,85 +1,121 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { upsertTranscriptSegment, type TranscriptDisplayMode, type TranscriptSegment } from '../lib/transcriptSegments';
+import { useQuery } from 'react-query';
+import { isTranscriptArrival, translationEnabledAfterEvent, upsertTranscriptSegment, type TranscriptDisplayMode, type TranscriptSegment } from '../lib/transcriptSegments';
+import { useLocalStorageValue } from './useLocalStorageValue';
+import { useMainEvent } from './useMainEvent';
 
 export function useMeetingTranscript() {
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
   const [isInterviewerSpeaking, setIsInterviewerSpeaking] = useState(false);
   const [currentInterviewerPartial, setCurrentInterviewerPartial] = useState('');
   const [transcriptDisplayMode, setTranscriptDisplayMode] = useState<TranscriptDisplayMode>('original');
-  const [showTranscript, setShowTranscript] = useState(() => {
-    const stored = localStorage.getItem('pika_interviewer_transcript');
-    return stored !== 'false';
-  });
+  const [translationEnabled, setTranslationEnabled] = useState(false);
+  const [translationConfigured, setTranslationConfigured] = useState(false);
+  const [targetLanguage, setTargetLanguage] = useState('chinese');
+  const [sourceLanguage, setSourceLanguage] = useState('auto');
+  const [theirLanguage, setTheirLanguage] = useState('english-us');
+  const [myLanguage, setMyLanguage] = useState('english-us');
+  const [storedShowTranscript, setStoredShowTranscript] = useLocalStorageValue('pika_interviewer_transcript');
+  const showTranscript = storedShowTranscript !== 'false';
+  const setShowTranscript = useCallback(
+    (action: boolean | ((prev: boolean) => boolean)) => {
+      const next = typeof action === 'function' ? action(storedShowTranscript !== 'false') : action;
+      setStoredShowTranscript(String(next));
+    },
+    [storedShowTranscript, setStoredShowTranscript]
+  );
   const speakingTimeoutRef = useRef<number | null>(null);
 
-  useEffect(() => {
+  const { data: languageOptions = [] } = useQuery(
+    ['recognition-languages'],
+    async () => {
+      const languages = await window.electronAPI?.getRecognitionLanguages?.();
+      return Object.entries(languages ?? {})
+        .map(([value, language]) => ({ value, label: (language as { label?: string }).label || value }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    },
+    { staleTime: Infinity }
+  );
+
+  const loadTranslationSettings = useCallback(() => {
     window.electronAPI?.getTranscriptTranslationSettings?.()
       .then((settings) => {
         if (settings?.displayMode) {
           setTranscriptDisplayMode(settings.displayMode);
         }
+        const configured = !!settings?.model?.trim();
+        setTranslationConfigured(configured);
+        setTranslationEnabled(!!settings?.enabled && configured);
+        if (settings?.targetLanguage) setTargetLanguage(settings.targetLanguage);
+        if (settings?.sourceLanguage) setSourceLanguage(settings.sourceLanguage);
       })
       .catch(() => {});
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('pika_interviewer_transcript', String(showTranscript));
-  }, [showTranscript]);
+    loadTranslationSettings();
+    window.electronAPI?.getSttLanguage?.('interviewer')
+      .then((lang) => {
+        if (lang) setTheirLanguage(lang);
+      })
+      .catch(() => {});
+    window.electronAPI?.getSttLanguage?.('user')
+      .then((lang) => {
+        if (lang) setMyLanguage(lang);
+      })
+      .catch(() => {});
+  }, [loadTranslationSettings]);
 
-  useEffect(() => {
-    const handleStorage = () => {
-      const stored = localStorage.getItem('pika_interviewer_transcript');
-      setShowTranscript(stored !== 'false');
-    };
+  /** Saves a header change; on failure the saved settings win and are read back. */
+  const saveTranslationSettings = useCallback(
+    (patch: { enabled?: boolean; targetLanguage?: string; displayMode?: TranscriptDisplayMode; sourceLanguage?: string }) => {
+      if (patch.enabled !== undefined) setTranslationEnabled(patch.enabled);
+      if (patch.targetLanguage !== undefined) setTargetLanguage(patch.targetLanguage);
+      if (patch.displayMode !== undefined) setTranscriptDisplayMode(patch.displayMode);
+      if (patch.sourceLanguage !== undefined) setSourceLanguage(patch.sourceLanguage);
+      window.electronAPI?.setTranscriptTranslationSettings?.(patch).catch(loadTranslationSettings);
+    },
+    [loadTranslationSettings]
+  );
 
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+  const refreshLanguages = useCallback(async () => {
+    try {
+      const [interviewer, user] = await Promise.all([
+        window.electronAPI?.getSttLanguage?.('interviewer'),
+        window.electronAPI?.getSttLanguage?.('user'),
+      ]);
+      if (interviewer) setTheirLanguage(interviewer);
+      if (user) setMyLanguage(user);
+    } catch {}
   }, []);
 
-  useEffect(() => {
-    if (!window.electronAPI?.onNativeAudioTranscript) return;
+  const changeSpokenLanguage = useCallback(
+    async (speaker: 'interviewer' | 'user', key: string) => {
+      if (speaker === 'interviewer') {
+        setTheirLanguage(key);
+        saveTranslationSettings({ sourceLanguage: key });
+      } else {
+        setMyLanguage(key);
+      }
 
-    return window.electronAPI.onNativeAudioTranscript((transcript) => {
-      if (transcript.speaker === 'user') {
-        if (transcript.final) {
-          const normalizedSegmentId =
-            transcript.segmentId ||
-            `user_${transcript.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-          setTranscriptSegments((prev) =>
-            upsertTranscriptSegment(prev, {
-              final: true,
-              text: transcript.text,
-              sourceText: transcript.sourceText,
-              translatedText: transcript.translatedText,
-              segmentId: normalizedSegmentId,
-              speaker: 'user',
-              speakerLabel: 'Me',
-              timestamp: transcript.timestamp,
-              translationState: transcript.translationState,
-              detectedLanguage: transcript.detectedLanguage,
-              revision: transcript.revision,
-            })
-          );
-
-          if (transcript.displayMode) {
-            setTranscriptDisplayMode(transcript.displayMode);
-          }
+      try {
+        const result = await window.electronAPI?.setRecognitionLanguage?.(key, speaker);
+        if (result && !result.success) {
+          await refreshLanguages();
         }
-        return;
+      } catch {
+        await refreshLanguages();
       }
+    },
+    [saveTranslationSettings, refreshLanguages]
+  );
 
-      if (transcript.speaker !== 'interviewer') {
-        return;
-      }
-
-      setIsInterviewerSpeaking(!transcript.final);
-
+  useMainEvent(window.electronAPI?.onNativeAudioTranscript, (transcript) => {
+    if (transcript.speaker === 'user') {
       if (transcript.final) {
-        setCurrentInterviewerPartial('');
         const normalizedSegmentId =
-          transcript.segmentId || `legacy_${transcript.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        const speakerFromPayload = transcript.speakerLabel?.trim();
+          transcript.segmentId ||
+          `user_${transcript.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
         setTranscriptSegments((prev) =>
           upsertTranscriptSegment(prev, {
@@ -88,18 +124,57 @@ export function useMeetingTranscript() {
             sourceText: transcript.sourceText,
             translatedText: transcript.translatedText,
             segmentId: normalizedSegmentId,
-            speaker: 'interviewer',
-            speakerLabel: speakerFromPayload || undefined,
+            speaker: 'user',
+            speakerLabel: 'Me',
             timestamp: transcript.timestamp,
             translationState: transcript.translationState,
+            translationError: transcript.translationError,
             detectedLanguage: transcript.detectedLanguage,
             revision: transcript.revision,
           })
         );
 
-        if (transcript.displayMode) {
-          setTranscriptDisplayMode(transcript.displayMode);
-        }
+        // Own speech is never translated, so its `skipped` says nothing about whether translation is on.
+      }
+      return;
+    }
+
+    if (transcript.speaker !== 'interviewer') {
+      return;
+    }
+
+    const arrival = transcript.final && isTranscriptArrival(transcript.translationState);
+    // A translation report (streaming, complete, error) is a final event too, but the speaker may already be on the next sentence.
+    if (!transcript.final || arrival) setIsInterviewerSpeaking(!transcript.final);
+
+    if (transcript.final) {
+      if (arrival) setCurrentInterviewerPartial('');
+      const normalizedSegmentId =
+        transcript.segmentId || `legacy_${transcript.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const speakerFromPayload = transcript.speakerLabel?.trim();
+
+      setTranscriptSegments((prev) =>
+        upsertTranscriptSegment(prev, {
+          final: true,
+          text: transcript.text,
+          sourceText: transcript.sourceText,
+          translatedText: transcript.translatedText,
+          segmentId: normalizedSegmentId,
+          speaker: 'interviewer',
+          speakerLabel: speakerFromPayload || undefined,
+          timestamp: transcript.timestamp,
+          translationState: transcript.translationState,
+          translationError: transcript.translationError,
+          detectedLanguage: transcript.detectedLanguage,
+          revision: transcript.revision,
+          replaces: transcript.replaces,
+        })
+      );
+
+      // The display mode and the on/off state are read when a request starts; later reports of that request carry stale copies.
+      if (arrival) {
+        if (transcript.displayMode) setTranscriptDisplayMode(transcript.displayMode);
+        setTranslationEnabled((current) => translationEnabledAfterEvent(current, transcript.translationState));
 
         if (speakingTimeoutRef.current) {
           window.clearTimeout(speakingTimeoutRef.current);
@@ -108,11 +183,11 @@ export function useMeetingTranscript() {
           setIsInterviewerSpeaking(false);
           speakingTimeoutRef.current = null;
         }, 3000);
-      } else {
-        setCurrentInterviewerPartial(transcript.text);
       }
-    });
-  }, []);
+    } else {
+      setCurrentInterviewerPartial(transcript.text);
+    }
+  });
 
   useEffect(() => {
     return () => {
@@ -165,6 +240,15 @@ export function useMeetingTranscript() {
     isInterviewerSpeaking,
     currentInterviewerPartial,
     transcriptDisplayMode,
+    translationEnabled,
+    translationConfigured,
+    targetLanguage,
+    sourceLanguage,
+    theirLanguage,
+    myLanguage,
+    changeSpokenLanguage,
+    languageOptions,
+    saveTranslationSettings,
     setTranscriptDisplayMode,
     showTranscript,
     setShowTranscript,

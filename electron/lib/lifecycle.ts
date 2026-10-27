@@ -4,6 +4,7 @@ import { KeybindManager } from "../services/KeybindManager"
 import { SettingsManager } from "../services/SettingsManager"
 import { OllamaManager } from "../services/OllamaManager"
 import { AppState } from "../main"
+import { reportAgentError } from '../agent/MeetingAgent'
 
 export async function initializeApp() {
   // 1. Enforce single instance — prevent duplicate dock icons from leftover processes.
@@ -65,11 +66,6 @@ export async function initializeApp() {
   // NOTE: CredentialsManager.init() and loadStoredCredentials() are already called
   // above before this block — do NOT call them again here to avoid double key-load.
 
-  // Anonymous install ping - one-time, non-blocking
-  // See electron/services/InstallPingManager.ts for privacy details
-  const { sendAnonymousInstallPing } = require('../services/InstallPingManager');
-  sendAnonymousInstallPing();
-
   // Load stored Google Service Account path (for Speech-to-Text)
   const storedServiceAccountPath = CredentialsManager.getInstance().getGoogleServiceAccountPath();
   if (storedServiceAccountPath) {
@@ -101,31 +97,6 @@ export async function initializeApp() {
   allWindows.forEach((win, i) => {
     console.log(`[Diagnostic]   Window ${i}: id=${win.id} title="${win.getTitle()}" visible=${win.isVisible()} skipTaskbar=${(win as any).skipTaskbar ?? 'unknown'}`);
   });
-
-  // Initialize CalendarManager
-  try {
-    const { CalendarManager } = require('../services/CalendarManager');
-    const calMgr = CalendarManager.getInstance();
-    calMgr.init();
-
-    calMgr.on('start-meeting-requested', (event: any) => {
-      console.log('[Main] Start meeting requested from calendar notification', event);
-      appState.centerAndShowWindow();
-      appState.startMeeting({
-        title: event.title,
-        calendarEventId: event.id,
-        source: 'calendar'
-      });
-    });
-
-    calMgr.on('open-requested', () => {
-      appState.centerAndShowWindow();
-    });
-
-    console.log('[Main] CalendarManager initialized');
-  } catch (e) {
-    console.error('[Main] Failed to initialize CalendarManager:', e);
-  }
 
   // Recover unprocessed meetings (persistence check)
   appState.getIntelligenceManager().recoverUnprocessedMeetings().catch(err => {
@@ -162,28 +133,34 @@ export async function initializeApp() {
     }
   })
 
-  // Scrub API keys from memory on quit to minimize exposure window
+  // Electron does not await async listeners; hold quit until agent cleanup precedes key scrubbing.
+  let agentQuitPending = false;
+  let quitCleanupDone = false;
   app.on("before-quit", (event) => {
+    if (quitCleanupDone) return;
+    event.preventDefault();
+    if (agentQuitPending) return;
+    agentQuitPending = true;
     console.log("App is quitting, cleaning up resources...");
     appState.setQuitting(true);
+    void appState.getMeetingAgent().stopAll(2000).finally(() => {
+      try {
+        // Dispose the capture listeners before scrubbing credentials.
+        appState.cropperWindowHelper?.dispose();
+        OllamaManager.getInstance().stop();
 
-    // Dispose CropperWindowHelper to clean up IPC listeners and prevent memory leaks
-    // This is critical to prevent resource leaks and ensure proper cleanup
-    if (appState?.cropperWindowHelper) {
-      appState.cropperWindowHelper.dispose();
-    }
-
-    // Kill Ollama if we started it
-    OllamaManager.getInstance().stop();
-
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      CredentialsManager.getInstance().scrubMemory();
-      appState.processingHelper.getLLMHelper().scrubKeys();
-      console.log('[Main] Credentials scrubbed from memory on quit');
-    } catch (e) {
-      console.error('[Main] Failed to scrub credentials on quit:', e);
-    }
+        try {
+          const { CredentialsManager } = require('../services/CredentialsManager');
+          CredentialsManager.getInstance().scrubMemory();
+          console.log('[Main] Credentials scrubbed from memory on quit');
+        } catch (e) {
+          console.error('[Main] Failed to scrub credentials on quit:', e);
+        }
+      } finally {
+        quitCleanupDone = true;
+        app.quit();
+      }
+    }).catch(error => reportAgentError(error));
   })
 
 

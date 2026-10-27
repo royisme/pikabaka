@@ -1,4 +1,4 @@
-import { BrowserWindow } from "electron"
+import { fetchSttModels, STT_MODEL_PROVIDERS, type SttModelProvider } from "../utils/sttModels"
 import { AppState } from "../main"
 import { AudioDevices } from "../audio/AudioDevices"
 import { DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE, isTranscriptAssemblerProfile } from "../lib/transcript-assembler"
@@ -9,6 +9,14 @@ export function registerSttHandlers(appState: AppState): void {
   // ==========================================
   // STT Provider Management Handlers
   // ==========================================
+
+  // Mute the microphone (for example when the other party is heard through speakers).
+  safeHandle("get-microphone-muted", () => appState.microphoneMuted);
+
+  safeHandle("set-microphone-muted", (_, muted: boolean) => {
+    appState.setMicrophoneMuted(muted === true);
+    return { success: true };
+  });
 
   safeHandle("set-stt-provider", async (_, provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => {
     try {
@@ -22,6 +30,34 @@ export function registerSttHandlers(appState: AppState): void {
     } catch (error: any) {
       console.error("Error setting STT provider:", error);
       return { success: false, error: error.message };
+    }
+  });
+
+  // The model of a speech service (empty means its default). Applies by rebuilding the recognition streams.
+  safeHandle("set-stt-model", async (_, provider: string, model: string) => {
+    if (!STT_MODEL_PROVIDERS.includes(provider as SttModelProvider) || typeof model !== 'string' || model.length > 200) {
+      return { success: false, error: 'This speech service has no model to choose' };
+    }
+    const { CredentialsManager } = require('../services/CredentialsManager');
+    CredentialsManager.getInstance().setSttModel(provider, model);
+    await appState.reconfigureSttProvider();
+    return { success: true };
+  });
+
+  // What a speech service offers. A key typed but not yet saved is used when given; otherwise the saved one.
+  safeHandle("fetch-stt-models", async (_, provider: string, apiKey?: string) => {
+    if (!STT_MODEL_PROVIDERS.includes(provider as SttModelProvider)) return { success: false, error: 'This speech service has no model list' };
+    try {
+      const { CredentialsManager } = require('../services/CredentialsManager');
+      const cm = CredentialsManager.getInstance();
+      const saved: Record<string, string | undefined> = {
+        groq: cm.getGroqSttApiKey(), openai: cm.getOpenAiSttApiKey(), deepgram: cm.getDeepgramApiKey(),
+        elevenlabs: cm.getElevenLabsApiKey(), soniox: cm.getSonioxApiKey(),
+      };
+      const models = await fetchSttModels(provider as SttModelProvider, (typeof apiKey === 'string' && apiKey.trim()) || saved[provider] || '');
+      return { success: true, models };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
     }
   });
 
@@ -355,172 +391,6 @@ export function registerSttHandlers(appState: AppState): void {
     }
   });
 
-  safeHandle("test-llm-connection", async (_, provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey?: string) => {
-    console.log(`[IPC] Received test-llm-connection request for provider: ${provider}`);
-    try {
-      if (!apiKey || !apiKey.trim()) {
-        const { CredentialsManager } = require('../services/CredentialsManager');
-        const creds = CredentialsManager.getInstance();
-        if (provider === 'gemini') apiKey = creds.getGeminiApiKey();
-        else if (provider === 'groq') apiKey = creds.getGroqApiKey();
-        else if (provider === 'openai') apiKey = creds.getOpenaiApiKey();
-        else if (provider === 'claude') apiKey = creds.getClaudeApiKey();
-      }
-
-      if (!apiKey || !apiKey.trim()) {
-        return { success: false, error: 'No API key provided' };
-      }
-
-      const axios = require('axios');
-      let response;
-
-      if (provider === 'gemini') {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent`;
-        response = await axios.post(url, {
-          contents: [{ parts: [{ text: "Hello" }] }]
-        }, {
-          headers: { 'x-goog-api-key': apiKey },
-          timeout: 15000
-        });
-      } else if (provider === 'groq') {
-        response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-          model: "llama-3.3-70b-versatile",
-          messages: [{ role: "user", content: "Hello" }]
-        }, {
-          headers: { Authorization: `Bearer ${apiKey}` },
-          timeout: 15000
-        });
-      } else if (provider === 'openai') {
-        response = await axios.post('https://api.openai.com/v1/chat/completions', {
-          model: "gpt-4o-mini",
-          messages: [{ role: "user", content: "Hello" }]
-        }, {
-          headers: { Authorization: `Bearer ${apiKey}` },
-          timeout: 15000
-        });
-      } else if (provider === 'claude') {
-        response = await axios.post('https://api.anthropic.com/v1/messages', {
-          model: "claude-sonnet-4-6",
-          max_tokens: 10,
-          messages: [{ role: "user", content: "Hello" }]
-        }, {
-          headers: {
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'content-type': 'application/json'
-          },
-          timeout: 15000
-        });
-      }
-
-      if (response && (response.status === 200 || response.status === 201)) {
-        return { success: true };
-      } else {
-        return { success: false, error: 'Request failed with status ' + response?.status };
-      }
-
-    } catch (error: any) {
-      console.error("LLM connection test failed:", error);
-      const rawMsg = error?.response?.data?.error?.message || error?.response?.data?.message || (error.response?.data?.error?.type ? `${error.response.data.error.type}: ${error.response.data.error.message}` : error.message) || 'Connection failed';
-      const msg = sanitizeErrorMessage(rawMsg);
-      return { success: false, error: msg };
-    }
-  });
-
-  safeHandle("get-groq-fast-text-mode", () => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      return { enabled: llmHelper.getGroqFastTextMode() };
-    } catch (error: any) {
-      return { enabled: false };
-    }
-  });
-
-  // Set Groq Fast Text Mode
-  safeHandle("set-groq-fast-text-mode", (_, enabled: boolean) => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      llmHelper.setGroqFastTextMode(enabled);
-
-      // Broadcast to all windows
-      BrowserWindow.getAllWindows().forEach(win => {
-        win.webContents.send('groq-fast-text-changed', enabled);
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  safeHandle("set-model", async (_, modelId: string) => {
-    try {
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      const cm = CredentialsManager.getInstance();
-
-      const allProviders = cm.getMergedLlmCustomProviders();
-
-      llmHelper.setModel(modelId, allProviders);
-
-      // Close the selector window if open
-      appState.modelSelectorWindowHelper.hideWindow();
-
-      // Broadcast to all windows so PikaInterface can update its selector (session-only update)
-      BrowserWindow.getAllWindows().forEach(win => {
-        if (!win.isDestroyed()) {
-          win.webContents.send('model-changed', modelId);
-        }
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error setting model:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Persist default model (from Settings) + update runtime + broadcast to all windows
-  safeHandle("set-default-model", async (_, modelId: string) => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      const cm = CredentialsManager.getInstance();
-      cm.setDefaultModel(modelId);
-
-      // Also update the runtime model
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      const allProviders = cm.getMergedLlmCustomProviders();
-      llmHelper.setModel(modelId, allProviders);
-
-      // Close the selector window if open
-      appState.modelSelectorWindowHelper.hideWindow();
-
-      // Broadcast to all windows so PikaInterface can update its selector
-      BrowserWindow.getAllWindows().forEach(win => {
-        if (!win.isDestroyed()) {
-          win.webContents.send('model-changed', modelId);
-        }
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error setting default model:", error);
-      return { success: false, error: error.message };
-    }
-  });
-
-  // Read the persisted default model
-  safeHandle("get-default-model", async () => {
-    try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
-      const cm = CredentialsManager.getInstance();
-      return { model: cm.getDefaultModel() };
-    } catch (error: any) {
-      console.error("Error getting default model:", error);
-      return { model: 'gemini-3.1-flash-lite-preview' };
-    }
-  });
-
   // --- Model Selector Window IPC ---
 
   safeHandle("show-model-selector", (_, coords: { x: number; y: number }) => {
@@ -564,8 +434,8 @@ export function registerSttHandlers(appState: AppState): void {
     return { success: true };
   });
 
-  safeHandle("set-recognition-language", async (_, key: string) => {
-    appState.setRecognitionLanguage(key);
+  safeHandle("set-recognition-language", async (_, key: string, speaker?: 'interviewer' | 'user') => {
+    appState.setRecognitionLanguage(key, speaker === 'user' ? 'user' : 'interviewer');
     return { success: true };
   });
 }

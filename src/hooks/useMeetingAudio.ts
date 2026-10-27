@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMainEvent } from './useMainEvent';
 
 type NativeAudioHealth = {
   connected: boolean;
@@ -26,13 +27,19 @@ export function useMeetingAudio() {
   const [voiceInput, setVoiceInput] = useState('');
   const [nativeAudioHealth, setNativeAudioHealth] = useState<NativeAudioHealth>(fallbackStatus);
   const [isConnected, setIsConnected] = useState(false);
-  const [noSystemAudioSince, setNoSystemAudioSince] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const isRecordingRef = useRef(false);
   const voiceInputRef = useRef('');
   const manualTranscriptRef = useRef('');
+  const activeSinceRef = useRef<number | null>(null);
+  const noSystemAudioSinceRef = useRef<number | null>(null);
+
+  isRecordingRef.current = isManualRecording;
+  voiceInputRef.current = voiceInput;
+  manualTranscriptRef.current = manualTranscript;
 
   const refreshNativeAudioStatus = () => {
-    window.electronAPI.getNativeAudioStatus()
+    window.electronAPI?.getNativeAudioStatus?.()
       .then((status) => {
         setIsConnected(status.connected);
         setNativeAudioHealth(status);
@@ -45,95 +52,87 @@ export function useMeetingAudio() {
 
   useEffect(() => {
     refreshNativeAudioStatus();
-
-    const cleanups: Array<() => void> = [];
     const statusTimer = window.setInterval(refreshNativeAudioStatus, 1500);
-    cleanups.push(() => window.clearInterval(statusTimer));
 
-    cleanups.push(window.electronAPI.onNativeAudioConnected(() => {
+    const unsubConnected = window.electronAPI?.onNativeAudioConnected?.(() => {
       setIsConnected(true);
       refreshNativeAudioStatus();
-    }));
+    });
 
-    cleanups.push(window.electronAPI.onNativeAudioDisconnected(() => {
+    const unsubDisconnected = window.electronAPI?.onNativeAudioDisconnected?.(() => {
       setIsConnected(false);
       refreshNativeAudioStatus();
-    }));
-
-    cleanups.push(window.electronAPI.onNativeAudioTranscript((transcript) => {
-      if (!isRecordingRef.current || transcript.speaker !== 'user') {
-        return;
-      }
-
-      if (transcript.final) {
-        setVoiceInput((prev) => {
-          const updated = prev + (prev ? ' ' : '') + transcript.text;
-          voiceInputRef.current = updated;
-          return updated;
-        });
-        setManualTranscript('');
-        manualTranscriptRef.current = '';
-        return;
-      }
-
-      setManualTranscript(transcript.text);
-      manualTranscriptRef.current = transcript.text;
-    }));
+    });
 
     return () => {
-      cleanups.forEach((cleanup) => cleanup());
+      window.clearInterval(statusTimer);
+      unsubConnected?.();
+      unsubDisconnected?.();
     };
   }, []);
 
-  useEffect(() => {
-    isRecordingRef.current = isManualRecording;
-  }, [isManualRecording]);
-
-  useEffect(() => {
-    const shouldTrackMissingSystemAudio =
-      nativeAudioHealth.meetingActive &&
-      isConnected &&
-      !nativeAudioHealth.hasRecentSystemAudioChunk &&
-      !nativeAudioHealth.hasRecentInterviewerTranscript;
-
-    if (!shouldTrackMissingSystemAudio) {
-      setNoSystemAudioSince(null);
+  useMainEvent(window.electronAPI?.onNativeAudioTranscript, (transcript) => {
+    if (!isRecordingRef.current || transcript.speaker !== 'user') {
       return;
     }
 
-    setNoSystemAudioSince((prev) => prev ?? Date.now());
-  }, [
-    isConnected,
-    nativeAudioHealth.meetingActive,
-    nativeAudioHealth.hasRecentSystemAudioChunk,
-    nativeAudioHealth.hasRecentInterviewerTranscript,
-  ]);
+    if (transcript.final) {
+      setVoiceInput((prev) => {
+        const updated = prev + (prev ? ' ' : '') + transcript.text;
+        voiceInputRef.current = updated;
+        return updated;
+      });
+      setManualTranscript('');
+      manualTranscriptRef.current = '';
+      return;
+    }
 
-  const sttStatus = useMemo(() => {
-    if (!nativeAudioHealth.meetingActive) {
-      return { label: 'STT idle', toneClass: 'text-text-tertiary', dotClass: 'bg-slate-500/50' };
-    }
-    if (!isConnected) {
-      return { label: 'STT disconnected', toneClass: 'text-red-400', dotClass: 'bg-red-400' };
-    }
-    if (nativeAudioHealth.hasRecentInterviewerTranscript) {
-      return { label: 'STT receiving transcript', toneClass: 'text-emerald-400', dotClass: 'bg-emerald-400 animate-pulse' };
-    }
-    if (nativeAudioHealth.hasRecentSystemAudioChunk) {
-      return { label: 'STT listening (no transcript yet)', toneClass: 'text-amber-300', dotClass: 'bg-amber-300' };
-    }
-    return { label: 'No system audio signal', toneClass: 'text-red-300', dotClass: 'bg-red-300' };
-  }, [isConnected, nativeAudioHealth]);
+    setManualTranscript(transcript.text);
+    manualTranscriptRef.current = transcript.text;
+  });
 
-  const sttNeedsTroubleshooting = useMemo(() => {
-    if (!nativeAudioHealth.meetingActive || !isConnected) return false;
-    if (nativeAudioHealth.hasRecentSystemAudioChunk || nativeAudioHealth.hasRecentInterviewerTranscript) return false;
-    if (nativeAudioHealth.lastError) return true;
-    if (!noSystemAudioSince) return false;
-    return Date.now() - noSystemAudioSince >= 8000;
-  }, [isConnected, nativeAudioHealth, noSystemAudioSince]);
+  if (!nativeAudioHealth.meetingActive) {
+    activeSinceRef.current = null;
+  } else if (activeSinceRef.current === null) {
+    activeSinceRef.current = Date.now();
+  }
+  const activeSince = activeSinceRef.current;
 
-  const showSttErrorDetail = !!nativeAudioHealth.lastError && !nativeAudioHealth.hasRecentInterviewerTranscript;
+  const shouldTrackMissingSystemAudio =
+    nativeAudioHealth.meetingActive &&
+    isConnected &&
+    !nativeAudioHealth.hasRecentSystemAudioChunk &&
+    !nativeAudioHealth.hasRecentInterviewerTranscript;
+
+  if (!shouldTrackMissingSystemAudio) {
+    noSystemAudioSinceRef.current = null;
+  } else if (noSystemAudioSinceRef.current === null) {
+    noSystemAudioSinceRef.current = Date.now();
+  }
+  const noSystemAudioSince = noSystemAudioSinceRef.current;
+
+  // The status changes with time (a slow start becomes a failure, silence becomes "no audio"), so it is
+  // re-read once a second while a meeting is active.
+  useEffect(() => {
+    if (!nativeAudioHealth.meetingActive) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [nativeAudioHealth.meetingActive]);
+
+  const audioStatusInput = useMemo(
+    () => ({
+      meetingActive: nativeAudioHealth.meetingActive,
+      isConnected,
+      hasRecentSystemAudioChunk: nativeAudioHealth.hasRecentSystemAudioChunk,
+      hasRecentInterviewerTranscript: nativeAudioHealth.hasRecentInterviewerTranscript,
+      lastError: nativeAudioHealth.lastError,
+      activeSince,
+      noSystemAudioSince,
+      now,
+    }),
+    [activeSince, isConnected, nativeAudioHealth, noSystemAudioSince, now]
+  );
 
   return {
     isManualRecording,
@@ -148,8 +147,6 @@ export function useMeetingAudio() {
     nativeAudioHealth,
     isConnected,
     noSystemAudioSince,
-    sttStatus,
-    sttNeedsTroubleshooting,
-    showSttErrorDetail,
+    audioStatusInput,
   };
 }

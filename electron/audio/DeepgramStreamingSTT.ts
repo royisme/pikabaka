@@ -25,6 +25,8 @@ export class DeepgramStreamingSTT extends EventEmitter {
 
     private sampleRate = 16000;
     private numChannels = 1;
+    /** The Deepgram model; the user can pick another in Settings, Audio. */
+    private model = 'nova-3';
     private languageCode: string | undefined = 'en'; // Default to English; undefined ⇒ multi/auto-detect
 
     private reconnectAttempts = 0;
@@ -50,6 +52,11 @@ export class DeepgramStreamingSTT extends EventEmitter {
     public setAudioChannelCount(count: number): void {
         this.numChannels = count;
         console.log(`[DeepgramStreaming] Channel count set to ${count}`);
+    }
+
+    /** An empty value keeps the default model. */
+    public setModel(model: string): void {
+        if (model.trim()) this.model = model.trim();
     }
 
     /** Set recognition language using ISO-639-1 code */
@@ -157,7 +164,7 @@ export class DeepgramStreamingSTT extends EventEmitter {
 
         const url =
             `wss://api.deepgram.com/v1/listen` +
-            `?model=nova-3` +
+            `?model=${encodeURIComponent(this.model)}` +
             `&encoding=linear16` +
             `&sample_rate=${this.sampleRate}` +
             `&channels=${this.numChannels}` +
@@ -170,13 +177,23 @@ export class DeepgramStreamingSTT extends EventEmitter {
 
         console.log(`[DeepgramStreaming] Connecting (rate=${this.sampleRate}, ch=${this.numChannels})...`);
 
-        this.ws = new WebSocket(url, {
+        // A restart (a language change) closes the old socket while a new one is already connecting. The
+        // old socket's close event must not touch the provider's state, or it clears the new connection's
+        // guards, a second connection is opened and the first is left open with no audio until Deepgram
+        // closes it with 1011 (NET-0001). Each handler therefore acts only while its socket is still this.ws.
+        const socket = new WebSocket(url, {
             headers: {
                 Authorization: `Token ${this.apiKey}`,
             },
         });
+        this.ws = socket;
 
         this.ws.on('open', () => {
+            if (this.ws !== socket) {
+                console.log('[DeepgramStreaming] Stale socket opened after a restart; closing it');
+                socket.close();
+                return;
+            }
             this.isActive = true;
             this.isConnecting = false;
             this.reconnectAttempts = 0;
@@ -257,6 +274,10 @@ export class DeepgramStreamingSTT extends EventEmitter {
         });
 
         this.ws.on('close', (code: number, reason: Buffer) => {
+            if (this.ws !== socket) {
+                console.log(`[DeepgramStreaming] Stale socket closed (code=${code})`);
+                return;
+            }
             // Do not force isActive=false; let write() trigger reconnect if isActive is still true
             this.isConnecting = false;
             this.clearKeepAlive();

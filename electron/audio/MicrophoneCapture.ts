@@ -81,10 +81,6 @@ export class MicrophoneCapture extends EventEmitter {
                     return;
                 }
                 if (chunk && chunk.length > 0) {
-                    // Debug: log occasionally
-                    if (Math.random() < 0.05) {
-                        console.log(`[MicrophoneCapture] Emitting chunk: ${chunk.length} bytes to JS`);
-                    }
                     this.emit('data', Buffer.from(chunk));
                 }
             }, (err: Error | null, _ended: boolean) => {

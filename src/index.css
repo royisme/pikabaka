@@ -25,71 +25,92 @@
   --font-display: "Space Grotesk", "Inter", -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
-  --surface: #0d0d1c;
-  --surface-container-low: #111127;
-  --surface-container-high: #1b1b40;
-  --surface-variant: rgba(32, 32, 77, 0.7);
-  --surface-tint: #a8c8ff;
-  --primary: #a8c8ff;
-  --primary-container: #6f8fcb;
+  /* Brand colours (the Pika identity board). Components never use these directly: the semantic
+     tokens below and in the light block refer to them, and each pairing was checked for contrast.
+     Brand blue is the identity colour (icon, logo, focus ring); it is 3.68:1 with white text, so
+     the filled control and light-theme text use --brand-action, one step deeper (5.17:1). */
+  --brand-blue: #3b82f6;
+  --brand-action: #2563eb;
+  --brand-sky: #7dd3fc;
+  --brand-cream: #fff8e7;
+  --brand-slate: #94a3b8;
+  --brand-ink: #0f172a;
+  /* The "done" star: a graphic only, never text or a button. */
+  --accent-spark: #f5b301;
+
+  /* Surfaces share the hue of the logo's dark card (about 220 degrees), not violet. */
+  --surface: #0b1120;
+  --surface-container-low: #0f172a;
+  --surface-container-high: #162033;
+  --surface-variant: rgba(30, 41, 59, 0.7);
+  --surface-tint: var(--brand-sky);
+  --primary: var(--brand-sky);
+  --primary-container: var(--brand-blue);
   --secondary: #72ac6f;
   --secondary-container: rgba(114, 172, 111, 0.18);
-  --outline: rgba(67, 67, 114, 0.28);
-  --outline-variant: rgba(67, 67, 114, 0.15);
+  --outline: rgba(148, 163, 184, 0.28);
+  --outline-variant: rgba(148, 163, 184, 0.15);
 
   --bg-primary: var(--surface);
   --bg-secondary: var(--surface-container-low);
   --bg-elevated: var(--surface-container-high);
-  --bg-input: rgba(27, 27, 64, 0.88);
+  --bg-input: rgba(22, 32, 51, 0.88);
   --bg-sidebar: var(--surface-container-low);
   --bg-main: var(--surface);
   --bg-card: var(--surface-container-high);
-  --bg-component: rgba(27, 27, 64, 0.72);
-  --bg-toggle-switch: rgba(67, 67, 114, 0.4);
-  --bg-item-surface: rgba(27, 27, 64, 0.72);
-  --bg-item-active: rgba(168, 200, 255, 0.16);
+  --bg-component: rgba(22, 32, 51, 0.72);
+  --bg-toggle-switch: rgba(148, 163, 184, 0.4);
+  --bg-item-surface: rgba(22, 32, 51, 0.72);
+  --bg-item-active: rgba(125, 211, 252, 0.16);
 
-  --text-primary: rgba(245, 247, 255, 0.96);
-  --text-secondary: rgba(201, 209, 235, 0.8);
-  --text-tertiary: rgba(145, 153, 188, 0.68);
+  --text-primary: rgba(241, 245, 249, 0.97);
+  --text-secondary: rgba(203, 213, 225, 0.88);
+  --text-tertiary: var(--brand-slate);
   --text-accent: var(--primary);
 
   --border-subtle: transparent;
   --border-muted: var(--outline-variant);
 
   --accent-primary: var(--primary);
-  --accent-muted: rgba(168, 200, 255, 0.14);
+  /* Text on a solid --primary fill. */
+  --on-primary: #0b1120;
+  --accent-muted: rgba(125, 211, 252, 0.14);
   --accent-live: var(--secondary);
 
-  --overlay-bg: rgba(24, 27, 34, 0.84);
+  --overlay-bg: rgba(11, 17, 32, 0.86);
   --overlay-opacity: 0.78;
-  --overlay-border: rgba(255, 255, 255, 0.11);
-  --overlay-border-soft: rgba(255, 255, 255, 0.07);
-  --overlay-panel-bg: rgba(24, 27, 34, 0.84);
-  --overlay-pill-bg: rgba(27, 30, 37, 0.8);
-  --overlay-transcript-bg: rgba(15, 18, 26, 0.34);
-  --overlay-chip-bg: rgba(50, 56, 66, 0.76);
-  --overlay-chip-hover-bg: rgba(60, 66, 77, 0.84);
-  --overlay-input-bg: rgba(44, 49, 60, 0.86);
-  --overlay-input-hover-bg: rgba(49, 55, 66, 0.91);
-  --overlay-input-focus-bg: rgba(47, 57, 81, 0.94);
-  --overlay-control-bg: rgba(47, 52, 62, 0.82);
-  --overlay-control-hover-bg: rgba(57, 63, 74, 0.89);
-  --overlay-code-bg: rgba(32, 37, 46, 0.9);
-  --overlay-code-border: rgba(255, 255, 255, 0.09);
-  --overlay-code-header-bg: rgba(43, 48, 58, 0.9);
-  --overlay-inline-code-bg: rgba(168, 200, 255, 0.15);
-  --overlay-icon-bg: rgba(50, 56, 66, 0.78);
-  --overlay-icon-hover-bg: rgba(60, 66, 77, 0.86);
-  --overlay-panel-shadow: rgba(0, 0, 0, 0.2);
-  --overlay-pill-shadow: rgba(0, 0, 0, 0.15);
-  --overlay-text-primary: rgba(245, 247, 255, 0.98);
-  --overlay-text-secondary: rgba(221, 227, 243, 0.9);
-  --overlay-text-muted: rgba(186, 194, 217, 0.8);
-  --overlay-text-placeholder: rgba(186, 194, 217, 0.64);
+  /* The one filled control, on either theme: white text on it is 5.17:1. */
+  --overlay-action: var(--brand-action);
+  --overlay-border: rgba(148, 163, 184, 0.2);
+  --overlay-border-soft: rgba(148, 163, 184, 0.12);
+  --overlay-panel-bg: rgba(11, 17, 32, 0.86);
+  --overlay-menu-bg: rgb(30, 41, 59);
+  --overlay-pill-bg: rgba(15, 23, 42, 0.8);
+  --overlay-transcript-bg: rgba(7, 11, 22, 0.4);
+  --overlay-chip-bg: rgba(30, 41, 59, 0.76);
+  --overlay-chip-hover-bg: rgba(41, 53, 74, 0.84);
+  --overlay-input-bg: rgba(22, 32, 51, 0.86);
+  --overlay-input-hover-bg: rgba(27, 39, 61, 0.91);
+  --overlay-input-focus-bg: rgba(30, 47, 80, 0.94);
+  --overlay-control-bg: rgba(30, 41, 59, 0.82);
+  --overlay-control-hover-bg: rgba(41, 53, 74, 0.89);
+  --overlay-code-bg: rgba(15, 23, 42, 0.9);
+  --overlay-code-border: rgba(148, 163, 184, 0.14);
+  --overlay-code-header-bg: rgba(30, 41, 59, 0.9);
+  --overlay-inline-code-bg: rgba(125, 211, 252, 0.15);
+  --overlay-icon-bg: rgba(30, 41, 59, 0.78);
+  --overlay-icon-hover-bg: rgba(41, 53, 74, 0.86);
+  --overlay-panel-shadow: rgba(0, 0, 0, 0.28);
+  --overlay-pill-shadow: rgba(0, 0, 0, 0.2);
+  /* The two areas of the overlay: what they say (cool, deep) and Pika (lifted). */
+  --overlay-zone-them: #070b16;
+  --overlay-zone-pika: #14203a;
+  --overlay-zone-line: rgba(148, 163, 184, 0.22);
+  --overlay-text-primary: rgba(241, 245, 249, 0.98);
+  --overlay-text-secondary: rgba(203, 213, 225, 0.92);
+  --overlay-text-muted: #94a3b8;
+  --overlay-text-placeholder: var(--overlay-text-muted);
   --overlay-text-strong: #ffffff;
-  --overlay-shell-blur: 17px;
-  --overlay-pill-blur: 11px;
   --overlay-transcript-blur: 8px;
 
   /* ─── Semantic state tokens ─────────────────────────────────────────────
@@ -113,7 +134,7 @@
 
   --state-info: var(--primary);
   --state-info-bg: var(--accent-muted);
-  --state-info-border: rgba(168, 200, 255, 0.32);
+  --state-info-border: rgba(125, 211, 252, 0.32);
 
   /* ─── Layered z-index scale (replaces magic numbers like z-[49] / z-[2000]) */
   --z-base: 0;
@@ -143,17 +164,60 @@
 [data-theme='light'] {
   color-scheme: light;
 
+  /* Base palette. Dark has deep indigo surfaces and a pale blue accent; light is the same cool
+     hue family: grey canvas, white cards and menus lifted by shadow, and a action-blue accent
+     (4.8:1 on the canvas, 5.2:1 on white). Every token the dark block sets that the app reads is
+     set here too, so a component never mixes a dark surface with light text. The bg-*, text-*,
+     border-* and accent-* aliases in :root follow --surface* and --primary. */
+  --surface: #f3f6fc;
+  --surface-container-low: #fafbfe;
+  --surface-container-high: #ffffff;
+  --surface-variant: rgba(226, 232, 244, 0.7);
+  --surface-tint: var(--brand-action);
+  --primary: var(--brand-action);
+  --primary-container: var(--brand-blue);
+  --secondary: #1a7f43;
+  --secondary-container: rgba(26, 127, 67, 0.12);
+  --outline: rgba(15, 23, 42, 0.16);
+  --outline-variant: rgba(15, 23, 42, 0.09);
+
+  --bg-input: rgba(255, 255, 255, 0.96);
+  --bg-component: rgba(15, 23, 42, 0.045);
+  --bg-toggle-switch: rgba(15, 23, 42, 0.2);
+  --bg-item-surface: rgba(15, 23, 42, 0.04);
+  --bg-item-active: rgba(37, 99, 235, 0.1);
+
+  --text-primary: rgba(15, 23, 42, 0.96);
+  --text-secondary: rgba(30, 41, 59, 0.84);
+  --text-tertiary: rgba(71, 85, 105, 0.9);
+
+  --border-subtle: rgba(15, 23, 42, 0.08);
+
+  --accent-muted: rgba(37, 99, 235, 0.1);
+  --on-primary: #ffffff;
+
+  /* The dark block's state colours are bright (#22c55e is 2.3:1 on white). On light surfaces the
+     foreground states are deep enough for small text (4.5:1 or more on white and on the canvas). */
+  --state-success: #15803d;
+  --state-success-strong: #166534;
+  --state-warning: #b45309;
+  --state-warning-strong: #92400e;
+  --state-danger: #c81e1e;
+  --state-danger-strong: #991b1b;
+
   /* Soften hot semantic states slightly on light backgrounds */
   --state-success-bg: rgba(34, 197, 94, 0.10);
   --state-warning-bg: rgba(245, 158, 11, 0.10);
   --state-danger-bg: rgba(239, 68, 68, 0.10);
   --state-info-bg: rgba(59, 130, 246, 0.10);
+  --state-info-border: rgba(37, 99, 235, 0.3);
 
   --overlay-bg: rgba(247, 249, 253, 0.9);
   --overlay-opacity: 0.8;
   --overlay-border: rgba(59, 130, 246, 0.13);
   --overlay-border-soft: rgba(59, 130, 246, 0.08);
   --overlay-panel-bg: rgba(247, 249, 253, 0.9);
+  --overlay-menu-bg: #ffffff;
   --overlay-pill-bg: rgba(255, 255, 255, 0.86);
   --overlay-transcript-bg: rgba(255, 255, 255, 0.46);
   --overlay-chip-bg: rgba(248, 250, 253, 0.86);
@@ -173,11 +237,13 @@
   --overlay-pill-shadow: rgba(15, 23, 42, 0.07);
   --overlay-text-primary: rgba(15, 23, 42, 0.97);
   --overlay-text-secondary: rgba(30, 41, 59, 0.86);
-  --overlay-text-muted: rgba(51, 65, 85, 0.74);
-  --overlay-text-placeholder: rgba(71, 85, 105, 0.6);
+  --overlay-text-muted: rgba(51, 65, 85, 0.82);
+  /* Pika speaks on the cream of its own body; the other party's words sit on a cooler, deeper ground. */
+  --overlay-zone-them: #e6ecf8;
+  --overlay-zone-pika: #fff8e7;
+  --overlay-zone-line: rgba(15, 23, 42, 0.12);
+  --overlay-text-placeholder: var(--overlay-text-muted);
   --overlay-text-strong: #020617;
-  --overlay-shell-blur: 16px;
-  --overlay-pill-blur: 10px;
   --overlay-transcript-blur: 6px;
 }
 
@@ -359,7 +425,7 @@ textarea,
   border: 1px solid var(--outline-variant);
   border-radius: 0.75rem;
   box-shadow:
-    0 24px 40px rgba(168, 200, 255, 0.08),
+    0 24px 40px rgba(125, 211, 252, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   position: relative;
   overflow: hidden;
@@ -369,8 +435,6 @@ textarea,
   background: var(--overlay-panel-bg);
   border-color: var(--overlay-border);
   box-shadow: 0 24px 40px var(--overlay-panel-shadow);
-  backdrop-filter: blur(var(--overlay-shell-blur)) saturate(138%);
-  -webkit-backdrop-filter: blur(var(--overlay-shell-blur)) saturate(138%);
 }
 
 .overlay-shell-surface,
@@ -385,22 +449,10 @@ textarea,
   color: var(--overlay-text-primary);
 }
 
-[data-theme='light'] .overlay-shell-surface {
-  backdrop-filter: blur(var(--overlay-shell-blur)) saturate(145%);
-  -webkit-backdrop-filter: blur(var(--overlay-shell-blur)) saturate(145%);
-}
-
 .overlay-pill-surface {
   background: var(--overlay-pill-bg);
   border-color: var(--overlay-border);
   box-shadow: 0 16px 28px var(--overlay-pill-shadow);
-  backdrop-filter: blur(var(--overlay-pill-blur)) saturate(134%);
-  -webkit-backdrop-filter: blur(var(--overlay-pill-blur)) saturate(134%);
-}
-
-[data-theme='light'] .overlay-pill-surface {
-  backdrop-filter: blur(var(--overlay-pill-blur)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--overlay-pill-blur)) saturate(140%);
 }
 
 .overlay-transcript-surface {
@@ -500,6 +552,10 @@ textarea,
   color: var(--overlay-text-placeholder);
 }
 
+.overlay-hairline {
+  border-color: var(--overlay-border-soft);
+}
+
 /* Interaction Utilities - Reusable */
 .interaction-base {
   transition-property: transform, opacity, background-color, border-color, color;
@@ -554,6 +610,10 @@ a {
   -webkit-app-region: no-drag;
   cursor: default !important;
 }
+
+/* The splitter is interactive inside a no-drag region: keep its resize cursor. */
+.no-drag.cursor-row-resize { cursor: row-resize !important; }
+.no-drag.cursor-col-resize { cursor: col-resize !important; }
 
 /* Explicit cursor class when pointer is explicitly needed */
 .cursor-pointer {

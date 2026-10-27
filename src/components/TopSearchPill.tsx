@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Search, Sparkles, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
+import { useWindowEvent } from '../hooks/useWindowEvent';
 
 // ============================================
 // Types
@@ -102,11 +103,6 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
     const inputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Notify parent of expansion changes
-    useEffect(() => {
-        onExpansionChange?.(state !== 'idle');
-    }, [state, onExpansionChange]);
-
     // Compute results
     const sessionResults = useMemo(() => {
         if (state !== 'results' || !query.trim()) return [];
@@ -119,18 +115,20 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
     // State transitions
     const open = useCallback(() => {
         setState('focused');
+        onExpansionChange?.(true);
         setTimeout(() => inputRef.current?.focus(), 50);
-    }, []);
+    }, [onExpansionChange]);
 
     const close = useCallback(() => {
         setState('idle');
+        onExpansionChange?.(false);
         // Delay clearing query to allow exit animation to complete
         setTimeout(() => {
             setQuery('');
             setSelectedIndex(-1);
         }, 150);
         inputRef.current?.blur();
-    }, []);
+    }, [onExpansionChange]);
 
     const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
@@ -165,46 +163,41 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
     }, [query, sessionResults, onAIQuery, onLiteralSearch, onOpenMeeting, close]);
 
     // Keyboard handling
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // ⌘K to open
-            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-                e.preventDefault();
-                if (state === 'idle') {
-                    open();
-                } else {
-                    close();
-                }
-                return;
-            }
-
-            if (state === 'idle') return;
-
-            // ESC to close
-            if (e.key === 'Escape') {
-                e.preventDefault();
+    useWindowEvent('keydown', (e: KeyboardEvent) => {
+        // ⌘K to open
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            if (state === 'idle') {
+                open();
+            } else {
                 close();
-                return;
             }
+            return;
+        }
 
-            // Arrow navigation
-            if (state === 'results') {
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    setSelectedIndex(prev => Math.min(prev + 1, totalItems - 1));
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    setSelectedIndex(prev => Math.max(prev - 1, -1));
-                } else if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSelect(selectedIndex);
-                }
+        if (state === 'idle') return;
+
+        // ESC to close
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            close();
+            return;
+        }
+
+        // Arrow navigation
+        if (state === 'results') {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSelectedIndex(prev => Math.min(prev + 1, totalItems - 1));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSelectedIndex(prev => Math.max(prev - 1, -1));
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSelect(selectedIndex);
             }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [state, open, close, selectedIndex, totalItems, handleSelect]);
+        }
+    });
 
     // Click outside to close
     useEffect(() => {
@@ -291,7 +284,7 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                                         type="text"
                                         value={query}
                                         onChange={handleInputChange}
-                                        onFocus={() => state === 'idle' && setState('focused')}
+                                        onFocus={() => state === 'idle' && open()}
                                         className={`
                                         w-full bg-transparent
                                         pl-9 pr-4 py-1

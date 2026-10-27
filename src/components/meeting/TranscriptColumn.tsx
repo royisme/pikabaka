@@ -1,21 +1,18 @@
 import React from 'react';
 import TranscriptPanel from './TranscriptPanel';
 import type { TranscriptDisplayMode, TranscriptSegment } from '../../lib/transcriptSegments';
-import type { getOverlayAppearance } from '../../lib/overlayAppearance';
+import type { AudioStatus } from '../../lib/audioStatus';
 
 interface TranscriptColumnProps {
     transcriptSegments: TranscriptSegment[];
     isInterviewerSpeaking: boolean;
     currentInterviewerPartial: string;
     transcriptDisplayMode: TranscriptDisplayMode;
+    translationEnabled: boolean;
     showTranscript: boolean;
     handleTranslateTranscriptSegment: (segment: TranscriptSegment) => void;
-    sttStatus: { label: string; toneClass: string; dotClass: string };
-    sttNeedsTroubleshooting: boolean;
-    showSttErrorDetail: boolean;
-    nativeAudioHealth: { lastError: string | null };
-    appearance: ReturnType<typeof getOverlayAppearance>;
-    isLightTheme: boolean;
+    status: AudioStatus;
+    onFixAudio: () => void;
 }
 
 const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
@@ -23,14 +20,11 @@ const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
     isInterviewerSpeaking,
     currentInterviewerPartial,
     transcriptDisplayMode,
+    translationEnabled,
     showTranscript,
     handleTranslateTranscriptSegment,
-    sttStatus,
-    sttNeedsTroubleshooting,
-    showSttErrorDetail,
-    nativeAudioHealth,
-    appearance,
-    isLightTheme,
+    status,
+    onFixAudio,
 }) => {
     return (
         <TranscriptPanel
@@ -38,14 +32,11 @@ const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
             isInterviewerSpeaking={isInterviewerSpeaking}
             currentInterviewerPartial={currentInterviewerPartial}
             transcriptDisplayMode={transcriptDisplayMode}
+            translationEnabled={translationEnabled}
             showTranscript={showTranscript}
             handleTranslateTranscriptSegment={handleTranslateTranscriptSegment}
-            sttStatus={sttStatus}
-            sttNeedsTroubleshooting={sttNeedsTroubleshooting}
-            showSttErrorDetail={showSttErrorDetail}
-            nativeAudioHealth={nativeAudioHealth}
-            appearance={appearance}
-            isLightTheme={isLightTheme}
+            status={status}
+            onFixAudio={onFixAudio}
         />
     );
 };

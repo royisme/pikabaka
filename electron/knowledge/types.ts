@@ -4,6 +4,8 @@
 export enum DocType {
   RESUME = 'resume',
   JD = 'jd',
+  /** Facts the user wrote about themselves, one per line. */
+  NOTES = 'notes',
 }
 
 // ─── Profile Types ───────────────────────────────────────────
@@ -204,6 +206,8 @@ export interface KnowledgeResult {
   resumeEvidence?: Array<{ source: string; text: string }>;
   mustHitKeywords?: string[];
   questionCategory?: 'behavioral' | 'technical' | 'system_design' | 'intro';
+  /** The user's materials were searched and nothing relevant was found: the answer must not invent personal facts. */
+  knowledgeMiss?: boolean;
 }
 
 // ─── Function Types (injected from main.ts) ──────────────────

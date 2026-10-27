@@ -1,5 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useQueryClient } from 'react-query';
+import SttModelPicker, { STT_MODEL_DEFAULTS } from './settings/SttModelPicker';
+import ConnectionModelPicker from './settings/ConnectionModelPicker';
+import TranslationTest from './settings/TranslationTest';
+import AnswerStyleSettings from './settings/AnswerStyleSettings';
+import NotesSettings from './settings/NotesSettings';
+import WorkspaceSettings from './settings/WorkspaceSettings';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useQuery, useQueryClient } from 'react-query';
+import { useWindowEvent } from '../hooks/useWindowEvent';
+import { useMainEvent } from '../hooks/useMainEvent';
+import { useLocalStorageValue } from '../hooks/useLocalStorageValue';
 import packageJson from '../../package.json';
 import {
     X, Mic, Speaker, Monitor, Keyboard, BookOpen, Upload,
@@ -7,9 +16,8 @@ import {
     RotateCcw, Eye, Layout, MessageSquare,
     ChevronDown, ChevronUp, ChevronRight, Check, BadgeCheck, Power, Palette, Ghost, Sun, Moon, RefreshCw, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink, Trash2,
     Pencil, MapPin, HelpCircle, Zap, SlidersHorizontal, PointerOff,
-    AlertCircle, Loader2, Shield
+    AlertCircle, Shield
 } from 'lucide-react';
-import { analytics } from '../lib/analytics/analytics.service';
 import { AboutSection } from './AboutSection';
 import { AIProvidersSettings } from './settings/AIProvidersSettings';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -160,15 +168,15 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, icon, value, options
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+    useWindowEvent(
+        'mousedown',
+        (event) => {
+            if (isOpen && containerRef.current && !containerRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+        },
+        'document'
+    );
 
     const selectedLabel = options.find(o => o.deviceId === value)?.label || placeholder;
 
@@ -238,15 +246,15 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+    useWindowEvent(
+        'mousedown',
+        (event) => {
+            if (isOpen && containerRef.current && !containerRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+        },
+        'document'
+    );
 
     const selected = options.find(o => o.id === value);
 
@@ -264,7 +272,7 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
     };
 
     const getIconStyle = (color?: string, isSelectedItem: boolean = false) => {
-        if (isSelectedItem) return 'bg-accent-primary text-white shadow-sm';
+        if (isSelectedItem) return 'bg-accent-primary text-on-primary shadow-sm';
         // For unselected items in list or trigger
         switch (color) {
             case 'blue': return 'bg-state-info-soft text-blue-600';
@@ -361,24 +369,16 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [activeTab, setActiveTab] = useState(initialTab);
     const [showMoreShortcuts, setShowMoreShortcuts] = useState<boolean>(false);
 
-    // Sync active tab when modal opens
-    useEffect(() => {
-        if (isOpen && initialTab) {
-            setActiveTab(initialTab);
-        }
-    }, [isOpen, initialTab]);
-    
+    // Sync active tab when modal opens or initialTab prop changes
+    const [prevOpenState, setPrevOpenState] = useState({ isOpen, initialTab });
+    if (isOpen && (!prevOpenState.isOpen || initialTab !== prevOpenState.initialTab)) {
+        setPrevOpenState({ isOpen, initialTab });
+        setActiveTab(initialTab);
+    } else if (!isOpen && prevOpenState.isOpen) {
+        setPrevOpenState({ isOpen, initialTab });
+    }
+
     const { shortcuts, updateShortcut, resetShortcuts } = useShortcuts();
-    const [isUndetectable, setIsUndetectable] = useState(false);
-    const [isMousePassthrough, setIsMousePassthrough] = useState(false);
-    const [disguiseMode, setDisguiseMode] = useState<'terminal' | 'settings' | 'activity' | 'none'>('none');
-    const [openOnLogin, setOpenOnLogin] = useState(false);
-    const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
-    const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
-    const [isAiLangDropdownOpen, setIsAiLangDropdownOpen] = useState(false);
-    const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'uptodate' | 'error'>('idle');
-    const themeDropdownRef = React.useRef<HTMLDivElement>(null);
-    const aiLangDropdownRef = React.useRef<HTMLDivElement>(null);
 
     // Profile Engine State
     const queryClient = useQueryClient();
@@ -388,75 +388,87 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const { isEnabled: knowledgeMode, toggle: toggleKnowledge } = useKnowledgeMode();
     const profileUploading = uploadResume.isLoading;
     const profileError = uploadResume.error instanceof Error ? uploadResume.error.message : '';
-    const [verboseLogging, setVerboseLogging] = useState(false);
-    const [permissionStatus, setPermissionStatus] = useState<{ microphone: string; screen: string } | null>(null);
 
-    // Close dropdown when clicking outside
-    // Sync with global state changes
-    useEffect(() => {
-        if (isOpen) {
-            // Fetch true initial state from main process
-            window.electronAPI?.getUndetectable?.().then(setIsUndetectable).catch(() => { });
-            window.electronAPI?.getOverlayMousePassthrough?.().then(setIsMousePassthrough).catch(() => { });
-            window.electronAPI?.getDisguise?.().then(setDisguiseMode).catch(() => { });
-            window.electronAPI?.getVerboseLogging?.().then(setVerboseLogging).catch(() => { });
-            window.electronAPI?.getPermissionStatus?.().then(setPermissionStatus).catch(() => { });
-        }
-    }, [isOpen]);
+    // General Settings (queries + main event subscriptions)
+    const { data: isUndetectable = false } = useQuery<boolean>(
+        ['undetectable'],
+        () => window.electronAPI?.getUndetectable?.() ?? Promise.resolve(false),
+        { enabled: isOpen && !!window.electronAPI?.getUndetectable }
+    );
+    useMainEvent(window.electronAPI?.onUndetectableChanged, (newState: boolean) => {
+        queryClient.setQueryData(['undetectable'], newState);
+    });
 
-    useEffect(() => {
-        if (window.electronAPI?.onUndetectableChanged) {
-            const unsubscribe = window.electronAPI.onUndetectableChanged((newState: boolean) => {
-                setIsUndetectable(newState);
-            });
-            return () => unsubscribe();
-        }
-    }, []);
+    const { data: isMousePassthrough = false } = useQuery<boolean>(
+        ['overlay-mouse-passthrough'],
+        () => window.electronAPI?.getOverlayMousePassthrough?.() ?? Promise.resolve(false),
+        { enabled: isOpen && !!window.electronAPI?.getOverlayMousePassthrough }
+    );
+    useMainEvent(window.electronAPI?.onOverlayMousePassthroughChanged, (enabled: boolean) => {
+        queryClient.setQueryData(['overlay-mouse-passthrough'], enabled);
+    });
 
-    useEffect(() => {
-        if (window.electronAPI?.onDisguiseChanged) {
-            const unsubscribe = window.electronAPI.onDisguiseChanged((newMode: any) => {
-                setDisguiseMode(newMode);
-            });
-            return () => unsubscribe();
-        }
-    }, []);
+    const { data: disguiseMode = 'none' } = useQuery<'terminal' | 'settings' | 'activity' | 'none'>(
+        ['settings', 'disguise'],
+        () => window.electronAPI?.getDisguise?.() ?? Promise.resolve('none'),
+        { enabled: isOpen && !!window.electronAPI?.getDisguise }
+    );
+    useMainEvent(window.electronAPI?.onDisguiseChanged, (newMode: any) => {
+        queryClient.setQueryData(['settings', 'disguise'], newMode);
+    });
 
-    useEffect(() => {
-        if (window.electronAPI?.onOverlayMousePassthroughChanged) {
-            const unsubscribe = window.electronAPI.onOverlayMousePassthroughChanged((enabled: boolean) => {
-                setIsMousePassthrough(enabled);
-            });
-            return () => unsubscribe();
-        }
-    }, []);
+    const { data: openOnLogin = false } = useQuery<boolean>(
+        ['settings', 'open-at-login'],
+        () => window.electronAPI?.getOpenAtLogin?.() ?? Promise.resolve(false),
+        { enabled: isOpen && !!window.electronAPI?.getOpenAtLogin }
+    );
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (themeDropdownRef.current && !themeDropdownRef.current.contains(event.target as Node)) {
+    const { data: themeMode = 'system' } = useQuery<'system' | 'light' | 'dark'>(
+        ['settings', 'theme-mode'],
+        async () => {
+            const res = await window.electronAPI?.getThemeMode?.();
+            return (res?.mode as 'system' | 'light' | 'dark') ?? 'system';
+        },
+        { enabled: isOpen && !!window.electronAPI?.getThemeMode }
+    );
+
+    const { data: verboseLogging = false } = useQuery<boolean>(
+        ['settings', 'verbose-logging'],
+        () => window.electronAPI?.getVerboseLogging?.() ?? Promise.resolve(false),
+        { enabled: isOpen && !!window.electronAPI?.getVerboseLogging }
+    );
+
+    const { data: permissionStatus = null } = useQuery<{ microphone: string; screen: string } | null>(
+        ['settings', 'permission-status'],
+        () => window.electronAPI?.getPermissionStatus?.() ?? Promise.resolve(null),
+        { enabled: isOpen && !!window.electronAPI?.getPermissionStatus }
+    );
+
+    const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
+    const [isAiLangDropdownOpen, setIsAiLangDropdownOpen] = useState(false);
+    const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'uptodate' | 'error'>('idle');
+    const themeDropdownRef = useRef<HTMLDivElement>(null);
+    const aiLangDropdownRef = useRef<HTMLDivElement>(null);
+
+    useWindowEvent(
+        'mousedown',
+        (event) => {
+            if (isThemeDropdownOpen && themeDropdownRef.current && !themeDropdownRef.current.contains(event.target as Node)) {
                 setIsThemeDropdownOpen(false);
             }
-            if (aiLangDropdownRef.current && !aiLangDropdownRef.current.contains(event.target as Node)) {
+            if (isAiLangDropdownOpen && aiLangDropdownRef.current && !aiLangDropdownRef.current.contains(event.target as Node)) {
                 setIsAiLangDropdownOpen(false);
             }
-        };
+        },
+        'document'
+    );
 
-        if (isThemeDropdownOpen || isAiLangDropdownOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isThemeDropdownOpen, isAiLangDropdownOpen]);
-
-    const [showTranscript, setShowTranscript] = useState(() => {
-        const stored = localStorage.getItem('pika_interviewer_transcript');
-        return stored !== 'false';
-    });
+    const [storedTranscript, setStoredTranscript] = useLocalStorageValue('pika_interviewer_transcript');
+    const showTranscript = storedTranscript !== 'false';
 
     // Recognition Language
     const [recognitionLanguage, setRecognitionLanguage] = useState('');
+    const [userRecognitionLanguage, setUserRecognitionLanguage] = useState('');
     const [selectedSttGroup, setSelectedSttGroup] = useState('');
     const [availableLanguages, setAvailableLanguages] = useState<Record<string, any>>({});
 
@@ -473,24 +485,28 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         return isUserSet ? clampOverlayOpacity(parsed) : getDefaultOverlayOpacity();
     });
 
-    // When the theme changes and the user hasn't saved a custom value, reset to theme-aware default
-    const resolvedTheme = useResolvedTheme();
-    useEffect(() => {
-        const stored = localStorage.getItem('pika_overlay_opacity');
-        const parsed = stored ? parseFloat(stored) : NaN;
-        const isUserSet = Number.isFinite(parsed) && parsed !== getDefaultOverlayOpacity();
-        if (!isUserSet) {
-            setOverlayOpacity(getDefaultOverlayOpacity());
-        }
-    }, [resolvedTheme]);
-
-
     // Live preview state — true while the user is holding down the slider
     const [isPreviewingOpacity, setIsPreviewingOpacity] = useState(false);
     const [previewOverlayOpacity, setPreviewOverlayOpacity] = useState(overlayOpacity);
 
     // Ref to hold the latest opacity value without triggering renders during drag
-    const latestOpacityRef = React.useRef(overlayOpacity);
+    const latestOpacityRef = useRef(overlayOpacity);
+
+    // When the theme changes and the user hasn't saved a custom value, reset to theme-aware default
+    const resolvedTheme = useResolvedTheme();
+    const [prevTheme, setPrevTheme] = useState(resolvedTheme);
+    if (resolvedTheme !== prevTheme) {
+        setPrevTheme(resolvedTheme);
+        const stored = localStorage.getItem('pika_overlay_opacity');
+        const parsed = stored ? parseFloat(stored) : NaN;
+        const isUserSet = Number.isFinite(parsed) && parsed !== getDefaultOverlayOpacity();
+        if (!isUserSet) {
+            const next = getDefaultOverlayOpacity();
+            setOverlayOpacity(next);
+            latestOpacityRef.current = next;
+            setPreviewOverlayOpacity(next);
+        }
+    }
 
     const handleOpacityChange = (val: number) => {
         // DOM-direct updates for 0-lag 60fps drag (bypasses React reconciliation)
@@ -504,20 +520,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         window.electronAPI?.setOverlayOpacity?.(val);
     };
 
-    // Bug fix #3: keep latestOpacityRef in sync when overlayOpacity changes outside of a drag
-    // (e.g. on first mount, or if another part of code updates it)
-    useEffect(() => {
-        latestOpacityRef.current = overlayOpacity;
-        setPreviewOverlayOpacity(overlayOpacity);
-    }, [overlayOpacity]);
-
     // Bug fix #3 (close-during-drag): if the overlay closes while the user is still dragging,
     // restore all DOM state so nothing is left in a broken state.
     useEffect(() => {
         if (!isOpen && isPreviewingOpacity) {
             stopPreviewingOpacity();
         }
-    }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [isOpen]);
 
     const startPreviewingOpacity = () => {
         // Bug fix #5: guard against rapid repeated calls (double pointerDown / touch events)
@@ -650,6 +659,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 } else {
                     setSelectedSttGroup('English');
                 }
+
+                if (window.electronAPI?.getSttLanguage) {
+                    const storedUserStt = await window.electronAPI.getSttLanguage('user');
+                    setUserRecognitionLanguage(storedUserStt || currentLangKey || 'english-us');
+                }
             }
 
             if (window.electronAPI?.getAiResponseLanguages) {
@@ -679,9 +693,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         } else if (availableLanguages[key]) {
             setSelectedSttGroup(availableLanguages[key].group);
         }
-        if (window.electronAPI?.setRecognitionLanguage) {
-            await window.electronAPI.setRecognitionLanguage(key);
-        }
+        // Nothing is sent here: the choice is applied when Save is pressed.
+    };
+
+    const handleUserLanguageChange = async (key: string) => {
+        setUserRecognitionLanguage(key);
     };
 
     const handleGroupChange = (group: string) => {
@@ -745,37 +761,57 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     };
 
 
-    // Sync transcript setting
-    useEffect(() => {
-        const handleStorage = () => {
-            const stored = localStorage.getItem('pika_interviewer_transcript');
-            setShowTranscript(stored !== 'false');
-        };
-        window.addEventListener('storage', handleStorage);
-        return () => window.removeEventListener('storage', handleStorage);
-    }, []);
-
     // Theme Handlers
     const handleSetTheme = async (mode: 'system' | 'light' | 'dark') => {
-        setThemeMode(mode);
+        queryClient.setQueryData(['settings', 'theme-mode'], mode);
         if (window.electronAPI?.setThemeMode) {
             await window.electronAPI.setThemeMode(mode);
         }
     };
 
     // Audio Settings
-    const [inputDevices, setInputDevices] = useState<MediaDeviceInfo[]>([]);
-    const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
-    const [selectedInput, setSelectedInput] = useState('');
-    const [selectedOutput, setSelectedOutput] = useState('');
+    const { data: devices } = useQuery(
+        ['settings', 'devices'],
+        async () => {
+            const [inputs, outputs] = await Promise.all([
+                // @ts-ignore
+                window.electronAPI?.getInputDevices() || Promise.resolve([]),
+                // @ts-ignore
+                window.electronAPI?.getOutputDevices() || Promise.resolve([])
+            ]);
+            const formatDevices = (devs: any[]) =>
+                devs.map((d: any) => ({
+                    deviceId: d.id,
+                    label: d.name,
+                    kind: 'audioinput' as MediaDeviceKind,
+                    groupId: '',
+                    toJSON: () => d,
+                }));
+            return {
+                inputs: formatDevices(inputs),
+                outputs: formatDevices(outputs),
+            };
+        },
+        { enabled: isOpen && !!window.electronAPI?.getInputDevices }
+    );
+    const inputDevices = devices?.inputs ?? [];
+    const outputDevices = devices?.outputs ?? [];
+    const [preferredInputId, setPreferredInputId] = useLocalStorageValue('preferredInputDeviceId');
+    const [preferredOutputId, setPreferredOutputId] = useLocalStorageValue('preferredOutputDeviceId');
+    const selectedInput = (preferredInputId && inputDevices.some((d) => d.deviceId === preferredInputId))
+        ? preferredInputId
+        : (inputDevices[0]?.deviceId ?? '');
+    const selectedOutput = (preferredOutputId && outputDevices.some((d) => d.deviceId === preferredOutputId))
+        ? preferredOutputId
+        : (outputDevices[0]?.deviceId ?? '');
     const [micLevel, setMicLevel] = useState(0);
     const [inputDeviceNotFound, setInputDeviceNotFound] = useState(false);
-    const [useExperimentalSck, setUseExperimentalSck] = useState(false);
+    const [storedSck, setStoredSck] = useLocalStorageValue('useExperimentalSckBackend');
+    const useExperimentalSck = storedSck === 'true';
 
     // STT Provider settings
     const [sttProvider, setSttProvider] = useState<'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'>('google');
     const [transcriptAssemblerProfile, setTranscriptAssemblerProfile] = useState<TranscriptAssemblerProfile>('sentence_bias');
-    const [groqSttModel, setGroqSttModel] = useState('whisper-large-v3-turbo');
     const [sttGroqKey, setSttGroqKey] = useState('');
     const [sttOpenaiKey, setSttOpenaiKey] = useState('');
     const [sttDeepgramKey, setSttDeepgramKey] = useState('');
@@ -799,38 +835,24 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [isSttDropdownOpen, setIsSttDropdownOpen] = useState(false);
     const sttDropdownRef = React.useRef<HTMLDivElement>(null);
     const [transcriptTranslationEnabled, setTranscriptTranslationEnabled] = useState(false);
-    const [transcriptTranslationProvider, setTranscriptTranslationProvider] = useState<string>('ollama');
+    const [transcriptTranslationProvider, setTranscriptTranslationProvider] = useState('ollama');
     const [transcriptTranslationModel, setTranscriptTranslationModel] = useState('');
-    const [translationLlmKeyStatus, setTranslationLlmKeyStatus] = useState({
-        gemini: false,
-        groq: false,
-        openai: false,
-        claude: false,
-    });
-    const [translationOpenAICompatFromSettings, setTranslationOpenAICompatFromSettings] = useState<
-        Array<{ id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }>
-    >([]);
     const [transcriptTranslationPrompt, setTranscriptTranslationPrompt] = useState(DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT);
     const [transcriptTranslationDisplayMode, setTranscriptTranslationDisplayMode] = useState<'original' | 'translated' | 'both'>('original');
     const [transcriptTranslationSourceLanguage, setTranscriptTranslationSourceLanguage] = useState('auto');
     const [transcriptTranslationTargetLanguage, setTranscriptTranslationTargetLanguage] = useState('chinese');
     const [translationSettingsSaved, setTranslationSettingsSaved] = useState(false);
-    const [translationModelOptions, setTranslationModelOptions] = useState<{ id: string; label: string }[]>([]);
-    const [translationModelsFetchLoading, setTranslationModelsFetchLoading] = useState(false);
-    const [translationModelsFetchError, setTranslationModelsFetchError] = useState<string | null>(null);
 
     // Close STT dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (sttDropdownRef.current && !sttDropdownRef.current.contains(event.target as Node)) {
+    useWindowEvent(
+        'mousedown',
+        (event) => {
+            if (isSttDropdownOpen && sttDropdownRef.current && !sttDropdownRef.current.contains(event.target as Node)) {
                 setIsSttDropdownOpen(false);
             }
-        };
-        if (isSttDropdownOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isSttDropdownOpen]);
+        },
+        'document'
+    );
 
     // Load STT settings on mount
     useEffect(() => {
@@ -840,7 +862,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 const creds = await window.electronAPI?.getStoredCredentials?.();
                 if (creds) {
                     setSttProvider(creds.sttProvider || 'google');
-                    if (creds.groqSttModel) setGroqSttModel(creds.groqSttModel);
+                    setSttModelDraft({ ...(creds.sttModels || {}), groq: creds.groqSttModel || '' });
                     setGoogleServiceAccountPath(creds.googleServiceAccountPath);
                     setHasStoredSttGroqKey(creds.hasSttGroqKey);
                     setHasStoredSttOpenaiKey(creds.hasSttOpenaiKey);
@@ -869,16 +891,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                             ? creds.transcriptTranslationTargetLanguage
                             : 'chinese'
                     );
-                    setTranslationLlmKeyStatus({
-                        gemini: !!creds.hasGeminiKey,
-                        groq: !!creds.hasGroqKey,
-                        openai: !!creds.hasOpenaiKey,
-                        claude: !!creds.hasClaudeKey,
-                    });
-                }
-                const oaiList = await window.electronAPI?.getOpenAICompatibleProviders?.();
-                if (oaiList) {
-                    setTranslationOpenAICompatFromSettings(oaiList);
                 }
                 const assemblerProfile = await window.electronAPI?.getTranscriptAssemblerProfile?.();
                 if (assemblerProfile) {
@@ -891,62 +903,64 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         if (isOpen) loadSttSettings();
     }, [isOpen]);
 
-    const translationProviderOptions = useMemo(() => {
-        const o: { value: string; label: string }[] = [];
-        o.push({ value: 'ollama', label: 'Ollama (local)' });
-        if (translationLlmKeyStatus.gemini) o.push({ value: 'gemini', label: 'Gemini' });
-        if (translationLlmKeyStatus.groq) o.push({ value: 'groq', label: 'Groq' });
-        if (translationLlmKeyStatus.openai) o.push({ value: 'openai', label: 'OpenAI' });
-        if (translationLlmKeyStatus.claude) o.push({ value: 'claude', label: 'Claude' });
-        translationOpenAICompatFromSettings.forEach((p) =>
-            o.push({ value: p.id, label: `${p.name} (OpenAI-compatible)` })
-        );
-        return o;
-    }, [translationLlmKeyStatus, translationOpenAICompatFromSettings]);
+    // The speech settings are a draft until Save: provider, model and both languages are applied together
+    // and read back, so the screen shows what the app really holds.
+    const [sttModelDraft, setSttModelDraft] = useState<Record<string, string>>({});
+    const [speechSaving, setSpeechSaving] = useState(false);
+    const [speechResult, setSpeechResult] = useState<{ ok: boolean; text: string } | null>(null);
 
-    useEffect(() => {
-        if (translationProviderOptions.length === 0) return;
-        if (!translationProviderOptions.some((x) => x.value === transcriptTranslationProvider)) {
-            setTranscriptTranslationProvider(translationProviderOptions[0].value);
-        }
-    }, [translationProviderOptions, transcriptTranslationProvider]);
-
-    useEffect(() => {
+    const handleSaveSpeechSettings = async () => {
         const api = window.electronAPI;
-        if (!api?.onOpenAICompatibleProvidersChanged) return undefined;
-        const unsub = api.onOpenAICompatibleProvidersChanged(async () => {
-            try {
-                const list = await api.getOpenAICompatibleProviders?.();
-                if (list) {
-                    setTranslationOpenAICompatFromSettings(list);
-                }
-                const creds = await api.getStoredCredentials?.();
-                if (creds) {
-                    setTranslationLlmKeyStatus({
-                        gemini: !!creds.hasGeminiKey,
-                        groq: !!creds.hasGroqKey,
-                        openai: !!creds.hasOpenaiKey,
-                        claude: !!creds.hasClaudeKey,
-                    });
-                }
-            } catch {
-                // ignore
+        setSpeechSaving(true);
+        setSpeechResult(null);
+        try {
+            const wantModel = (sttModelDraft[sttProvider] ?? '').trim();
+            if (sttProvider in STT_MODEL_DEFAULTS) {
+                const modelResult = await api.setSttModel(sttProvider, wantModel);
+                if (!modelResult.success) throw new Error(modelResult.error || 'The model was not saved');
             }
-        });
-        return () => unsub();
-    }, []);
+            // @ts-ignore
+            const providerResult = await api.setSttProvider?.(sttProvider);
+            if (providerResult && !providerResult.success) throw new Error(providerResult.error || 'The service was not saved');
+            await api.setRecognitionLanguage(recognitionLanguage, 'interviewer');
+            await api.setRecognitionLanguage(userRecognitionLanguage || recognitionLanguage, 'user');
+
+            // Read back what the app holds now.
+            const [creds, theirs, yours, running] = await Promise.all([
+                api.getStoredCredentials(),
+                api.getSttLanguage('interviewer'),
+                api.getSttLanguage('user'),
+                api.getMeetingActive().catch(() => false),
+            ]);
+            const heldModel = sttProvider === 'groq' ? creds.groqSttModel : creds.sttModels?.[sttProvider];
+            const matches =
+                creds.sttProvider === sttProvider &&
+                theirs === recognitionLanguage &&
+                yours === (userRecognitionLanguage || recognitionLanguage) &&
+                (!(sttProvider in STT_MODEL_DEFAULTS) || (heldModel || '') === (sttProvider === 'groq' && !wantModel ? 'whisper-large-v3-turbo' : wantModel));
+            const label = (key: string) => availableLanguages[key]?.label ?? key;
+            setSpeechResult(
+                matches
+                    ? {
+                          ok: true,
+                          text: `Saved: ${sttProvider}${sttProvider in STT_MODEL_DEFAULTS ? ` · ${heldModel || 'default model'}` : ''} · their audio ${label(theirs)} · you ${label(yours)}. ${running ? 'The running meeting restarted its recognition with these.' : 'They apply from your next meeting.'}`,
+                      }
+                    : { ok: false, text: 'Saved, but the app reports different values. Close this window and open it again to see what is in effect.' }
+            );
+        } catch (e) {
+            setSpeechResult({ ok: false, text: (e as Error).message || 'Could not save' });
+        } finally {
+            setSpeechSaving(false);
+        }
+    };
 
     const handleSttProviderChange = async (provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => {
         setSttProvider(provider);
         setIsSttDropdownOpen(false);
         setSttTestStatus('idle');
         setSttTestError('');
-        try {
-            // @ts-ignore
-            await window.electronAPI?.setSttProvider?.(provider);
-        } catch (e) {
-            console.error('Failed to set STT provider:', e);
-        }
+        setSpeechResult(null);
+        // Nothing is sent here: the provider is applied when Save is pressed.
         // If switching to a provider that doesn't support multi-language detection
         // and the current STT language is "auto", fall back to a sensible default.
         if (STT_PROVIDERS_WITHOUT_AUTO.has(provider) && recognitionLanguage === 'auto') {
@@ -1124,67 +1138,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         }
     };
 
-    useEffect(() => {
-        setTranslationModelOptions([]);
-        setTranslationModelsFetchError(null);
-    }, [transcriptTranslationProvider]);
-
-    const handleFetchTranslationModels = async () => {
-        setTranslationModelsFetchLoading(true);
-        setTranslationModelsFetchError(null);
-        try {
-            if (transcriptTranslationProvider === 'ollama') {
-                const list = (await window.electronAPI.getAvailableOllamaModels()) ?? [];
-                const opts = list.map((id) => ({ id, label: id }));
-                setTranslationModelOptions(opts);
-                if (opts.length === 0) {
-                    setTranslationModelsFetchError('No local Ollama models found. Pull a model or start Ollama.');
-                } else if (!transcriptTranslationModel.trim()) {
-                    setTranscriptTranslationModel(opts[0].id);
-                }
-            } else if (
-                transcriptTranslationProvider === 'gemini' ||
-                transcriptTranslationProvider === 'groq' ||
-                transcriptTranslationProvider === 'openai' ||
-                transcriptTranslationProvider === 'claude'
-            ) {
-                const p = transcriptTranslationProvider as 'gemini' | 'groq' | 'openai' | 'claude';
-                const result = await window.electronAPI.fetchProviderModels(p, '');
-                if (result?.success && result.models && result.models.length > 0) {
-                    setTranslationModelOptions(result.models);
-                    if (!transcriptTranslationModel.trim()) {
-                        setTranscriptTranslationModel(result.models[0].id);
-                    }
-                } else if (result?.success && (!result.models || result.models.length === 0)) {
-                    setTranslationModelsFetchError('No models returned.');
-                } else {
-                    setTranslationModelsFetchError(result?.error || 'Failed to fetch models');
-                }
-            } else {
-                const ep = translationOpenAICompatFromSettings.find((x) => x.id === transcriptTranslationProvider);
-                if (!ep) {
-                    setTranslationModelsFetchError('This endpoint is not in AI Providers. Add it under AI Providers, then reopen settings.');
-                    return;
-                }
-                const result = await window.electronAPI.fetchOpenAICompatibleModels(ep.baseUrl, ep.apiKey);
-                if (result?.success && result.models && result.models.length > 0) {
-                    setTranslationModelOptions(result.models);
-                    if (!transcriptTranslationModel.trim()) {
-                        setTranscriptTranslationModel(result.models[0].id);
-                    }
-                } else if (result?.success && (!result.models || result.models.length === 0)) {
-                    setTranslationModelsFetchError('No models returned.');
-                } else {
-                    setTranslationModelsFetchError(result?.error || 'Failed to fetch models');
-                }
-            }
-        } catch (e: unknown) {
-            setTranslationModelsFetchError(e instanceof Error ? e.message : 'Failed to fetch models');
-        } finally {
-            setTranslationModelsFetchLoading(false);
-        }
-    };
-
     const handleSaveTranscriptTranslationSettings = async () => {
         try {
             await window.electronAPI?.setTranscriptTranslationSettings?.({
@@ -1250,71 +1203,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         return () => unsubs.forEach(unsub => unsub());
     }, [isOpen, onClose]);
 
-
-
-    useEffect(() => {
-        if (isOpen) {
-            // Load detectable status
-            if (window.electronAPI?.getUndetectable) {
-                window.electronAPI.getUndetectable().then(setIsUndetectable);
-            }
-            if (window.electronAPI?.getOpenAtLogin) {
-                window.electronAPI.getOpenAtLogin().then(setOpenOnLogin);
-            }
-            if (window.electronAPI?.getThemeMode) {
-                window.electronAPI.getThemeMode().then(({ mode }) => setThemeMode(mode));
-            }
-
-            // Load settings
-            const loadDevices = async () => {
-                try {
-                    const [inputs, outputs] = await Promise.all([
-                        // @ts-ignore
-                        window.electronAPI?.getInputDevices() || Promise.resolve([]),
-                        // @ts-ignore
-                        window.electronAPI?.getOutputDevices() || Promise.resolve([])
-                    ]);
-
-                    // Map to shape compatible with CustomSelect (which expects MediaDeviceInfo-like objects)
-                    const formatDevices = (devs: any[]) => devs.map(d => ({
-                        deviceId: d.id,
-                        label: d.name,
-                        kind: 'audioinput' as MediaDeviceKind,
-                        groupId: '',
-                        toJSON: () => d
-                    }));
-
-                    setInputDevices(formatDevices(inputs));
-                    setOutputDevices(formatDevices(outputs));
-
-                    // Load saved preferences
-                    const savedInput = localStorage.getItem('preferredInputDeviceId');
-                    const savedOutput = localStorage.getItem('preferredOutputDeviceId');
-
-                    if (savedInput && inputs.find((d: any) => d.id === savedInput)) {
-                        setSelectedInput(savedInput);
-                    } else if (inputs.length > 0 && !selectedInput) {
-                        setSelectedInput(inputs[0].id);
-                    }
-
-                    if (savedOutput && outputs.find((d: any) => d.id === savedOutput)) {
-                        setSelectedOutput(savedOutput);
-                    } else if (outputs.length > 0 && !selectedOutput) {
-                        setSelectedOutput(outputs[0].id);
-                    }
-                } catch (e) {
-                    console.error("Error loading native devices:", e);
-                }
-            };
-            loadDevices();
-
-            // Load Experimental SCK pref
-            const savedSck = localStorage.getItem('useExperimentalSckBackend') === 'true';
-            setUseExperimentalSck(savedSck);
-
-        }
-    }, [isOpen, selectedInput, selectedOutput]); // Re-run if isOpen changes, or if selected devices are cleared
-
     // Use the native mic test path so device IDs stay consistent with the meeting runtime.
     useEffect(() => {
         if (isOpen && activeTab === 'audio') {
@@ -1325,8 +1213,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             window.electronAPI?.startAudioTest(selectedInput || undefined).then((result) => {
                 if (result?.warning) {
                     setInputDeviceNotFound(true);
-                    setSelectedInput('');
-                    localStorage.removeItem('preferredInputDeviceId');
+                    setPreferredInputId(null);
                 } else {
                     setInputDeviceNotFound(false);
                 }
@@ -1348,7 +1235,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 console.error("Error stopping native microphone test:", error);
             });
         }
-    }, [isOpen, activeTab, selectedInput]);
+    }, [isOpen, activeTab, selectedInput, setPreferredInputId]);
 
     return (
         <AnimatePresence>
@@ -1391,7 +1278,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                         {/* Sidebar */}
                         <div className="w-64 bg-bg-sidebar flex flex-col border-r border-border-subtle">
                             <div className="p-6">
-                                <h2 className="font-semibold text-gray-400 text-xs uppercase tracking-wider mb-2">Settings</h2>
+                                <h2 className="font-semibold text-text-tertiary text-xs uppercase tracking-wider mb-2">Settings</h2>
                                 <nav className="space-y-1">
                                     <button
                                         onClick={() => setActiveTab('general')}
@@ -1483,10 +1370,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             <div
                                                 onClick={() => {
                                                     const newState = !isUndetectable;
-                                                    setIsUndetectable(newState);
+                                                    queryClient.setQueryData(['undetectable'], newState);
                                                     window.electronAPI?.setUndetectable(newState);
                                                     // Analytics: Undetectable Mode Toggle
-                                                    analytics.trackModeSelected(newState ? 'undetectable' : 'overlay');
                                                 }}
                                                 className={`w-11 h-6 rounded-full relative transition-colors ${isUndetectable ? 'bg-accent-primary' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                             >
@@ -1508,7 +1394,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             <div
                                                 onClick={() => {
                                                     const newState = !isMousePassthrough;
-                                                    setIsMousePassthrough(newState);
+                                                    queryClient.setQueryData(['overlay-mouse-passthrough'], newState);
                                                     window.electronAPI?.setOverlayMousePassthrough(newState);
                                                 }}
                                                 className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer ${isMousePassthrough ? 'bg-state-info' : 'bg-bg-toggle-switch border border-border-muted'}`}
@@ -1578,7 +1464,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     <div
                                                         onClick={() => {
                                                             const newState = !openOnLogin;
-                                                            setOpenOnLogin(newState);
+                                                            queryClient.setQueryData(['settings', 'open-at-login'], newState);
                                                             window.electronAPI?.setOpenAtLogin(newState);
                                                         }}
                                                         className={`w-11 h-6 rounded-full relative transition-colors ${openOnLogin ? 'bg-accent-primary' : 'bg-bg-toggle-switch border border-border-muted'}`}
@@ -1601,7 +1487,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     <div
                                                         onClick={() => {
                                                             const newState = !verboseLogging;
-                                                            setVerboseLogging(newState);
+                                                            queryClient.setQueryData(['settings', 'verbose-logging'], newState);
                                                             window.electronAPI?.setVerboseLogging?.(newState);
                                                         }}
                                                         className={`w-11 h-6 rounded-full relative transition-colors ${verboseLogging ? 'bg-state-warning' : 'bg-bg-toggle-switch border border-border-muted'}`}
@@ -1623,10 +1509,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     </div>
                                                     <div
                                                         onClick={() => {
-                                                            const newState = !showTranscript;
-                                                            setShowTranscript(newState);
-                                                            localStorage.setItem('pika_interviewer_transcript', String(newState));
-                                                            window.dispatchEvent(new Event('storage'));
+                                                            setStoredTranscript(showTranscript ? 'false' : 'true');
                                                         }}
                                                         className={`w-11 h-6 rounded-full relative transition-colors ${showTranscript ? 'bg-accent-primary' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                                     >
@@ -1731,6 +1614,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     </div>
                                                 </div>
 
+                                                <AnswerStyleSettings />
+
                                                 {/* Version */}
                                                 <div className="flex items-start justify-between gap-4 px-4 py-3">
                                                     <div className="flex items-start gap-4">
@@ -1760,7 +1645,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         }}
                                                         disabled={updateStatus === 'checking'}
                                                         className={`px-5 py-2 rounded-lg text-[13px] font-bold transition-all flex items-center gap-2 shrink-0 ${updateStatus === 'checking' ? 'bg-bg-input text-text-tertiary cursor-wait' :
-                                                            updateStatus === 'available' ? 'bg-accent-primary text-white hover:bg-accent-secondary shadow-lg shadow-blue-500/20' :
+                                                            updateStatus === 'available' ? 'bg-accent-primary text-on-primary hover:bg-accent-secondary shadow-lg shadow-blue-500/20' :
                                                                 updateStatus === 'uptodate' ? 'bg-state-success-soft text-state-success border border-state-success-border' :
                                                                     updateStatus === 'error' ? 'bg-state-danger-soft text-state-danger border border-state-danger-border' :
                                                                         'bg-bg-component hover:bg-bg-input text-text-primary'
@@ -1877,15 +1762,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     disabled={isUndetectable}
                                                     onClick={() => {
                                                         if (isUndetectable) return;
-                                                        // @ts-ignore
-                                                        setDisguiseMode(option.id);
+                                                        queryClient.setQueryData(['settings', 'disguise'], option.id);
                                                         // @ts-ignore
                                                         window.electronAPI?.setDisguise(option.id);
                                                         // Analytics
-                                                        analytics.trackModeSelected(`disguise_${option.id}`);
                                                     }}
                                                     className={`p-3 rounded-lg border text-left flex items-center gap-3 transition-all ${disguiseMode === option.id
-                                                        ? 'bg-accent-primary border-accent-primary text-white shadow-lg shadow-blue-500/20'
+                                                        ? 'bg-accent-primary border-accent-primary text-on-primary shadow-lg shadow-blue-500/20'
                                                         : 'bg-bg-input border-border-subtle text-text-secondary hover:text-text-primary hover:bg-bg-subtle-hover'
                                                         } ${isUndetectable ? 'cursor-not-allowed' : ''}`}
                                                 >
@@ -2065,6 +1948,10 @@ Core Skills
                                         <JDListManager onSelectFile={() => window.electronAPI?.profileSelectFile?.()} />
                                     </div>
 
+                                    <div className="mt-5">
+                                        <NotesSettings />
+                                    </div>
+
                                     <ProfileVisualizer profileData={profileData} />
 
                                 </div>
@@ -2095,6 +1982,8 @@ Core Skills
                                             { id: 'captureAndProcess', label: 'Capture screen and ask AI' },
                                             { id: 'processScreenshots', label: 'Process current screenshots' },
                                             { id: 'resetCancel', label: 'Reset or cancel' },
+                                            { id: 'toggleTranslation', label: 'Turn translation on or off' },
+                                            { id: 'toggleOriginal', label: 'Show or hide the original text' },
                                         ].map((item) => (
                                             <div key={item.id} className="flex items-center justify-between py-2 border-b border-border-subtle/50 last:border-b-0">
                                                 <span className="text-sm text-text-secondary">{item.label}</span>
@@ -2199,37 +2088,17 @@ Core Skills
                                                 </div>
                                             </div>
 
-                                            {/* Groq Model Selector */}
-                                            {sttProvider === 'groq' && (
-                                                <div className="bg-bg-card rounded-xl border border-border-subtle p-4">
-                                                    <label className="text-xs font-medium text-text-secondary mb-2.5 block">Whisper Model</label>
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        {[
-                                                            { id: 'whisper-large-v3-turbo', label: 'V3 Turbo', desc: 'Fastest' },
-                                                            { id: 'whisper-large-v3', label: 'V3', desc: 'Most Accurate' },
-                                                        ].map((m) => (
-                                                            <button
-                                                                key={m.id}
-                                                                type="button"
-                                                                onClick={async () => {
-                                                                    setGroqSttModel(m.id);
-                                                                    try {
-                                                                        await window.electronAPI.setGroqSttModel(m.id);
-                                                                    } catch (e) {
-                                                                        console.error('Failed to set Groq model:', e);
-                                                                    }
-                                                                }}
-                                                                className={`rounded-lg px-3 py-2.5 text-left transition-all duration-200 ease-in-out active:scale-[0.98] ${groqSttModel === m.id
-                                                                    ? 'bg-blue-600 text-white shadow-md'
-                                                                    : 'bg-bg-input hover:bg-bg-elevated text-text-primary'
-                                                                    }`}
-                                                            >
-                                                                <span className="text-sm font-medium block">{m.label}</span>
-                                                                <span className={`text-[11px] transition-colors ${groqSttModel === m.id ? 'text-white/70' : 'text-text-tertiary'
-                                                                    }`}>{m.desc}</span>
-                                                            </button>
-                                                        ))}
-                                                    </div>
+                                            {/* Model (services that let you choose one) */}
+                                            {sttProvider in STT_MODEL_DEFAULTS && (
+                                                <div className="bg-bg-card rounded-xl border border-border-subtle p-4 space-y-2">
+                                                    <label className="text-xs font-medium text-text-secondary block">Model</label>
+                                                    <SttModelPicker
+                                                        provider={sttProvider}
+                                                        model={sttModelDraft[sttProvider] ?? ''}
+                                                        apiKey={({ groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey, elevenlabs: sttElevenLabsKey, soniox: sttSonioxKey } as Record<string, string>)[sttProvider] ?? ''}
+                                                        onChange={(model) => { setSttModelDraft({ ...sttModelDraft, [sttProvider]: model }); setSpeechResult(null); }}
+                                                    />
+                                                    <p className="text-[10px] text-text-tertiary">Leave empty for the default. The key above is used to fetch the list; a saved key works too.</p>
                                                 </div>
                                             )}
 
@@ -2429,7 +2298,7 @@ Core Skills
 
                                             {/* Recognition Language Family */}
                                             <CustomSelect
-                                                label="Language"
+                                                label="Their language"
                                                 icon={<Globe size={14} />}
                                                 value={selectedSttGroup}
                                                 options={(STT_PROVIDERS_WITHOUT_AUTO.has(sttProvider)
@@ -2467,6 +2336,37 @@ Core Skills
                                                         ? 'Auto: detect language per segment for multilingual meetings. Not available on Azure / IBM Watson.'
                                                         : 'Select the primary language being spoken in the meeting. Choose Auto for multilingual meetings.'}
                                                 </p>
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-medium text-text-secondary block">You speak</label>
+                                                <select
+                                                    value={userRecognitionLanguage || 'english-us'}
+                                                    onChange={(e) => { void handleUserLanguageChange(e.target.value); }}
+                                                    className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
+                                                >
+                                                    {translationLanguageOptions.map((o) => (
+                                                        <option key={o.value} value={o.value}>
+                                                            {o.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <div className="flex flex-wrap items-center gap-3">
+                                                    <button
+                                                        onClick={handleSaveSpeechSettings}
+                                                        disabled={speechSaving}
+                                                        className="px-5 py-2.5 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-50 transition-colors"
+                                                    >
+                                                        {speechSaving ? 'Saving...' : 'Save speech settings'}
+                                                    </button>
+                                                    <span className="text-[11px] text-text-tertiary">The service, model and languages above apply when you press Save. A key has its own Save.</span>
+                                                </div>
+                                                {speechResult && (
+                                                    <p className={`text-[11px] ${speechResult.ok ? 'text-state-success' : 'text-state-danger'}`}>{speechResult.text}</p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -2523,24 +2423,6 @@ Core Skills
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 <div className="space-y-1.5">
-                                                    <label className="text-xs font-medium text-text-secondary block">Translation provider</label>
-                                                    <select
-                                                        value={
-                                                            translationProviderOptions.some((x) => x.value === transcriptTranslationProvider)
-                                                                ? transcriptTranslationProvider
-                                                                : translationProviderOptions[0]?.value ?? 'ollama'
-                                                        }
-                                                        onChange={(e) => setTranscriptTranslationProvider(e.target.value)}
-                                                        className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-                                                    >
-                                                        {translationProviderOptions.map((opt) => (
-                                                            <option key={opt.value} value={opt.value}>
-                                                                {opt.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                                <div className="space-y-1.5">
                                                     <label className="text-xs font-medium text-text-secondary block">Display Mode</label>
                                                     <select
                                                         value={transcriptTranslationDisplayMode}
@@ -2590,82 +2472,22 @@ Core Skills
                                             </div>
 
                                             <div className="space-y-1.5">
-                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                    <label className="text-xs font-medium text-text-secondary block">Translation Model</label>
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleFetchTranslationModels}
-                                                        disabled={translationModelsFetchLoading}
-                                                        className="shrink-0 h-9 flex items-center gap-1.5 px-3 rounded-md text-xs font-medium border border-border-subtle bg-bg-input hover:bg-bg-elevated text-text-primary disabled:opacity-50 transition-colors"
-                                                        title={
-                                                            transcriptTranslationProvider === 'ollama'
-                                                                ? 'List models from local Ollama'
-                                                                : transcriptTranslationProvider === 'gemini' ||
-                                                                    transcriptTranslationProvider === 'groq' ||
-                                                                    transcriptTranslationProvider === 'openai' ||
-                                                                    transcriptTranslationProvider === 'claude'
-                                                                  ? 'Uses stored API keys from AI Providers'
-                                                                  : 'Uses the selected OpenAI-compatible endpoint from AI Providers (URL + key)'
-                                                        }
-                                                    >
-                                                        {translationModelsFetchLoading ? (
-                                                            <Loader2 size={12} className="animate-spin" />
-                                                        ) : (
-                                                            <RefreshCw size={12} />
-                                                        )}
-                                                        Fetch Models
-                                                    </button>
-                                                </div>
-                                                {translationModelsFetchError && (
-                                                    <p className="text-[11px] text-state-danger">{translationModelsFetchError}</p>
-                                                )}
-                                                {translationModelOptions.length > 0 && (
-                                                    <select
-                                                        value={
-                                                            translationModelOptions.some((o) => o.id === transcriptTranslationModel)
-                                                                ? transcriptTranslationModel
-                                                                : ''
-                                                        }
-                                                        onChange={(e) => {
-                                                            const v = e.target.value;
-                                                            if (v) setTranscriptTranslationModel(v);
-                                                        }}
-                                                        className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-                                                    >
-                                                        <option value="">Quick pick from list</option>
-                                                        {translationModelOptions.map((m) => (
-                                                            <option key={m.id} value={m.id}>
-                                                                {m.label || m.id}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                )}
-                                                <input
-                                                    type="text"
-                                                    value={transcriptTranslationModel}
-                                                    onChange={(e) => setTranscriptTranslationModel(e.target.value)}
-                                                    placeholder={
-                                                        transcriptTranslationProvider === 'ollama'
-                                                            ? 'e.g. qwen2.5:7b'
-                                                            : transcriptTranslationProvider === 'gemini' ||
-                                                                transcriptTranslationProvider === 'groq' ||
-                                                                transcriptTranslationProvider === 'openai' ||
-                                                                transcriptTranslationProvider === 'claude'
-                                                              ? 'Provider model id'
-                                                              : 'Model id (optional if endpoint has a preferred model)'
-                                                    }
-                                                    className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
+                                                <label className="text-xs font-medium text-text-secondary block">Translation model</label>
+                                                <ConnectionModelPicker
+                                                    id="translation"
+                                                    connectionId={transcriptTranslationProvider}
+                                                    model={transcriptTranslationModel}
+                                                    onChange={(next) => { setTranscriptTranslationProvider(next.connectionId); setTranscriptTranslationModel(next.model); }}
                                                 />
                                                 <p className="text-[10px] text-text-tertiary">
-                                                    {transcriptTranslationProvider === 'ollama'
-                                                        ? 'Ollama must be running. Cloud providers use keys from the AI Providers tab.'
-                                                        : transcriptTranslationProvider === 'gemini' ||
-                                                            transcriptTranslationProvider === 'groq' ||
-                                                            transcriptTranslationProvider === 'openai' ||
-                                                            transcriptTranslationProvider === 'claude'
-                                                          ? 'Save API keys under AI Providers before fetching.'
-                                                          : 'OpenAI-compatible endpoints are only listed here after you add them under AI Providers.'}
+                                                    Connections (any host, any type) are added under AI Providers. A cheap, fast model works well here.
                                                 </p>
+                                                <TranslationTest
+                                                    provider={transcriptTranslationProvider}
+                                                    model={transcriptTranslationModel}
+                                                    prompt={transcriptTranslationPrompt}
+                                                    targetLanguage={transcriptTranslationTargetLanguage}
+                                                />
                                             </div>
 
                                             <div className="space-y-1.5">
@@ -2700,6 +2522,10 @@ Core Skills
 
                                     <div className="h-px bg-border-subtle" />
 
+                                    <WorkspaceSettings />
+
+                                    <div className="h-px bg-border-subtle" />
+
                                     {/* ── Audio Configuration Section ── */}
                                     <div>
                                         <h3 className="text-lg font-bold text-text-primary mb-1">Audio Configuration</h3>
@@ -2712,9 +2538,8 @@ Core Skills
                                                 value={selectedInput}
                                                 options={inputDevices}
                                                 onChange={(id) => {
-                                                    setSelectedInput(id);
                                                     setInputDeviceNotFound(false);
-                                                    localStorage.setItem('preferredInputDeviceId', id);
+                                                    setPreferredInputId(id);
                                                 }}
                                                 placeholder="Default Microphone"
                                             />
@@ -2744,8 +2569,7 @@ Core Skills
                                                 value={selectedOutput}
                                                 options={outputDevices}
                                                 onChange={(id) => {
-                                                    setSelectedOutput(id);
-                                                    localStorage.setItem('preferredOutputDeviceId', id);
+                                                    setPreferredOutputId(id);
                                                 }}
                                                 placeholder="Default Speakers"
                                             />
@@ -2818,9 +2642,7 @@ Core Skills
                                                     </div>
                                                     <div
                                                         onClick={() => {
-                                                            const newState = !useExperimentalSck;
-                                                            setUseExperimentalSck(newState);
-                                                            window.localStorage.setItem('useExperimentalSckBackend', newState ? 'true' : 'false');
+                                                            setStoredSck(useExperimentalSck ? 'false' : 'true');
                                                         }}
                                                         className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${useExperimentalSck ? 'bg-state-warning' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                                     >

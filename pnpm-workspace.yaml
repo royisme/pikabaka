@@ -1,12 +1,14 @@
+nodeLinker: hoisted
 allowBuilds:
+  # Reached through pi-ai; its only install script is `echo 'preinstall: no-op'`, so it is refused on purpose.
+  '@google/genai': false
   better-sqlite3: true
   core-js: true
-  electron: true
   electron-winstaller: true
   esbuild: true
-  keytar: true
-  lzma-native: true
   protobufjs: true
   sharp: true
-  sqlite3: true
-  tesseract.js: true
+
+# The pins that used to sit in package.json's "pnpm" field, which pnpm 11 ignores.
+overrides:
+  caniuse-lite: 1.0.30001781

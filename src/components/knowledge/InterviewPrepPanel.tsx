@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from 'react-query';
 import { X, Target, ChevronDown, ChevronUp, AlertTriangle, Sparkles, Zap, BookOpen } from 'lucide-react';
-import { useGeneratePrep } from '../../hooks/useInterviewPrep';
 import type { InterviewPrepData, InterviewPrepQuestion } from '../../../electron/knowledge/types';
 
 interface InterviewPrepPanelProps {
@@ -20,31 +20,22 @@ const categoryColors: Record<string, { bg: string; text: string; border: string 
 
 const difficultyLabels = ['Easy', 'Medium', 'Hard'];
 
-export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
-  isOpen, onClose, jdId, jdTitle, jdCompany,
+const InterviewPrepContent: React.FC<InterviewPrepPanelProps> = ({
+  onClose, jdId, jdTitle, jdCompany,
 }) => {
-  const { mutateAsync: generatePrepAsync, isLoading: prepLoading, isError: prepError, error: prepErrorObj } = useGeneratePrep();
-  const [prepData, setPrepData] = useState<InterviewPrepData | null>(null);
+  const { data: prepData, isLoading: prepLoading, isError: prepError, error: prepErrorObj, refetch } = useQuery(
+    ['interview-prep', jdId],
+    async () => {
+      const result = await window.electronAPI.knowledgeGeneratePrep(jdId);
+      if (!result?.success) throw new Error(result?.error || 'Failed to generate prep');
+      return result.data as InterviewPrepData;
+    },
+    // Generating prep is an AI call: it runs once when the panel opens (the panel's key resets it), never again on
+    // window focus or by itself on failure; the Retry button asks again.
+    { staleTime: Infinity, cacheTime: 0, refetchOnWindowFocus: false, retry: false }
+  );
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set([0]));
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isOpen && !prepData && !prepLoading) {
-      generatePrepAsync(jdId).then((data) => {
-        setPrepData(data);
-      }).catch(() => {});
-    }
-  }, [isOpen, jdId, prepData, prepLoading]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setPrepData(null);
-      setExpandedQuestions(new Set([0]));
-      setActiveCategory(null);
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
 
   const toggleQuestion = (index: number) => {
     setExpandedQuestions((prev) => {
@@ -99,7 +90,7 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
               <p className="text-sm text-state-danger font-medium">Couldn’t generate prep</p>
               <p className="text-xs text-text-secondary mt-1">{(prepErrorObj as Error | undefined)?.message}</p>
               <button
-                onClick={() => generatePrepAsync(jdId).then((d) => setPrepData(d)).catch(() => {})}
+                onClick={() => { void refetch(); }}
                 className="mt-3 px-4 py-1.5 rounded-full text-xs font-medium bg-state-danger-soft text-state-danger hover:bg-state-danger-soft transition-colors"
               >
                 Retry
@@ -306,4 +297,9 @@ export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = ({
       </div>
     </div>
   );
+};
+
+export const InterviewPrepPanel: React.FC<InterviewPrepPanelProps> = (props) => {
+  if (!props.isOpen) return null;
+  return <InterviewPrepContent key={props.jdId ?? 'open'} {...props} />;
 };

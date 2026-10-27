@@ -30,7 +30,7 @@ export {
 } from "./IntentClassifier";
 export type { ConversationIntent, IntentResult } from "./IntentClassifier";
 export { MODE_CONFIGS } from "./types";
-export type { GenerationConfig, GeminiContent, LLMClient } from "./types";
+export type { GenerationConfig, GeminiContent } from "./types";
 export {
     HARD_SYSTEM_PROMPT,
     ANSWER_MODE_PROMPT,
@@ -39,8 +39,6 @@ export {
     RECAP_MODE_PROMPT,
     WHAT_TO_ANSWER_PROMPT,
     TEMPORAL_CONTEXT_TEMPLATE,
-    GROQ_TITLE_PROMPT,
-    GROQ_SUMMARY_JSON_PROMPT,
     FOLLOWUP_EMAIL_PROMPT,
     GROQ_FOLLOWUP_EMAIL_PROMPT,
     CODE_HINT_PROMPT,

@@ -1,6 +1,24 @@
 import { contextBridge, ipcRenderer } from "electron"
 
+type PreloadAgentEvent = { meetingId: string } & (
+  | { type: 'run_started' | 'run_settled' }
+  | { type: 'text_delta' | 'text_final'; text: string }
+  | { type: 'tool_started' | 'tool_finished'; toolName: string }
+  | { type: 'run_failed'; errorClass: string }
+);
+
+type PreloadThreadLine = { id: string; role: 'user' | 'assistant' | 'tool'; text: string };
+
 // Types for the exposed Electron API
+type AiConnectionType = 'openai' | 'anthropic' | 'gemini'
+interface AiConnectionView { id: string; name: string; type: AiConnectionType; baseUrl: string; customBaseUrl: boolean; hasApiKey: boolean; builtin: boolean }
+interface AgentApprovalRequest { id: string; meetingId: string; tool: 'bash' | 'write' | 'edit' | 'read'; target: string; detail?: string; folder: string; outside?: boolean }
+type AgentApprovalEvent = { type: 'requested'; request: AgentApprovalRequest } | { type: 'settled'; id: string; allowed: boolean }
+interface AgentProactiveCard { id: string; meetingId: string; segmentId: string; kind: string; text: string; time: number }
+interface AgentGateDecision {
+  time: number; meetingId: string; segmentId: string; revision: number; model: string; threshold: number; cooldownSeconds: number
+  help?: number; kind?: string; kindProbability?: number; latencyMs?: number; outcome: string
+}
 interface ElectronAPI {
   updateContentDimensions: (dimensions: {
     width: number
@@ -45,23 +63,40 @@ interface ElectronAPI {
 
   analyzeImageFile: (path: string) => Promise<void>
   quitApp: () => Promise<void>
-
-  // LLM Model Management
-  getCurrentLlmConfig: () => Promise<{ provider: "ollama" | "gemini"; model: string; isOllama: boolean }>
-  getAvailableOllamaModels: () => Promise<string[]>
-  switchToOllama: (model?: string, url?: string) => Promise<{ success: boolean; error?: string }>
-  switchToGemini: (apiKey?: string, modelId?: string) => Promise<{ success: boolean; error?: string }>
-  testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey?: string) => Promise<{ success: boolean; error?: string }>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
-
-  // API Key Management
-  setGeminiApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setGroqApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setOpenaiApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  setClaudeApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   getStoredCredentials: () => Promise<{ hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: string; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; hasSonioxKey: boolean }>
-  getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude'; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both' }>
-  setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude'; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) => Promise<{ success: boolean }>
+  testTranscriptTranslation: (draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => Promise<{ success: boolean; sample: string; translatedText?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
+  getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both' }>
+  setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) => Promise<{ success: boolean }>
+  agentGateGetSettings: () => Promise<{ mode: 'log' | 'on' | 'off'; model: string; baseUrl: string; hasApiKey: boolean; threshold: number; cooldownSeconds: number }>
+  agentGateSetSettings: (settings: { mode?: 'log' | 'on' | 'off'; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }) => Promise<{ success: boolean; error?: string }>
+  agentGateStatus: () => Promise<{ mode: 'log' | 'on' | 'off'; configured: boolean; state: 'ok' | 'unavailable' | 'unconfigured'; reason?: string; lastDecision?: AgentGateDecision }>
+  agentGateLog: () => Promise<AgentGateDecision[]>
+  onAgentProactive: (callback: (card: AgentProactiveCard) => void) => () => void
+  agentApprovalsList: () => Promise<AgentApprovalRequest[]>
+  agentApprovalRespond: (payload: { id: string; allowed: boolean }) => Promise<{ success: boolean }>
+  onAgentApproval: (callback: (event: AgentApprovalEvent) => void) => () => void
+  agentWorkspaceGet: () => Promise<{ root: string; error?: string }>
+  agentWorkspacePick: () => Promise<{ canceled: boolean; root?: string; error?: string }>
+  agentWorkspaceClear: () => Promise<{ success: boolean }>
+  aiConnectionsList: () => Promise<AiConnectionView[]>
+  aiConnectionSave: (input: { id?: string; name?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; id?: string; error?: string }>
+  aiConnectionDelete: (id: string) => Promise<{ success: boolean }>
+  aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
+  agentTest: (draft: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; reply?: string; toolCalls?: boolean | null; totalMs?: number; error?: string }>
+  modelTest: (draft: { job: 'chat' | 'summary'; connectionId: string; model: string }) => Promise<{ success: boolean; reply?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
+
+  embeddingUseGet: () => Promise<{ connectionId: string; model: string }>
+  embeddingUseSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
+  embeddingStatus: () => Promise<{ providerName: string | null; dimensions: number | null; usingSelected: boolean; selectedLabel: string | null; incompatible: number }>
+  reindexIncompatibleMeetings: () => Promise<{ success: boolean; error?: string }>
+  agentGateTest: (draft: { model?: string; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; help?: number; kind?: string; latencyMs?: number; error?: string }>
+  agentModelGet: () => Promise<{ connectionId: string; model: string; supportsImages: boolean }>
+  agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; error?: string }>
+  chatModelGet: () => Promise<{ connectionId: string; model: string }>
+  chatModelSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
+  summaryModelGet: () => Promise<{ connectionId: string; model: string }>
+  summaryModelSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string }>
 
   // STT Provider Management
@@ -77,6 +112,8 @@ interface ElectronAPI {
   setAzureRegion: (region: string) => Promise<{ success: boolean; error?: string }>
   setIbmWatsonApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   setGroqSttModel: (model: string) => Promise<{ success: boolean; error?: string }>
+  setSttModel: (provider: string, model: string) => Promise<{ success: boolean; error?: string }>
+  fetchSttModels: (provider: string, apiKey?: string) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
   setSonioxApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   testSttConnection: (provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox', apiKey: string, region?: string) => Promise<{ success: boolean; error?: string }>
 
@@ -91,11 +128,15 @@ interface ElectronAPI {
   generateSuggestion: (context: string, lastQuestion: string) => Promise<{ suggestion: string }>
   getInputDevices: () => Promise<Array<{ id: string; name: string }>>
   getOutputDevices: () => Promise<Array<{ id: string; name: string }>>
-  setRecognitionLanguage: (key: string) => Promise<{ success: boolean; error?: string }>
+  setRecognitionLanguage: (key: string, speaker?: 'interviewer' | 'user') => Promise<{ success: boolean; error?: string }>
   getAiResponseLanguages: () => Promise<Array<{ label: string; code: string }>>
   setAiResponseLanguage: (language: string) => Promise<{ success: boolean; error?: string }>
-  getSttLanguage: () => Promise<string>
+  getSttLanguage: (speaker?: 'interviewer' | 'user') => Promise<string>
   getAiResponseLanguage: () => Promise<string>
+  getAnswerStyle: () => Promise<string>
+  profileGetNotes: () => Promise<string>
+  profileSetNotes: (text: string) => Promise<{ success: boolean; error?: string }>
+  setAnswerStyle: (style: string) => Promise<{ success: boolean; error?: string }>
   getNativeAudioStatus: () => Promise<{
     connected: boolean;
     meetingActive: boolean;
@@ -139,35 +180,20 @@ interface ElectronAPI {
   onIntelligenceError: (callback: (data: { error: string; mode: string }) => void) => () => void
 
   // Model Management
-  getDefaultModel: () => Promise<{ model: string }>
-  setModel: (modelId: string) => Promise<{ success: boolean; error?: string }>
-  setDefaultModel: (modelId: string) => Promise<{ success: boolean; error?: string }>
   toggleModelSelector: (coords: { x: number; y: number }) => Promise<void>
-  forceRestartOllama: () => Promise<void>
 
   // Settings Window
   toggleSettingsWindow: (coords?: { x: number; y: number }) => Promise<void>
-
-  // Groq Fast Text Mode
-  getGroqFastTextMode: () => Promise<{ enabled: boolean }>
-  setGroqFastTextMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>
+  // Opens the full settings, on one tab (for example 'audio'), from any window
+  openSettingsSection: (section: string) => Promise<{ success: boolean }>
+  onOpenSettingsSection: (callback: (data: { section: string }) => void) => () => void
 
   // Demo
   seedDemo: () => Promise<{ success: boolean }>
 
-  // Custom Providers
-  saveCustomProvider: (provider: any) => Promise<{ success: boolean; id?: string; error?: string }>
-  getCustomProviders: () => Promise<any[]>
-  deleteCustomProvider: (id: string) => Promise<{ success: boolean; error?: string }>
-  getOpenAICompatibleProviders: () => Promise<Array<{ id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }>>
-  saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) => Promise<{ success: boolean; error?: string }>
-  deleteOpenAICompatibleProvider: (id: string) => Promise<{ success: boolean; error?: string }>
-  fetchOpenAICompatibleModels: (baseUrl: string, apiKey: string) => Promise<{ success: boolean; models?: { id: string; label: string }[]; error?: string }>
-
   // Follow-up Email
   generateFollowupEmail: (input: any) => Promise<string>
   extractEmailsFromTranscript: (transcript: Array<{ text: string }>) => Promise<string[]>
-  getCalendarAttendees: (eventId: string) => Promise<Array<{ email: string; name: string }>>
   openMailto: (params: { to: string; subject: string; body: string }) => Promise<{ success: boolean; error?: string }>
 
   // Audio Test
@@ -193,15 +219,17 @@ interface ElectronAPI {
   onOverlayMousePassthroughChanged: (callback: (enabled: boolean) => void) => () => void
 
   // Streaming listeners
-  streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean }) => Promise<void>
+  streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean; ragMiss?: boolean }) => Promise<void>
+  cancelGeneration: () => Promise<{ success: boolean }>
   onGeminiStreamToken: (callback: (token: string) => void) => () => void
   onGeminiStreamDone: (callback: () => void) => () => void
   onGeminiStreamError: (callback: (error: string) => void) => () => void
 
 
   onUndetectableChanged: (callback: (state: boolean) => void) => () => void
-  onGroqFastTextChanged: (callback: (enabled: boolean) => void) => () => void
-  onOpenAICompatibleProvidersChanged: (callback: () => void) => () => void
+  getMicrophoneMuted: () => Promise<boolean>
+  setMicrophoneMuted: (muted: boolean) => Promise<{ success: boolean }>
+  onMicrophoneMutedChanged: (callback: (muted: boolean) => void) => () => void
   onModelChanged: (callback: (modelId: string) => void) => () => void
 
   // Ollama
@@ -212,13 +240,6 @@ interface ElectronAPI {
   getThemeMode: () => Promise<{ mode: 'system' | 'light' | 'dark', resolved: 'light' | 'dark' }>
   setThemeMode: (mode: 'system' | 'light' | 'dark') => Promise<void>
   onThemeChanged: (callback: (data: { mode: 'system' | 'light' | 'dark', resolved: 'light' | 'dark' }) => void) => () => void
-
-  // Calendar
-  calendarConnect: () => Promise<{ success: boolean; error?: string }>
-  calendarDisconnect: () => Promise<{ success: boolean; error?: string }>
-  getCalendarStatus: () => Promise<{ connected: boolean; email?: string }>
-  getUpcomingEvents: () => Promise<Array<{ id: string; title: string; startTime: string; endTime: string; link?: string; source: 'google' }>>
-  calendarRefresh: () => Promise<{ success: boolean; error?: string }>
 
   // Auto-Update
   onUpdateAvailable: (callback: (info: any) => void) => () => void
@@ -307,6 +328,13 @@ interface ElectronAPI {
   cropperConfirmed: (bounds: Electron.Rectangle) => void;
   cropperCancelled: () => void;
   onResetCropper: (callback: (data: { hudPosition: { x: number; y: number } }) => void) => () => void;
+
+  // Agent API
+  agentStatus: () => Promise<{ meetingActive: boolean; available: boolean; reason?: string }>;
+  agentSubmit: (payload: { text: string; mode?: 'followup' | 'steer'; requestId?: string }) => Promise<{ ok: true; requestId: string } | { ok: false; reason: string }>;
+  agentAbort: () => Promise<{ success: boolean }>;
+  agentGetThread: () => Promise<PreloadThreadLine[]>;
+  onAgentEvent: (callback: (event: PreloadAgentEvent) => void) => () => void;
 
   // Platform
   platform: NodeJS.Platform;
@@ -527,24 +555,48 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.removeListener("toggle-expand", subscription)
     }
   },
-
-  // LLM Model Management
-  getCurrentLlmConfig: () => ipcRenderer.invoke("get-current-llm-config"),
-  getAvailableOllamaModels: () => ipcRenderer.invoke("get-available-ollama-models"),
-  switchToOllama: (model?: string, url?: string) => ipcRenderer.invoke("switch-to-ollama", model, url),
-  switchToGemini: (apiKey?: string, modelId?: string) => ipcRenderer.invoke("switch-to-gemini", apiKey, modelId),
-  testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey: string) => ipcRenderer.invoke("test-llm-connection", provider, apiKey),
   selectServiceAccount: () => ipcRenderer.invoke("select-service-account"),
-
-  // API Key Management
-  setGeminiApiKey: (apiKey: string) => ipcRenderer.invoke("set-gemini-api-key", apiKey),
-  setGroqApiKey: (apiKey: string) => ipcRenderer.invoke("set-groq-api-key", apiKey),
-  setOpenaiApiKey: (apiKey: string) => ipcRenderer.invoke("set-openai-api-key", apiKey),
-  setClaudeApiKey: (apiKey: string) => ipcRenderer.invoke("set-claude-api-key", apiKey),
   getStoredCredentials: () => ipcRenderer.invoke("get-stored-credentials"),
+  testTranscriptTranslation: (draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => ipcRenderer.invoke("test-transcript-translation", draft),
   getTranscriptTranslationSettings: () => ipcRenderer.invoke("get-transcript-translation-settings"),
-  setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude'; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) =>
+  setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) =>
     ipcRenderer.invoke("set-transcript-translation-settings", settings),
+  agentGateGetSettings: () => ipcRenderer.invoke("agent-gate-get-settings"),
+  agentGateSetSettings: (settings: { mode?: 'log' | 'on' | 'off'; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }) => ipcRenderer.invoke("agent-gate-set-settings", settings),
+  agentGateStatus: () => ipcRenderer.invoke("agent-gate-status"),
+  agentGateLog: () => ipcRenderer.invoke("agent-gate-log"),
+  onAgentProactive: (callback: (card: AgentProactiveCard) => void) => {
+    const subscription = (_: unknown, card: AgentProactiveCard) => callback(card)
+    ipcRenderer.on("agent-proactive", subscription)
+    return () => { ipcRenderer.removeListener("agent-proactive", subscription) }
+  },
+  agentApprovalsList: () => ipcRenderer.invoke("agent-approvals-list"),
+  agentApprovalRespond: (payload: { id: string; allowed: boolean }) => ipcRenderer.invoke("agent-approval-respond", payload),
+  onAgentApproval: (callback: (event: AgentApprovalEvent) => void) => {
+    const subscription = (_: unknown, event: AgentApprovalEvent) => callback(event)
+    ipcRenderer.on("agent-approval", subscription)
+    return () => { ipcRenderer.removeListener("agent-approval", subscription) }
+  },
+  agentWorkspaceGet: () => ipcRenderer.invoke("agent-workspace-get"),
+  agentWorkspacePick: () => ipcRenderer.invoke("agent-workspace-pick"),
+  agentWorkspaceClear: () => ipcRenderer.invoke("agent-workspace-clear"),
+  aiConnectionsList: () => ipcRenderer.invoke("ai-connections-list"),
+  aiConnectionSave: (input: { id?: string; name?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => ipcRenderer.invoke("ai-connection-save", input),
+  aiConnectionDelete: (id: string) => ipcRenderer.invoke("ai-connection-delete", id),
+  aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => ipcRenderer.invoke("ai-connection-models", input),
+  agentTest: (draft: { connectionId: string; model: string; supportsImages?: boolean }) => ipcRenderer.invoke("agent-test", draft),
+  modelTest: (draft: { job: 'chat' | 'summary'; connectionId: string; model: string }) => ipcRenderer.invoke("model-test", draft),
+
+  embeddingUseGet: () => ipcRenderer.invoke("embedding-use-get"),
+  embeddingUseSet: (use: { connectionId: string; model: string }) => ipcRenderer.invoke("embedding-use-set", use),
+  embeddingStatus: () => ipcRenderer.invoke("embedding-status"),
+  agentGateTest: (draft: { model?: string; baseUrl?: string; apiKey?: string }) => ipcRenderer.invoke("agent-gate-test", draft),
+  agentModelGet: () => ipcRenderer.invoke("agent-model-get"),
+  agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => ipcRenderer.invoke("agent-model-set", use),
+  chatModelGet: () => ipcRenderer.invoke("chat-model-get"),
+  chatModelSet: (use: { connectionId: string; model: string }) => ipcRenderer.invoke("chat-model-set", use),
+  summaryModelGet: () => ipcRenderer.invoke("summary-model-get"),
+  summaryModelSet: (use: { connectionId: string; model: string }) => ipcRenderer.invoke("summary-model-set", use),
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) =>
     ipcRenderer.invoke("translate-transcript-segment", segment),
 
@@ -561,6 +613,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setAzureRegion: (region: string) => ipcRenderer.invoke("set-azure-region", region),
   setIbmWatsonApiKey: (apiKey: string) => ipcRenderer.invoke("set-ibmwatson-api-key", apiKey),
   setGroqSttModel: (model: string) => ipcRenderer.invoke("set-groq-stt-model", model),
+  setSttModel: (provider: string, model: string) => ipcRenderer.invoke("set-stt-model", provider, model),
+  fetchSttModels: (provider: string, apiKey?: string) => ipcRenderer.invoke("fetch-stt-models", provider, apiKey),
   setSonioxApiKey: (apiKey: string) => ipcRenderer.invoke("set-soniox-api-key", apiKey),
   testSttConnection: (provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox', apiKey: string, region?: string) => ipcRenderer.invoke("test-stt-connection", provider, apiKey, region),
 
@@ -620,11 +674,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getNativeAudioStatus: () => ipcRenderer.invoke("native-audio-status"),
   getInputDevices: () => ipcRenderer.invoke("get-input-devices"),
   getOutputDevices: () => ipcRenderer.invoke("get-output-devices"),
-  setRecognitionLanguage: (key: string) => ipcRenderer.invoke("set-recognition-language", key),
+  setRecognitionLanguage: (key: string, speaker?: 'interviewer' | 'user') => ipcRenderer.invoke("set-recognition-language", key, speaker),
   getAiResponseLanguages: () => ipcRenderer.invoke("get-ai-response-languages"),
   setAiResponseLanguage: (language: string) => ipcRenderer.invoke("set-ai-response-language", language),
-  getSttLanguage: () => ipcRenderer.invoke("get-stt-language"),
+  getSttLanguage: (speaker?: 'interviewer' | 'user') => ipcRenderer.invoke("get-stt-language", speaker),
   getAiResponseLanguage: () => ipcRenderer.invoke("get-ai-response-language"),
+  getAnswerStyle: () => ipcRenderer.invoke("get-answer-style"),
+  profileGetNotes: () => ipcRenderer.invoke("profile:get-notes"),
+  profileSetNotes: (text: string) => ipcRenderer.invoke("profile:set-notes", text),
+  setAnswerStyle: (style: string) => ipcRenderer.invoke("set-answer-style", style),
 
   // Intelligence Mode IPC
   generateAssist: () => ipcRenderer.invoke("generate-assist"),
@@ -792,7 +850,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
 
   // Streaming Chat
-  streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean }) => ipcRenderer.invoke("gemini-chat-stream", message, imagePaths, context, options),
+  streamGeminiChat: (message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean; ragMiss?: boolean }) => ipcRenderer.invoke("gemini-chat-stream", message, imagePaths, context, options),
+  cancelGeneration: () => ipcRenderer.invoke('cancel-generation'),
 
   onGeminiStreamToken: (callback: (token: string) => void) => {
     const subscription = (_: any, token: string) => callback(token)
@@ -819,37 +878,25 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   // Model Management
-  getDefaultModel: () => ipcRenderer.invoke('get-default-model'),
-  setModel: (modelId: string) => ipcRenderer.invoke('set-model', modelId),
-  setDefaultModel: (modelId: string) => ipcRenderer.invoke('set-default-model', modelId),
   toggleModelSelector: (coords: { x: number; y: number }) => ipcRenderer.invoke('toggle-model-selector', coords),
-  forceRestartOllama: () => ipcRenderer.invoke('force-restart-ollama'),
 
   // Settings Window
   toggleSettingsWindow: (coords?: { x: number; y: number }) => ipcRenderer.invoke('toggle-settings-window', coords),
-
-  // Groq Fast Text Mode
-  getGroqFastTextMode: () => ipcRenderer.invoke('get-groq-fast-text-mode'),
-  setGroqFastTextMode: (enabled: boolean) => ipcRenderer.invoke('set-groq-fast-text-mode', enabled),
+  openSettingsSection: (section: string) => ipcRenderer.invoke('open-settings-section', section),
+  onOpenSettingsSection: (callback: (data: { section: string }) => void) => {
+    const subscription = (_event: Electron.IpcRendererEvent, data: { section: string }) => callback(data)
+    ipcRenderer.on('open-settings-section', subscription)
+    return () => {
+      ipcRenderer.removeListener('open-settings-section', subscription)
+    }
+  },
 
   // Demo
   seedDemo: () => ipcRenderer.invoke('seed-demo'),
 
-  // Custom Providers
-  saveCustomProvider: (provider: any) => ipcRenderer.invoke('save-custom-provider', provider),
-  getCustomProviders: () => ipcRenderer.invoke('get-custom-providers'),
-  deleteCustomProvider: (id: string) => ipcRenderer.invoke('delete-custom-provider', id),
-  getOpenAICompatibleProviders: () => ipcRenderer.invoke('get-openai-compatible-providers'),
-  saveOpenAICompatibleProvider: (provider: { id: string; name: string; baseUrl: string; apiKey: string; preferredModel?: string }) =>
-    ipcRenderer.invoke('save-openai-compatible-provider', provider),
-  deleteOpenAICompatibleProvider: (id: string) => ipcRenderer.invoke('delete-openai-compatible-provider', id),
-  fetchOpenAICompatibleModels: (baseUrl: string, apiKey: string) =>
-    ipcRenderer.invoke('fetch-openai-compatible-models', baseUrl, apiKey),
-
   // Follow-up Email
   generateFollowupEmail: (input: any) => ipcRenderer.invoke('generate-followup-email', input),
   extractEmailsFromTranscript: (transcript: Array<{ text: string }>) => ipcRenderer.invoke('extract-emails-from-transcript', transcript),
-  getCalendarAttendees: (eventId: string) => ipcRenderer.invoke('get-calendar-attendees', eventId),
   openMailto: (params: { to: string; subject: string; body: string }) => ipcRenderer.invoke('open-mailto', params),
 
   // Audio Test
@@ -868,6 +915,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
 
 
+  getMicrophoneMuted: () => ipcRenderer.invoke('get-microphone-muted'),
+  setMicrophoneMuted: (muted: boolean) => ipcRenderer.invoke('set-microphone-muted', muted),
+  onMicrophoneMutedChanged: (callback: (muted: boolean) => void) => {
+    const subscription = (_: any, muted: boolean) => callback(muted)
+    ipcRenderer.on('microphone-muted-changed', subscription)
+    return () => {
+      ipcRenderer.removeListener('microphone-muted-changed', subscription)
+    }
+  },
+
   onUndetectableChanged: (callback: (state: boolean) => void) => {
     const subscription = (_: any, state: boolean) => callback(state)
     ipcRenderer.on('undetectable-changed', subscription)
@@ -881,22 +938,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on('overlay-mouse-passthrough-changed', subscription)
     return () => {
       ipcRenderer.removeListener('overlay-mouse-passthrough-changed', subscription)
-    }
-  },
-
-  onGroqFastTextChanged: (callback: (enabled: boolean) => void) => {
-    const subscription = (_: any, enabled: boolean) => callback(enabled)
-    ipcRenderer.on('groq-fast-text-changed', subscription)
-    return () => {
-      ipcRenderer.removeListener('groq-fast-text-changed', subscription)
-    }
-  },
-
-  onOpenAICompatibleProvidersChanged: (callback: () => void) => {
-    const subscription = () => callback()
-    ipcRenderer.on('openai-compatible-providers-changed', subscription)
-    return () => {
-      ipcRenderer.removeListener('openai-compatible-providers-changed', subscription)
     }
   },
 
@@ -934,13 +975,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.removeListener('theme:changed', subscription)
     }
   },
-
-  // Calendar API
-  calendarConnect: () => ipcRenderer.invoke('calendar-connect'),
-  calendarDisconnect: () => ipcRenderer.invoke('calendar-disconnect'),
-  getCalendarStatus: () => ipcRenderer.invoke('get-calendar-status'),
-  getUpcomingEvents: () => ipcRenderer.invoke('get-upcoming-events'),
-  calendarRefresh: () => ipcRenderer.invoke('calendar-refresh'),
 
   // Auto-Update
   onUpdateAvailable: (callback: (info: any) => void) => {
@@ -1104,10 +1138,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Tavily Search API
   setTavilyApiKey: (apiKey: string) => ipcRenderer.invoke('set-tavily-api-key', apiKey),
 
-  // Dynamic Model Discovery
-  fetchProviderModels: (provider: 'gemini' | 'groq' | 'openai' | 'claude', apiKey: string) => ipcRenderer.invoke('fetch-provider-models', provider, apiKey),
-  setProviderPreferredModel: (provider: 'gemini' | 'groq' | 'openai' | 'claude', modelId: string) => ipcRenderer.invoke('set-provider-preferred-model', provider, modelId),
-
   // License Management
   licenseActivate: (key: string) => ipcRenderer.invoke('license:activate', key),
   licenseCheckPremium: () => ipcRenderer.invoke('license:check-premium'),
@@ -1139,6 +1169,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on('reset-cropper', subscription)
     return () => {
       ipcRenderer.removeListener('reset-cropper', subscription)
+    }
+  },
+
+  // Agent API
+  agentStatus: () => ipcRenderer.invoke('agent-status'),
+  agentSubmit: (payload: { text: string; mode?: 'followup' | 'steer'; requestId?: string }) =>
+    ipcRenderer.invoke('agent-submit', payload),
+  agentAbort: () => ipcRenderer.invoke('agent-abort'),
+  agentGetThread: () => ipcRenderer.invoke('agent-get-thread'),
+  onAgentEvent: (callback: (event: PreloadAgentEvent) => void) => {
+    const subscription = (_: unknown, event: PreloadAgentEvent) => callback(event)
+    ipcRenderer.on('agent-event', subscription)
+    return () => {
+      ipcRenderer.removeListener('agent-event', subscription)
     }
   },
 

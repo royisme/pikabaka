@@ -1,149 +1,50 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { MessageSquare, Link, Camera, Zap, Heart, User } from 'lucide-react';
+import React, { useState, useLayoutEffect, useRef } from 'react';
+import { MessageSquare, Link, Camera, Heart, User } from 'lucide-react';
+import { useQuery, useQueryClient } from 'react-query';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
+import { useMainEvent } from '../hooks/useMainEvent';
+import { useLocalStorageValue } from '../hooks/useLocalStorageValue';
+import { useProfileStatus } from '../hooks/useProfileStatus';
 
 const SettingsPopup = () => {
+    const queryClient = useQueryClient();
     const { shortcuts } = useShortcuts();
     const isLightTheme = useResolvedTheme() === 'light';
-    const [isUndetectable, setIsUndetectable] = useState(false);
-    const [useGroqFastText, setUseGroqFastText] = useState(() => {
-        return localStorage.getItem('pika_groq_fast_text') === 'true';
-    });
-    const [profileMode, setProfileMode] = useState(false);
-    const [hasProfile, setHasProfile] = useState(false);
 
-    const isFirstRender = React.useRef(true);
+    // Profile status query
+    const { data: profileStatus } = useProfileStatus();
+    const hasProfile = profileStatus?.hasProfile ?? false;
+    const [draftProfileMode, setDraftProfileMode] = useState<boolean | null>(null);
+    const profileMode = draftProfileMode ?? profileStatus?.profileMode ?? false;
 
-    const [hasStoredKey, setHasStoredKey] = useState<Record<string, boolean>>({});
-
-    // Load credentials func
-    const loadCredentials = async () => {
-        try {
-            // @ts-ignore
-            const creds = await window.electronAPI?.getStoredCredentials?.();
-            if (creds) {
-                setHasStoredKey({
-                    gemini: creds.hasGeminiKey,
-                    groq: creds.hasGroqKey,
-                    openai: creds.hasOpenaiKey,
-                    claude: creds.hasClaudeKey
-                });
-            }
-        } catch (e) {
-            console.error("Failed to load settings:", e);
-        }
-    };
-
-    // Load Initial Data and refresh on focus
-    useEffect(() => {
-        loadCredentials();
-        const handleFocus = () => loadCredentials();
-        window.addEventListener('focus', handleFocus);
-
-        // Load profile status
-        const loadProfile = async () => {
-            try {
-                // @ts-ignore
-                const status = await window.electronAPI?.profileGetStatus?.();
-                if (status) {
-                    setHasProfile(status.hasProfile);
-                    setProfileMode(status.profileMode);
-                }
-            } catch (e) { console.warn('[SettingsPopup] Failed to load profile status:', e); }
-
-        };
-        loadProfile();
-
-        return () => window.removeEventListener('focus', handleFocus);
-    }, []);
-
-    // Fetch initial undetectable state from main process (source of truth)
-    useEffect(() => {
-        if (window.electronAPI?.getUndetectable) {
-            window.electronAPI.getUndetectable().then((state: boolean) => {
-                setIsUndetectable(state);
-            });
-        }
-    }, []);
-
-    // One-way listener: receive state changes from main process, never echo back
-    useEffect(() => {
-        if (window.electronAPI?.onUndetectableChanged) {
-            const unsubscribe = window.electronAPI.onUndetectableChanged((newState: boolean) => {
-                setIsUndetectable(newState);
-                localStorage.setItem('pika_undetectable', String(newState));
-            });
-            return () => unsubscribe();
-        }
-    }, []);
-
-    useEffect(() => {
-        // Listen for changes from other windows (2-way sync)
-        if (window.electronAPI?.onGroqFastTextChanged) {
-            const unsubscribe = window.electronAPI.onGroqFastTextChanged((enabled: boolean) => {
-                setUseGroqFastText(enabled);
-                localStorage.setItem('pika_groq_fast_text', String(enabled));
-            });
-            return () => unsubscribe();
-        }
-    }, []);
-
-    useEffect(() => {
-        // Skip initial render to avoid unnecessary IPC calls
-        if (isFirstRender.current) {
-            isFirstRender.current = false;
-            // Ensure backend is synced on mount (even if no change)
-            try {
-                // @ts-ignore
-                window.electronAPI?.invoke('set-groq-fast-text-mode', useGroqFastText);
-            } catch (e) {
-                console.error(e);
-            }
-            return;
-        }
-
-        // Apply Groq Text Mode
-        localStorage.setItem('pika_groq_fast_text', String(useGroqFastText));
-        try {
-            // @ts-ignore - electronAPI not typed in this file yet
-            window.electronAPI?.invoke('set-groq-fast-text-mode', useGroqFastText);
-        } catch (e) {
-            console.error(e);
-        }
-    }, [useGroqFastText]);
-
-    const [actionButtonMode, setActionButtonModeState] = useState<'recap' | 'brainstorm'>('recap');
-
-    const [showTranscript, setShowTranscript] = useState(() => {
-        const stored = localStorage.getItem('pika_interviewer_transcript');
-        return stored !== 'false'; // Default to true if not set
+    // Undetectable state: read via query, stream via useMainEvent
+    const { data: undetectableData } = useQuery<boolean>(
+        ['undetectable'],
+        () => window.electronAPI?.getUndetectable?.() ?? Promise.resolve(false)
+    );
+    const isUndetectable = undetectableData ?? false;
+    useMainEvent(window.electronAPI?.onUndetectableChanged, (newState: boolean) => {
+        queryClient.setQueryData(['undetectable'], newState);
+        localStorage.setItem('pika_undetectable', String(newState));
     });
 
-    useEffect(() => {
-        const handleStorage = () => {
-            const stored = localStorage.getItem('pika_interviewer_transcript');
-            setShowTranscript(stored !== 'false');
-        };
+    // Live transcript: external store via useLocalStorageValue
+    const [storedTranscript, setStoredTranscript] = useLocalStorageValue('pika_interviewer_transcript');
+    const showTranscript = storedTranscript !== 'false';
 
-        window.addEventListener('storage', handleStorage);
-        return () => window.removeEventListener('storage', handleStorage);
-    }, []);
-
-    // Load action button mode and subscribe to changes from other windows
-    useEffect(() => {
-        // @ts-ignore
-        window.electronAPI?.getActionButtonMode?.()?.then((mode: 'recap' | 'brainstorm') => {
-            setActionButtonModeState(mode ?? 'recap');
-        }).catch(() => {});
-        // @ts-ignore
-        if (!window.electronAPI?.onActionButtonModeChanged) return;
-        // @ts-ignore
-        const unsubscribe = window.electronAPI.onActionButtonModeChanged((mode: 'recap' | 'brainstorm') => {
-            setActionButtonModeState(mode);
-        });
-        return () => unsubscribe();
-    }, []);
+    // Action button mode: read via query, stream via useMainEvent
+    const actionButtonModeQuery = useQuery<'recap' | 'brainstorm'>(
+        ['action-button-mode'],
+        async () => {
+            const mode = await window.electronAPI?.getActionButtonMode?.();
+            return mode ?? 'recap';
+        }
+    );
+    const actionButtonMode = actionButtonModeQuery.data ?? 'recap';
+    useMainEvent(window.electronAPI?.onActionButtonModeChanged, (mode: 'recap' | 'brainstorm') => {
+        queryClient.setQueryData(['action-button-mode'], mode);
+    });
 
     const contentRef = useRef<HTMLDivElement>(null);
 
@@ -203,7 +104,7 @@ const SettingsPopup = () => {
                     <button
                         onClick={() => {
                             const newState = !isUndetectable;
-                            setIsUndetectable(newState);
+                            queryClient.setQueryData(['undetectable'], newState);
                             localStorage.setItem('pika_undetectable', String(newState));
                             window.electronAPI?.setUndetectable(newState);
                         }}
@@ -215,27 +116,6 @@ const SettingsPopup = () => {
                     </button>
                 </div>
 
-
-                {/* Groq (Fast Text) Toggle */}
-                <div className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors duration-200 group ${hasStoredKey.groq === false ? 'opacity-50 grayscale cursor-not-allowed' : `${itemHoverClass} cursor-default`}`} title={hasStoredKey.groq === false ? "Requires Groq API Key to be configured in Settings" : ""}>
-                    <div className="flex items-center gap-3">
-                        <Zap
-                            className={`w-4 h-4 transition-colors ${useGroqFastText ? 'text-orange-500' : iconInactiveClass}`}
-                            fill={useGroqFastText ? "currentColor" : "none"}
-                        />
-                        <span className={`text-[12px] font-medium transition-colors ${useGroqFastText ? (isLightTheme ? 'text-slate-950' : 'text-white') : labelInactiveClass}`}>Fast responses</span>
-                    </div>
-                    <button
-                        onClick={() => {
-                            if (hasStoredKey.groq === false) return; // Prevent clicking
-                            setUseGroqFastText(!useGroqFastText);
-                        }}
-                        className={`w-[30px] h-[18px] rounded-full p-[1.5px] transition-all duration-300 ease-spring active:scale-[0.92] ${useGroqFastText ? 'bg-orange-500 shadow-[0_2px_10px_rgba(249,115,22,0.3)]' : defaultToggleTrackClass}`}
-                        disabled={hasStoredKey.groq === false}
-                    >
-                        <div className={`w-[15px] h-[15px] rounded-full transition-transform duration-300 ease-spring ${toggleKnobClass} ${useGroqFastText ? 'translate-x-[12px]' : 'translate-x-0'}`} />
-                    </button>
-                </div>
 
                 {/* Interviewer Transcript Toggle */}
                 <div className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors duration-200 group cursor-default ${itemHoverClass}`}>
@@ -249,8 +129,7 @@ const SettingsPopup = () => {
                     <button
                         onClick={() => {
                             const newState = !showTranscript;
-                            setShowTranscript(newState);
-                            localStorage.setItem('pika_interviewer_transcript', String(newState));
+                            setStoredTranscript(String(newState));
                             // Dispatch event for same-window listeners
                             window.dispatchEvent(new Event('storage'));
                         }}
@@ -283,9 +162,8 @@ const SettingsPopup = () => {
                     <button
                         onClick={async () => {
                             const newMode: 'recap' | 'brainstorm' = actionButtonMode === 'brainstorm' ? 'recap' : 'brainstorm';
-                            setActionButtonModeState(newMode);
+                            queryClient.setQueryData(['action-button-mode'], newMode);
                             try {
-                                // @ts-ignore
                                 await window.electronAPI?.setActionButtonMode?.(newMode);
                             } catch (e) { console.error(e); }
                         }}
@@ -308,11 +186,15 @@ const SettingsPopup = () => {
                         <button
                             onClick={async () => {
                                 const newState = !profileMode;
-                                setProfileMode(newState);
+                                setDraftProfileMode(newState);
                                 try {
-                                    // @ts-ignore
                                     await window.electronAPI?.profileSetMode?.(newState);
-                                } catch (e) { console.error(e); }
+                                    await queryClient.invalidateQueries(['profile', 'status']);
+                                } catch (e) {
+                                    console.error(e);
+                                } finally {
+                                    setDraftProfileMode(null);
+                                }
                             }}
                             className={`w-[30px] h-[18px] rounded-full p-[1.5px] transition-all duration-300 ease-spring active:scale-[0.92] ${profileMode ? 'bg-accent-primary shadow-[0_2px_10px_rgba(var(--color-accent-primary),0.3)]' : defaultToggleTrackClass}`}
                         >
@@ -329,10 +211,10 @@ const SettingsPopup = () => {
                         <MessageSquare className={`w-3.5 h-3.5 transition-colors ${iconInactiveClass}`} />
                         <span className={`text-[12px] transition-colors ${labelInactiveClass}`}>Show or hide Pika</span>
                     </div>
-                    <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1">
                         {/* Dynamic Keys for Toggle Visibility */}
                         {(shortcuts.toggleVisibility || ['⌘', 'B']).map((key, index) => (
-                            <div key={index} className={`px-1.5 py-0.5 rounded border text-[10px] font-medium min-w-[20px] text-center ${shortcutKeyClass}`}>
+                            <div key={index} className={`px-1.5 py-0.5 rounded border text-[11px] font-medium min-w-[20px] text-center ${shortcutKeyClass}`}>
                                 {key}
                             </div>
                         ))}
@@ -345,10 +227,10 @@ const SettingsPopup = () => {
                         <Camera className={`w-3.5 h-3.5 transition-colors ${iconInactiveClass}`} />
                         <span className={`text-[12px] transition-colors ${labelInactiveClass}`}>Take screenshot</span>
                     </div>
-                    <div className="flex gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1">
                         {/* Dynamic Keys for Take Screenshot */}
                         {(shortcuts.takeScreenshot || ['⌘', 'H']).map((key, index) => (
-                            <div key={index} className={`px-1.5 py-0.5 rounded border text-[10px] font-medium min-w-[20px] text-center ${shortcutKeyClass}`}>
+                            <div key={index} className={`px-1.5 py-0.5 rounded border text-[11px] font-medium min-w-[20px] text-center ${shortcutKeyClass}`}>
                                 {key}
                             </div>
                         ))}

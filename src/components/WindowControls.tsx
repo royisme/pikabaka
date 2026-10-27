@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useQuery, useQueryClient } from 'react-query';
 import { Minus, X } from 'lucide-react';
 import { isMac } from '../utils/platformUtils';
+import { useMainEvent } from '../hooks/useMainEvent';
 
 /**
  * WindowControls — Custom minimize / maximize / close buttons.
@@ -14,25 +16,15 @@ const WindowControls: React.FC = () => {
   if (isMac) return null;
 
   // Hooks — only reachable on Windows / Linux
-  const [isMaximized, setIsMaximized] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: isMaximized = false } = useQuery<boolean>(
+    ['window-maximized'],
+    () => window.electronAPI?.windowIsMaximized() ?? Promise.resolve(false)
+  );
 
-  useEffect(() => {
-    let active = true;
-
-    // Query initial maximized state (e.g. app reopened while maximized)
-    window.electronAPI?.windowIsMaximized().then((maximized: boolean) => {
-      if (active) setIsMaximized(maximized);
-    }).catch(() => {});
-
-    const unsubscribe = window.electronAPI?.onWindowMaximizedChanged((maximized: boolean) => {
-      setIsMaximized(maximized);
-    });
-
-    return () => {
-      active = false;
-      unsubscribe?.();
-    };
-  }, []);
+  useMainEvent(window.electronAPI?.onWindowMaximizedChanged, (maximized: boolean) => {
+    queryClient.setQueryData(['window-maximized'], maximized);
+  });
 
   const handleMinimize = () => window.electronAPI?.windowMinimize();
   const handleMaximize = () => window.electronAPI?.windowMaximize();

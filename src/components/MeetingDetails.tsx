@@ -89,7 +89,7 @@ const MeetingDetails: React.FC<MeetingDetailsProps> = ({ meeting: initialMeeting
                 segmentId: `dashboard_${meeting.id}_${index}`,
                 text: entry.text,
                 speaker: entry.speaker === 'user' ? 'user' : 'interviewer',
-                speakerLabel: entry.speaker === 'user' ? 'Me' : 'Them',
+                speakerLabel: entry.speaker === 'user' ? 'Me' : 'Interviewer',
                 timestamp: entry.timestamp,
             });
             if (result?.success && result?.translatedText) {
@@ -155,7 +155,7 @@ KEY POINTS:
 ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'None'}
             `.trim();
         } else if (activeTab === 'transcript' && meeting.transcript) {
-            textToCopy = meeting.transcript.map(t => `[${formatTime(t.timestamp)}] ${t.speaker === 'user' ? 'Me' : 'Them'}: ${t.text}`).join('\n');
+            textToCopy = meeting.transcript.map(t => `[${formatTime(t.timestamp)}] ${t.speaker === 'user' ? 'Me' : 'Interviewer'}: ${t.text}`).join('\n');
         } else if (activeTab === 'usage' && meeting.usage) {
             textToCopy = meeting.usage.map(u => `Q: ${u.question || ''}\nA: ${u.answer || ''}`).join('\n\n');
         }
@@ -259,7 +259,7 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                     onClick={() => setActiveTab(tab as any)}
                                     className={`
                                         relative px-3 py-1 text-[13px] font-medium rounded-lg transition-all duration-200 z-10
-                                        ${activeTab === tab ? (isLight ? 'text-gray-900' : 'text-text-primary') : `${isLight ? 'text-gray-500' : 'text-text-secondary'} hover:text-text-primary`}
+                                        ${activeTab === tab ? (isLight ? 'text-gray-900' : 'text-text-primary') : 'text-text-secondary hover:text-text-primary'}
                                     `}
                                 >
                                     {activeTab === tab && (
@@ -315,7 +315,7 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                             ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
                                             li: ({ node, ...props }) => <li className="text-sm text-text-secondary" {...props} />,
                                             strong: ({ node, ...props }) => <strong className="font-semibold text-text-primary" {...props} />,
-                                            a: ({ node, ...props }) => <a className="text-blue-500 hover:underline" {...props} />,
+                                            a: ({ node, ...props }) => <a className="text-primary hover:underline" {...props} />,
                                         }}
                                     >
                                         {meeting.detailedSummary?.overview || ''}
@@ -429,7 +429,7 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                                     <div className="flex items-center justify-between mb-1">
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-xs font-semibold text-text-primary">
-                                                                {entry.speaker === 'user' ? 'Me' : 'Them'}
+                                                                {entry.speaker === 'user' ? 'Me' : 'Interviewer'}
                                                             </span>
                                                             <span className="text-xs text-text-secondary font-mono">{entry.timestamp ? formatTime(entry.timestamp) : '0:00'}</span>
                                                         </div>
@@ -474,7 +474,7 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                         {/* User Question */}
                                         {interaction.question && (
                                             <div className="flex justify-end">
-                                                <div className="bg-accent-primary text-white px-5 py-2.5 rounded-2xl rounded-tr-sm max-w-[80%] text-[15px] leading-relaxed shadow-sm">
+                                                <div className="bg-accent-primary text-on-primary px-5 py-2.5 rounded-2xl rounded-tr-sm max-w-[80%] text-[15px] leading-relaxed shadow-sm">
                                                     {interaction.question}
                                                 </div>
                                             </div>
@@ -500,7 +500,7 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                                                 ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
                                                                 li: ({ node, ...props }) => <li className="text-[15px] text-text-secondary font-normal" {...props} />,
                                                                 strong: ({ node, ...props }) => <span className="font-normal text-text-secondary" {...props} />,
-                                                                a: ({ node, ...props }: any) => <a className="text-blue-500 hover:underline" {...props} />,
+                                                                a: ({ node, ...props }: any) => <a className="text-primary hover:underline" {...props} />,
                                                                 pre: ({ children }: any) => <div className="not-prose mb-4">{children}</div>,
                                                                 code: ({ node, inline, className, children, ...props }: any) => {
                                                                     const match = /language-(\w+)/.exec(className || '');

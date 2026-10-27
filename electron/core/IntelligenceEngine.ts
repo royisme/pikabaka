@@ -217,7 +217,7 @@ export class IntelligenceEngine extends EventEmitter {
     /**
      * MODE 2: What Should I Say (Primary)
      * Manual trigger - uses clean transcript pipeline for question inference
-     * NEVER returns null - always provides a usable response
+     * Returns null when it failed; the reason was reported through the engine's `error` event.
      */
     async runWhatShouldISay(question?: string, confidence: number = 0.8, imagePaths?: string[]): Promise<string | null> {
         const now = Date.now();
@@ -247,7 +247,8 @@ export class IntelligenceEngine extends EventEmitter {
                     this.emit('suggested_answer', answer, question || 'inferred', confidence);
                 }
                 this.setMode('idle');
-                return answer || "Could you repeat that? I want to make sure I address your question properly.";
+                if (!answer) throw new Error('The model returned no text.');
+                return answer;
             }
 
             const contextItems = this.session.getContext(180);
@@ -319,9 +320,8 @@ export class IntelligenceEngine extends EventEmitter {
                 return null;
             }
 
-            if (!fullAnswer || fullAnswer.trim().length < 5) {
-                fullAnswer = "Could you repeat that? I want to make sure I address your question properly.";
-            }
+            // An empty answer is a failure to report, not a sentence to put in the user's mouth.
+            if (!fullAnswer || fullAnswer.trim().length < 5) throw new Error('The model returned no text.');
 
             this.session.addAssistantMessage(fullAnswer);
 
@@ -342,7 +342,7 @@ export class IntelligenceEngine extends EventEmitter {
         } catch (error) {
             this.emit('error', error as Error, 'what_to_say');
             this.setMode('idle');
-            return "Could you repeat that? I want to make sure I address your question properly.";
+            return null;
         }
     }
 
@@ -698,6 +698,12 @@ export class IntelligenceEngine extends EventEmitter {
                 fullHint += token;
             }
 
+            if (this.currentGenerationId !== generationId) {
+                // Stopped or superseded: keep the half answer out of the session and say nothing more.
+                this.setMode('idle');
+                return null;
+            }
+
             if (!fullHint || fullHint.trim().length < 5) {
                 fullHint = "I couldn't detect any code in the screenshot. Try screenshotting your code editor directly.";
             }
@@ -817,12 +823,20 @@ export class IntelligenceEngine extends EventEmitter {
     /**
      * Reset engine state (cancels any in-flight operations)
      */
-    reset(): void {
+    /**
+     * Stops whatever answer is being generated: every stream loop compares its generation id with this one
+     * at the next token and ends itself. The session history is left alone.
+     */
+    cancelGeneration(): void {
         this.activeMode = 'idle';
         this.currentGenerationId++; // Increment to break all active LLM streams
         if (this.assistCancellationToken) {
             this.assistCancellationToken.abort();
             this.assistCancellationToken = null;
         }
+    }
+
+    reset(): void {
+        this.cancelGeneration();
     }
 }

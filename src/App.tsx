@@ -11,14 +11,20 @@ import { AnimatePresence, motion } from "framer-motion"
 import UpdateBanner from "./components/UpdateBanner"
 import { AlertCircle } from "lucide-react"
 import { clampOverlayOpacity, getDefaultOverlayOpacity } from "./lib/overlayAppearance"
-import { analytics } from "./lib/analytics/analytics.service"
 import { ErrorBoundary } from "./components/ErrorBoundary"
+import { useMainEvent } from "./hooks/useMainEvent"
 
 const queryClient = new QueryClient()
 
+// Clean up old local storage once on module evaluation
+try {
+  localStorage.removeItem('useLegacyAudioBackend');
+} catch {
+  // Local storage unavailable
+}
+
 const App: React.FC = () => {
   const isSettingsWindow = new URLSearchParams(window.location.search).get('window') === 'settings';
-  const isLauncherWindow = new URLSearchParams(window.location.search).get('window') === 'launcher';
   const isOverlayWindow = new URLSearchParams(window.location.search).get('window') === 'overlay';
   const isModelSelectorWindow = new URLSearchParams(window.location.search).get('window') === 'model-selector';
   const isCropperWindow = new URLSearchParams(window.location.search).get('window') === 'cropper';
@@ -48,37 +54,16 @@ const App: React.FC = () => {
     }
   }, [isOverlayWindow]);
 
-  useEffect(() => {
-    analytics.initAnalytics();
-
-    if (isLauncherWindow || isDefault) {
-      analytics.trackAppOpen();
-    }
-
-    if (isOverlayWindow) {
-      analytics.trackAssistantStart();
-    }
-
-    // Cleanup / Session End
-    const handleUnload = () => {
-      if (isOverlayWindow) {
-        analytics.trackAssistantStop();
-      }
-      if (isLauncherWindow || isDefault) {
-        analytics.trackAppClose();
-      }
-    };
-
-    window.addEventListener('beforeunload', handleUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleUnload);
-    };
-  }, [isLauncherWindow, isOverlayWindow, isDefault]);
-
   // State
   const [showStartup, setShowStartup] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState('general');
+
+  // "Fix audio" in the overlay opens the full settings on one tab.
+  useMainEvent(window.electronAPI?.onOpenSettingsSection, ({ section }) => {
+    setSettingsInitialTab(section);
+    setIsSettingsOpen(true);
+  });
 
   // Overlay opacity — only meaningful when isOverlayWindow, but stored centrally
   // so it can be initialized once from localStorage and updated via IPC.
@@ -97,64 +82,38 @@ const App: React.FC = () => {
 
   // Re-index State
   const [incompatibleWarning, setIncompatibleWarning] = useState<{count: number; oldProvider: string; newProvider: string} | null>(null);
-  
-  useEffect(() => {
-    // Clean up old local storage
-    localStorage.removeItem('useLegacyAudioBackend');
 
-    // Listen for Ollama Auto-Pull Progress
-    let removeProgress: (() => void) | undefined;
-    let removeComplete: (() => void) | undefined;
-    if (window.electronAPI?.onOllamaPullProgress && window.electronAPI?.onOllamaPullComplete) {
-      removeProgress = window.electronAPI.onOllamaPullProgress((data) => {
-        setOllamaPullStatus('downloading');
-        setOllamaPullPercent(data.percent || 0);
-        setOllamaPullMessage(data.status || 'Downloading...');
-      });
+  // Listen for Ollama Auto-Pull Progress and Incompatible Provider Warning
+  useMainEvent(window.electronAPI?.onOllamaPullProgress, (data) => {
+    setOllamaPullStatus('downloading');
+    setOllamaPullPercent(data.percent || 0);
+    setOllamaPullMessage(data.status || 'Downloading...');
+  });
 
-      removeComplete = window.electronAPI.onOllamaPullComplete(() => {
-        setOllamaPullStatus('complete');
-        setOllamaPullMessage('Local AI memory ready');
-        setOllamaPullPercent(100);
-        setTimeout(() => setOllamaPullStatus('idle'), 3000);
-      });
-    }
+  // onOllamaPullComplete takes a 0-arg callback, so useMainEvent type does not fit; kept as effect
+  useEffect(() => window.electronAPI?.onOllamaPullComplete?.(() => {
+    setOllamaPullStatus('complete');
+    setOllamaPullMessage('Local AI memory ready');
+    setOllamaPullPercent(100);
+    setTimeout(() => setOllamaPullStatus('idle'), 3000);
+  }), []);
 
-    let removeWarning: (() => void) | undefined;
-    if (window.electronAPI?.onIncompatibleProviderWarning) {
-      removeWarning = window.electronAPI.onIncompatibleProviderWarning((data) => {
-        setIncompatibleWarning(data);
-      });
-    }
-
-    return () => {
-      if (removeProgress) removeProgress();
-      if (removeComplete) removeComplete();
-      if (removeWarning) removeWarning();
-    }
-  }, []);
+  useMainEvent(window.electronAPI?.onIncompatibleProviderWarning, (data) => {
+    setIncompatibleWarning(data);
+  });
 
   // Listen for overlay opacity changes — scoped to overlay window only
-  useEffect(() => {
-    if (!isOverlayWindow) return;
-    const removeOpacityListener = window.electronAPI?.onOverlayOpacityChanged?.((opacity) => {
-      setOverlayOpacity(opacity);
-    });
-    return () => {
-      if (removeOpacityListener) removeOpacityListener();
-    };
-  }, [isOverlayWindow]);
+  useMainEvent(isOverlayWindow ? window.electronAPI?.onOverlayOpacityChanged : undefined, (opacity) => {
+    setOverlayOpacity(opacity);
+  });
 
   // When the theme switches and no user preference is stored, reset to theme-aware default
-  useEffect(() => {
-    if (!isOverlayWindow || !window.electronAPI?.onThemeChanged) return;
-    return window.electronAPI.onThemeChanged(() => {
-      const stored = localStorage.getItem('pika_overlay_opacity');
-      if (!stored) {
-        setOverlayOpacity(getDefaultOverlayOpacity());
-      }
-    });
-  }, [isOverlayWindow]);
+  useMainEvent(isOverlayWindow ? window.electronAPI?.onThemeChanged : undefined, () => {
+    const stored = localStorage.getItem('pika_overlay_opacity');
+    if (!stored) {
+      setOverlayOpacity(getDefaultOverlayOpacity());
+    }
+  });
 
 
   // Handlers
@@ -185,7 +144,6 @@ const App: React.FC = () => {
         audio: { inputDeviceId, outputDeviceId }
       });
       if (result.success) {
-        analytics.trackMeetingStarted();
         // Switch to Overlay Mode via IPC
         // The main process handles window switching, but we can reinforce it or just trust main.
         // Actually, main process startMeeting triggers nothing UI-wise unless we tell it to switch window
@@ -202,7 +160,6 @@ const App: React.FC = () => {
 
   const handleEndMeeting = async () => {
     console.log("[App.tsx] handleEndMeeting triggered");
-    analytics.trackMeetingEnded();
     try {
       await window.electronAPI.endMeeting();
       console.log("[App.tsx] endMeeting IPC completed");
@@ -266,7 +223,7 @@ const App: React.FC = () => {
             <ToastProvider>
               <div
                 style={{
-                  ['--overlay-opacity' as '--overlay-opacity']: String(overlayOpacity),
+                  ['--overlay-opacity' as const]: String(overlayOpacity),
                   transition: 'background-color 75ms ease, border-color 75ms ease, box-shadow 75ms ease'
                 } as React.CSSProperties}
               >

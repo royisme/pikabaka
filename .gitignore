@@ -209,3 +209,6 @@ node-compile-cache/
 tsx-*/
 v8-compile-cache-*/
 test/sample/*
+
+# Live session state for agents: local only (history belongs in the git log and PROGRESS.md)
+docs/HANDOFF.md

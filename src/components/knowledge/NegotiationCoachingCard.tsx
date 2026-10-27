@@ -31,26 +31,19 @@ export const NegotiationCoachingCard = ({
   useEffect(() => {
     if (!showSilenceTimer || !phase.silence_strategy) return;
 
+    let remaining = 10;
     setTimerSeconds(10);
     const interval = setInterval(() => {
-      setTimerSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
+      remaining -= 1;
+      setTimerSeconds(remaining);
+      if (remaining <= 0) {
+        clearInterval(interval);
+        onEndRef.current?.();
+      }
     }, 1000);
 
     return () => clearInterval(interval);
   }, [showSilenceTimer, phase.silence_strategy]);
-
-  // Fire callback when timer reaches 0 — outside of state updater
-  useEffect(() => {
-    if (timerSeconds === 0 && showSilenceTimer && phase.silence_strategy) {
-      onEndRef.current?.();
-    }
-  }, [timerSeconds, showSilenceTimer, phase.silence_strategy]);
 
   const displayWarning = warning || (phase.warnings?.length ? phase.warnings[0] : null);
 

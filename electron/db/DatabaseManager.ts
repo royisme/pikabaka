@@ -4,12 +4,14 @@ import path from 'path';
 import { app } from 'electron';
 import fs from 'fs';
 import * as sqliteVec from 'sqlite-vec';
+import * as meetingRecord from './meetingRecord';
 
 // Interfaces for our data objects
 export interface Meeting {
     id: string;
     title: string;
     date: string; // ISO string
+    startTimeMs?: number;
     duration: string;
     summary: string;
     detailedSummary?: {
@@ -29,8 +31,6 @@ export interface Meeting {
         answer?: string;
         items?: string[];
     }>;
-    calendarEventId?: string;
-    source?: 'manual' | 'calendar';
     isProcessed?: boolean;
 }
 
@@ -141,8 +141,6 @@ export class DatabaseManager {
                     duration_ms INTEGER,
                     summary_json TEXT,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    calendar_event_id TEXT,
-                    source TEXT,
                     is_processed INTEGER DEFAULT 1
                 );
 
@@ -233,8 +231,6 @@ export class DatabaseManager {
             // For fresh installs these columns already exist from v1, so we guard with try/catch.
             // Unlike the old code, these are versioned and run exactly once.
             const columnsToAdd = [
-                "ALTER TABLE meetings ADD COLUMN calendar_event_id TEXT",
-                "ALTER TABLE meetings ADD COLUMN source TEXT",
                 "ALTER TABLE meetings ADD COLUMN is_processed INTEGER DEFAULT 1"
             ];
             for (const sql of columnsToAdd) {
@@ -243,65 +239,11 @@ export class DatabaseManager {
             this.db.pragma('user_version = 2');
         }
 
-        // Version 2 → 3: sqlite-vec virtual tables for native vector search
-        if (version < 3) {
-            console.log('[DatabaseManager] Applying migration v2 → v3: vec0 virtual tables');
-            try {
-                // Create vec0 virtual table for chunk embeddings (dynamic dimension)
-                this.db.exec(`
-                    CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
-                        chunk_id INTEGER PRIMARY KEY,
-                        embedding float
-                    );
-                `);
-
-                // Create vec0 virtual table for summary embeddings (dynamic dimension)
-                this.db.exec(`
-                    CREATE VIRTUAL TABLE IF NOT EXISTS vec_summaries USING vec0(
-                        summary_id INTEGER PRIMARY KEY,
-                        embedding float
-                    );
-                `);
-
-                // Migrate existing chunk embeddings from BLOB column to vec0 table
-                this.migrateExistingEmbeddings();
-
-                console.log('[DatabaseManager] vec0 virtual tables created successfully');
-            } catch (e) {
-                console.error('[DatabaseManager] vec0 migration failed (sqlite-vec may not be loaded):', e);
-                console.warn('[DatabaseManager] VectorStore will fall back to JS cosine similarity');
-            }
-            this.db.pragma('user_version = 3');
-        }
-
-        // Version 3 → 4: Drop strict 768-dim vec0 tables to allow flexible embedding dimensions
-        if (version < 4) {
-            console.log('[DatabaseManager] Applying migration v3 → v4: Drop strict dimension vec0 tables');
-            try {
-                this.db.exec('DROP TABLE IF EXISTS vec_chunks;');
-                this.db.exec('DROP TABLE IF EXISTS vec_summaries;');
-
-                this.db.exec(`
-                    CREATE VIRTUAL TABLE IF NOT EXISTS vec_chunks USING vec0(
-                        chunk_id INTEGER PRIMARY KEY,
-                        embedding float
-                    );
-                `);
-
-                this.db.exec(`
-                    CREATE VIRTUAL TABLE IF NOT EXISTS vec_summaries USING vec0(
-                        summary_id INTEGER PRIMARY KEY,
-                        embedding float
-                    );
-                `);
-
-                this.migrateExistingEmbeddings();
-                console.log('[DatabaseManager] vec0 virtual tables recreated for flexible dimensions');
-            } catch (e) {
-                console.error('[DatabaseManager] vec0 migration v4 failed:', e);
-            }
-            this.db.pragma('user_version = 4');
-        }
+        // Versions 3 and 4 used to create single-table vec0 tables with no vector dimension, which
+        // sqlite-vec rejects. v8 drops them and provisions the per-dimension tables, so they only
+        // advance the version.
+        if (version < 3) this.db.pragma('user_version = 3');
+        if (version < 4) this.db.pragma('user_version = 4');
 
         // Version 4 → 5: Add embedding provider and dimensions columns
         if (version < 5) {
@@ -440,6 +382,13 @@ export class DatabaseManager {
             this.db.pragma('user_version = 10');
         }
 
+        // Version 10 → 11: Persist transcript segments by identity and revision.
+        if (version < 11) {
+            console.log('[DatabaseManager] Applying migration v10 → v11: Add transcript segment identity');
+            meetingRecord.migrateRecordColumns(this.db);
+            this.db.pragma('user_version = 11');
+        }
+
         console.log('[DatabaseManager] Migrations completed.');
     }
 
@@ -476,66 +425,6 @@ export class DatabaseManager {
             stmt.run(key);
         } catch (error) {
             console.error(`[DatabaseManager] Failed to delete app_state for key: ${key}`, error);
-        }
-    }
-
-    /**
-     * One-time migration: Copy existing BLOB embeddings into vec0 virtual tables.
-     */
-    private migrateExistingEmbeddings(): void {
-        if (!this.db) return;
-
-        // Migrate chunk embeddings
-        try {
-            const chunkRows = this.db.prepare(
-                'SELECT id, embedding FROM chunks WHERE embedding IS NOT NULL'
-            ).all() as any[];
-
-            if (chunkRows.length > 0) {
-                const insert = this.db.prepare(
-                    'INSERT OR IGNORE INTO vec_chunks(chunk_id, embedding) VALUES (?, ?)'
-                );
-                const migrateAll = this.db.transaction(() => {
-                    for (const row of chunkRows) {
-                        try {
-                            insert.run(row.id, row.embedding);
-                        } catch (err) {
-                            // On mismatch (e.g. mixed 768 and 3072 dims), nullify to re-embed later
-                            this.db.prepare('UPDATE chunks SET embedding = NULL WHERE id = ?').run(row.id);
-                        }
-                    }
-                });
-                migrateAll();
-                console.log(`[DatabaseManager] Migrated ${chunkRows.length} chunk embeddings to vec_chunks`);
-            }
-        } catch (e) {
-            console.error('[DatabaseManager] Failed to migrate chunk embeddings:', e);
-        }
-
-        // Migrate summary embeddings
-        try {
-            const summaryRows = this.db.prepare(
-                'SELECT id, embedding FROM chunk_summaries WHERE embedding IS NOT NULL'
-            ).all() as any[];
-
-            if (summaryRows.length > 0) {
-                const insert = this.db.prepare(
-                    'INSERT OR IGNORE INTO vec_summaries(summary_id, embedding) VALUES (?, ?)'
-                );
-                const migrateAll = this.db.transaction(() => {
-                    for (const row of summaryRows) {
-                        try {
-                            insert.run(row.id, row.embedding);
-                        } catch (err) {
-                            this.db.prepare('UPDATE chunk_summaries SET embedding = NULL WHERE id = ?').run(row.id);
-                        }
-                    }
-                });
-                migrateAll();
-                console.log(`[DatabaseManager] Migrated ${summaryRows.length} summary embeddings to vec_summaries`);
-            }
-        } catch (e) {
-            console.error('[DatabaseManager] Failed to migrate summary embeddings:', e);
         }
     }
 
@@ -620,6 +509,68 @@ export class DatabaseManager {
         return this.resolvedExtPath;
     }
 
+    public createMeeting(meeting: Parameters<typeof meetingRecord.createMeeting>[1]): void {
+        if (!this.db) {
+            console.error('[DatabaseManager] DB not initialized');
+            return;
+        }
+        meetingRecord.createMeeting(this.db, meeting);
+    }
+
+    public upsertSegment(segment: Parameters<typeof meetingRecord.upsertSegment>[1]): boolean {
+        if (!this.db) {
+            console.error('[DatabaseManager] DB not initialized');
+            return false;
+        }
+        return meetingRecord.upsertSegment(this.db, segment);
+    }
+
+    public getSegmentRevision(meetingId: string, segmentId: string): number | undefined {
+        if (!this.db) return undefined;
+        const row = this.db.prepare('SELECT revision FROM transcripts WHERE meeting_id = ? AND segment_id = ?')
+            .get(meetingId, segmentId) as { revision: number | null } | undefined;
+        return row?.revision ?? undefined;
+    }
+
+    public getRecentSegments(meetingId: string, sinceMs: number): Array<{
+        segmentId: string; revision: number | null; speaker: string; text: string; timestampMs: number;
+    }> {
+        if (!this.db) throw new Error('Database not initialized');
+        return this.db.prepare(`
+            SELECT COALESCE(segment_id, CAST(id AS TEXT)) AS segmentId, revision,
+                   speaker, content AS text, timestamp_ms AS timestampMs
+            FROM transcripts WHERE meeting_id = ? AND timestamp_ms >= ?
+            ORDER BY timestamp_ms ASC, id ASC
+        `).all(meetingId, sinceMs) as ReturnType<DatabaseManager['getRecentSegments']>;
+    }
+
+    public searchSegments(meetingId: string, query: string, limit: number): ReturnType<DatabaseManager['getRecentSegments']> {
+        if (!this.db) throw new Error('Database not initialized');
+        if (!query.trim()) return [];
+        return this.db.prepare(`
+            SELECT COALESCE(segment_id, CAST(id AS TEXT)) AS segmentId, revision,
+                   speaker, content AS text, timestamp_ms AS timestampMs
+            FROM transcripts WHERE meeting_id = ? AND instr(lower(content), lower(?)) > 0
+            ORDER BY timestamp_ms DESC, id DESC LIMIT ?
+        `).all(meetingId, query, Math.max(1, Math.min(8, Math.trunc(limit)))) as ReturnType<DatabaseManager['getRecentSegments']>;
+    }
+
+    public addInteraction(meetingId: string, usage: NonNullable<Meeting['usage']>[number]): void {
+        if (!this.db) {
+            console.error('[DatabaseManager] DB not initialized');
+            return;
+        }
+        meetingRecord.addInteraction(this.db, meetingId, usage);
+    }
+
+    public completeMeeting(id: string, completion: Parameters<typeof meetingRecord.completeMeeting>[2]): boolean {
+        if (!this.db) {
+            console.error('[DatabaseManager] DB not initialized');
+            return false;
+        }
+        return meetingRecord.completeMeeting(this.db, id, completion);
+    }
+
     public saveMeeting(meeting: Meeting, startTimeMs: number, durationMs: number) {
         if (!this.db) {
             console.error('[DatabaseManager] DB not initialized');
@@ -627,8 +578,8 @@ export class DatabaseManager {
         }
 
         const insertMeeting = this.db.prepare(`
-            INSERT OR REPLACE INTO meetings (id, title, start_time, duration_ms, summary_json, created_at, calendar_event_id, source, is_processed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO meetings (id, title, start_time, duration_ms, summary_json, created_at, is_processed)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `);
 
         const insertTranscript = this.db.prepare(`
@@ -638,7 +589,7 @@ export class DatabaseManager {
 
         const insertInteraction = this.db.prepare(`
             INSERT INTO ai_interactions (meeting_id, type, timestamp, user_query, ai_response, metadata_json)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (@meeting_id, @type, @timestamp, @user_query, @ai_response, @metadata_json)
         `);
 
         const summaryJson = JSON.stringify({
@@ -655,8 +606,6 @@ export class DatabaseManager {
                 durationMs,
                 summaryJson,
                 meeting.date, // Using the ISO string as created_at for sorting simply
-                meeting.calendarEventId || null,
-                meeting.source || 'manual',
                 meeting.isProcessed ? 1 : 0
             );
 
@@ -675,30 +624,7 @@ export class DatabaseManager {
             // 3. Insert Interactions
             if (meeting.usage) {
                 for (const usage of meeting.usage) {
-                    let metadata = null;
-                    if (usage.items) {
-                        metadata = JSON.stringify(usage.items);
-                    } else if (usage.type === 'followup_questions' && usage.answer) {
-                        // Sometimes answer is the array for questions, or we store it in metadata
-                        // In intelligence manager we pushed: { type: 'followup_questions', answer: fullQuestions }
-                        // Let's store that 'answer' (array) in metadata for this type
-                        if (Array.isArray(usage.answer)) {
-                            metadata = JSON.stringify(usage.answer);
-                        }
-                    }
-
-                    // Normalization
-                    const answerText = Array.isArray(usage.answer) ? null : usage.answer || null;
-                    const queryText = usage.question || null;
-
-                    insertInteraction.run(
-                        meeting.id,
-                        usage.type,
-                        usage.timestamp,
-                        queryText,
-                        answerText,
-                        metadata
-                    );
+                    insertInteraction.run({ meeting_id: meeting.id, ...meetingRecord.interactionRow(usage) });
                 }
             }
         });
@@ -793,8 +719,6 @@ export class DatabaseManager {
                 duration: durationStr,
                 summary: summaryData.legacySummary || '',
                 detailedSummary: summaryData.detailedSummary,
-                calendarEventId: row.calendar_event_id,
-                source: row.source as any,
                 // We don't load full transcript/usage for list view to keep it light
                 transcript: [] as any[],
                 usage: [] as any[]
@@ -858,11 +782,10 @@ export class DatabaseManager {
             id: meetingRow.id,
             title: meetingRow.title,
             date: meetingRow.created_at,
+            startTimeMs: meetingRow.start_time,
             duration: durationStr,
             summary: summaryData.legacySummary || '',
             detailedSummary: summaryData.detailedSummary,
-            calendarEventId: meetingRow.calendar_event_id,
-            source: meetingRow.source,
             transcript: transcript,
             usage: usage
         };
@@ -909,8 +832,6 @@ export class DatabaseManager {
                 duration: durationStr,
                 summary: summaryData.legacySummary || '',
                 detailedSummary: summaryData.detailedSummary,
-                calendarEventId: row.calendar_event_id,
-                source: row.source,
                 isProcessed: false,
                 transcript: [] as any[], // Fetched separately via getMeetingDetails or manually if needed
                 usage: [] as any[]
@@ -972,7 +893,6 @@ Pika is a real-time AI meeting assistant designed to help you stay focused, info
 
 ### Start a Session
 Click **Start Session** from the dashboard.
-Join a scheduled meeting and start directly from the meeting notification.
 
 ### During a Meeting
 - Use the **five quick action buttons** for real-time assistance
