@@ -181,6 +181,8 @@ export interface ElectronAPI {
   onUpdateError: (callback: (err: string) => void) => () => void
   onDownloadProgress: (callback: (progressObj: any) => void) => () => void
   restartAndInstall: () => Promise<void>
+  getUpdateState: () => Promise<{ autoCheck: boolean; checking: boolean; lastCheckedAt: number | null; availableVersion: string | null; downloadedVersion: string | null }>
+  setAutoCheckUpdates: (enabled: boolean) => Promise<{ success: boolean }>
   checkForUpdates: () => Promise<void>
   downloadUpdate: () => Promise<void>
   testReleaseFetch: () => Promise<{ success: boolean; error?: string }>

@@ -2,8 +2,23 @@ import { app } from "electron"
 import { autoUpdater, type UpdateDownloadedEvent } from "electron-updater"
 import { ReleaseNotesManager } from "../update/ReleaseNotesManager"
 import type { AppState } from "../main"
+import { SettingsManager } from "../services/SettingsManager"
 
 let pendingUpdateNotice: UpdateDownloadedEvent | null = null
+let lastCheckedAt: number | null = null
+let availableVersion: string | null = null
+let downloadedVersion: string | null = null
+let checking = false
+
+export function getUpdateState() {
+  return {
+    autoCheck: SettingsManager.getInstance().get('autoCheckUpdates') !== false,
+    checking,
+    lastCheckedAt,
+    availableVersion,
+    downloadedVersion
+  }
+}
 
 export function setupAutoUpdater(appState: AppState): void {
   autoUpdater.autoDownload = true
@@ -14,11 +29,15 @@ export function setupAutoUpdater(appState: AppState): void {
   console.log(`[AutoUpdater] Channel: ${autoUpdater.channel}`)
 
   autoUpdater.on("checking-for-update", () => {
+    checking = true
     console.log("[AutoUpdater] Checking for update...")
     appState.broadcast("update-checking")
   })
 
   autoUpdater.on("update-available", async (info) => {
+    checking = false
+    lastCheckedAt = Date.now()
+    availableVersion = info.version
     console.log("[AutoUpdater] Update available:", info.version)
     appState.updateAvailable = true
 
@@ -34,11 +53,15 @@ export function setupAutoUpdater(appState: AppState): void {
   })
 
   autoUpdater.on("update-not-available", (info) => {
+    checking = false
+    lastCheckedAt = Date.now()
+    availableVersion = null
     console.log("[AutoUpdater] Update not available:", info.version)
     appState.broadcast("update-not-available", info)
   })
 
   autoUpdater.on("error", (err) => {
+    checking = false
     console.error("[AutoUpdater] Error:", err)
     // Include more details in the error message for debugging
     const errorMessage = err.message || err.toString() || 'Unknown update error'
@@ -54,6 +77,7 @@ export function setupAutoUpdater(appState: AppState): void {
   })
 
   autoUpdater.on("update-downloaded", (info) => {
+    downloadedVersion = info.version
     console.log("[AutoUpdater] Update downloaded:", info.version)
     if (appState.getIsMeetingActive()) {
       pendingUpdateNotice = info
@@ -64,6 +88,7 @@ export function setupAutoUpdater(appState: AppState): void {
 
   if (app.isPackaged) {
     const checkForUpdates = () => {
+      if (SettingsManager.getInstance().get('autoCheckUpdates') === false) return
       autoUpdater.checkForUpdates().catch(err => {
         console.error("[AutoUpdater] Failed to check for updates:", err);
       });

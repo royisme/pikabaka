@@ -1,5 +1,7 @@
 import { app } from "electron"
 import { safeHandle } from "./safeHandle"
+import { getUpdateState } from "../lib/auto-updater"
+import { SettingsManager } from "../services/SettingsManager"
 import { AppState } from "../main"
 import { cancelActiveRagQueries } from "./rag"
 import { DatabaseManager } from "../db/DatabaseManager"
@@ -417,6 +419,14 @@ export function registerCoreHandlers(appState: AppState): void {
       console.error('[IPC] quit-and-install-update failed:', err)
       return { success: false, error: err.message }
     }
+  })
+
+  safeHandle("get-update-state", () => getUpdateState())
+
+  safeHandle("set-auto-check-updates", (_, enabled: boolean) => {
+    if (typeof enabled !== 'boolean') throw new Error('Invalid automatic update check value')
+    SettingsManager.getInstance().set('autoCheckUpdates', enabled)
+    return { success: true }
   })
 
   safeHandle("check-for-updates", async () => {

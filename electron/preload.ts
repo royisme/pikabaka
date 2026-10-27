@@ -246,6 +246,8 @@ interface ElectronAPI {
   onUpdateError: (callback: (err: string) => void) => () => void
   onDownloadProgress: (callback: (progressObj: any) => void) => () => void
   restartAndInstall: () => Promise<void>
+  getUpdateState: () => Promise<{ autoCheck: boolean; checking: boolean; lastCheckedAt: number | null; availableVersion: string | null; downloadedVersion: string | null }>
+  setAutoCheckUpdates: (enabled: boolean) => Promise<{ success: boolean }>
   checkForUpdates: () => Promise<void>
   downloadUpdate: () => Promise<void>
   testReleaseFetch: () => Promise<{ success: boolean; error?: string }>
@@ -1014,6 +1016,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     }
   },
   restartAndInstall: () => ipcRenderer.invoke("quit-and-install-update"),
+  getUpdateState: () => ipcRenderer.invoke("get-update-state"),
+  setAutoCheckUpdates: (enabled: boolean) => ipcRenderer.invoke("set-auto-check-updates", enabled),
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
   downloadUpdate: () => ipcRenderer.invoke("download-update"),
   testReleaseFetch: () => ipcRenderer.invoke("test-release-fetch"),

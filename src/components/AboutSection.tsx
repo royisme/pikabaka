@@ -3,6 +3,7 @@ import { Heart, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 import packageJson from '../../package.json';
 import { useWindowEvent } from '../hooks/useWindowEvent';
+import { UpdatesCard } from './UpdatesCard';
 
 export type AboutSectionProps = Record<string, never>;
 
@@ -75,6 +76,10 @@ export const AboutSection: React.FC<AboutSectionProps> = () => {
 
             {/* Divider */}
             <motion.div variants={fadeUp} className="border-t border-border-subtle" />
+
+            <motion.div variants={fadeUp} className="pt-8">
+                <UpdatesCard />
+            </motion.div>
 
             {/* Support card */}
             <motion.div variants={fadeUp} className="pt-8">

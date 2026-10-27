@@ -13,7 +13,7 @@ Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR 
 
 ## Updates card (owner-approved dispatch, `docs/design-auto-update.md`, section "Updates card")
 
-- Next, on `update-card` (stacked on `auto-update`, PR #48): replace the Settings > General "Version" button with an Updates card in Settings > About, copied from quotio's layout: automatic-check switch (`autoCheckUpdates`, default on), status line with one action, "Last checked". Done when: both typechecks, lint and tap exit 0, and the card's states render with a mocked `electronAPI` in the browser preview.
+- Done on `update-card` (stacked on `auto-update`, PR #48): the Settings > General "Version" button is replaced by an Updates card in Settings > About, copied from quotio's layout: automatic-check switch (`autoCheckUpdates`, default on), status line with one action, "Last checked". Both typechecks, lint and tap exit 0; every state renders in a browser preview with a mocked `electronAPI`, in both themes.
 - Then: owner checks the card in both themes and the real states with a packaged build.
 
 ## Acoustic echo cancellation (issue #39, owner-approved dispatch)
