@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-26: AI connections merged to main (branch `ai-connections`)
+
+- Landed: connections and per-job model choice, search-index model and rebuild, sentence-aligned translation with a paragraph second pass and a Test button, source-above-translation rows, microphone mute, agent and decision-model tests, proactive help on by default, answers in the call's language and a spoken style, expert-perspective answers when the materials have nothing (no invented facts), optional notes, screenshot buttons, card/chat overlap fix, calendar removal (A7.1), legacy key paths removed.
+- Owner tested the first version in the running app and accepted it. Not exercised: Windows, packaged builds, committed tests for the newest paths, acoustic echo cancellation (issue #39), the overlay two-zone redesign (A1.2/A3.6).
+- The relevance floor for the materials (0.3) is a guess; tune it from real use.
+
 ## Chosen models: Phase 3 (`legacy-keys`)
 
 - Added model-test IPC, live preload/types and Quick answers/Summaries test buttons in the existing Agent-row style. Tests use the displayed draft without saving; an empty Summaries connection inherits the saved Quick answers row. The agent's provider/test path is unchanged.

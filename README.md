@@ -53,7 +53,11 @@ Full demo video: [`demo/out/pika-demo.mp4`](demo/out/pika-demo.mp4) · Built wit
 
 - **Sub-500 ms transcription** powered by a Rust native audio module (cpal + WebRTC VAD + rubato resampling).
 - **Dual-channel capture** — system audio (the meeting) and your microphone are streamed independently for clean attribution.
-- **Any LLM, any STT** — switch providers at runtime: OpenAI, Anthropic Claude, Google Gemini, Groq, Ollama, or any OpenAI-compatible endpoint.
+- **Any LLM, any STT** — add a connection (OpenAI, Anthropic Claude, Google Gemini, Groq, or any OpenAI-compatible host such as Ollama or LM Studio) and pick the exact model for quick answers, summaries and the agent.
+- **Live translation** — each finished sentence is translated as it is spoken, source text first and larger; a second pass tidies whole paragraphs. A Test button in Audio settings shows the speed.
+- **Suggestions in the language of the call** — answers come in spoken style, in the language the other side is using, with a translation line you can read. They draw on your résumé and notes, and answer as an expert when your materials have nothing.
+- **Proactive help** — an optional decision model watches the conversation and offers a card when help would be useful.
+- **Mute your microphone** — one button stops your own voice from being transcribed when the call plays through speakers.
 - **Local RAG memory** — past meetings indexed with `sqlite-vec`; search and recall without sending data anywhere.
 - **Screenshot reasoning** — capture full screen or a region, pipe it to a vision model, get an answer in seconds.
 - **Stealth overlay** — disguise the process name and hide the window from screen-sharing.
@@ -96,8 +100,10 @@ You only need **one** LLM provider and **one** STT provider to get started. All 
 | OpenAI       | General quality, GPT-4o, o3    | Strong at chained reasoning          |
 | Anthropic Claude | Coding interviews          | Best Claude tier for technical depth |
 | Groq         | Sub-second inference, vision   | Cheapest fast tier                   |
-| Ollama       | Fully offline, no key required | Run Llama/Qwen/etc. on your machine  |
-| Custom       | Any OpenAI-compatible endpoint | Self-hosted vLLM, LM Studio, etc.    |
+| Local server | Fully offline, no key required | Ollama, LM Studio, vLLM: add an OpenAI-compatible connection with a local address |
+| Custom       | Any OpenAI, Anthropic or Gemini compatible host | Your own base URL and key |
+
+Each job (quick answers, summaries, agent) uses the connection and model id you choose; Pika never switches to another model on its own. The search index (embeddings) has its own model setting.
 
 ### STT Providers
 
