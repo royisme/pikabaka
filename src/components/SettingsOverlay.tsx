@@ -2,6 +2,7 @@ import SttModelPicker, { STT_MODEL_DEFAULTS } from './settings/SttModelPicker';
 import ConnectionModelPicker from './settings/ConnectionModelPicker';
 import TranslationTest from './settings/TranslationTest';
 import AnswerStyleSettings from './settings/AnswerStyleSettings';
+import NotesSettings from './settings/NotesSettings';
 import WorkspaceSettings from './settings/WorkspaceSettings';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
@@ -1945,6 +1946,10 @@ Core Skills
                                     {/* JD List Manager */}
                                     <div className="mt-5">
                                         <JDListManager onSelectFile={() => window.electronAPI?.profileSelectFile?.()} />
+                                    </div>
+
+                                    <div className="mt-5">
+                                        <NotesSettings />
                                     </div>
 
                                     <ProfileVisualizer profileData={profileData} />

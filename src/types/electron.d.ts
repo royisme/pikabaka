@@ -153,6 +153,8 @@ export interface ElectronAPI {
   getSttLanguage: (speaker?: 'interviewer' | 'user') => Promise<string>
   getAiResponseLanguage: () => Promise<string>
   getAnswerStyle: () => Promise<string>
+  profileGetNotes: () => Promise<string>
+  profileSetNotes: (text: string) => Promise<{ success: boolean; error?: string }>
   setAnswerStyle: (style: string) => Promise<{ success: boolean; error?: string }>
 
   getNativeAudioStatus: () => Promise<{

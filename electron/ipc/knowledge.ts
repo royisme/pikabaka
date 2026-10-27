@@ -26,6 +26,17 @@ export function registerKnowledgeHandlers(appState: AppState): void {
     }
   });
 
+  // The user's own facts, one per line: saved as a document that questions are matched against.
+  safeHandle("profile:get-notes", async () => appState.getKnowledgeOrchestrator()?.getNotes() ?? '');
+
+  safeHandle("profile:set-notes", async (_, text: string) => {
+    const orchestrator = appState.getKnowledgeOrchestrator();
+    if (!orchestrator) return { success: false, error: 'Knowledge engine not initialized. Please ensure API keys are configured.' };
+    if (typeof text !== 'string' || text.length > 40_000) return { success: false, error: 'The notes are too long.' };
+    orchestrator.setNotes(text);
+    return { success: true };
+  });
+
   safeHandle("profile:get-status", async () => {
     try {
       const orchestrator = appState.getKnowledgeOrchestrator();

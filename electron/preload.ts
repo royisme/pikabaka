@@ -134,6 +134,8 @@ interface ElectronAPI {
   getSttLanguage: (speaker?: 'interviewer' | 'user') => Promise<string>
   getAiResponseLanguage: () => Promise<string>
   getAnswerStyle: () => Promise<string>
+  profileGetNotes: () => Promise<string>
+  profileSetNotes: (text: string) => Promise<{ success: boolean; error?: string }>
   setAnswerStyle: (style: string) => Promise<{ success: boolean; error?: string }>
   getNativeAudioStatus: () => Promise<{
     connected: boolean;
@@ -678,6 +680,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getSttLanguage: (speaker?: 'interviewer' | 'user') => ipcRenderer.invoke("get-stt-language", speaker),
   getAiResponseLanguage: () => ipcRenderer.invoke("get-ai-response-language"),
   getAnswerStyle: () => ipcRenderer.invoke("get-answer-style"),
+  profileGetNotes: () => ipcRenderer.invoke("profile:get-notes"),
+  profileSetNotes: (text: string) => ipcRenderer.invoke("profile:set-notes", text),
   setAnswerStyle: (style: string) => ipcRenderer.invoke("set-answer-style", style),
 
   // Intelligence Mode IPC
