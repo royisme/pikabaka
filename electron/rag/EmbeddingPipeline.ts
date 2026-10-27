@@ -31,6 +31,7 @@ export class EmbeddingPipeline {
     private db: Database.Database;
     private vectorStore: VectorStore;
     private processingPromise: Promise<void> | null = null;
+    private liveBatches = new Set<Promise<number>>();
     private initPromise: Promise<void> | null = null;
     /** Tracks the config used in the most recent successful initialize() call to enable idempotency. */
     private _lastConfig: AppAPIConfig | null = null;
@@ -59,7 +60,7 @@ export class EmbeddingPipeline {
         this.initPromise = (async () => {
             await previous?.catch(() => {});
             // Finish in-flight writes before a forced model switch changes index metadata.
-            if (options?.force) await this.processingPromise;
+            if (options?.force) await Promise.all([this.processingPromise, ...this.liveBatches]);
             this.provider = null;
             if (options?.force) this.fallbackMeetings.clear();
             await this._doInitialize(config);
@@ -430,10 +431,32 @@ export class EmbeddingPipeline {
         return this.provider.embedQuery(text);
     }
 
+    /** Capture one provider for the whole live batch, including its metadata writes. */
+    embedLiveChunks(chunkIds: number[], isCurrent: () => boolean): Promise<number> {
+        const provider = this.provider;
+        if (!provider) return Promise.resolve(0);
+
+        const batch = (async () => {
+            let embedded = 0;
+            for (const chunkId of chunkIds) {
+                if (!isCurrent()) break;
+                try {
+                    if (await this.embedChunk(chunkId, provider, isCurrent)) embedded++;
+                } catch {
+                    console.warn(`[EmbeddingPipeline] Failed to embed live chunk ${chunkId} via ${provider.name}`);
+                }
+            }
+            return embedded;
+        })();
+        this.liveBatches.add(batch);
+        void batch.finally(() => { this.liveBatches.delete(batch); });
+        return batch;
+    }
+
     /**
      * Embed a single chunk using the given provider (defaults to this.provider).
      */
-    private async embedChunk(chunkId: number, provider?: IEmbeddingProvider): Promise<void> {
+    private async embedChunk(chunkId: number, provider?: IEmbeddingProvider, isCurrent = () => true): Promise<boolean> {
         const p = provider ?? this.provider;
         if (!p) throw new Error('No embedding provider');
 
@@ -441,22 +464,30 @@ export class EmbeddingPipeline {
         const row = this.db.prepare('SELECT cleaned_text, meeting_id FROM chunks WHERE id = ?').get(chunkId) as any;
         if (!row) {
             console.log(`[EmbeddingPipeline] Chunk ${chunkId} not found, skipping`);
-            return;
+            return false;
         }
 
         const embedding = await p.embed(row.cleaned_text);
-        this.vectorStore.storeEmbedding(chunkId, embedding);
+        if (!isCurrent()) return false;
 
-        // Record provider metadata on the meeting after first successful embedding
-        try {
+        const stored = this.db.transaction(() => {
+            if (!this.db.prepare('SELECT 1 FROM chunks WHERE id = ?').get(chunkId)) return false;
+            const meeting = this.db.prepare(
+                'SELECT embedding_provider, embedding_dimensions FROM meetings WHERE id = ?'
+            ).get(row.meeting_id) as { embedding_provider: string | null; embedding_dimensions: number | null } | undefined;
+            // Meeting metadata is shared by all its vectors; never stamp a new model onto old vectors.
+            if (meeting?.embedding_provider != null &&
+                (meeting.embedding_provider !== p.name || meeting.embedding_dimensions !== p.dimensions)) {
+                throw new Error('Meeting embeddings use a different provider; rebuild required');
+            }
+            this.vectorStore.storeEmbedding(chunkId, embedding);
             this.db.prepare(
                 'UPDATE meetings SET embedding_provider = ?, embedding_dimensions = ? WHERE id = ? AND embedding_provider IS NULL'
             ).run(p.name, p.dimensions, row.meeting_id);
-        } catch (e) {
-            // Non-fatal — metadata is for safety filtering, not critical path
-        }
-
-        console.log(`[EmbeddingPipeline] Embedded chunk ${chunkId} via ${p.name}`);
+            return true;
+        })();
+        if (stored) console.log(`[EmbeddingPipeline] Embedded chunk ${chunkId} via ${p.name}`);
+        return stored;
     }
 
     /**
