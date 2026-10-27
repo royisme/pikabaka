@@ -233,9 +233,6 @@ export interface ElectronAPI {
   seedDemo: () => Promise<{ success: boolean }>;
 
   // Follow-up Email
-  generateFollowupEmail: (input: any) => Promise<string>;
-  extractEmailsFromTranscript: (transcript: Array<{ text: string }>) => Promise<string[]>;
-  openMailto: (params: { to: string; subject: string; body: string }) => Promise<{ success: boolean; error?: string }>;
 
   // Audio Test
   startAudioTest: (deviceId?: string) => Promise<{ success: boolean; warning?: string }>;

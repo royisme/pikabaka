@@ -520,7 +520,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         )}
       </div>
 
-      <div className="shrink-0 px-3 min-[480px]:px-4 py-2 no-drag">
+      <div className="shrink-0 px-3 min-[560px]:px-4 py-2 no-drag">
         <div className="flex h-7 items-center gap-1.5 mb-1.5">
           <button
             onClick={isProcessing ? onStop : handleWhatToSay}
@@ -533,19 +533,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             style={primaryQuiet ? appearance.chipStyle : undefined}
           >
             {isProcessing ? <Square className="w-3 h-3 fill-current opacity-75" aria-hidden="true" /> : <Zap className="w-3 h-3 opacity-75" />} {isProcessing ? 'Stop' : 'What to say'}
-            {!isProcessing && shortcuts.whatToAnswer.length > 0 && <KeyBadge keys={shortcuts.whatToAnswer} onAction={!primaryQuiet} className="hidden min-[480px]:flex ml-0.5" />}
+            {!isProcessing && shortcuts.whatToAnswer.length > 0 && <KeyBadge keys={shortcuts.whatToAnswer} onAction={!primaryQuiet} className="hidden min-[560px]:flex ml-0.5" />}
           </button>
-          <button onClick={handleClarify} aria-label="Clarify" title="Clarify" className={`flex h-7 w-7 min-[480px]:w-auto items-center justify-center gap-1.5 min-[480px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-            <MessageSquare className="w-3 h-3 opacity-65" /> <span className="hidden min-[480px]:inline">Clarify</span>
+          <button onClick={handleClarify} aria-label="Clarify" title="Clarify" className={`flex h-7 w-7 min-[560px]:w-auto items-center justify-center gap-1.5 min-[560px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+            <MessageSquare className="w-3 h-3 opacity-65" /> <span className="hidden min-[560px]:inline">Clarify</span>
           </button>
-          <button onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap} aria-label={actionButtonMode === 'brainstorm' ? 'Ideas' : 'Recap'} title={actionButtonMode === 'brainstorm' ? 'Ideas' : 'Recap'} className={`flex h-7 w-7 min-[480px]:w-auto items-center justify-center gap-1.5 min-[480px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+          <button onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap} aria-label={actionButtonMode === 'brainstorm' ? 'Ideas' : 'Recap'} title={actionButtonMode === 'brainstorm' ? 'Ideas' : 'Recap'} className={`flex h-7 w-7 min-[560px]:w-auto items-center justify-center gap-1.5 min-[560px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
             {actionButtonMode === 'brainstorm'
-              ? <><Lightbulb className="w-3 h-3 opacity-65" /> <span className="hidden min-[480px]:inline">Ideas</span></>
-              : <><RefreshCw className="w-3 h-3 opacity-65" /> <span className="hidden min-[480px]:inline">Recap</span></>
+              ? <><Lightbulb className="w-3 h-3 opacity-65" /> <span className="hidden min-[560px]:inline">Ideas</span></>
+              : <><RefreshCw className="w-3 h-3 opacity-65" /> <span className="hidden min-[560px]:inline">Recap</span></>
             }
           </button>
-          <button onClick={handleFollowUpQuestions} aria-label="Follow-up" title="Follow-up" className={`flex h-7 w-7 min-[480px]:w-auto items-center justify-center gap-1.5 min-[480px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
-            <HelpCircle className="w-3 h-3 opacity-65" /> <span className="hidden min-[480px]:inline">Follow-up</span>
+          <button onClick={handleFollowUpQuestions} aria-label="Follow-up" title="Follow-up" className={`flex h-7 w-7 min-[560px]:w-auto items-center justify-center gap-1.5 min-[560px]:px-2 rounded-full text-xs font-medium border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`} style={appearance.chipStyle}>
+            <HelpCircle className="w-3 h-3 opacity-65" /> <span className="hidden min-[560px]:inline">Follow-up</span>
           </button>
           {onCaptureScreen && (
             <button onClick={onCaptureScreen} aria-label="Screenshot" title={`Screenshot of the screen, attached to your next question${shortcuts.takeScreenshot.length ? ` (${shortcuts.takeScreenshot.join('+')})` : ''}`} className={`ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press ${quickActionClass}`} style={appearance.chipStyle}>

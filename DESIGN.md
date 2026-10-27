@@ -73,7 +73,7 @@ The audio status is shown once (`src/lib/audioStatus.ts`): the top-bar chip carr
 ## Controls
 
 - 28px high in the bar and the composer; icon-only buttons are 28px square, with an accessible name.
-- From 480px up Translate and Original are buttons in the bar and secondary actions show their words; below 480px they move into the menu or become icon-only, so nothing is ever cut off.
+- From 560px up Translate and Original are buttons in the bar and secondary actions show their words; below 560px they move into the menu or become icon-only, so nothing is ever cut off.
 - Hide and Stop sit at the right of the bar; Stop needs a second press within three seconds.
 - Interactive elements inside a `draggable-area` carry `no-drag`.
 
