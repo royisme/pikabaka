@@ -1,3 +1,5 @@
+import type { KeybindStatus, KeybindResult } from '../services/KeybindManager'
+
 export interface ElectronAPI {
   updateContentDimensions: (dimensions: {
     width: number
@@ -200,10 +202,10 @@ export interface ElectronAPI {
   onRAGStreamError: (callback: (data: { meetingId?: string; global?: boolean; error: string }) => void) => () => void
 
   // Keybind Management
-  getKeybinds: () => Promise<Array<{ id: string; label: string; accelerator: string; isGlobal: boolean; defaultAccelerator: string }>>
-  setKeybind: (id: string, accelerator: string) => Promise<boolean>
-  resetKeybinds: () => Promise<Array<{ id: string; label: string; accelerator: string; isGlobal: boolean; defaultAccelerator: string }>>
-  onKeybindsUpdate: (callback: (keybinds: Array<any>) => void) => () => void
+  getKeybinds: () => Promise<KeybindStatus[]>
+  setKeybind: (id: string, accelerator: string) => Promise<KeybindResult>
+  resetKeybinds: () => Promise<KeybindStatus[]>
+  onKeybindsUpdate: (callback: (keybinds: KeybindStatus[]) => void) => () => void
 
   // Global shortcut events (stealth: fired even when window is not focused)
   onGlobalShortcut: (callback: (data: { action: string }) => void) => () => void

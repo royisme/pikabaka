@@ -1,4 +1,5 @@
 import { ipcRenderer } from "electron"
+import type { KeybindStatus, KeybindResult } from '../services/KeybindManager'
 
 export function settingsChannels() {
   return {
@@ -13,11 +14,11 @@ export function settingsChannels() {
         ipcRenderer.removeListener('theme:changed', subscription)
       }
     },
-    getKeybinds: () => ipcRenderer.invoke('keybinds:get-all'),
-    setKeybind: (id: string, accelerator: string) => ipcRenderer.invoke('keybinds:set', id, accelerator),
-    resetKeybinds: () => ipcRenderer.invoke('keybinds:reset'),
-    onKeybindsUpdate: (callback: (keybinds: Array<any>) => void) => {
-      const subscription = (_: any, keybinds: any) => callback(keybinds)
+    getKeybinds: (): Promise<KeybindStatus[]> => ipcRenderer.invoke('keybinds:get-all'),
+    setKeybind: (id: string, accelerator: string): Promise<KeybindResult> => ipcRenderer.invoke('keybinds:set', id, accelerator),
+    resetKeybinds: (): Promise<KeybindStatus[]> => ipcRenderer.invoke('keybinds:reset'),
+    onKeybindsUpdate: (callback: (keybinds: KeybindStatus[]) => void) => {
+      const subscription = (_: Electron.IpcRendererEvent, keybinds: KeybindStatus[]) => callback(keybinds)
       ipcRenderer.on('keybinds:update', subscription)
       return () => {
         ipcRenderer.removeListener('keybinds:update', subscription)

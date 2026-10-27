@@ -698,7 +698,7 @@ ANSWER DIRECTLY:`;
       ? `CONTEXT:\n${context}\n\nUSER QUESTION:\n${message}`
       : message;
 
-    // The connection and model chosen for quick answers (Settings, AI Providers): any host, any model id.
+    // The connection and model chosen for quick answers (Settings, Models & Agent): any host, any model id.
     const chatUse = CredentialsManager.getInstance().resolveModelUse('chat');
     if ('connection' in chatUse) {
       const systemFor = chatUse.connection.id === 'groq' ? GROQ_SYSTEM_PROMPT : chatUse.connection.type === 'anthropic' ? CLAUDE_SYSTEM_PROMPT : OPENAI_SYSTEM_PROMPT;

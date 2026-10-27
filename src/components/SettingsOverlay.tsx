@@ -3,7 +3,6 @@ import ConnectionModelPicker from './settings/ConnectionModelPicker';
 import TranslationTest from './settings/TranslationTest';
 import AnswerStyleSettings from './settings/AnswerStyleSettings';
 import NotesSettings from './settings/NotesSettings';
-import WorkspaceSettings from './settings/WorkspaceSettings';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
 import { useWindowEvent } from '../hooks/useWindowEvent';
@@ -12,8 +11,8 @@ import { useLocalStorageValue } from '../hooks/useLocalStorageValue';
 import {
     X, Mic, Speaker, Monitor, Keyboard, BookOpen, Upload,
     RotateCcw, Eye, Layout, MessageSquare,
-    ChevronDown, ChevronUp, ChevronRight, Check, Power, Palette, Ghost, Sun, Moon, RefreshCw, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink, Trash2,
-    Pencil, MapPin, HelpCircle, Zap, SlidersHorizontal, PointerOff,
+    ChevronDown, ChevronRight, Check, Power, Palette, Ghost, Sun, Moon, RefreshCw, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink, Trash2,
+    MapPin, PointerOff,
     AlertCircle, Shield
 } from 'lucide-react';
 import { AboutSection } from './AboutSection';
@@ -23,14 +22,13 @@ import { useShortcuts } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import {
     clampOverlayOpacity,
-    getOverlayAppearance,
     OVERLAY_OPACITY_MIN,
     getDefaultOverlayOpacity,
 } from '../lib/overlayAppearance';
 import { KeyRecorder } from './ui/KeyRecorder';
 import { ProfileVisualizer } from '../premium';
 import { JDListManager } from './knowledge/JDListManager';
-import icon from '../../assets/icon.png';
+import { isMac } from '../utils/platformUtils';
 import { useProfileStatus } from '../hooks/useProfileStatus';
 import { useProfileData } from '../hooks/useProfileData';
 import { useUploadResume } from '../hooks/useUploadResume';
@@ -46,112 +44,6 @@ const TRANSCRIPT_ASSEMBLER_PROFILE_OPTIONS: Array<{ value: TranscriptAssemblerPr
     { value: 'low_latency', label: 'Low-latency', desc: 'Fastest transcript updates, but long sentences may split earlier.' },
     { value: 'coherent', label: 'Coherent', desc: 'Most complete segments for translation; final subtitles may arrive 5-30s later.' },
 ];
-
-// ---------------------------------------------------------------------------
-// MockupPikaInterface — fake in-meeting widget for the opacity preview
-// ---------------------------------------------------------------------------
-const MockupPikaInterface = ({ opacity }: { opacity: number }) => {
-    const resolvedTheme = useResolvedTheme();
-    const appearance = useMemo(
-        () => getOverlayAppearance(opacity, resolvedTheme),
-        [opacity, resolvedTheme]
-    );
-
-    return (
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none bg-transparent">
-                {/* PikaInterface Widget — opacity controlled by the slider */}
-                <div
-                    id="mockup-pika-interface"
-                    className="flex flex-col items-center pointer-events-none -mt-56"
-                >
-                    {/* TopPill Replica */}
-                    <div className="flex justify-center mb-2 select-none z-50">
-                        <div className="flex items-center gap-2 rounded-full overlay-pill-surface backdrop-blur-md pl-1.5 pr-1.5 py-1.5" style={appearance.pillStyle}>
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden overlay-icon-surface" style={appearance.iconStyle}>
-                                <img
-                                    src={icon}
-                                    alt="Pika"
-                                    className="w-[24px] h-[24px] object-contain opacity-95 scale-105 drop-shadow-sm"
-                                    draggable="false"
-                                />
-                            </div>
-                            <div className="flex items-center gap-2 px-4 py-1.5 rounded-full text-[12px] font-medium border overlay-chip-surface overlay-text-interactive" style={appearance.chipStyle}>
-                                <ChevronUp className="w-3.5 h-3.5 opacity-70" />
-                                <span className="opacity-80 tracking-wide">Hide</span>
-                            </div>
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center overlay-icon-surface overlay-text-primary" style={appearance.iconStyle}>
-                                <div className="w-3.5 h-3.5 rounded-[3px] bg-state-danger opacity-80" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Main Interface Window Replica */}
-                    <div className="relative w-[600px] max-w-full overlay-shell-surface overlay-text-primary backdrop-blur-2xl border rounded-[24px] overflow-hidden flex flex-col pt-2 pb-3" style={appearance.shellStyle}>
-
-                        {/* Rolling Transcript Bar */}
-                        <div className="w-full flex justify-center py-2 px-4 border-b mb-1 overlay-transcript-surface" style={appearance.transcriptStyle}>
-                            <p className="text-[13px] truncate max-w-[90%] font-medium overlay-text-primary">
-                                <span className={`${resolvedTheme === 'light' ? 'text-blue-700' : 'text-state-info'} mr-2 font-semibold`}>Interviewer</span>
-                                <span className="opacity-95">So how would you optimize the current algorithm?</span>
-                            </p>
-                        </div>
-
-                        {/* Chat History Mock */}
-                        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-3">
-                            <div className="flex justify-start">
-                                <div className="max-w-[85%] px-4 py-3 text-[14px] leading-relaxed font-normal overlay-text-primary">
-                                    <span className="font-semibold text-state-success block mb-1">Suggestion</span>
-                                    A good approach would be to use a hash map to cache the intermediate results, which brings the time complexity down from O(n²) to O(n).
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Quick Actions */}
-                        <div className="flex flex-nowrap justify-center items-center gap-1.5 px-4 pb-3 pt-3">
-                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border shrink-0 overlay-chip-surface overlay-text-interactive" style={appearance.chipStyle}>
-                                <Pencil className="w-3 h-3 opacity-70" /> What to answer?
-                            </div>
-                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border shrink-0 overlay-chip-surface overlay-text-interactive" style={appearance.chipStyle}>
-                                <MessageSquare className="w-3 h-3 opacity-70" /> Clarify
-                            </div>
-                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border shrink-0 overlay-chip-surface overlay-text-interactive" style={appearance.chipStyle}>
-                                <RefreshCw className="w-3 h-3 opacity-70" /> Recap
-                            </div>
-                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border shrink-0 overlay-chip-surface overlay-text-interactive" style={appearance.chipStyle}>
-                                <HelpCircle className="w-3 h-3 opacity-70" /> Follow Up Question
-                            </div>
-                            <div className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium min-w-[74px] shrink-0 border overlay-chip-surface overlay-text-interactive" style={appearance.chipStyle}>
-                                <Zap className="w-3 h-3 opacity-70" /> Answer
-                            </div>
-                        </div>
-
-                        {/* Input Area */}
-                        <div className="px-3">
-                            <div className="relative group">
-                                <div className="w-full border rounded-xl pl-3 pr-10 py-2.5 h-[38px] flex items-center overlay-input-surface" style={appearance.inputStyle}>
-                                    <span className="text-[13px] overlay-text-muted">Ask anything on screen or conversation</span>
-                                </div>
-                            </div>
-
-                            {/* Bottom Row */}
-                            <div className="flex items-center justify-between mt-3 px-0.5">
-                                <div className="flex items-center gap-1.5">
-                                    <div className="flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs font-medium w-[140px] overlay-control-surface overlay-text-interactive" style={appearance.controlStyle}>
-                                        <span className="truncate min-w-0 flex-1">Gemini 3 Flash</span>
-                                        <ChevronDown size={14} className="shrink-0" />
-                                    </div>
-                                    <div className="w-px h-3 mx-1" style={appearance.dividerStyle} />
-                                    <div className="w-7 h-7 flex items-center justify-center rounded-lg overlay-icon-surface overlay-text-muted" style={appearance.iconStyle}>
-                                        <SlidersHorizontal className="w-3.5 h-3.5" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-        </div>
-    );
-};
 
 interface CustomSelectProps {
     label: string;
@@ -213,7 +105,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, icon, value, options
                                 </button>
                             ))}
                             {options.length === 0 && (
-                                <div className="px-3 py-2 text-sm text-gray-500 italic">No devices found</div>
+                                <div className="px-3 py-2 text-sm text-text-tertiary italic">No devices found</div>
                             )}
                         </div>
                     </div>
@@ -229,7 +121,6 @@ interface ProviderOption {
     badge?: string | null;
     recommended?: boolean;
     desc: string;
-    color: string;
     icon: React.ReactNode;
 }
 
@@ -240,7 +131,6 @@ interface ProviderSelectProps {
 }
 
 const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChange }) => {
-    const isLight = useResolvedTheme() === 'light';
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -256,34 +146,6 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
 
     const selected = options.find(o => o.id === value);
 
-    const getBadgeStyle = (color?: string) => {
-        switch (color) {
-            case 'blue': return 'bg-state-info-soft text-state-info border-state-info-border';
-            case 'orange': return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
-            case 'purple': return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
-            case 'teal': return 'bg-teal-500/10 text-teal-500 border-teal-500/20';
-            case 'cyan': return 'bg-state-info-soft text-state-info border-cyan-500/20';
-            case 'indigo': return 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20';
-            case 'green': return 'bg-state-success-soft text-state-success border-state-success-border';
-            default: return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
-        }
-    };
-
-    const getIconStyle = (color?: string, isSelectedItem: boolean = false) => {
-        if (isSelectedItem) return 'bg-accent-primary text-on-primary shadow-sm';
-        // For unselected items in list or trigger
-        switch (color) {
-            case 'blue': return 'bg-state-info-soft text-blue-600';
-            case 'orange': return 'bg-orange-500/10 text-orange-600';
-            case 'purple': return 'bg-purple-500/10 text-purple-600';
-            case 'teal': return 'bg-teal-500/10 text-teal-600';
-            case 'cyan': return 'bg-state-info-soft text-cyan-600';
-            case 'indigo': return 'bg-indigo-500/10 text-indigo-600';
-            case 'green': return 'bg-state-success-soft text-green-600';
-            default: return 'bg-gray-500/10 text-gray-600';
-        }
-    };
-
     return (
         <div ref={containerRef} className="relative z-20 font-sans">
             <button
@@ -292,14 +154,14 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
             >
                 {selected ? (
                     <div className="flex items-center gap-3 overflow-hidden">
-                        <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 transition-all duration-300 ${getIconStyle(selected.color)}`}>
+                        <div className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 bg-bg-item-surface text-text-secondary">
                             {selected.icon}
                         </div>
                         <div className="min-w-0 flex-1 text-left">
-                            <div className="flex items-center gap-2">
-                                <span className="text-[13px] font-semibold text-text-primary truncate leading-tight">{selected.label}</span>
-                                {selected.badge && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ml-2 ${getBadgeStyle(selected.badge === 'Saved' ? 'green' : selected.color)}`}>{selected.badge}</span>}
-                                {selected.recommended && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ml-2 ${getBadgeStyle(selected.color)}`}>Recommended</span>}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-semibold text-text-primary truncate leading-tight">{selected.label}</span>
+                                {selected.badge && <span className="text-[11px] text-text-secondary">✓ {selected.badge}</span>}
+                                {selected.recommended && <span className="text-[11px] text-text-tertiary">Recommended</span>}
                             </div>
                             {/* Short description for trigger */}
                             <span className="text-[11px] text-text-tertiary truncate block leading-tight mt-0.5">{selected.desc}</span>
@@ -318,7 +180,7 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 4, scale: 0.98 }}
                         transition={{ duration: 0.15, ease: "easeOut" }}
-                        className={`absolute top-full left-0 w-full mt-2 backdrop-blur-xl rounded-xl shadow-2xl overflow-hidden ring-1 ring-black/5 ${isLight ? 'bg-bg-elevated border border-border-subtle' : 'bg-bg-elevated/90 border border-white/5'}`}
+                        className="absolute top-full left-0 w-full mt-2 rounded-xl shadow-2xl overflow-hidden bg-bg-elevated border border-border-subtle"
                     >
                         <div className="max-h-[320px] overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar">
                             {options.map(option => {
@@ -327,21 +189,21 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
                                     <button
                                         key={option.id}
                                         onClick={() => { onChange(option.id); setIsOpen(false); }}
-                                        className={`w-full rounded-[10px] p-2 flex items-center gap-3 transition-all duration-200 group relative ${isSelected ? (isLight ? 'bg-bg-item-active shadow-inner' : 'bg-white/10 shadow-inner') : (isLight ? 'hover:bg-bg-item-surface' : 'hover:bg-white/5')}`}
+                                        className={`w-full rounded-[10px] p-2 flex items-center gap-3 transition-all duration-200 group relative ${isSelected ? 'bg-bg-item-active shadow-inner' : 'hover:bg-bg-item-surface'}`}
                                     >
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 ${isSelected ? 'scale-100' : 'scale-95 group-hover:scale-100'} ${getIconStyle(option.color, false)}`}>
+                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-bg-input text-text-secondary">
                                             {option.icon}
                                         </div>
                                         <div className="flex-1 min-w-0 text-left">
                                             <div className="flex items-center justify-between mb-0.5">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`text-[13px] font-medium transition-colors ${isSelected && !isLight ? 'text-white' : 'text-text-primary'}`}>{option.label}</span>
-                                                    {option.badge && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${getBadgeStyle(option.badge === 'Saved' ? 'green' : option.color)}`}>{option.badge}</span>}
-                                                    {option.recommended && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${getBadgeStyle(option.color)}`}>Recommended</span>}
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="text-sm font-medium text-text-primary">{option.label}</span>
+                                                    {option.badge && <span className="text-[11px] text-text-secondary">✓ {option.badge}</span>}
+                                                    {option.recommended && <span className="text-[11px] text-text-tertiary">Recommended</span>}
                                                 </div>
                                                 {isSelected && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}><Check size={14} className="text-accent-primary" strokeWidth={3} /></motion.div>}
                                             </div>
-                                            <span className={`text-[11px] block truncate transition-colors ${isSelected && !isLight ? 'text-white/70' : 'text-text-tertiary'}`}>{option.desc}</span>
+                                            <span className="text-[11px] block text-text-tertiary">{option.desc}</span>
                                         </div>
                                         {/* Hover Indicator */}
                                         {!isSelected && <div className="absolute inset-0 rounded-[10px] ring-1 ring-inset ring-transparent group-hover:ring-border-subtle pointer-events-none" />}
@@ -482,13 +344,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         return isUserSet ? clampOverlayOpacity(parsed) : getDefaultOverlayOpacity();
     });
 
-    // Live preview state — true while the user is holding down the slider
-    const [isPreviewingOpacity, setIsPreviewingOpacity] = useState(false);
-    const [previewOverlayOpacity, setPreviewOverlayOpacity] = useState(overlayOpacity);
-
-    // Ref to hold the latest opacity value without triggering renders during drag
-    const latestOpacityRef = useRef(overlayOpacity);
-
     // When the theme changes and the user hasn't saved a custom value, reset to theme-aware default
     const resolvedTheme = useResolvedTheme();
     const [prevTheme, setPrevTheme] = useState(resolvedTheme);
@@ -500,121 +355,17 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         if (!isUserSet) {
             const next = getDefaultOverlayOpacity();
             setOverlayOpacity(next);
-            latestOpacityRef.current = next;
-            setPreviewOverlayOpacity(next);
         }
     }
 
     const handleOpacityChange = (val: number) => {
-        // DOM-direct updates for 0-lag 60fps drag (bypasses React reconciliation)
-        const percentText = `${Math.round(val * 100)}%`;
-        document.querySelectorAll('.opacity-percent-label').forEach(el => el.textContent = percentText);
-        setPreviewOverlayOpacity(val);
-        latestOpacityRef.current = val;
-        
-        // Broadcast IPC in real-time so actual meeting overlay tracks slider instantly
-        // (safe to do at 60fps, does not trigger React renders)
+        setOverlayOpacity(val);
+        // Keep the live meeting overlay in sync while the slider moves.
         window.electronAPI?.setOverlayOpacity?.(val);
     };
 
-    // Bug fix #3 (close-during-drag): if the overlay closes while the user is still dragging,
-    // restore all DOM state so nothing is left in a broken state.
     useEffect(() => {
-        if (!isOpen && isPreviewingOpacity) {
-            stopPreviewingOpacity();
-        }
-    }, [isOpen]);
-
-    const startPreviewingOpacity = () => {
-        // Bug fix #5: guard against rapid repeated calls (double pointerDown / touch events)
-        if (isPreviewingOpacity) return;
-
-        // Direct DOM mutation for sub-millisecond instant hide (bypassing slow React tree diffs)
-        document.body.classList.add('disable-transitions');
-        
-        const backdrop = document.getElementById('settings-backdrop');
-        const wrapper = document.getElementById('settings-panel-wrapper');
-        const panel = document.getElementById('settings-panel');
-        const card = document.getElementById('opacity-slider-card');
-        const mockup = document.getElementById('settings-mockup-wrapper');
-        const launcher = document.getElementById('launcher-container');
-
-        if (backdrop) {
-            backdrop.style.backgroundColor = 'transparent';
-            backdrop.style.backdropFilter = 'none';
-            backdrop.style.transition = 'none';
-        }
-        if (wrapper) {
-            wrapper.style.backgroundColor = 'transparent';
-            wrapper.style.border = 'none';
-            wrapper.style.boxShadow = 'none';
-        }
-        if (panel) {
-            panel.style.visibility = 'hidden';
-        }
-        if (launcher) {
-            launcher.style.visibility = 'hidden';
-        }
-        
-        if (card) {
-            card.style.visibility = 'visible';
-            card.style.position = 'relative';
-            card.style.zIndex = '9999';
-        }
-        if (mockup) {
-            mockup.style.opacity = '1';
-        }
-
-        setPreviewOverlayOpacity(latestOpacityRef.current);
-        setIsPreviewingOpacity(true);
-    };
-
-    const stopPreviewingOpacity = () => {
-        // Direct DOM restoration
-        document.body.classList.remove('disable-transitions');
-        const backdrop = document.getElementById('settings-backdrop');
-        const wrapper = document.getElementById('settings-panel-wrapper');
-        const panel = document.getElementById('settings-panel');
-        const card = document.getElementById('opacity-slider-card');
-        const mockup = document.getElementById('settings-mockup-wrapper');
-        const launcher = document.getElementById('launcher-container');
-
-        if (backdrop) {
-            backdrop.style.backgroundColor = '';
-            backdrop.style.backdropFilter = '';
-            backdrop.style.transition = '';
-        }
-        if (wrapper) {
-            wrapper.style.backgroundColor = '';
-            wrapper.style.border = '';
-            wrapper.style.boxShadow = '';
-        }
-        if (panel) {
-            panel.style.visibility = '';
-        }
-        if (launcher) {
-            launcher.style.visibility = '';
-        }
-
-        if (card) {
-            card.style.visibility = '';
-            card.style.position = '';
-            card.style.zIndex = '';
-        }
-        if (mockup) {
-            // Bug fix #4: restore mockup to hidden (opacity 0) rather than leaving it visible
-            mockup.style.opacity = '0';
-        }
-
-        setIsPreviewingOpacity(false);
-        // Sync final dragged value back to React state (persists to localStorage + IPC via useEffect)
-        setOverlayOpacity(latestOpacityRef.current);
-        setPreviewOverlayOpacity(latestOpacityRef.current);
-    };
-
-    useEffect(() => {
-        // Only persist to localStorage here. IPC is handled real-time in handleOpacityChange
-        // to avoid a redundant extra call 150ms after every drag ends.
+        // Debounce storage writes; handleOpacityChange sends live IPC updates.
         const timeoutId = setTimeout(() => {
             localStorage.setItem('pika_overlay_opacity', String(overlayOpacity));
         }, 150);
@@ -829,6 +580,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [hasStoredIbmWatsonKey, setHasStoredIbmWatsonKey] = useState(false);
     const [sttSonioxKey, setSttSonioxKey] = useState('');
     const [hasStoredSonioxKey, setHasStoredSonioxKey] = useState(false);
+    const sttKey = {
+        google: '', groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey,
+        elevenlabs: sttElevenLabsKey, azure: sttAzureKey, ibmwatson: sttIbmKey,
+        soniox: sttSonioxKey,
+    }[sttProvider];
     const [isSttDropdownOpen, setIsSttDropdownOpen] = useState(false);
     const sttDropdownRef = React.useRef<HTMLDivElement>(null);
     const [transcriptTranslationEnabled, setTranscriptTranslationEnabled] = useState(false);
@@ -839,6 +595,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [transcriptTranslationSourceLanguage, setTranscriptTranslationSourceLanguage] = useState('auto');
     const [transcriptTranslationTargetLanguage, setTranscriptTranslationTargetLanguage] = useState('chinese');
     const [translationSettingsSaved, setTranslationSettingsSaved] = useState(false);
+    const [showTranslationAdvanced, setShowTranslationAdvanced] = useState(false);
 
     // Close STT dropdown when clicking outside
     useWindowEvent(
@@ -1095,17 +852,12 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
     const handleTestSttConnection = async () => {
         if (sttProvider === 'google') return;
-        const keyMap: Record<string, string> = {
-            groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey,
-            elevenlabs: sttElevenLabsKey, azure: sttAzureKey, ibmwatson: sttIbmKey,
-            soniox: sttSonioxKey,
-        };
         const hasStoredMap: Record<string, boolean> = {
             groq: hasStoredSttGroqKey, openai: hasStoredSttOpenaiKey, deepgram: hasStoredDeepgramKey,
             elevenlabs: hasStoredElevenLabsKey, azure: hasStoredAzureKey, ibmwatson: hasStoredIbmWatsonKey,
             soniox: hasStoredSonioxKey,
         };
-        const keyToTest = keyMap[sttProvider] || '';
+        const keyToTest = sttKey;
         // Allow test with empty local key if a stored key exists (backend will use it)
         if (!keyToTest.trim() && !hasStoredMap[sttProvider]) {
             setSttTestStatus('error');
@@ -1205,8 +957,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.2 }}
-                    id="settings-backdrop"
-                    className={`fixed inset-0 z-50 flex items-center justify-center p-8 transition-colors duration-150 ${isPreviewingOpacity ? 'bg-transparent backdrop-blur-none' : 'bg-black/60 backdrop-blur-sm'}`}
+                    className="fixed inset-0 z-50 flex items-center justify-center p-8 transition-colors duration-150 bg-black/60 backdrop-blur-sm"
                 >
                     <motion.div
                         id="settings-panel-wrapper"
@@ -1226,14 +977,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                             onClick={onClose}
                             aria-label="Close settings"
                             className="absolute top-4 right-4 z-10 p-1.5 rounded-md text-text-tertiary hover:text-text-primary hover:bg-bg-item-active/60 transition-colors"
-                            style={{ visibility: isPreviewingOpacity ? 'hidden' : 'visible' }}
                         >
                             <X size={16} strokeWidth={2.25} />
                         </button>
                         <div
-                            id="settings-panel"
                             className="flex w-full h-full"
-                            style={{ visibility: isPreviewingOpacity ? 'hidden' : 'visible' }}
                         >
                         {/* Sidebar */}
                         <div className="w-64 bg-bg-sidebar flex flex-col border-r border-border-subtle">
@@ -1247,16 +995,16 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                         <Monitor size={16} /> General
                                     </button>
                                     <button
-                                        onClick={() => setActiveTab('ai-providers')}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'ai-providers' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
-                                    >
-                                        <FlaskConical size={16} /> AI Providers
-                                    </button>
-                                    <button
                                         onClick={() => setActiveTab('audio')}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'audio' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Mic size={16} /> Audio
+                                        <Mic size={16} className="shrink-0" /> Audio &amp; Translation
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('ai-providers')}
+                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'ai-providers' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
+                                    >
+                                        <FlaskConical size={16} /> Models &amp; Agent
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('keybinds')}
@@ -1321,10 +1069,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     ) : (
                                                         <Ghost size={18} className="text-text-primary" />
                                                     )}
-                                                    <h3 className="text-lg font-bold text-text-primary">{isUndetectable ? 'Undetectable' : 'Detectable'}</h3>
+                                                    <h3 className="text-lg font-bold text-text-primary">Undetectable mode: {isUndetectable ? 'on' : 'off'}</h3>
                                                 </div>
                                                 <p className="text-xs text-text-secondary">
-                                                    Pika is currently {isUndetectable ? 'undetectable' : 'detectable'} by screen-sharing. <button className="text-state-info hover:underline">Supported apps here</button>
+                                                    Requests capture exclusion on Windows and macOS. macOS apps using ScreenCaptureKit can still capture Pika. Not supported on Linux.
                                                 </p>
                                             </div>
                                             <div
@@ -1456,15 +1204,15 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     </div>
                                                 </div>
 
-                                                {/* Interviewer Transcript */}
+                                                {/* Live transcript */}
                                                 <div className="flex items-center justify-between px-4 py-3">
                                                     <div className="flex items-center gap-4">
                                                         <div className="w-10 h-10 bg-bg-item-surface rounded-lg border border-border-subtle flex items-center justify-center text-text-tertiary">
                                                             <MessageSquare size={20} />
                                                         </div>
                                                         <div>
-                                                            <h3 className="text-sm font-bold text-text-primary">Interviewer Transcript</h3>
-                                                            <p className="text-xs text-text-secondary mt-0.5">Show real-time transcription of the interviewer</p>
+                                                            <h3 className="text-sm font-bold text-text-primary">Live transcript</h3>
+                                                            <p className="text-xs text-text-secondary mt-0.5">Show the live transcript for both the interviewer and you</p>
                                                         </div>
                                                     </div>
                                                     <div
@@ -1539,7 +1287,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         </div>
                                                         <div>
                                                             <h3 className="text-sm font-bold text-text-primary">AI Response Language</h3>
-                                                            <p className="text-xs text-text-secondary mt-0.5">Language for AI suggestions and notes</p>
+                                                            <p className="text-xs text-text-secondary mt-0.5">Reading language for quick answers and proactive cards; adds a translation when it differs from your speaking-language setting.</p>
                                                         </div>
                                                     </div>
 
@@ -1579,47 +1327,32 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             </div>
                                             </div>
 
-                                                {/* ------------------------------------------------------------------ */}
-                                                {/* Interface Opacity (Stealth Mode)                                   */}
-                                                {/* ------------------------------------------------------------------ */}
-                                                <div
-                                                    id="opacity-slider-card"
-                                                    style={isPreviewingOpacity ? { visibility: 'visible', position: 'relative', zIndex: 9999 } : {}}
-                                                    className={`${isLight ? 'bg-bg-card' : 'bg-bg-item-surface'} rounded-xl p-5 border border-border-subtle mt-4`}
-                                                >
+                                                <div className={`${isLight ? 'bg-bg-card' : 'bg-bg-item-surface'} rounded-xl p-5 border border-border-subtle mt-4`}>
                                                     <div className="flex items-center justify-between mb-3">
-                                                        <label className="flex items-center gap-2 text-xs font-medium text-text-secondary uppercase tracking-wide">
+                                                        <label htmlFor="overlay-opacity" className="flex items-center gap-2 text-xs font-medium text-text-secondary">
                                                             <Eye size={13} className="text-text-secondary" />
-                                                            Interface Opacity
+                                                            Overlay opacity
                                                         </label>
-                                                        <span className="opacity-percent-label text-xs font-semibold text-text-primary tabular-nums">
+                                                        <span className="text-xs font-semibold text-text-primary tabular-nums">
                                                             {Math.round(overlayOpacity * 100)}%
                                                         </span>
                                                     </div>
 
                                                     <input
+                                                        id="overlay-opacity"
                                                         type="range"
+                                                        aria-describedby="overlay-opacity-help"
                                                         min={OVERLAY_OPACITY_MIN}
                                                         max={1.0}
                                                         step={0.01}
-                                                        defaultValue={overlayOpacity}
+                                                        value={overlayOpacity}
                                                         onChange={(e) => handleOpacityChange(parseFloat(e.target.value))}
-                                                        onPointerDown={startPreviewingOpacity}
-                                                        onPointerUp={stopPreviewingOpacity}
-                                                        onPointerCancel={stopPreviewingOpacity}
-                                                        onPointerLeave={stopPreviewingOpacity}
-                                                        className="w-full h-1.5 rounded-full appearance-none bg-bg-input accent-accent-primary"
+                                                        className="w-full h-1.5 rounded-full appearance-none bg-border-muted accent-accent-primary"
                                                         style={{ WebkitAppearance: 'none' } as React.CSSProperties}
                                                     />
 
-                                                    <div className="flex justify-between mt-1.5">
-                                                        <span className="text-[10px] text-text-tertiary">More Stealth</span>
-                                                        <span className="text-[10px] text-text-tertiary">Fully Visible</span>
-                                                    </div>
-
-                                                    <p className="text-xs text-text-tertiary mt-2">
-                                                        Controls the visibility of the in-meeting overlay.{' '}
-                                                        <span className="text-text-secondary">Hold the slider to preview.</span>
+                                                    <p id="overlay-opacity-help" className="text-xs text-text-tertiary mt-2">
+                                                        Lowering this makes the panel only slightly more transparent; an opacity floor keeps text behind it hidden.
                                                     </p>
                                                 </div>
 
@@ -1635,9 +1368,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <h3 className="text-lg font-bold text-text-primary">Process Disguise</h3>
                                             </div>
                                             <p className="text-xs text-text-secondary">
-                                                Disguise Pika as another application to prevent detection during screen sharing.
+                                                Changes Pika's process name and window titles, with platform-specific icons. This does not exclude it from screen capture.
                                                 <span className="block mt-1 text-text-tertiary">
-                                                    Select a disguise to be automatically applied when Undetectable mode is on.
+                                                    Your choice applies immediately, even with Undetectable mode off.
                                                 </span>
                                             </p>
                                         </div>
@@ -1873,20 +1606,21 @@ Core Skills
                                     </div>
 
                                     <div className="bg-bg-card border border-border-subtle rounded-2xl p-4 md:p-5">
-                                        {[
+                                        {([
                                             { id: 'toggleVisibility', label: 'Show or hide Pika' },
-                                            { id: 'whatToAnswer', label: 'What should I answer?' },
-                                            { id: 'captureAndProcess', label: 'Capture screen and ask AI' },
-                                            { id: 'processScreenshots', label: 'Process current screenshots' },
-                                            { id: 'resetCancel', label: 'Reset or cancel' },
+                                            { id: 'toggleMousePassthrough', label: 'Toggle click-through' },
+                                            { id: 'whatToAnswer', label: 'What to say' },
+                                            { id: 'selectiveScreenshot', label: 'Capture Selected Area' },
                                             { id: 'toggleTranslation', label: 'Turn translation on or off' },
-                                            { id: 'toggleOriginal', label: 'Show or hide the original text' },
-                                        ].map((item) => (
-                                            <div key={item.id} className="flex items-center justify-between py-2 border-b border-border-subtle/50 last:border-b-0">
+                                            { id: 'resetCancel', label: 'Stop generation' },
+                                        ] as const).map((item) => (
+                                            <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 py-2 border-b border-border-subtle last:border-b-0">
                                                 <span className="text-sm text-text-secondary">{item.label}</span>
                                                 <KeyRecorder
-                                                    currentKeys={shortcuts[item.id as keyof typeof shortcuts]}
-                                                    onSave={(keys) => updateShortcut(item.id as any, keys)}
+                                                    actionId={item.id}
+                                                    label={item.label}
+                                                    currentKeys={shortcuts[item.id]}
+                                                    onSave={(keys) => updateShortcut(item.id, keys)}
                                                 />
                                             </div>
                                         ))}
@@ -1901,54 +1635,26 @@ Core Skills
                                                 <ChevronRight size={15} className={`transition-transform ${showMoreShortcuts ? 'rotate-90' : ''}`} />
                                                 More shortcuts
                                             </span>
-                                            <span className="px-2 py-0.5 rounded-full bg-bg-subtle text-[11px] text-text-tertiary font-medium">15</span>
+                                            <span className="px-2 py-0.5 rounded-full bg-bg-subtle text-[11px] text-text-tertiary font-medium">5</span>
                                         </button>
 
                                         {showMoreShortcuts && (
                                             <div className="mt-4">
-                                                {[
-                                                    {
-                                                        title: 'AI actions',
-                                                        items: [
-                                                            { id: 'clarify', label: 'Clarify the question' },
-                                                            { id: 'followUp', label: 'Generate a follow-up' },
-                                                            { id: 'dynamicAction4', label: 'Recap or brainstorm' },
-                                                            { id: 'answer', label: 'Answer or record' },
-                                                            { id: 'codeHint', label: 'Get a code hint' },
-                                                            { id: 'brainstorm', label: 'Brainstorm approaches' },
-                                                            { id: 'scrollUp', label: 'Scroll up' },
-                                                            { id: 'scrollDown', label: 'Scroll down' },
-                                                        ],
-                                                    },
-                                                    {
-                                                        title: 'Window',
-                                                        items: [
-                                                            { id: 'moveWindowUp', label: 'Move up' },
-                                                            { id: 'moveWindowDown', label: 'Move down' },
-                                                            { id: 'moveWindowLeft', label: 'Move left' },
-                                                            { id: 'moveWindowRight', label: 'Move right' },
-                                                        ],
-                                                    },
-                                                    {
-                                                        title: 'Other',
-                                                        items: [
-                                                            { id: 'toggleMousePassthrough', label: 'Toggle mouse passthrough' },
-                                                            { id: 'takeScreenshot', label: 'Full screenshot' },
-                                                            { id: 'selectiveScreenshot', label: 'Selective screenshot' },
-                                                        ],
-                                                    },
-                                                ].map((group) => (
-                                                    <div key={group.title} className="border-t border-border-subtle pt-3 first:border-t-0 first:pt-0">
-                                                        <div className="text-[10px] uppercase tracking-wider text-text-tertiary font-medium mb-1 mt-3 first:mt-0">{group.title}</div>
-                                                        {group.items.map((item) => (
-                                                            <div key={item.id} className="flex items-center justify-between py-2 border-b border-border-subtle/50 last:border-b-0">
-                                                                <span className="text-sm text-text-secondary">{item.label}</span>
-                                                                <KeyRecorder
-                                                                    currentKeys={shortcuts[item.id as keyof typeof shortcuts]}
-                                                                    onSave={(keys) => updateShortcut(item.id as any, keys)}
-                                                                />
-                                                            </div>
-                                                        ))}
+                                                {([
+                                                    { id: 'toggleOriginal', label: 'Show or hide the original text' },
+                                                    { id: 'moveWindowUp', label: 'Move window up' },
+                                                    { id: 'moveWindowDown', label: 'Move window down' },
+                                                    { id: 'moveWindowLeft', label: 'Move window left' },
+                                                    { id: 'moveWindowRight', label: 'Move window right' },
+                                                ] as const).map((item) => (
+                                                    <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 py-2 border-b border-border-subtle last:border-b-0">
+                                                        <span className="text-sm text-text-secondary">{item.label}</span>
+                                                        <KeyRecorder
+                                                            actionId={item.id}
+                                                            label={item.label}
+                                                            currentKeys={shortcuts[item.id]}
+                                                            onSave={(keys) => updateShortcut(item.id, keys)}
+                                                        />
                                                     </div>
                                                 ))}
                                             </div>
@@ -1959,9 +1665,123 @@ Core Skills
 
                             {activeTab === 'audio' && (
                                 <div className="space-y-6 animated fadeIn">
-                                    {/* ── Speech Provider Section ── */}
-                                    <div>
-                                        <h3 className="text-lg font-bold text-text-primary mb-1">Speech Provider</h3>
+                                    <div className="bg-bg-card rounded-xl border border-border-subtle p-4">
+                                        <h3 className="text-lg font-bold text-text-primary mb-1">Devices</h3>
+                                        <div className="space-y-4 mt-4">
+                                            <CustomSelect
+                                                label="Input Device"
+                                                icon={<Mic size={16} />}
+                                                value={selectedInput}
+                                                options={inputDevices}
+                                                onChange={(id) => {
+                                                    setInputDeviceNotFound(false);
+                                                    setPreferredInputId(id);
+                                                }}
+                                                placeholder="Default Microphone"
+                                            />
+                                            {inputDeviceNotFound && (
+                                                <p className="text-xs text-text-primary mt-1 px-1">
+                                                    ▲ Previously selected device not found. Using default microphone.
+                                                </p>
+                                            )}
+
+                                            <div>
+                                                <div className="flex justify-between text-xs text-text-secondary mb-2 px-1">
+                                                    <span>Input Level</span>
+                                                </div>
+                                                <div className="h-1.5 bg-bg-input rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-state-success transition-all duration-100 ease-out"
+                                                        style={{ width: `${micLevel}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="h-px bg-border-subtle my-2" />
+
+                                            <CustomSelect
+                                                label="System audio source (output device)"
+                                                icon={<Speaker size={16} />}
+                                                value={selectedOutput}
+                                                options={outputDevices}
+                                                onChange={(id) => {
+                                                    setPreferredOutputId(id);
+                                                }}
+                                                placeholder="Default Speakers"
+                                            />
+                                            <p className="text-xs text-text-tertiary">Chooses which output device's system audio is captured, starting with the next meeting.</p>
+
+                                            <div className="flex justify-end">
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+                                                            if (!AudioContext) {
+                                                                console.error("Web Audio API not supported");
+                                                                return;
+                                                            }
+
+                                                            const ctx = new AudioContext();
+
+                                                            if (ctx.state === 'suspended') {
+                                                                await ctx.resume();
+                                                            }
+
+                                                            const oscillator = ctx.createOscillator();
+                                                            const gainNode = ctx.createGain();
+
+                                                            oscillator.connect(gainNode);
+                                                            gainNode.connect(ctx.destination);
+
+                                                            oscillator.type = 'sine';
+                                                            oscillator.frequency.setValueAtTime(523.25, ctx.currentTime);
+                                                            gainNode.gain.setValueAtTime(0.5, ctx.currentTime);
+                                                            gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.0);
+
+                                                            if (selectedOutput && (ctx as any).setSinkId) {
+                                                                try {
+                                                                    await (ctx as any).setSinkId(selectedOutput);
+                                                                } catch (e) {
+                                                                    console.warn("Error setting sink for AudioContext", e);
+                                                                }
+                                                            }
+
+                                                            oscillator.start();
+                                                            oscillator.stop(ctx.currentTime + 1.0);
+                                                        } catch (e) {
+                                                            console.error("Error playing test sound", e);
+                                                        }
+                                                    }}
+                                                    className="text-xs bg-bg-input hover:bg-bg-elevated text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-2"
+                                                >
+                                                    <Speaker size={12} /> Test Sound
+                                                </button>
+                                            </div>
+
+                                            {isMac && (
+                                                <div className="rounded-xl border border-border-subtle p-4 flex items-center justify-between gap-3">
+                                                    <div>
+                                                        <h4 className="text-sm font-bold text-text-primary mb-1">SCK Backend</h4>
+                                                        <p className="text-xs text-text-secondary">Use ScreenCaptureKit instead of CoreAudio to capture system audio at the next meeting.</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        aria-label="Use ScreenCaptureKit backend"
+                                                        aria-pressed={useExperimentalSck}
+                                                        onClick={() => {
+                                                            setStoredSck(useExperimentalSck ? 'false' : 'true');
+                                                        }}
+                                                        className="text-xs bg-bg-input hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-md shrink-0"
+                                                    >
+                                                        {useExperimentalSck ? '● On' : '○ Off'}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-bg-card rounded-xl border border-border-subtle p-4">
+                                        <h3 className="text-lg font-bold text-text-primary mb-1">Speech recognition</h3>
                                         <p className="text-xs text-text-secondary mb-5">Choose the engine that transcribes audio to text.</p>
 
                                         <div className="space-y-4">
@@ -1972,14 +1792,14 @@ Core Skills
                                                         value={sttProvider}
                                                         onChange={(val) => handleSttProviderChange(val as any)}
                                                         options={[
-                                                            { id: 'google', label: 'Google Cloud', badge: googleServiceAccountPath ? 'Saved' : null, recommended: true, desc: 'gRPC streaming via Service Account', color: 'blue', icon: <Mic size={14} /> },
-                                                            { id: 'groq', label: 'Groq Whisper', badge: hasStoredSttGroqKey ? 'Saved' : null, recommended: true, desc: 'Ultra-fast REST transcription', color: 'orange', icon: <Mic size={14} /> },
-                                                            { id: 'openai', label: 'OpenAI Whisper', badge: hasStoredSttOpenaiKey ? 'Saved' : null, desc: 'OpenAI-compatible Whisper API', color: 'green', icon: <Mic size={14} /> },
-                                                            { id: 'deepgram', label: 'Deepgram Nova-3', badge: hasStoredDeepgramKey ? 'Saved' : null, recommended: true, desc: 'High-accuracy REST transcription', color: 'purple', icon: <Mic size={14} /> },
-                                                            { id: 'elevenlabs', label: 'ElevenLabs Scribe', badge: hasStoredElevenLabsKey ? 'Saved' : null, desc: 'Scribe v2 Realtime API', color: 'teal', icon: <Mic size={14} /> },
-                                                            { id: 'azure', label: 'Azure Speech', badge: hasStoredAzureKey ? 'Saved' : null, desc: 'Microsoft Cognitive Services STT', color: 'cyan', icon: <Mic size={14} /> },
-                                                            { id: 'ibmwatson', label: 'IBM Watson', badge: hasStoredIbmWatsonKey ? 'Saved' : null, desc: 'IBM Watson cloud STT service', color: 'indigo', icon: <Mic size={14} /> },
-                                                            { id: 'soniox', label: 'Soniox', badge: hasStoredSonioxKey ? 'Saved' : null, recommended: true, desc: '60+ languages, multilingual, domain context', color: 'cyan', icon: <Mic size={14} /> },
+                                                            { id: 'google', label: 'Google Cloud', badge: googleServiceAccountPath ? 'Saved' : null, recommended: true, desc: 'gRPC streaming via Service Account', icon: <Mic size={14} /> },
+                                                            { id: 'groq', label: 'Groq Whisper', badge: hasStoredSttGroqKey ? 'Saved' : null, recommended: true, desc: 'Ultra-fast REST transcription', icon: <Mic size={14} /> },
+                                                            { id: 'openai', label: 'OpenAI', badge: hasStoredSttOpenaiKey ? 'Saved' : null, desc: 'Streaming transcription with REST fallback', icon: <Mic size={14} /> },
+                                                            { id: 'deepgram', label: 'Deepgram', badge: hasStoredDeepgramKey ? 'Saved' : null, recommended: true, desc: 'Streaming transcription with a configurable model', icon: <Mic size={14} /> },
+                                                            { id: 'elevenlabs', label: 'ElevenLabs Scribe', badge: hasStoredElevenLabsKey ? 'Saved' : null, desc: 'Scribe v2 Realtime API', icon: <Mic size={14} /> },
+                                                            { id: 'azure', label: 'Azure Speech', badge: hasStoredAzureKey ? 'Saved' : null, desc: 'Microsoft Cognitive Services STT', icon: <Mic size={14} /> },
+                                                            { id: 'ibmwatson', label: 'IBM Watson', badge: hasStoredIbmWatsonKey ? 'Saved' : null, desc: 'IBM Watson cloud STT service', icon: <Mic size={14} /> },
+                                                            { id: 'soniox', label: 'Soniox', badge: hasStoredSonioxKey ? 'Saved' : null, recommended: true, desc: '60+ languages, multilingual, domain context', icon: <Mic size={14} /> },
                                                         ]}
                                                     />
                                                 </div>
@@ -1992,10 +1812,10 @@ Core Skills
                                                     <SttModelPicker
                                                         provider={sttProvider}
                                                         model={sttModelDraft[sttProvider] ?? ''}
-                                                        apiKey={({ groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey, elevenlabs: sttElevenLabsKey, soniox: sttSonioxKey } as Record<string, string>)[sttProvider] ?? ''}
+                                                        apiKey={sttKey}
                                                         onChange={(model) => { setSttModelDraft({ ...sttModelDraft, [sttProvider]: model }); setSpeechResult(null); }}
                                                     />
-                                                    <p className="text-[10px] text-text-tertiary">Leave empty for the default. The key above is used to fetch the list; a saved key works too.</p>
+                                                    <p className="text-[11px] text-text-tertiary">Leave empty for the default. The API key below is used to fetch the list; a saved key works too.</p>
                                                 </div>
                                             )}
 
@@ -2022,7 +1842,7 @@ Core Skills
                                                             <Upload size={14} /> Select File
                                                         </button>
                                                     </div>
-                                                    <p className="text-[10px] text-text-tertiary mt-2">
+                                                    <p className="text-[11px] text-text-tertiary mt-2">
                                                         Required for Google Cloud Speech-to-Text.
                                                     </p>
                                                 </div>
@@ -2035,22 +1855,14 @@ Core Skills
                                                         {sttProvider === 'groq' ? 'Groq' : sttProvider === 'openai' ? 'OpenAI STT' : sttProvider === 'elevenlabs' ? 'ElevenLabs' : sttProvider === 'azure' ? 'Azure' : sttProvider === 'ibmwatson' ? 'IBM Watson' : sttProvider === 'soniox' ? 'Soniox' : 'Deepgram'} API Key
                                                     </label>
                                                     {sttProvider === 'openai' && (
-                                                        <p className="text-[10px] text-text-tertiary mb-1.5">
-                                                            This key is separate from your main AI Provider key.
+                                                        <p className="text-[11px] text-text-tertiary mb-1.5">
+                                                            This key is separate from the OpenAI connection key in Models &amp; Agent.
                                                         </p>
                                                     )}
                                                     <div className="flex gap-2">
                                                         <input
                                                             type="password"
-                                                            value={
-                                                                sttProvider === 'groq' ? sttGroqKey
-                                                                    : sttProvider === 'openai' ? sttOpenaiKey
-                                                                        : sttProvider === 'elevenlabs' ? sttElevenLabsKey
-                                                                            : sttProvider === 'azure' ? sttAzureKey
-                                                                                : sttProvider === 'ibmwatson' ? sttIbmKey
-                                                                                    : sttProvider === 'soniox' ? sttSonioxKey
-                                                                                        : sttDeepgramKey
-                                                            }
+                                                            value={sttKey}
                                                             onChange={(e) => {
                                                                 if (sttProvider === 'groq') setSttGroqKey(e.target.value);
                                                                 else if (sttProvider === 'openai') setSttOpenaiKey(e.target.value);
@@ -2078,27 +1890,14 @@ Core Skills
                                                             className="flex-1 bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
                                                         />
                                                         <button
-                                                            onClick={() => {
-                                                                const keyMap: Record<string, string> = {
-                                                                    groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey,
-                                                                    elevenlabs: sttElevenLabsKey, azure: sttAzureKey, ibmwatson: sttIbmKey,
-                                                                };
-                                                                handleSttKeySubmit(sttProvider as any, keyMap[sttProvider] || '');
-                                                            }}
-                                                            disabled={sttSaving || !(() => {
-                                                                const keyMap: Record<string, string> = {
-                                                                    groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey,
-                                                                    elevenlabs: sttElevenLabsKey, azure: sttAzureKey, ibmwatson: sttIbmKey,
-                                                                    soniox: sttSonioxKey,
-                                                                };
-                                                                return (keyMap[sttProvider] || '').trim();
-                                                            })()}
+                                                            onClick={() => handleSttKeySubmit(sttProvider, sttKey)}
+                                                            disabled={sttSaving || !sttKey.trim()}
                                                             className={`px-5 py-2.5 rounded-lg text-xs font-medium transition-colors ${sttSaved
                                                                 ? 'bg-state-success-soft text-state-success'
                                                                 : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-50'
                                                                 }`}
                                                         >
-                                                            {sttSaving ? 'Saving...' : sttSaved ? 'Saved!' : 'Save'}
+                                                            {sttSaving ? '● Saving...' : sttSaved ? '✓ Saved' : 'Save'}
                                                         </button>
                                                         {(() => {
                                                             const hasKeyMap: Record<string, boolean> = {
@@ -2121,6 +1920,48 @@ Core Skills
                                                             ) : null;
                                                         })()}
                                                     </div>
+
+                                                    <div className="flex flex-wrap items-center gap-3">
+                                                        <button
+                                                            onClick={handleTestSttConnection}
+                                                            disabled={sttTestStatus === 'testing'}
+                                                            className="text-xs bg-bg-input hover:bg-bg-elevated text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-2 disabled:opacity-50"
+                                                        >
+                                                            {sttTestStatus === 'testing' ? (
+                                                                <><span aria-hidden="true">●</span> Checking key...</>
+                                                            ) : sttTestStatus === 'success' ? (
+                                                                <><Check size={12} className="text-state-success" /> The key is accepted</>
+                                                            ) : (
+                                                                <>Test key</>
+                                                            )}
+                                                        </button>
+                                                        {sttProvider !== 'soniox' && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    const urls: Record<string, string> = {
+                                                                        groq: 'https://console.groq.com/keys',
+                                                                        openai: 'https://platform.openai.com/api-keys',
+                                                                        deepgram: 'https://console.deepgram.com',
+                                                                        elevenlabs: 'https://elevenlabs.io/app/settings/api-keys',
+                                                                        azure: 'https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeech',
+                                                                        ibmwatson: 'https://cloud.ibm.com/catalog/services/speech-to-text'
+                                                                    };
+                                                                    if (urls[sttProvider]) {
+                                                                        // @ts-ignore
+                                                                        window.electronAPI?.openExternal(urls[sttProvider]);
+                                                                    }
+                                                                }}
+                                                                className="text-xs text-text-tertiary hover:text-text-primary flex items-center gap-1 transition-colors ml-1"
+                                                                title="Get API Key"
+                                                            >
+                                                                <ExternalLink size={12} />
+                                                            </button>
+                                                        )}
+                                                        {sttTestStatus === 'error' && (
+                                                            <span className="text-xs text-text-primary">✕ {sttTestError}</span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[11px] text-text-tertiary">Checks the key, not the selected model or languages.</p>
 
                                                     {/* Azure Region Input */}
                                                     {sttProvider === 'azure' && (
@@ -2148,48 +1989,9 @@ Core Skills
                                                                     Save
                                                                 </button>
                                                             </div>
-                                                            <p className="text-[10px] text-text-tertiary">e.g. eastus, westeurope, westus2</p>
+                                                            <p className="text-[11px] text-text-tertiary">e.g. eastus, westeurope, westus2</p>
                                                         </div>
                                                     )}
-
-                                                    <div className="flex items-center gap-3">
-                                                        <button
-                                                            onClick={handleTestSttConnection}
-                                                            disabled={sttTestStatus === 'testing'}
-                                                            className="text-xs bg-bg-input hover:bg-bg-elevated text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-2 disabled:opacity-50"
-                                                        >
-                                                            {sttTestStatus === 'testing' ? (
-                                                                <><RefreshCw size={12} className="animate-spin" /> Testing...</>
-                                                            ) : sttTestStatus === 'success' ? (
-                                                                <><Check size={12} className="text-state-success" /> Connected</>
-                                                            ) : (
-                                                                <>Test Connection</>
-                                                            )}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                const urls: Record<string, string> = {
-                                                                    groq: 'https://console.groq.com/keys',
-                                                                    openai: 'https://platform.openai.com/api-keys',
-                                                                    deepgram: 'https://console.deepgram.com',
-                                                                    elevenlabs: 'https://elevenlabs.io/app/settings/api-keys',
-                                                                    azure: 'https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeech',
-                                                                    ibmwatson: 'https://cloud.ibm.com/catalog/services/speech-to-text'
-                                                                };
-                                                                if (urls[sttProvider]) {
-                                                                    // @ts-ignore
-                                                                    window.electronAPI?.openExternal(urls[sttProvider]);
-                                                                }
-                                                            }}
-                                                            className="text-xs text-text-tertiary hover:text-text-primary flex items-center gap-1 transition-colors ml-1"
-                                                            title="Get API Key"
-                                                        >
-                                                            <ExternalLink size={12} />
-                                                        </button>
-                                                        {sttTestStatus === 'error' && (
-                                                            <span className="text-xs text-state-danger">{sttTestError}</span>
-                                                        )}
-                                                    </div>
                                                 </div>
                                             )}
 
@@ -2257,66 +2059,37 @@ Core Skills
                                                         disabled={speechSaving}
                                                         className="px-5 py-2.5 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-50 transition-colors"
                                                     >
-                                                        {speechSaving ? 'Saving...' : 'Save speech settings'}
+                                                        {speechSaving ? '● Saving...' : 'Save speech settings'}
                                                     </button>
                                                     <span className="text-[11px] text-text-tertiary">The service, model and languages above apply when you press Save. A key has its own Save.</span>
                                                 </div>
                                                 {speechResult && (
-                                                    <p className={`text-[11px] ${speechResult.ok ? 'text-state-success' : 'text-state-danger'}`}>{speechResult.text}</p>
+                                                    <p className="text-[11px] text-text-primary">{speechResult.ok ? '✓' : '✕'} {speechResult.text}</p>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div>
-                                        <h3 className="text-lg font-bold text-text-primary mb-1">Transcript Segmentation</h3>
-                                        <p className="text-xs text-text-secondary mb-5">Choose how patiently Pika buffers final speech segments before translation.</p>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                            {TRANSCRIPT_ASSEMBLER_PROFILE_OPTIONS.map((option) => {
-                                                const selected = transcriptAssemblerProfile === option.value;
-                                                return (
-                                                    <button
-                                                        key={option.value}
-                                                        type="button"
-                                                        onClick={() => handleTranscriptAssemblerProfileChange(option.value)}
-                                                        className={`rounded-xl border p-4 text-left transition-all duration-base ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary ${selected
-                                                            ? 'bg-accent-primary/10 border-accent-primary text-text-primary shadow-sm'
-                                                            : 'bg-bg-card border-border-subtle text-text-secondary hover:bg-bg-elevated hover:text-text-primary'
-                                                            }`}
-                                                    >
-                                                        <div className="flex items-center justify-between gap-3 mb-2">
-                                                            <span className="text-sm font-semibold">{option.label}</span>
-                                                            {selected && <Check size={15} className="text-accent-primary" />}
-                                                        </div>
-                                                        <p className="text-xs leading-relaxed text-text-tertiary">{option.desc}</p>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="text-lg font-bold text-text-primary mb-1">Transcript Translation</h3>
+                                    <div className="bg-bg-card rounded-xl border border-border-subtle p-4">
+                                        <h3 className="text-lg font-bold text-text-primary mb-1">Translation</h3>
                                         <p className="text-xs text-text-secondary mb-5">STT is realtime. Translation is applied asynchronously to final interviewer segments.</p>
 
-                                        <div className="bg-bg-card rounded-xl border border-border-subtle p-4 space-y-4">
+                                        <div className="space-y-4">
                                             <div className="flex items-center justify-between">
                                                 <div>
                                                     <label className="text-xs font-medium text-text-secondary block">Enable Translation</label>
-                                                    <p className="text-[10px] text-text-tertiary mt-1">Requires independent provider and model configuration.</p>
+                                                    <p className="text-[11px] text-text-tertiary mt-1">Choose a connection and model below.</p>
                                                 </div>
                                                 <button
+                                                    type="button"
+                                                    aria-label="Enable translation"
+                                                    aria-pressed={transcriptTranslationEnabled}
                                                     onClick={() => setTranscriptTranslationEnabled((v) => !v)}
-                                                    className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${transcriptTranslationEnabled ? 'bg-state-info' : 'bg-bg-toggle-switch border border-border-muted'}`}
+                                                    className="text-xs bg-bg-input hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-md shrink-0"
                                                 >
-                                                    <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${transcriptTranslationEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                                                    {transcriptTranslationEnabled ? '● On' : '○ Off'}
                                                 </button>
                                             </div>
-
-                                            <p className="text-[10px] text-text-tertiary">
-                                                Uses the same API keys and OpenAI-compatible endpoints as AI Providers (nothing new to add here).
-                                            </p>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 <div className="space-y-1.5">
@@ -2348,8 +2121,8 @@ Core Skills
                                                             </option>
                                                         ))}
                                                     </select>
-                                                    <p className="text-[10px] text-text-tertiary leading-snug">
-                                                        Translation always targets the language below. Source is auto-detected; this hint only nudges the model on short or ambiguous segments.
+                                                    <p className="text-[11px] text-text-tertiary leading-snug">
+                                                        Guides the translation model. When no language is detected, this is also used to skip translation if it matches the target language.
                                                     </p>
                                                 </div>
                                                 <div className="space-y-1.5">
@@ -2376,8 +2149,8 @@ Core Skills
                                                     model={transcriptTranslationModel}
                                                     onChange={(next) => { setTranscriptTranslationProvider(next.connectionId); setTranscriptTranslationModel(next.model); }}
                                                 />
-                                                <p className="text-[10px] text-text-tertiary">
-                                                    Connections (any host, any type) are added under AI Providers. A cheap, fast model works well here.
+                                                <p className="text-[11px] text-text-tertiary">
+                                                    Add connections and their API keys in Models &amp; Agent.
                                                 </p>
                                                 <TranslationTest
                                                     provider={transcriptTranslationProvider}
@@ -2387,168 +2160,76 @@ Core Skills
                                                 />
                                             </div>
 
-                                            <div className="space-y-1.5">
-                                                <div className="flex items-center justify-between">
-                                                    <label className="text-xs font-medium text-text-secondary block">Translation Prompt</label>
-                                                    <button
-                                                        onClick={handleResetTranscriptTranslationPrompt}
-                                                        className="text-[10px] text-text-tertiary hover:text-text-primary transition-colors"
-                                                    >
-                                                        Reset to Default
-                                                    </button>
-                                                </div>
-                                                <textarea
-                                                    value={transcriptTranslationPrompt}
-                                                    onChange={(e) => setTranscriptTranslationPrompt(e.target.value)}
-                                                    rows={4}
-                                                    className="w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors resize-y"
-                                                />
-                                            </div>
-
                                             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                                                 <button
                                                     onClick={handleSaveTranscriptTranslationSettings}
                                                     className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${translationSettingsSaved ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
                                                 >
-                                                    {translationSettingsSaved ? 'Saved!' : 'Save Translation Settings'}
+                                                    {translationSettingsSaved ? '✓ Saved' : 'Save Translation Settings'}
                                                 </button>
-                                                <p className="text-[10px] text-text-tertiary sm:pl-1">Only interviewer final transcript segments are translated in phase 1.</p>
+                                                <p className="text-[11px] text-text-tertiary sm:pl-1">Only final interviewer transcript segments are translated.</p>
                                             </div>
-                                        </div>
-                                    </div>
 
-                                    <div className="h-px bg-border-subtle" />
-
-                                    <WorkspaceSettings />
-
-                                    <div className="h-px bg-border-subtle" />
-
-                                    {/* ── Audio Configuration Section ── */}
-                                    <div>
-                                        <h3 className="text-lg font-bold text-text-primary mb-1">Audio Configuration</h3>
-                                        <p className="text-xs text-text-secondary mb-5">Manage input and output devices.</p>
-
-                                        <div className="space-y-4">
-                                            <CustomSelect
-                                                label="Input Device"
-                                                icon={<Mic size={16} />}
-                                                value={selectedInput}
-                                                options={inputDevices}
-                                                onChange={(id) => {
-                                                    setInputDeviceNotFound(false);
-                                                    setPreferredInputId(id);
-                                                }}
-                                                placeholder="Default Microphone"
-                                            />
-                                            {inputDeviceNotFound && (
-                                                <p className="text-xs text-state-warning mt-1 px-1">
-                                                    Previously selected device not found. Using default microphone.
-                                                </p>
-                                            )}
-
-                                            <div>
-                                                <div className="flex justify-between text-xs text-text-secondary mb-2 px-1">
-                                                    <span>Input Level</span>
-                                                </div>
-                                                <div className="h-1.5 bg-bg-input rounded-full overflow-hidden">
-                                                    <div
-                                                        className="h-full bg-state-success transition-all duration-100 ease-out"
-                                                        style={{ width: `${micLevel}%` }}
+                                            <button
+                                                type="button"
+                                                aria-expanded={showTranslationAdvanced}
+                                                aria-controls="translation-advanced"
+                                                onClick={() => setShowTranslationAdvanced(!showTranslationAdvanced)}
+                                                className="w-full flex items-center gap-2 text-left text-sm text-text-secondary hover:text-text-primary transition-colors"
+                                            >
+                                                <ChevronRight size={15} className={showTranslationAdvanced ? 'rotate-90' : ''} />
+                                                Advanced
+                                            </button>
+                                            <div id="translation-advanced" hidden={!showTranslationAdvanced} className="space-y-4">
+                                                <div className="space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="text-xs font-medium text-text-secondary block">Translation Prompt</label>
+                                                        <button
+                                                            onClick={handleResetTranscriptTranslationPrompt}
+                                                            className="text-[11px] text-text-tertiary hover:text-text-primary transition-colors"
+                                                        >
+                                                            Reset to Default
+                                                        </button>
+                                                    </div>
+                                                    <textarea
+                                                        value={transcriptTranslationPrompt}
+                                                        onChange={(e) => setTranscriptTranslationPrompt(e.target.value)}
+                                                        rows={4}
+                                                        className="w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors resize-y"
                                                     />
                                                 </div>
-                                            </div>
 
-                                            <div className="h-px bg-border-subtle my-2" />
-
-                                            <CustomSelect
-                                                label="Output Device"
-                                                icon={<Speaker size={16} />}
-                                                value={selectedOutput}
-                                                options={outputDevices}
-                                                onChange={(id) => {
-                                                    setPreferredOutputId(id);
-                                                }}
-                                                placeholder="Default Speakers"
-                                            />
-
-                                            <div className="flex justify-end">
-                                                <button
-                                                    onClick={async () => {
-                                                        try {
-                                                            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-                                                            if (!AudioContext) {
-                                                                console.error("Web Audio API not supported");
-                                                                return;
-                                                            }
-
-                                                            const ctx = new AudioContext();
-
-                                                            if (ctx.state === 'suspended') {
-                                                                await ctx.resume();
-                                                            }
-
-                                                            const oscillator = ctx.createOscillator();
-                                                            const gainNode = ctx.createGain();
-
-                                                            oscillator.connect(gainNode);
-                                                            gainNode.connect(ctx.destination);
-
-                                                            oscillator.type = 'sine';
-                                                            oscillator.frequency.setValueAtTime(523.25, ctx.currentTime);
-                                                            gainNode.gain.setValueAtTime(0.5, ctx.currentTime);
-                                                            gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.0);
-
-                                                            if (selectedOutput && (ctx as any).setSinkId) {
-                                                                try {
-                                                                    await (ctx as any).setSinkId(selectedOutput);
-                                                                } catch (e) {
-                                                                    console.warn("Error setting sink for AudioContext", e);
-                                                                }
-                                                            }
-
-                                                            oscillator.start();
-                                                            oscillator.stop(ctx.currentTime + 1.0);
-                                                        } catch (e) {
-                                                            console.error("Error playing test sound", e);
-                                                        }
-                                                    }}
-                                                    className="text-xs bg-bg-input hover:bg-bg-elevated text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-2"
-                                                >
-                                                    <Speaker size={12} /> Test Sound
-                                                </button>
-                                            </div>
-
-                                            <div className="h-px bg-border-subtle my-2" />
-
-                                            {/* SCK Backend Toggle */}
-                                            <div className="bg-state-warning-soft rounded-xl border border-state-warning-border p-4">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="mt-0.5 p-1.5 rounded-lg bg-state-warning-soft text-state-warning">
-                                                            <FlaskConical size={18} />
-                                                        </div>
-                                                        <div>
-                                                            <div className="flex items-center gap-2 mb-0.5">
-                                                                <h3 className="text-sm font-bold text-text-primary">SCK Backend</h3>
-                                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-state-info-soft text-state-info uppercase tracking-wide">Alternative</span>
-                                                            </div>
-                                                            <p className="text-xs text-text-secondary leading-relaxed max-w-[300px]">
-                                                                Use the ScreenCaptureKit backend. An optimized alternative to CoreAudio if you experience any capture issues.
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <div
-                                                        onClick={() => {
-                                                            setStoredSck(useExperimentalSck ? 'false' : 'true');
-                                                        }}
-                                                        className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${useExperimentalSck ? 'bg-state-warning' : 'bg-bg-toggle-switch border border-border-muted'}`}
-                                                    >
-                                                        <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${useExperimentalSck ? 'translate-x-5' : 'translate-x-0'}`} />
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-text-primary mb-1">Transcript Segmentation</h4>
+                                                    <p className="text-xs text-text-secondary mb-3">Choose how patiently Pika buffers final speech segments before translation.</p>
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                        {TRANSCRIPT_ASSEMBLER_PROFILE_OPTIONS.map((option) => {
+                                                            const selected = transcriptAssemblerProfile === option.value;
+                                                            return (
+                                                                <button
+                                                                    key={option.value}
+                                                                    type="button"
+                                                                    aria-pressed={selected}
+                                                                    onClick={() => handleTranscriptAssemblerProfileChange(option.value)}
+                                                                    className={`rounded-xl border p-4 text-left transition-colors ${selected
+                                                                        ? 'bg-bg-input border-accent-primary text-text-primary'
+                                                                        : 'bg-bg-card border-border-subtle text-text-secondary hover:bg-bg-elevated hover:text-text-primary'
+                                                                        }`}
+                                                                >
+                                                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                                                        <span className="text-sm font-semibold">{option.label}</span>
+                                                                        {selected && <Check size={15} className="text-accent-primary" />}
+                                                                    </div>
+                                                                    <p className="text-xs leading-relaxed text-text-tertiary">{option.desc}</p>
+                                                                </button>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
+
                                 </div>
                             )}
 
@@ -2562,21 +2243,6 @@ Core Skills
                 </motion.div>
             )
             }
-            {/* ------------------------------------------------------------------ */}
-            {/* Live Preview — mockup sits below the z-50 modal                    */}
-            {/* ------------------------------------------------------------------ */}
-            {/* ------------------------------------------------------------------ */}
-            {/* Live Preview — mockup sits below the z-50 modal                    */}
-            {/* ALWAYS MOUNTED to prevent React AnimatePresence lag spikes         */}
-            {/* ------------------------------------------------------------------ */}
-            <div
-                id="settings-mockup-wrapper"
-                /* z-[49] is intentional: must sit just below the z-50 settings modal it previews */
-                className="fixed inset-0 z-[49] pointer-events-none transition-opacity duration-150"
-                style={{ opacity: isPreviewingOpacity ? 1 : 0 }}
-            >
-                <MockupPikaInterface opacity={previewOverlayOpacity} />
-            </div>
         </AnimatePresence >
     );
 };

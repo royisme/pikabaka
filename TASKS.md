@@ -11,6 +11,11 @@ Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR 
 - Done on `auto-update`: `build.publish` is the GitHub provider, `scripts/release.js` uploads `latest-mac.yml`, updates download in the background, never restart the app on their own, the finished-download notice waits during a meeting, the unsigned-app Finder branch and the manual-update modal views are gone, and `ReleaseNotesManager` asks `royisme/pikabaka`. Both typechecks, lint and tap exit 0; an unsigned `electron-builder --mac zip` run writes `latest-mac.yml` and a packaged `app-update.yml`.
 - Then: owner builds N+1, uploads it, and checks the update from a packaged N build, and that the modal waits during a meeting. Real signing, notarization, GitHub and a real update cannot be run by the agent.
 
+## Settings cleanup (owner-approved dispatch, `docs/design-settings-cleanup.md`)
+
+- Done on `settings-cleanup`: A (Soniox Save fixed, Settings wording made true to the code), B (six default shortcuts, five optional unbound ones, eleven removed with their handlers; a keyboard-operable recorder that refuses conflicts and shows registration failures in words) and C (the audio page reordered into Devices, Speech recognition and Translation with an Advanced disclosure, the workspace chooser moved to Models & Agent, the fake opacity preview removed). No migration for old users (owner decision). Both typechecks, lint and tap exit 0 for each step.
+- Then: owner checks the shortcuts with another app focused, the recorder with the keyboard only, Soniox with a real key, the audio page and the opacity card in both themes, and the keyboard operation of the Advanced disclosure.
+
 ## Updates card (owner-approved dispatch, `docs/design-auto-update.md`, section "Updates card")
 
 - Done on `update-card` (stacked on `auto-update`, PR #48): the Settings > General "Version" button is replaced by an Updates card in Settings > About, copied from quotio's layout: automatic-check switch (`autoCheckUpdates`, default on), status line with one action, "Last checked". Both typechecks, lint and tap exit 0; every state renders in a browser preview with a mocked `electronAPI`, in both themes.

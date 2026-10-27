@@ -95,7 +95,7 @@ const ProactiveHelpSettings: React.FC = () => {
         <div>
             <h3 className="text-lg font-bold text-text-primary mb-1">Proactive help</h3>
             <p className="text-xs text-text-secondary mb-5">
-                A decision model reads the conversation as it happens and judges whether you would benefit from help right now. It starts in log mode, so nothing appears on screen until you switch it on.
+                A decision model reads the conversation and judges whether help is needed. Show cards is on by default once a decision model is configured.
             </p>
 
             <div className="space-y-4">
@@ -194,7 +194,8 @@ const ProactiveHelpSettings: React.FC = () => {
                         ) : test.data?.success ? (
                             <p className="text-xs text-text-primary">
                                 It decided help is {percent(test.data.help)} likely, kind: {test.data.kind?.replace('_', ' ')}, in {test.data.latencyMs} ms.
-                                {test.data.help !== undefined && test.data.help < threshold ? ' That is under the threshold, so no card would show.' : ' A card would show.'}
+                                {test.data.help !== undefined && ` The help score is ${test.data.help < threshold ? 'below' : 'at or above'} the ${percent(threshold)} threshold.`}
+                                {' Mode, help kind, staleness, cooldown and card drafting also determine whether a card appears.'}
                             </p>
                         ) : (
                             <p className="text-[11px] text-state-danger">{test.data?.error}</p>

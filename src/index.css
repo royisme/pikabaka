@@ -653,11 +653,6 @@ a {
   animation: shine 2s infinite;
 }
 
-/* Force instant transitions globally during previews */
-.disable-transitions, .disable-transitions * {
-  transition: none !important;
-}
-
 /* ── Windows / Linux window chrome – rounded corners ──────────────────────────
    Using positive selectors (not :not()) avoids a brief border-radius flash on
    macOS during cold-start, before the data-platform attribute is set.

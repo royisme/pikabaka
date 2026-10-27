@@ -1,5 +1,6 @@
 import ConnectionsSettings from './ConnectionsSettings';
 import ModelUsesSettings from './ModelUsesSettings';
+import WorkspaceSettings from './WorkspaceSettings';
 import SearchIndexSettings from './SearchIndexSettings';
 import ProactiveHelpSettings from './ProactiveHelpSettings';
 
@@ -11,6 +12,7 @@ export const AIProvidersSettings = () => (
             <ModelUsesSettings job="chat" />
             <ModelUsesSettings job="summary" />
             <ModelUsesSettings job="agent" />
+            <WorkspaceSettings />
         </section>
         <SearchIndexSettings />
         <ProactiveHelpSettings />

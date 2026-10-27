@@ -1,234 +1,75 @@
 import { useCallback } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
 import { acceleratorToKeys, keysToAccelerator } from '../utils/keyboardUtils';
-import { isMac } from '../utils/platformUtils';
+import { isMac, isWindows } from '../utils/platformUtils';
 import { useMainEvent } from './useMainEvent';
 
-// Define the shape of our shortcuts configuration
-export interface ShortcutConfig {
-    whatToAnswer: string[];
-    autoAnswerMode: string[];
-    clarify: string[];
-    followUp: string[];
-    dynamicAction4: string[];
-    answer: string[];
-    codeHint: string[];
-    brainstorm: string[];
-    shorten: string[];
-    recap: string[];
-    scrollUp: string[];
-    scrollDown: string[];
-    // Window Movement
-    moveWindowUp: string[];
-    moveWindowDown: string[];
-    moveWindowLeft: string[];
-    moveWindowRight: string[];
-    // General
-    toggleVisibility: string[];
-    toggleMousePassthrough: string[];
-    processScreenshots: string[];
-    captureAndProcess: string[];
-    resetCancel: string[];
-    takeScreenshot: string[];
-    selectiveScreenshot: string[];
-    // Live translation
-    toggleTranslation: string[];
-    toggleOriginal: string[];
-}
+export const SHORTCUT_IDS = {
+    toggleVisibility: 'general:toggle-visibility',
+    toggleMousePassthrough: 'general:toggle-mouse-passthrough',
+    whatToAnswer: 'chat:whatToAnswer',
+    selectiveScreenshot: 'general:selective-screenshot',
+    toggleTranslation: 'translation:toggle',
+    resetCancel: 'general:reset-cancel',
+    toggleOriginal: 'translation:toggle-original',
+    moveWindowUp: 'window:move-up',
+    moveWindowDown: 'window:move-down',
+    moveWindowLeft: 'window:move-left',
+    moveWindowRight: 'window:move-right',
+} as const;
+
+export type ShortcutConfig = Record<keyof typeof SHORTCUT_IDS, string[]>;
+type BackendKeybind = Awaited<ReturnType<Window['electronAPI']['getKeybinds']>>[number];
 
 function buildDefaultShortcuts(): ShortcutConfig {
     const mod = isMac ? '⌘' : 'Ctrl';
     const shift = isMac ? '⇧' : 'Shift';
     return {
-        whatToAnswer: [mod, '1'],
-        autoAnswerMode: [mod, 'f'],
-        clarify: [mod, '2'],
-        dynamicAction4: [mod, '3'],
-        followUp: [mod, '4'],
-        answer: [mod, '5'],
-        codeHint: [mod, '6'],
-        brainstorm: [mod, '7'],
-        shorten: [],
-        recap: [],
-        scrollUp: ['↑'],
-        scrollDown: ['↓'],
-        moveWindowUp: [mod, shift, '↑'],
-        moveWindowDown: [mod, shift, '↓'],
-        moveWindowLeft: [mod, shift, '←'],
-        moveWindowRight: [mod, shift, '→'],
         toggleVisibility: [mod, 'B'],
         toggleMousePassthrough: [mod, shift, 'B'],
-        processScreenshots: [mod, 'Enter'],
-        captureAndProcess: [mod, shift, 'Enter'],
-        resetCancel: [mod, 'R'],
-        takeScreenshot: [mod, 'H'],
+        whatToAnswer: [mod, '1'],
         selectiveScreenshot: [mod, shift, 'H'],
-        toggleTranslation: isMac ? [mod, '⌥', 'T'] : ['Ctrl', shift, 'F9'],
-        toggleOriginal: isMac ? [mod, '⌥', 'O'] : ['Ctrl', shift, 'F10']
+        toggleTranslation: isWindows ? ['Ctrl', shift, 'F9'] : [mod, isMac ? '⌥' : 'Alt', 'T'],
+        resetCancel: [mod, 'R'],
+        toggleOriginal: [],
+        moveWindowUp: [],
+        moveWindowDown: [],
+        moveWindowLeft: [],
+        moveWindowRight: [],
     };
 }
 
-export const DEFAULT_SHORTCUTS: ShortcutConfig = {
-    whatToAnswer: ['⌘', '1'],
-    autoAnswerMode: ['⌘', 'F'],
-    clarify: ['⌘', '2'],
-    dynamicAction4: ['⌘', '3'],   // slot 3 — matches KeybindManager
-    followUp: ['⌘', '4'],          // slot 4 — matches KeybindManager
-    answer: ['⌘', '5'],
-    codeHint: ['⌘', '6'],
-    brainstorm: ['⌘', '7'],
-    shorten: [],
-    recap: [],
-    scrollUp: ['↑'],
-    scrollDown: ['↓'],
-    moveWindowUp: ['⌘', '⇧', '↑'],
-    moveWindowDown: ['⌘', '⇧', '↓'],
-    moveWindowLeft: ['⌘', '⇧', '←'],
-    moveWindowRight: ['⌘', '⇧', '→'],
-    toggleVisibility: ['⌘', 'B'],
-    toggleMousePassthrough: ['⌘', '⇧', 'B'],
-    processScreenshots: ['⌘', 'Enter'],
-    captureAndProcess: ['⌘', '⇧', 'Enter'],
-    resetCancel: ['⌘', 'R'],
-    takeScreenshot: ['⌘', 'H'],
-    selectiveScreenshot: ['⌘', '⇧', 'H'],
-    toggleTranslation: ['⌘', '⌥', 'T'],
-    toggleOriginal: ['⌘', '⌥', 'O']
-};
-
-interface BackendKeybind {
-    id: string;
-    accelerator: string;
-}
-
-function applyBackendKeybinds(backendKeybinds: BackendKeybind[], base: ShortcutConfig = buildDefaultShortcuts()): ShortcutConfig {
-    const newShortcuts: ShortcutConfig = { ...base };
-
-    backendKeybinds.forEach(kb => {
-        const keys = acceleratorToKeys(kb.accelerator);
-
-        // Map backend IDs to frontend keys
-        if (kb.id === 'chat:whatToAnswer') newShortcuts.whatToAnswer = keys;
-        else if (kb.id === 'app:toggle-global-overlay') (newShortcuts as unknown as Record<string, unknown>).toggleGlobalOverlay = keys;
-        else if (kb.id === 'chat:followUp') newShortcuts.followUp = keys;
-        else if (kb.id === 'chat:followup') newShortcuts.followUp = keys; // backwards compat
-        else if (kb.id === 'chat:clarify') newShortcuts.clarify = keys;
-        else if (kb.id === 'chat:dynamicAction4') newShortcuts.dynamicAction4 = keys;
-        else if (kb.id === 'chat:answer') newShortcuts.answer = keys;
-        else if (kb.id === 'chat:codeHint') newShortcuts.codeHint = keys;
-        else if (kb.id === 'chat:brainstorm') newShortcuts.brainstorm = keys;
-        else if (kb.id === 'chat:shorten') newShortcuts.shorten = keys;
-        else if (kb.id === 'chat:recap') newShortcuts.recap = keys;
-        else if (kb.id === 'chat:scrollUp') newShortcuts.scrollUp = keys;
-        else if (kb.id === 'chat:scrollDown') newShortcuts.scrollDown = keys;
-        else if (kb.id === 'chat:auto-answer-mode') newShortcuts.autoAnswerMode = keys;
-        // Window
-        else if (kb.id === 'window:move-up') newShortcuts.moveWindowUp = keys;
-        else if (kb.id === 'window:move-down') newShortcuts.moveWindowDown = keys;
-        else if (kb.id === 'window:move-left') newShortcuts.moveWindowLeft = keys;
-        else if (kb.id === 'window:move-right') newShortcuts.moveWindowRight = keys;
-        // General
-        else if (kb.id === 'general:toggle-visibility') newShortcuts.toggleVisibility = keys;
-        else if (kb.id === 'general:toggle-mouse-passthrough') newShortcuts.toggleMousePassthrough = keys;
-        else if (kb.id === 'general:process-screenshots') newShortcuts.processScreenshots = keys;
-        else if (kb.id === 'general:capture-and-process') newShortcuts.captureAndProcess = keys;
-        else if (kb.id === 'general:reset-cancel') newShortcuts.resetCancel = keys;
-        else if (kb.id === 'general:take-screenshot') newShortcuts.takeScreenshot = keys;
-        else if (kb.id === 'general:selective-screenshot') newShortcuts.selectiveScreenshot = keys;
-        // Live translation
-        else if (kb.id === 'translation:toggle') newShortcuts.toggleTranslation = keys;
-        else if (kb.id === 'translation:toggle-original') newShortcuts.toggleOriginal = keys;
-    });
-
-    return newShortcuts;
-}
+export const DEFAULT_SHORTCUTS = buildDefaultShortcuts();
 
 export const useShortcuts = () => {
     const queryClient = useQueryClient();
-
-    const { data: shortcuts = buildDefaultShortcuts() } = useQuery<ShortcutConfig>(
-        ['shortcuts'],
-        async () => {
-            if (!window.electronAPI?.getKeybinds) return buildDefaultShortcuts();
-            const keybinds = await window.electronAPI.getKeybinds();
-            return applyBackendKeybinds(keybinds);
-        },
-        { initialData: buildDefaultShortcuts }
+    const { data: keybinds = [] } = useQuery<BackendKeybind[]>(
+        ['keybinds'],
+        () => window.electronAPI.getKeybinds()
     );
+    const shortcuts = buildDefaultShortcuts();
+    for (const actionId of Object.keys(SHORTCUT_IDS) as (keyof ShortcutConfig)[]) {
+        const keybind = keybinds.find(kb => kb.id === SHORTCUT_IDS[actionId]);
+        if (!keybind) continue;
+        shortcuts[actionId] = acceleratorToKeys(keybind.accelerator);
+    }
 
     useMainEvent(
         window.electronAPI?.onKeybindsUpdate,
-        useCallback((keybinds: BackendKeybind[]) => {
-            queryClient.setQueryData<ShortcutConfig>(['shortcuts'], (current) =>
-                applyBackendKeybinds(keybinds, current ?? buildDefaultShortcuts())
-            );
+        useCallback((updated: BackendKeybind[]) => {
+            queryClient.setQueryData(['keybinds'], updated);
         }, [queryClient])
     );
 
-    // Function to update a specific shortcut
     const updateShortcut = useCallback(async (actionId: keyof ShortcutConfig, keys: string[]) => {
-        // Optimistic update
-        queryClient.setQueryData<ShortcutConfig>(['shortcuts'], (prev) => ({
-            ...(prev ?? buildDefaultShortcuts()),
-            [actionId]: keys,
-        }));
-
-        const accelerator = keysToAccelerator(keys);
-        let backendId = '';
-
-        // Map frontend key back to backend ID
-        switch (actionId) {
-            case 'whatToAnswer': backendId = 'chat:whatToAnswer'; break;
-            case 'autoAnswerMode': backendId = 'chat:auto-answer-mode'; break;
-            case 'clarify': backendId = 'chat:clarify'; break;
-            case 'followUp': backendId = 'chat:followUp'; break;
-            case 'dynamicAction4': backendId = 'chat:dynamicAction4'; break;
-            case 'answer': backendId = 'chat:answer'; break;
-            case 'codeHint': backendId = 'chat:codeHint'; break;
-            case 'brainstorm': backendId = 'chat:brainstorm'; break;
-            case 'shorten': backendId = 'chat:shorten'; break;
-            case 'recap': backendId = 'chat:recap'; break;
-            case 'scrollUp': backendId = 'chat:scrollUp'; break;
-            case 'scrollDown': backendId = 'chat:scrollDown'; break;
-            // Window
-            case 'moveWindowUp': backendId = 'window:move-up'; break;
-            case 'moveWindowDown': backendId = 'window:move-down'; break;
-            case 'moveWindowLeft': backendId = 'window:move-left'; break;
-            case 'moveWindowRight': backendId = 'window:move-right'; break;
-            // General
-            case 'toggleVisibility': backendId = 'general:toggle-visibility'; break;
-            case 'toggleMousePassthrough': backendId = 'general:toggle-mouse-passthrough'; break;
-            case 'processScreenshots': backendId = 'general:process-screenshots'; break;
-            case 'captureAndProcess': backendId = 'general:capture-and-process'; break;
-            case 'resetCancel': backendId = 'general:reset-cancel'; break;
-            case 'takeScreenshot': backendId = 'general:take-screenshot'; break;
-            case 'selectiveScreenshot': backendId = 'general:selective-screenshot'; break;
-            // Live translation
-            case 'toggleTranslation': backendId = 'translation:toggle'; break;
-            case 'toggleOriginal': backendId = 'translation:toggle-original'; break;
-            default: break;
-        }
-
-        if (backendId && window.electronAPI?.setKeybind) {
-            try {
-                await window.electronAPI.setKeybind(backendId, accelerator);
-            } catch (error) {
-                console.error(`Failed to set keybind for ${actionId}:`, error);
-            }
-        }
+        const result = await window.electronAPI.setKeybind(SHORTCUT_IDS[actionId], keysToAccelerator(keys));
+        if (result.success) await queryClient.invalidateQueries(['keybinds']);
+        return result;
     }, [queryClient]);
 
-    // Function to reset all shortcuts to defaults
     const resetShortcuts = useCallback(async () => {
-        if (!window.electronAPI?.resetKeybinds) return;
-        try {
-            const defaults = await window.electronAPI.resetKeybinds();
-            queryClient.setQueryData<ShortcutConfig>(['shortcuts'], (current) =>
-                applyBackendKeybinds(defaults, current ?? buildDefaultShortcuts())
-            );
-        } catch (error) {
-            console.error('Failed to reset keybinds:', error);
-        }
+        const defaults = await window.electronAPI.resetKeybinds();
+        queryClient.setQueryData(['keybinds'], defaults);
     }, [queryClient]);
 
     // Helper to check if a keyboard event matches a configured shortcut

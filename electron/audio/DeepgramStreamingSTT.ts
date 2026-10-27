@@ -25,7 +25,7 @@ export class DeepgramStreamingSTT extends EventEmitter {
 
     private sampleRate = 16000;
     private numChannels = 1;
-    /** The Deepgram model; the user can pick another in Settings, Audio. */
+    /** The Deepgram model; the user can pick another in Settings, Audio & Translation. */
     private model = 'nova-3';
     private languageCode: string | undefined = 'en'; // Default to English; undefined ⇒ multi/auto-detect
 

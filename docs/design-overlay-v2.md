@@ -178,12 +178,12 @@ At 420px: content = 420 − 138 = 282px. At the 55% split the transcript area ge
 Overlay `minHeight` becomes 360 (138 + 2×112); today it is 1 (`WindowHelper.ts:211`). Collapsing hides the window, so the floor is safe; verify `updateContentDimensions` never asks for less.
 
 - **Top bar** (36px, `draggable-area`, controls `no-drag`). Left: status chip. Right: Translate, `→ 中文 ▾`, `⋯`, Hide (chevron), Stop (■, two-press arm from `TopPill.tsx:21`). Below 480px, Translate and Original move into `⋯` and the status keeps a ≤ 12-character label, never colour only. At 380 the right group is ≈190px, leaving ≈150px for status.
-- **`⋯` menu** (portal): Show original ⌥⌘O, Translate ⌥⌘T (below 480), Model ▸, Settings, Click-through, Open Pika window. The logo button and the footer row leave the chrome.
+- **`⋯` menu** (portal): Show original (unbound by default), Translate ⌥⌘T (below 480), Model ▸, Settings, Click-through, Open Pika window. The logo button and the footer row leave the chrome.
 - **Composer.** Row 1 (28px): primary plus secondary chips; below 480px the secondary chips are icon-only 28px buttons with names (≈232px at 380, no scrolling). Row 2 (36px): input with Send inside its right edge. Below 400px tall, row 1 folds into a 28px ⚡ button left of the input.
 
 ## 6. One status component
 
-Replace `sttStatus` and `sttNeedsTroubleshooting` with one pure, unit-tested `audioStatus(health, isConnected, meetingStartedAt, noSystemAudioSince, now)` returning `{ key, level, chip, zone, action }`. Its words render in one place (Q6): **the chip** when the transcript area has rows, **the zone line** when it is empty (the chip then shows only the dot, with a screen-reader label). **Amends** translation spec §6: the action is a visible button; the popover keeps only details (real `lastError`, tips, "Open audio settings").
+Replace `sttStatus` and `sttNeedsTroubleshooting` with one pure, unit-tested `audioStatus(health, isConnected, meetingStartedAt, noSystemAudioSince, now)` returning `{ key, level, chip, zone, action }`. Its words render in one place (Q6): **the chip** when the transcript area has rows, **the zone line** when it is empty (the chip then shows only the dot, with a screen-reader label). **Amends** translation spec §6: the action is a visible button; the popover keeps only details (real `lastError`, tips, "Open Audio & Translation settings").
 
 | Key | Condition [code basis] | Level | Chip | Zone line (empty area) | Action |
 | --- | --- | --- | --- | --- | --- |

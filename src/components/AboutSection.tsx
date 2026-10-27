@@ -69,8 +69,7 @@ export const AboutSection: React.FC<AboutSectionProps> = () => {
                     </span>
                 </div>
                 <p className="text-sm text-text-secondary leading-relaxed mt-3 max-w-[52ch]">
-                    Interview copilot and meeting assistant. Transcription, answer
-                    suggestions, and screen analysis — running locally on your device.
+                    Pika provides live translation, a meeting record and an AI agent using the services you configure.
                 </p>
             </motion.div>
 

@@ -319,23 +319,11 @@ export function registerSttHandlers(appState: AppState): void {
       const testWav = Buffer.concat([wavHeader, pcmData]);
 
       if (provider === 'elevenlabs') {
-        // ElevenLabs: Use /v1/voices to validate the API key (minimal scope required).
-        // Scoped keys may lack speech_to_text or user_read but still be usable once permissions are added.
-        try {
-          await axios.get('https://api.elevenlabs.io/v1/voices', {
-            headers: { 'xi-api-key': apiKey },
-            timeout: 10000,
-          });
-        } catch (elErr: any) {
-          const elStatus = elErr?.response?.data?.detail?.status;
-          // If the error is "invalid_api_key", the key itself is wrong — fail.
-          // Any other error (missing permission, etc.) means the key IS valid, just possibly scoped.
-          if (elStatus === 'invalid_api_key') {
-            throw elErr;
-          }
-          // Key is valid but scoped — pass with a warning
-          console.log('[IPC] ElevenLabs key is valid but may have restricted scopes. Saving key.');
-        }
+        // Checks key acceptance at /v1/voices, not speech recognition.
+        await axios.get('https://api.elevenlabs.io/v1/voices', {
+          headers: { 'xi-api-key': apiKey },
+          timeout: 10000,
+        });
       } else if (provider === 'azure') {
         // Azure: raw binary with subscription key
         const azureRegion = region || 'eastus';

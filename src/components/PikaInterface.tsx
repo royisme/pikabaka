@@ -24,8 +24,7 @@ import { useLocalStorageValue } from '../hooks/useLocalStorageValue';
 
 interface PikaInterfaceProps { onEndMeeting?: () => void; overlayOpacity?: number; }
 type ScreenshotAttachment = { path: string; preview: string };
-type CommandHandlers = { handleWhatToSay: () => void; handleFollowUp: (intent?: string) => void; handleFollowUpQuestions: () => void; handleRecap: () => void; handleAnswerNow: () => void; handleClarify: () => void; handleCodeHint: () => void; handleBrainstorm: () => void; };
-type GeneralHandlers = { toggleVisibility: () => void; processScreenshots: () => void; resetCancel: () => Promise<void>; toggleMousePassthrough: () => void; takeScreenshot: () => Promise<void>; selectiveScreenshot: () => Promise<void>; };
+type GeneralHandlers = { toggleVisibility: () => void; resetCancel: () => Promise<void>; toggleMousePassthrough: () => void; takeScreenshot: () => Promise<void>; selectiveScreenshot: () => Promise<void>; toggleTranslation: () => void; toggleOriginal: () => void; };
 
 const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpacity = getDefaultOverlayOpacity() }) => {
     const queryClient = useQueryClient();
@@ -151,25 +150,8 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         }
     }, [chat.messages, isExpanded, chat.isProcessing]);
 
-    const handleAnswerNow = useCallback(() => chat.handleWhatToSay(), [chat.handleWhatToSay]);
-
-    const handlersRef = useRef<CommandHandlers>(null!);
-    handlersRef.current = { handleWhatToSay: chat.handleWhatToSay, handleFollowUp: chat.handleFollowUp, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleAnswerNow, handleClarify: chat.handleClarify, handleCodeHint: chat.handleCodeHint, handleBrainstorm: chat.handleBrainstorm };
     useWindowEvent('keydown', (e: KeyboardEvent) => {
-        const h = handlersRef.current;
-        if (isShortcutPressed(e, 'whatToAnswer')) { e.preventDefault(); h.handleWhatToSay(); }
-        else if (isShortcutPressed(e, 'clarify')) { e.preventDefault(); h.handleClarify(); }
-        else if (isShortcutPressed(e, 'followUp')) { e.preventDefault(); h.handleFollowUpQuestions(); }
-        else if (isShortcutPressed(e, 'dynamicAction4')) {
-            e.preventDefault();
-            if (chat.actionButtonMode === 'brainstorm') h.handleBrainstorm();
-            else h.handleRecap();
-        }
-        else if (isShortcutPressed(e, 'answer')) { e.preventDefault(); h.handleAnswerNow(); }
-        else if (isShortcutPressed(e, 'codeHint')) { e.preventDefault(); h.handleCodeHint(); }
-        else if (isShortcutPressed(e, 'brainstorm')) { e.preventDefault(); h.handleBrainstorm(); }
-        else if (isShortcutPressed(e, 'scrollUp')) { e.preventDefault(); scrollContainerRef.current?.scrollBy({ top: -100, behavior: 'smooth' }); }
-        else if (isShortcutPressed(e, 'scrollDown')) { e.preventDefault(); scrollContainerRef.current?.scrollBy({ top: 100, behavior: 'smooth' }); }
+        if (isShortcutPressed(e, 'whatToAnswer')) { e.preventDefault(); chat.handleWhatToSay(); }
         else if (isShortcutPressed(e, 'moveWindowUp') || isShortcutPressed(e, 'moveWindowDown')) e.preventDefault();
     });
 
@@ -203,13 +185,10 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
 
     replyContextRef.current = () => latestOtherPartyText(transcript.transcriptSegments, transcript.currentInterviewerPartial);
 
-    const transcriptRef = useRef(transcript);
-    transcriptRef.current = transcript;
-
     const generalHandlersRef = useRef<GeneralHandlers>(null!);
     generalHandlersRef.current = {
-        toggleVisibility: () => window.electronAPI.toggleWindow(), processScreenshots: chat.handleWhatToSay,
-        resetCancel: async () => { if (chat.isProcessing) await chat.stopGeneration(); else { await window.electronAPI.resetIntelligence(); chat.setSystemMessages([]); chat.setAttachedContext([]); chat.setInputValue(''); } },
+        toggleVisibility: () => window.electronAPI.toggleWindow(),
+        resetCancel: async () => { if (chat.isProcessing) await chat.stopGeneration(); },
         toggleMousePassthrough: () => {
             const next = !isMousePassthrough;
             queryClient.setQueryData(['overlay-mouse-passthrough'], next);
@@ -217,54 +196,31 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         },
         takeScreenshot: async () => { const data = await window.electronAPI.takeScreenshot().catch((err) => console.error('Error triggering screenshot:', err)); if (data?.path) handleScreenshotAttach(data as ScreenshotAttachment); },
         selectiveScreenshot: async () => { const data = await window.electronAPI.takeSelectiveScreenshot().catch((err) => console.error('Error triggering selective screenshot:', err)); if (data && !data.cancelled && data.path) handleScreenshotAttach(data as ScreenshotAttachment); },
+        toggleTranslation: () => {
+            if (transcript.translationConfigured) transcript.saveTranslationSettings({ enabled: !transcript.translationEnabled });
+        },
+        toggleOriginal: () => transcript.saveTranslationSettings({ displayMode: toggleOriginal(transcript.transcriptDisplayMode) }),
     };
     useWindowEvent('keydown', (e: KeyboardEvent) => {
-        const target = e.target as HTMLElement;
-        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
         const h = generalHandlersRef.current;
         if (isShortcutPressed(e, 'toggleVisibility')) { e.preventDefault(); h.toggleVisibility(); }
-        else if (isShortcutPressed(e, 'processScreenshots') && !isInput) { e.preventDefault(); h.processScreenshots(); }
         else if (isShortcutPressed(e, 'resetCancel')) { e.preventDefault(); void h.resetCancel(); }
-        else if (isShortcutPressed(e, 'takeScreenshot')) { e.preventDefault(); void h.takeScreenshot(); }
         else if (isShortcutPressed(e, 'selectiveScreenshot')) { e.preventDefault(); void h.selectiveScreenshot(); }
         else if (isShortcutPressed(e, 'toggleMousePassthrough')) { e.preventDefault(); h.toggleMousePassthrough(); }
+        else if (isShortcutPressed(e, 'toggleTranslation')) { e.preventDefault(); h.toggleTranslation(); }
+        else if (isShortcutPressed(e, 'toggleOriginal')) { e.preventDefault(); h.toggleOriginal(); }
     });
 
-    useMainEvent(window.electronAPI?.onCaptureAndProcess, (data) => {
-        handleScreenshotAttach(data as ScreenshotAttachment);
-        setTimeout(() => handlersRef.current.handleWhatToSay(), 0);
-    });
     useMainEvent(window.electronAPI?.onScreenshotTaken, handleScreenshotAttach);
     useMainEvent(window.electronAPI?.onScreenshotAttached, handleScreenshotAttach);
     useEffect(() => window.electronAPI.onSuggestionProcessingStart?.(() => { chat.setIsProcessing(true); setIsExpanded(true); }), [chat.setIsProcessing]);
     useMainEvent(window.electronAPI?.onGlobalShortcut, ({ action }) => {
-        const h = handlersRef.current;
         const g = generalHandlersRef.current;
         isStealthRef.current = true;
-        if (action === 'whatToAnswer') h.handleWhatToSay();
-        else if (action === 'shorten') h.handleFollowUp('shorten');
-        else if (action === 'followUp') h.handleFollowUpQuestions();
-        else if (action === 'recap') h.handleRecap();
-        else if (action === 'dynamicAction4') {
-            if (chat.actionButtonMode === 'brainstorm') h.handleBrainstorm();
-            else h.handleRecap();
-        }
-        else if (action === 'answer') h.handleAnswerNow();
-        else if (action === 'clarify') h.handleClarify();
-        else if (action === 'codeHint') h.handleCodeHint();
-        else if (action === 'brainstorm') h.handleBrainstorm();
-        else if (action === 'scrollUp') scrollContainerRef.current?.scrollBy({ top: -100, behavior: 'smooth' });
-        else if (action === 'scrollDown') scrollContainerRef.current?.scrollBy({ top: 100, behavior: 'smooth' });
-        else if (action === 'processScreenshots') g.processScreenshots();
+        if (action === 'whatToAnswer') chat.handleWhatToSay();
         else if (action === 'resetCancel') void g.resetCancel();
-        else if (action === 'toggleTranslation') {
-            if (transcriptRef.current.translationConfigured) {
-                transcriptRef.current.saveTranslationSettings({ enabled: !transcriptRef.current.translationEnabled });
-            }
-        }
-        else if (action === 'toggleOriginal') {
-            transcriptRef.current.saveTranslationSettings({ displayMode: toggleOriginal(transcriptRef.current.transcriptDisplayMode) });
-        }
+        else if (action === 'toggleTranslation') g.toggleTranslation();
+        else if (action === 'toggleOriginal') g.toggleOriginal();
         setTimeout(() => { isStealthRef.current = false; }, 500);
     });
 

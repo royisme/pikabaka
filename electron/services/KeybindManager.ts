@@ -10,41 +10,30 @@ export interface KeybindConfig {
     defaultAccelerator: string;
 }
 
-// Ctrl+Alt is AltGr on many Windows keyboard layouts and can swallow typed characters, so the
-// Windows defaults avoid it. Both are rebindable in Settings.
+export interface KeybindStatus extends KeybindConfig {
+    registered: boolean;
+}
+
+export interface KeybindResult {
+    success: boolean;
+    error?: string;
+}
+
+// Ctrl+Alt is AltGr on many Windows keyboard layouts, so avoid it on Windows.
 const TOGGLE_TRANSLATION_DEFAULT = process.platform === 'win32' ? 'Control+Shift+F9' : 'CommandOrControl+Alt+T';
-const TOGGLE_ORIGINAL_DEFAULT = process.platform === 'win32' ? 'Control+Shift+F10' : 'CommandOrControl+Alt+O';
 
 export const DEFAULT_KEYBINDS: KeybindConfig[] = [
-    // General
     { id: 'general:toggle-visibility', label: 'Toggle Visibility', accelerator: 'CommandOrControl+B', isGlobal: true, defaultAccelerator: 'CommandOrControl+B' },
     { id: 'general:toggle-mouse-passthrough', label: 'Toggle Mouse Passthrough', accelerator: 'CommandOrControl+Shift+B', isGlobal: true, defaultAccelerator: 'CommandOrControl+Shift+B' },
-    { id: 'general:process-screenshots', label: 'Process Screenshots', accelerator: 'CommandOrControl+Enter', isGlobal: true, defaultAccelerator: 'CommandOrControl+Enter' },
-    { id: 'general:capture-and-process', label: 'Capture Screen & Ask AI (Global)', accelerator: 'CommandOrControl+Shift+Enter', isGlobal: true, defaultAccelerator: 'CommandOrControl+Shift+Enter' },
-    { id: 'general:reset-cancel', label: 'Reset / Cancel', accelerator: 'CommandOrControl+R', isGlobal: true, defaultAccelerator: 'CommandOrControl+R' },
-    { id: 'general:take-screenshot', label: 'Take Screenshot', accelerator: 'CommandOrControl+H', isGlobal: true, defaultAccelerator: 'CommandOrControl+H' },
-    { id: 'general:selective-screenshot', label: 'Selective Screenshot', accelerator: 'CommandOrControl+Shift+H', isGlobal: true, defaultAccelerator: 'CommandOrControl+Shift+H' },
-
-    // Chat - Global shortcuts (work even when app is not focused - stealth mode)
-    { id: 'chat:whatToAnswer', label: 'What to Answer', accelerator: 'CommandOrControl+1', isGlobal: true, defaultAccelerator: 'CommandOrControl+1' },
-    { id: 'chat:clarify', label: 'Clarify', accelerator: 'CommandOrControl+2', isGlobal: true, defaultAccelerator: 'CommandOrControl+2' },
-    { id: 'chat:dynamicAction4', label: 'Recap / Brainstorm', accelerator: 'CommandOrControl+3', isGlobal: true, defaultAccelerator: 'CommandOrControl+3' },
-    { id: 'chat:followUp', label: 'Follow Up', accelerator: 'CommandOrControl+4', isGlobal: true, defaultAccelerator: 'CommandOrControl+4' },
-    { id: 'chat:answer', label: 'Answer / Record', accelerator: 'CommandOrControl+5', isGlobal: true, defaultAccelerator: 'CommandOrControl+5' },
-    { id: 'chat:codeHint', label: 'Get Code Hint', accelerator: 'CommandOrControl+6', isGlobal: true, defaultAccelerator: 'CommandOrControl+6' },
-    { id: 'chat:brainstorm', label: 'Brainstorm Approaches', accelerator: 'CommandOrControl+7', isGlobal: true, defaultAccelerator: 'CommandOrControl+7' },
-    { id: 'chat:scrollUp', label: 'Scroll Up', accelerator: 'CommandOrControl+Up', isGlobal: true, defaultAccelerator: 'CommandOrControl+Up' },
-    { id: 'chat:scrollDown', label: 'Scroll Down', accelerator: 'CommandOrControl+Down', isGlobal: true, defaultAccelerator: 'CommandOrControl+Down' },
-
-    // Live translation - global, so the reader can switch it mid-call without focusing Pika
+    { id: 'chat:whatToAnswer', label: 'What to Say', accelerator: 'CommandOrControl+1', isGlobal: true, defaultAccelerator: 'CommandOrControl+1' },
+    { id: 'general:selective-screenshot', label: 'Capture Selected Area', accelerator: 'CommandOrControl+Shift+H', isGlobal: true, defaultAccelerator: 'CommandOrControl+Shift+H' },
     { id: 'translation:toggle', label: 'Toggle Translation', accelerator: TOGGLE_TRANSLATION_DEFAULT, isGlobal: true, defaultAccelerator: TOGGLE_TRANSLATION_DEFAULT },
-    { id: 'translation:toggle-original', label: 'Toggle Original Text', accelerator: TOGGLE_ORIGINAL_DEFAULT, isGlobal: true, defaultAccelerator: TOGGLE_ORIGINAL_DEFAULT },
-
-    // Window Movement - Global shortcuts (stealth window positioning)
-    { id: 'window:move-up', label: 'Move Window Up', accelerator: 'CommandOrControl+Shift+Up', isGlobal: true, defaultAccelerator: 'CommandOrControl+Shift+Up' },
-    { id: 'window:move-down', label: 'Move Window Down', accelerator: 'CommandOrControl+Shift+Down', isGlobal: true, defaultAccelerator: 'CommandOrControl+Shift+Down' },
-    { id: 'window:move-left', label: 'Move Window Left', accelerator: 'CommandOrControl+Shift+Left', isGlobal: true, defaultAccelerator: 'CommandOrControl+Shift+Left' },
-    { id: 'window:move-right', label: 'Move Window Right', accelerator: 'CommandOrControl+Shift+Right', isGlobal: true, defaultAccelerator: 'CommandOrControl+Shift+Right' },
+    { id: 'general:reset-cancel', label: 'Stop Generation', accelerator: 'CommandOrControl+R', isGlobal: true, defaultAccelerator: 'CommandOrControl+R' },
+    { id: 'translation:toggle-original', label: 'Toggle Original Text', accelerator: '', isGlobal: true, defaultAccelerator: '' },
+    { id: 'window:move-up', label: 'Move Window Up', accelerator: '', isGlobal: true, defaultAccelerator: '' },
+    { id: 'window:move-down', label: 'Move Window Down', accelerator: '', isGlobal: true, defaultAccelerator: '' },
+    { id: 'window:move-left', label: 'Move Window Left', accelerator: '', isGlobal: true, defaultAccelerator: '' },
+    { id: 'window:move-right', label: 'Move Window Right', accelerator: '', isGlobal: true, defaultAccelerator: '' },
 ];
 
 export class KeybindManager {
@@ -61,16 +50,11 @@ export class KeybindManager {
         this.activeMode = mode;
         console.log(`[KeybindManager] Mode changed to: ${mode}. Refreshing global shortcuts.`);
         this.registerGlobalShortcuts();
+        this.broadcastUpdate();
     }
 
     private shouldRegister(actionId: string): boolean {
-        if (this.activeMode === 'overlay') return true;
-        
-        // In launcher mode, only register specific shortcuts
-        if (actionId === 'general:toggle-visibility') return true;
-        if (actionId === 'general:toggle-mouse-passthrough') return true;
-        if (actionId.startsWith('window:move-')) return true;
-        return false;
+        return this.activeMode === 'overlay' || actionId === 'general:toggle-visibility';
     }
 
     private normalizeAccelerator(acc: string): string {
@@ -78,7 +62,16 @@ export class KeybindManager {
         // Electron accelerators are case-insensitive and order-independent for modifiers.
         // We split, lowercase, and sort to ensure consistent string matching.
         // E.g., 'Shift+CommandOrControl+Up' === 'CommandOrControl+Shift+Up'
-        const parts = acc.split('+').map(p => p.trim().toLowerCase());
+        const aliases: Record<string, string> = {
+            commandorcontrol: process.platform === 'darwin' ? 'command' : 'control',
+            cmdorctrl: process.platform === 'darwin' ? 'command' : 'control',
+            cmd: 'command', meta: 'command', ctrl: 'control', option: 'alt',
+            arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right'
+        };
+        const parts = acc.split('+').map(p => {
+            const part = p.trim().toLowerCase();
+            return aliases[part] || part;
+        });
         parts.sort();
         return parts.join('+');
     }
@@ -115,17 +108,6 @@ export class KeybindManager {
         try {
             if (fs.existsSync(this.filePath)) {
                 const data = JSON.parse(fs.readFileSync(this.filePath, 'utf-8'));
-
-                // Migrate renamed IDs so saved user customizations survive renames
-                const ID_MIGRATIONS: Record<string, string> = {
-                    'chat:recap': 'chat:dynamicAction4',
-                    'chat:followup': 'chat:followUp',  // casing fix — persisted keybinds.json may have old casing
-                };
-                for (const fileKb of data) {
-                    if (ID_MIGRATIONS[fileKb.id]) {
-                        fileKb.id = ID_MIGRATIONS[fileKb.id];
-                    }
-                }
 
                 // Validate and merge
                 let hadConflicts = false;
@@ -185,40 +167,41 @@ export class KeybindManager {
         return this.keybinds.get(id)?.accelerator;
     }
 
-    public getAllKeybinds(): KeybindConfig[] {
-        return Array.from(this.keybinds.values());
+    public getAllKeybinds(): KeybindStatus[] {
+        return Array.from(this.keybinds.values(), kb => ({
+            ...kb,
+            // False only when this mode should have registered the chord and the OS refused it.
+            registered: !kb.isGlobal || !kb.accelerator || !this.shouldRegister(kb.id) || globalShortcut.isRegistered(kb.accelerator)
+        }));
     }
 
-    public setKeybind(id: string, accelerator: string) {
-        if (!this.keybinds.has(id)) return;
+    public setKeybind(id: string, accelerator: string): KeybindResult {
+        const currentKb = this.keybinds.get(id);
+        if (!currentKb) return { success: false, error: 'Unknown shortcut' };
+        accelerator = accelerator.trim();
+        const oldAccelerator = currentKb.accelerator;
+        const normalizedNew = this.normalizeAccelerator(accelerator);
+        const conflict = Array.from(this.keybinds.values()).find(kb =>
+            kb.id !== id && accelerator && this.normalizeAccelerator(kb.accelerator) === normalizedNew
+        );
+        if (conflict) return { success: false, error: `Already used by ${conflict.label}` };
 
-        const currentKb = this.keybinds.get(id)!;
-        const oldAccelerator = currentKb.accelerator || '';
-
-        // Fallback: If assigning a new accelerator, swap any existing action using it
-        if (accelerator && accelerator.trim() !== '') {
-            const normalizedNew = this.normalizeAccelerator(accelerator);
-            let swappedId: string | null = null;
-
-            this.keybinds.forEach((kb, existingId) => {
-                if (existingId !== id && this.normalizeAccelerator(kb.accelerator) === normalizedNew) {
-                    swappedId = existingId;
-                }
-            });
-
-            if (swappedId) {
-                const conflictKb = this.keybinds.get(swappedId)!;
-                conflictKb.accelerator = oldAccelerator; // Give the conflicting one our old shortcut
-                this.keybinds.set(swappedId, conflictKb);
+        const sameAccelerator = this.normalizeAccelerator(oldAccelerator) === normalizedNew;
+        // Probe before releasing the old chord, so a refusal leaves it working.
+        if (currentKb.isGlobal && accelerator && this.shouldRegister(id)) {
+            const alreadyRegistered = sameAccelerator && globalShortcut.isRegistered(oldAccelerator);
+            if (!alreadyRegistered && !this.registerShortcut(currentKb, accelerator)) {
+                return { success: false, error: 'Could not register this key combination. Another app may already be using it.' };
             }
         }
-
+        if (currentKb.isGlobal && oldAccelerator && !sameAccelerator) {
+            globalShortcut.unregister(oldAccelerator);
+        }
         currentKb.accelerator = accelerator;
-        this.keybinds.set(id, currentKb);
-
         this.save();
-        this.registerGlobalShortcuts(); // Re-register if it was a global one
+        this.updateMenu();
         this.broadcastUpdate();
+        return { success: true };
     }
 
     public resetKeybinds() {
@@ -236,23 +219,22 @@ export class KeybindManager {
             if (kb.isGlobal && kb.accelerator && kb.accelerator.trim() !== '') {
                 if (!this.shouldRegister(kb.id)) return;
 
-                const acc = kb.accelerator.trim();
-                try {
-                    globalShortcut.register(acc, () => {
-                        this.onShortcutTriggeredCallbacks.forEach(cb => cb(kb.id));
-                    });
-                    if (globalShortcut.isRegistered(acc)) {
-                        console.log(`[KeybindManager] Registered global shortcut: ${acc} -> ${kb.id}`);
-                    } else {
-                        console.warn(`[KeybindManager] Failed to register global shortcut (likely in use by OS): ${acc}`);
-                    }
-                } catch (e) {
-                    console.error(`[KeybindManager] Exception while registering global shortcut ${acc}:`, e);
-                }
+                this.registerShortcut(kb, kb.accelerator.trim());
             }
         });
 
         this.updateMenu();
+    }
+
+    private registerShortcut(kb: KeybindConfig, accelerator: string): boolean {
+        try {
+            return globalShortcut.register(accelerator, () => {
+                this.onShortcutTriggeredCallbacks.forEach(cb => cb(kb.id));
+            });
+        } catch (error) {
+            console.error(`[KeybindManager] Could not register shortcut ${kb.id}:`, error);
+            return false;
+        }
     }
 
     public updateMenu() {
@@ -388,8 +370,10 @@ export class KeybindManager {
 
         ipcMain.handle('keybinds:set', (_, id: string, accelerator: string) => {
             console.log(`[KeybindManager] Set ${id} -> ${accelerator}`);
-            this.setKeybind(id, accelerator);
-            return true;
+            if (typeof id !== 'string' || typeof accelerator !== 'string') {
+                return { success: false, error: 'Invalid shortcut' };
+            }
+            return this.setKeybind(id, accelerator);
         });
 
         ipcMain.handle('keybinds:reset', () => {

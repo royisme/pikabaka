@@ -36,15 +36,6 @@ export const SupportToaster: React.FC<SupportToasterProps> = ({ className }) => 
         };
     }, []);
 
-    useWindowEvent('keydown', (e: KeyboardEvent) => {
-        if (!import.meta.env.DEV) return;
-        if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-            e.preventDefault();
-            console.log("Debug: Toggling Donation Toaster");
-            setIsVisible(prev => !prev);
-        }
-    });
-
     useWindowEvent('focus', async () => {
         if (clickTimeRef.current) {
             const elapsed = Date.now() - clickTimeRef.current;
