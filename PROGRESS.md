@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-27: overlay zones and compact breakpoint (branch `overlay-zones`)
+
+- The translation area now has its own deeper ground (`overlay-transcript-surface`); the Pika area keeps the panel ground. No per-area header rows or per-line times: the top bar is the one header (owner decision V9, chrome budget Q3). Design rule 1 and 3 in `docs/design-agent-platform.md` are rewritten to match; A1.2 (mockup) is dropped, A3.6 is done.
+- Found in a browser preview with a mocked `electronAPI` (not the real app): between 480 and about 560px the Stop button in the top bar and the Select-area button in the chip row were cut off (the Screenshot/Select-area and mute buttons were added after the 480px breakpoint was set). The compact breakpoint is now 560px in the bar, the chip row and the menu; `docs/conventions.md` and `DESIGN.md` say 560px. Checked at 380, 500, 560 and 600px: no button outside the window.
+- Checks: tsc 0/0, tap 1265 pass, lint 0 errors.
+- Owner: look at the overlay at the default width and at the narrowest, dark and light; the deeper ground in light theme is white-over-panel and may need tuning.
+
 ## 2026-10-26: AI connections merged to main (branch `ai-connections`)
 
 - Landed: connections and per-job model choice, search-index model and rebuild, sentence-aligned translation with a paragraph second pass and a Test button, source-above-translation rows, microphone mute, agent and decision-model tests, proactive help on by default, answers in the call's language and a spoken style, expert-perspective answers when the materials have nothing (no invented facts), optional notes, screenshot buttons, card/chat overlap fix, calendar removal (A7.1), legacy key paths removed.

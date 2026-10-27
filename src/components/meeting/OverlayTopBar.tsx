@@ -121,14 +121,14 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
 
     const menuItems: PopoverMenuItem[] = [
         ...(hasRows && status.action === 'fix-audio'
-            ? [{ key: 'fix', label: 'Fix audio', onSelect: onFixAudio, className: 'min-[480px]:hidden' } satisfies PopoverMenuItem]
+            ? [{ key: 'fix', label: 'Fix audio', onSelect: onFixAudio, className: 'min-[560px]:hidden' } satisfies PopoverMenuItem]
             : []),
         ...(translationConfigured
             ? [
-                  { key: 'translate', label: 'Translate', role: 'menuitemcheckbox', checked: translationEnabled, hint: toggleTranslationKeys.length > 0 ? <KeyBadge keys={toggleTranslationKeys} /> : undefined, onSelect: onToggleTranslation, className: 'min-[480px]:hidden' } satisfies PopoverMenuItem,
-                  { key: 'their-language', label: `Their language: ${shortLanguageLabel(theirLanguage, theirLanguageLabel)}`, onSelect: () => { void window.electronAPI?.toggleSettingsWindow?.(); }, className: 'min-[480px]:hidden' } satisfies PopoverMenuItem,
-                  { key: 'my-language', label: `You speak: ${shortLanguageLabel(myLanguage, myLanguageLabel)}`, onSelect: () => { void window.electronAPI?.toggleSettingsWindow?.(); }, className: 'min-[480px]:hidden' } satisfies PopoverMenuItem,
-                  { key: 'original', label: 'Show original', role: 'menuitemcheckbox', checked: displayMode === 'both', hint: toggleOriginalKeys.length > 0 ? <KeyBadge keys={toggleOriginalKeys} /> : undefined, onSelect: onToggleOriginal, className: 'min-[480px]:hidden' } satisfies PopoverMenuItem,
+                  { key: 'translate', label: 'Translate', role: 'menuitemcheckbox', checked: translationEnabled, hint: toggleTranslationKeys.length > 0 ? <KeyBadge keys={toggleTranslationKeys} /> : undefined, onSelect: onToggleTranslation, className: 'min-[560px]:hidden' } satisfies PopoverMenuItem,
+                  { key: 'their-language', label: `Their language: ${shortLanguageLabel(theirLanguage, theirLanguageLabel)}`, onSelect: () => { void window.electronAPI?.toggleSettingsWindow?.(); }, className: 'min-[560px]:hidden' } satisfies PopoverMenuItem,
+                  { key: 'my-language', label: `You speak: ${shortLanguageLabel(myLanguage, myLanguageLabel)}`, onSelect: () => { void window.electronAPI?.toggleSettingsWindow?.(); }, className: 'min-[560px]:hidden' } satisfies PopoverMenuItem,
+                  { key: 'original', label: 'Show original', role: 'menuitemcheckbox', checked: displayMode === 'both', hint: toggleOriginalKeys.length > 0 ? <KeyBadge keys={toggleOriginalKeys} /> : undefined, onSelect: onToggleOriginal, className: 'min-[560px]:hidden' } satisfies PopoverMenuItem,
               ]
             : []),
         { key: 'model', label: `Model: ${modelName}`, onSelect: onOpenModelSelector, separatorBefore: true },
@@ -138,22 +138,22 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
     ];
 
     return (
-        <div className="draggable-area relative z-40 flex h-9 shrink-0 select-none items-center gap-1.5 border-b overlay-hairline px-2 min-[480px]:px-3">
+        <div className="draggable-area relative z-40 flex h-9 shrink-0 select-none items-center gap-1.5 border-b overlay-hairline px-2 min-[560px]:px-3">
             <span role="status" className="inline-flex min-w-0 items-center gap-1.5" title={status.chip}>
                 <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT_CLASS[status.dot]}`} />
                 {hasRows ? (
                     <>
                         {status.level === 'warn' && <span aria-hidden="true" className="text-[11px]">▲</span>}
                         {status.level === 'blocking' && <span aria-hidden="true" className="text-[11px]">✕</span>}
-                        <span className="hidden truncate text-[11px] font-medium overlay-text-secondary min-[480px]:inline">{status.chip}</span>
-                        <span className="truncate text-[11px] font-medium overlay-text-secondary min-[480px]:hidden">{status.chipShort}</span>
+                        <span className="hidden truncate text-[11px] font-medium overlay-text-secondary min-[560px]:inline">{status.chip}</span>
+                        <span className="truncate text-[11px] font-medium overlay-text-secondary min-[560px]:hidden">{status.chipShort}</span>
                     </>
                 ) : (
                     <span className="sr-only">{status.chip}</span>
                 )}
             </span>
             {hasRows && status.action === 'fix-audio' && (
-                <button type="button" onClick={onFixAudio} className={`no-drag hidden min-[480px]:inline-flex shrink-0 !border-transparent bg-[var(--overlay-action)] !text-white hover:brightness-95 ${barButton}`}>
+                <button type="button" onClick={onFixAudio} className={`no-drag hidden min-[560px]:inline-flex shrink-0 !border-transparent bg-[var(--overlay-action)] !text-white hover:brightness-95 ${barButton}`}>
                     Fix audio
                 </button>
             )}
@@ -167,7 +167,7 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
                             aria-label="Translate"
                             title="Translate"
                             onClick={onToggleTranslation}
-                            className={`no-drag hidden min-[480px]:inline-flex ${barButton}`}
+                            className={`no-drag hidden min-[560px]:inline-flex ${barButton}`}
                         >
                             <Languages className="h-3 w-3" aria-hidden="true" />
                             <span>Translate</span>
@@ -175,13 +175,13 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
                         <PopoverMenu
                             label="Their language"
                             trigger={<span>Them {shortLanguageLabel(theirLanguage, theirLanguageLabel)} ▾</span>}
-                            triggerClassName={`no-drag hidden min-[480px]:inline-flex ${barButton}`}
+                            triggerClassName={`no-drag hidden min-[560px]:inline-flex ${barButton}`}
                             items={theirLanguageItems}
                         />
                         <PopoverMenu
                             label="You speak"
                             trigger={<span>You {shortLanguageLabel(myLanguage, myLanguageLabel)} ▾</span>}
-                            triggerClassName={`no-drag hidden min-[480px]:inline-flex ${barButton}`}
+                            triggerClassName={`no-drag hidden min-[560px]:inline-flex ${barButton}`}
                             items={myLanguageItems}
                         />
                         <PopoverMenu
@@ -196,7 +196,7 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
                             aria-label="Show original"
                             title="Show original"
                             onClick={onToggleOriginal}
-                            className={`no-drag hidden min-[480px]:inline-flex ${barButton}`}
+                            className={`no-drag hidden min-[560px]:inline-flex ${barButton}`}
                         >
                             <Type className="h-3 w-3" aria-hidden="true" />
                             <span>Original</span>
