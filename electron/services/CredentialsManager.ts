@@ -64,7 +64,7 @@ export interface StoredCredentials {
     /** How answers sound (a manner of speaking, free text). Unset means the default style. */
     answerStyle?: string;
     transcriptTranslationEnabled?: boolean;
-    /** Connection id from AI Providers. An unknown or removed id is not configured. */
+    /** Connection id from Models & Agent. An unknown or removed id is not configured. */
     transcriptTranslationProvider?: string;
     transcriptTranslationModel?: string;
     transcriptTranslationPrompt?: string;
@@ -616,7 +616,7 @@ export class CredentialsManager {
     public resolveModelUse(job: 'chat' | 'summary' | 'agent'): { connection: Connection; model: string } | { error: string } {
         let use = job === 'agent' ? this.getAgentUse() : this.getModelUse(job);
         if (!use.connectionId && job !== 'chat') use = this.getModelUse('chat');
-        if (!use.connectionId || !use.model) return { error: 'Choose the quick answers model in Settings, AI Providers' };
+        if (!use.connectionId || !use.model) return { error: 'Choose the quick answers model in Settings, Models & Agent' };
         const connection = this.resolveConnection(use.connectionId);
         if (!connection) return { error: 'The connection chosen for this job no longer exists' };
         if (!connection.apiKey && connectionNeedsKey(connection.baseUrl)) return { error: `No API key is saved for ${connection.name}` };

@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-27: settings cleanup, step C (branch `settings-cleanup`)
+
+- Sidebar labels and order are now General, Audio & Translation, Models & Agent, Shortcuts, Your Background, About (tab ids unchanged). The audio tab is three cards: Devices (input with level test, system audio source with test tone and a one-line note that it applies from the next meeting, the SCK toggle now macOS-only), Speech recognition (provider, model, key, region, languages) and Translation (enable, display, languages, connection and model, Test; the prompt editor, Reset and the segmentation profile are under a collapsed Advanced disclosure that is not persisted). The agent workspace chooser moved from the audio tab to Models & Agent, under the Agent model row.
+- The fake overlay preview of a retired layout is gone, with the preview mode that hid Settings while dragging; the General card is one slider labelled "Overlay opacity" with a help line that matches the alpha floor in `overlayAppearance.ts`. The slider track used the input fill, which is white on the light card; it now uses the border colour. `SettingsOverlay.tsx` went from 2,539 to about 2,250 lines. User-visible "destination" wording in two error strings, the README and two tests followed the new tab names.
+- Checks: both typechecks, lint and tap (1375 assertions) exit 0. Browser preview with a mocked `electronAPI`: the audio tab in the dark theme (Devices first, Advanced collapsed by default, expands to prompt and segmentation) and the opacity card in the light theme. Not run: real devices, providers, Windows, the running app.
+- Found, not changed: Test Sound creates an `AudioContext` and never closes it.
+- Owner: look at the audio page and the opacity card in both themes; operate Advanced with the keyboard; play the test tone; drag the slider and confirm the overlay follows and the value survives a restart.
+
 ## 2026-10-27: settings cleanup, steps A and B (branch `settings-cleanup`)
 
 - A: the Soniox Save button always saved an empty key (its click handler had its own key table without Soniox); one shared lookup now serves the field, Save, Test and the model fetch. Wording made true to the code: proactive help (default is on, the test no longer says a card "would show"), what each speech Test checks, Deepgram and OpenAI labels, stealth (no dead "Supported apps here" button; disguise applies immediately), "Live transcript", AI response language, the translation source skip rule, and About. The ElevenLabs test no longer counts a network failure as success.

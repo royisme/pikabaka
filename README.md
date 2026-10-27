@@ -54,7 +54,7 @@ Full demo video: [`demo/out/pika-demo.mp4`](demo/out/pika-demo.mp4) · Built wit
 - **Sub-500 ms transcription** powered by a Rust native audio module (cpal + WebRTC VAD + rubato resampling).
 - **Dual-channel capture** — system audio (the meeting) and your microphone are streamed independently for clean attribution.
 - **Any LLM, any STT** — add a connection (OpenAI, Anthropic Claude, Google Gemini, Groq, or any OpenAI-compatible host such as Ollama or LM Studio) and pick the exact model for quick answers, summaries and the agent.
-- **Live translation** — each finished sentence is translated as it is spoken, source text first and larger; a second pass tidies whole paragraphs. A Test button in Audio settings shows the speed.
+- **Live translation** — each finished sentence is translated as it is spoken, source text first and larger; a second pass tidies whole paragraphs. A Test button in Settings > Audio & Translation shows the speed.
 - **Suggestions in the language of the call** — answers come in spoken style, in the language the other side is using, with a translation line you can read. They draw on your résumé and notes, and answer as an expert when your materials have nothing.
 - **Proactive help** — an optional decision model watches the conversation and offers a card when help would be useful.
 - **Mute your microphone** — one button stops your own voice from being transcribed when the call plays through speakers.
@@ -88,7 +88,7 @@ pnpm run dist           # production build via electron-builder
 
 **Prerequisites**: Node.js 20+, pnpm, Rust toolchain (for the native audio module), Git.
 
-## Configure AI Providers
+## Configure Models & Agent
 
 You only need **one** LLM provider and **one** STT provider to get started. All keys are stored in your OS keychain.
 

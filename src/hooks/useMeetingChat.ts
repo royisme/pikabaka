@@ -553,7 +553,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
                 {
                   id: Date.now().toString(),
                   role: 'system',
-                  text: `The agent could not answer${agentFailureWords(event.errorClass)}. Try again, or test the agent model in Settings, AI Providers.`,
+                  text: `The agent could not answer${agentFailureWords(event.errorClass)}. Try again, or test the agent model in Settings, Models & Agent.`,
                   isError: true,
                 },
               ];

@@ -28,11 +28,11 @@ const TranslationTest: React.FC<TranslationTestProps> = ({ provider, model, prom
                     disabled={test.isLoading || !model.trim()}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary transition-colors disabled:opacity-50"
                 >
-                    {test.isLoading ? 'Translating…' : 'Test translation'}
+                    {test.isLoading ? '● Translating…' : 'Test translation'}
                 </button>
-                <span className="text-[10px] text-text-tertiary">Sends one sample sentence with the settings above. Nothing is saved.</span>
+                <span className="text-[11px] text-text-tertiary">Sends one sample sentence with this model and prompt. Nothing is saved.</span>
             </div>
-            {test.isError && <p className="text-[11px] text-state-danger">{(test.error as Error).message}</p>}
+            {test.isError && <p className="text-[11px] text-text-primary">✕ {(test.error as Error).message}</p>}
             {result && (
                 <div className="rounded-lg border border-border-subtle bg-bg-input/50 px-3 py-2 space-y-1">
                     <p className="text-[11px] text-text-tertiary">{result.sample}</p>
@@ -44,7 +44,7 @@ const TranslationTest: React.FC<TranslationTestProps> = ({ provider, model, prom
                             </p>
                         </>
                     ) : (
-                        <p className="text-[11px] text-state-danger">{result.error}</p>
+                        <p className="text-[11px] text-text-primary">✕ {result.error}</p>
                     )}
                 </div>
             )}

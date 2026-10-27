@@ -183,7 +183,7 @@ Overlay `minHeight` becomes 360 (138 + 2×112); today it is 1 (`WindowHelper.ts:
 
 ## 6. One status component
 
-Replace `sttStatus` and `sttNeedsTroubleshooting` with one pure, unit-tested `audioStatus(health, isConnected, meetingStartedAt, noSystemAudioSince, now)` returning `{ key, level, chip, zone, action }`. Its words render in one place (Q6): **the chip** when the transcript area has rows, **the zone line** when it is empty (the chip then shows only the dot, with a screen-reader label). **Amends** translation spec §6: the action is a visible button; the popover keeps only details (real `lastError`, tips, "Open audio settings").
+Replace `sttStatus` and `sttNeedsTroubleshooting` with one pure, unit-tested `audioStatus(health, isConnected, meetingStartedAt, noSystemAudioSince, now)` returning `{ key, level, chip, zone, action }`. Its words render in one place (Q6): **the chip** when the transcript area has rows, **the zone line** when it is empty (the chip then shows only the dot, with a screen-reader label). **Amends** translation spec §6: the action is a visible button; the popover keeps only details (real `lastError`, tips, "Open Audio & Translation settings").
 
 | Key | Condition [code basis] | Level | Chip | Zone line (empty area) | Action |
 | --- | --- | --- | --- | --- | --- |

@@ -12,7 +12,7 @@ function credentials(values: Record<string, unknown> = {}): CredentialsManager {
     return manager;
 }
 
-const notChosen = { error: 'Choose the quick answers model in Settings, AI Providers' };
+const notChosen = { error: 'Choose the quick answers model in Settings, Models & Agent' };
 
 t.test('no default id or model prefix chooses a connection', t => {
     for (const defaultModel of ['gemini-example', 'claude-example', 'gpt-example', 'ollama-example', 'custom-example']) {

@@ -58,7 +58,7 @@ t.test('missing selections and provider failures are not replaced with another m
     Reflect.set(manager, 'credentials', {});
     CredentialsManager.getInstance = () => manager;
     const llm = helper();
-    await t.rejects(llm.generateContentStructured('Invented request'), { message: 'Choose the quick answers model in Settings, AI Providers' });
+    await t.rejects(llm.generateContentStructured('Invented request'), { message: 'Choose the quick answers model in Settings, Models & Agent' });
     manager.resolveModelUse = () => ({ connection: {} as Connection, model: 'invented' });
     let calls = 0;
     const failure = new Error('Invented host rejected images: HTTP 400');
