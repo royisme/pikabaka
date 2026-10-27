@@ -39,7 +39,7 @@ const SearchIndexSettings: React.FC = () => {
         <section className="space-y-3">
             <h3 className="text-sm font-bold text-text-primary">Search index</h3>
             <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-3">
-                <p className="text-xs text-text-secondary">The embedding model makes past meetings searchable and supplies context for answers; only text of transcripts is indexed.</p>
+                <p className="text-xs text-text-secondary">The embedding model makes meetings (transcript passages and summaries), your notes, resume and target roles searchable. One model serves both meetings and materials.</p>
                 <fieldset disabled={save.isLoading || rebuild.isLoading} className="space-y-3 min-w-0">
                     <ConnectionModelPicker
                         id="embedding"
@@ -59,13 +59,13 @@ const SearchIndexSettings: React.FC = () => {
                     </button>
                 </fieldset>
                 <div className="space-y-2 text-xs text-text-secondary" aria-live="polite">
-                    <p>{current?.providerName ? `In use: ${current.providerName} (${current.dimensions} dimensions)` : status.isLoading ? 'Loading index status…' : 'Search index unavailable: no embedding model is in use.'}</p>
+                    <p>{current?.providerName ? `● In use: ${current.providerName} (${current.dimensions} dimensions)` : status.isLoading ? '● Loading index status…' : '○ Search index unavailable: no embedding model is in use.'}</p>
                     {current?.selectedLabel && !current.usingSelected && current.providerName && (
-                        <p className="text-state-warning-strong">The chosen model did not answer; {current.providerName} is used instead.</p>
+                        <p className="text-state-warning-strong">▲ The chosen model did not answer; {current.providerName} is used instead.</p>
                     )}
                     {!!current?.incompatible && (
                         <div className="space-y-2">
-                            <p>{current.incompatible} past meetings are indexed with another model and are not searched until the index is rebuilt.</p>
+                            <p>▲ {current.incompatible} past meetings are indexed with another model and are not searched until the index is rebuilt.</p>
                             <button
                                 onClick={() => rebuild.mutate()}
                                 disabled={save.isLoading || rebuild.isLoading}
@@ -75,8 +75,8 @@ const SearchIndexSettings: React.FC = () => {
                             </button>
                         </div>
                     )}
-                    {rebuild.isSuccess && <p>Index rebuild queued. Meetings become searchable as indexing finishes.</p>}
-                    {failure ? <p className="text-[11px] text-state-danger-strong">{(failure as Error).message}</p> : null}
+                    {rebuild.isSuccess && <p>● Index rebuild queued. Meetings become searchable as indexing finishes.</p>}
+                    {failure ? <p className="text-[11px] text-state-danger-strong">✕ {(failure as Error).message}</p> : null}
                 </div>
             </div>
         </section>

@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-27: Knowledge tab, step K1 (branch `knowledge-tab`)
+
+- Settings > Your Background is now Knowledge (tab id `profile` unchanged) with three local pages. Sources lists what exists today with real numbers only: the recorded-meetings count from the launcher's recent-meetings call (the call is capped at 50, so a full result says "The latest 50"; it is not an indexed count) and the saved notes (characters, Edit, Remove). Index holds the Search index controls, moved from Models & Agent, and its text now says meetings (transcripts and summaries), notes, resume and roles are indexed. Interview profile holds the resume, the background switch, target roles, prep and the profile editor, marked "only for interview practice"; the fake upload percentage and the spinner are gone (the button says "Uploading…"). `SettingsOverlay.tsx` shrank from 2,250 to about 2,070 lines. No stored data, IPC or setting changed.
+- Not in K1 (later steps): document import, per-source rows and re-index, the Use when answering switches (K4), neutral notes wording (K4).
+- Checks: both typechecks, lint and tap (1392 assertions; 17 new server-render checks in `test/unit/knowledge-settings.test.ts`) exit 0. Browser preview with a mocked `electronAPI`: Sources (empty and with notes), Index and Interview profile in the dark theme; Sources with notes in the light theme. Not run: the real app, real index status, upload, delete profile.
+- Found, not changed: the profile status and profile read handlers swallow backend errors as false or null; the profile editor logs Save failures without showing them; "Each recorded meeting is queued for indexing" is the most the code guarantees (live indexing and summary freshness have known gaps, steps K2 and K3).
+- Owner: look at the three pages in both themes in the running app; edit and remove notes; add a resume and refresh it; Delete Profile; open meeting history from Sources.
+
 ## 2026-10-27: Settings cleanup merged, Knowledge and AI split approved (branch `ai-split`)
 
 - PR #50 (settings cleanup: six default shortcuts, a keyboard-operable recorder, Soniox Save, Settings wording, the audio page) merged as `5b804c0`.

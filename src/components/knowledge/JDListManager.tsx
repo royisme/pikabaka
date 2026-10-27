@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Briefcase, Check, Trash2, Plus, Upload, RefreshCw } from 'lucide-react';
+import { Briefcase, Check, Trash2, Plus, Upload } from 'lucide-react';
 import { useJDList, useActivateJD, useDeleteJD, useUploadNewJD } from '../../hooks/useJDList';
 import type { JDListItem } from '../../../electron/knowledge/types';
 import { InterviewPrepPanel } from './InterviewPrepPanel';
@@ -9,23 +9,26 @@ interface JDListManagerProps {
 }
 
 export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) => {
-  const { data: jds = [], isLoading } = useJDList();
+  const { data: jds = [], isLoading, error } = useJDList();
   const activateJD = useActivateJD();
   const deleteJD = useDeleteJD();
   const uploadJD = useUploadNewJD();
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [fileError, setFileError] = useState('');
   const [prepJD, setPrepJD] = useState<{ id: number; title: string; company: string } | null>(null);
 
   const handleUpload = async () => {
     try {
       setIsUploading(true);
+      setFileError('');
       const fileResult = await onSelectFile();
+      if (fileResult.error) throw new Error(fileResult.error);
       if (fileResult?.filePath) {
         await uploadJD.mutateAsync(fileResult.filePath);
       }
     } catch (e) {
-      console.error('JD upload failed:', e);
+      setFileError(e instanceof Error ? e.message : String(e));
     } finally {
       setIsUploading(false);
     }
@@ -43,13 +46,12 @@ export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) =>
   if (isLoading) {
     return (
       <div className="bg-bg-item-surface rounded-xl border border-border-subtle p-5">
-        <div className="animate-pulse space-y-3">
-          <div className="h-4 bg-bg-input rounded w-1/3" />
-          <div className="h-12 bg-bg-input rounded" />
-        </div>
+        <p className="text-xs text-text-secondary">● Loading roles…</p>
       </div>
     );
   }
+
+  const failure = fileError || uploadJD.error || deleteJD.error || activateJD.error || error;
 
   return (
     <div className="space-y-3">
@@ -61,17 +63,19 @@ export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) =>
         <button
           onClick={handleUpload}
           disabled={isUploading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-text-primary text-bg-main hover:opacity-90 transition-all shadow-sm disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-subtle text-xs font-medium text-text-primary hover:bg-bg-input disabled:opacity-50"
         >
           {isUploading ? (
-            <><RefreshCw size={12} className="animate-spin" /> Adding role...</>
+            <>Adding role…</>
           ) : (
             <><Plus size={12} /> Add Role</>
           )}
         </button>
       </div>
 
-      {jds.length === 0 ? (
+      {failure ? <p role="alert" className="text-xs text-text-primary">✕ {String(failure instanceof Error ? failure.message : failure)}</p> : null}
+
+      {error ? null : jds.length === 0 ? (
         <div className="bg-bg-item-surface rounded-xl border border-border-subtle p-8 text-center">
           <Briefcase size={24} className="mx-auto text-text-tertiary mb-3" />
           <p className="text-sm font-medium text-text-secondary">No roles added yet</p>
@@ -79,7 +83,7 @@ export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) =>
           <button
             onClick={handleUpload}
             disabled={isUploading}
-            className="mt-4 px-4 py-2 rounded-full text-xs font-medium bg-text-primary text-bg-main hover:opacity-90 transition-all"
+            className="mt-4 px-4 py-2 rounded-lg border border-border-subtle text-xs font-medium text-text-primary hover:bg-bg-input disabled:opacity-50"
           >
             <Upload size={12} className="inline mr-1.5" />
             Upload Job Description
@@ -90,14 +94,11 @@ export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) =>
           {jds.map((jd: JDListItem) => (
             <div
               key={jd.id}
-              className={`bg-bg-item-surface rounded-xl border transition-all cursor-pointer group ${
+              className={`bg-bg-item-surface rounded-xl border transition-all group ${
                 jd.isActive
                   ? 'border-accent-primary/50 ring-1 ring-accent-primary/20'
                   : 'border-border-subtle hover:border-border-muted'
               }`}
-              onClick={() => {
-                if (!jd.isActive) activateJD.mutate(jd.id);
-              }}
             >
               <div className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3 min-w-0">
@@ -111,10 +112,17 @@ export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) =>
 
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h5 className="text-sm font-semibold text-text-primary truncate">{jd.title}</h5>
+                      <button
+                        type="button"
+                        aria-pressed={jd.isActive}
+                        onClick={() => { if (!jd.isActive) activateJD.mutate(jd.id); }}
+                        className="text-sm font-semibold text-text-primary truncate text-left"
+                      >
+                        {jd.title}
+                      </button>
                       {jd.isActive && (
-                        <span className="text-[9px] font-bold text-accent-primary px-1.5 py-0.5 bg-accent-primary/10 rounded uppercase tracking-wide border border-accent-primary/20 shrink-0">
-                          Active
+                        <span className="text-[11px] font-bold text-text-secondary px-1.5 py-0.5 rounded uppercase tracking-wide border border-border-subtle shrink-0">
+                          ✓ Active
                         </span>
                       )}
                     </div>
@@ -123,12 +131,12 @@ export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) =>
                     {jd.technologies.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
                         {jd.technologies.slice(0, 5).map((tech, i) => (
-                          <span key={i} className="text-[10px] font-medium text-text-secondary px-1.5 py-0.5 rounded border border-border-subtle bg-bg-input">
+                          <span key={i} className="text-[11px] font-medium text-text-secondary px-1.5 py-0.5 rounded border border-border-subtle bg-bg-input">
                             {tech}
                           </span>
                         ))}
                         {jd.technologies.length > 5 && (
-                          <span className="text-[10px] text-text-tertiary">+{jd.technologies.length - 5}</span>
+                          <span className="text-[11px] text-text-tertiary">+{jd.technologies.length - 5}</span>
                         )}
                       </div>
                     )}
@@ -168,7 +176,8 @@ export const JDListManager: React.FC<JDListManagerProps> = ({ onSelectFile }) =>
                         e.stopPropagation();
                         setDeleteConfirmId(jd.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-state-danger p-1.5 rounded-md hover:bg-state-danger-soft transition-all"
+                      aria-label={`Delete ${jd.title}`}
+                      className="text-text-tertiary hover:text-state-danger p-1.5 rounded-md hover:bg-state-danger-soft transition-all"
                     >
                       <Trash2 size={14} />
                     </button>

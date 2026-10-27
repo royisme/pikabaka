@@ -1,4 +1,4 @@
-# Knowledge (replaces "Your Background")
+# Knowledge
 
 Status: option A approved by the owner on 2026-10-27; built step by step (see `TASKS.md`). Nothing is built. Evidence is a source-only investigation (GPT, commit `fdd71df`); every claim below was cited there by file and line, and none was run.
 

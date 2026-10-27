@@ -15,7 +15,7 @@ Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR 
 
 One step at a time, each one branch and one PR (they all touch `SettingsOverlay.tsx` or its children). Delegated to GPT, reviewed by the agent.
 
-- K1 `knowledge-tab` (next): the Knowledge tab replaces Your Background (tab id `profile` stays): Sources, Index and Interview profile as local pages; the Search index controls move here from AI functions; fix the "only transcripts" text; drop the fake upload percentage and spinner; no resume needed to use the tab. Pure UI, no stored data or IPC change, no sample data (real counts only from existing queries, else "Unknown"). Done when: both typechecks, lint and tap exit 0 and the page renders in a browser preview in both themes.
+- K1 `knowledge-tab` (done, PR open): the Knowledge tab replaces Your Background (tab id `profile` stays): Sources, Index and Interview profile as local pages; the Search index controls move here from AI functions; fix the "only transcripts" text; drop the fake upload percentage and spinner; no resume needed to use the tab. Pure UI, no stored data or IPC change, no sample data (real counts only from existing queries, else "Unknown"). Done when: both typechecks, lint and tap exit 0 and the page renders in a browser preview in both themes.
 - K2 `live-index-fix`: index live meetings under the real meeting id, remove the stale `source` insert, record the embedding provider on live writes, flush the last segments (fewer than three). Tests with a fake provider on a fresh schema.
 - K3 `summary-index`: refresh the summary-derived search after the summary is final, including recovery and edits.
 - K4 `material-notes`: neutral material lookup separate from the candidate prompt, an agent `search_materials` tool over the existing notes, and the Use when answering switches on the Sources page (new settings keys, default: past meetings on, materials and profile off).
@@ -23,7 +23,7 @@ One step at a time, each one branch and one PR (they all touch `SettingsOverlay.
 
 ## AI settings split (`docs/design-ai-settings-split.md`, option A approved)
 
-Starts after K1 lands (it also edits `AIProvidersSettings.tsx`); one step at a time, same delegation. The preview is in `.pi-runs/ai-split-preview/` (git-ignored).
+Starts after K1 is merged (it also edits `AIProvidersSettings.tsx`); one step at a time, same delegation. The preview is in `.pi-runs/ai-split-preview/` (git-ignored).
 
 - S1 `provider-list`: Provider setup page: language model providers as one row per configured provider (name, interface, host, state in words and a mark, delete with a second press), an Interface dropdown first in the Add and Edit form, no vendor rows and no presets, built-ins shown only when they have a key or a host override. Pure UI over the existing connection storage; no headers yet.
 - S2 `answer-style`: answer language and style move beside Quick answers.

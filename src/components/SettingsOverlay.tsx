@@ -2,7 +2,7 @@ import SttModelPicker, { STT_MODEL_DEFAULTS } from './settings/SttModelPicker';
 import ConnectionModelPicker from './settings/ConnectionModelPicker';
 import TranslationTest from './settings/TranslationTest';
 import AnswerStyleSettings from './settings/AnswerStyleSettings';
-import NotesSettings from './settings/NotesSettings';
+import KnowledgeSettings from './settings/KnowledgeSettings';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
 import { useWindowEvent } from '../hooks/useWindowEvent';
@@ -11,7 +11,7 @@ import { useLocalStorageValue } from '../hooks/useLocalStorageValue';
 import {
     X, Mic, Speaker, Monitor, Keyboard, BookOpen, Upload,
     RotateCcw, Eye, Layout, MessageSquare,
-    ChevronDown, ChevronRight, Check, Power, Palette, Ghost, Sun, Moon, RefreshCw, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink, Trash2,
+    ChevronDown, ChevronRight, Check, Power, Palette, Ghost, Sun, Moon, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink, Trash2,
     MapPin, PointerOff,
     AlertCircle, Shield
 } from 'lucide-react';
@@ -26,13 +26,7 @@ import {
     getDefaultOverlayOpacity,
 } from '../lib/overlayAppearance';
 import { KeyRecorder } from './ui/KeyRecorder';
-import { ProfileVisualizer } from '../premium';
-import { JDListManager } from './knowledge/JDListManager';
 import { isMac } from '../utils/platformUtils';
-import { useProfileStatus } from '../hooks/useProfileStatus';
-import { useProfileData } from '../hooks/useProfileData';
-import { useUploadResume } from '../hooks/useUploadResume';
-import { useKnowledgeMode } from '../hooks/useKnowledgeMode';
 
 const DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT =
     'You are a realtime subtitle translator. Preserve meaning, tone, technical terms, product names, numbers, and code tokens exactly when appropriate. Do not summarize, do not add explanations, and do not omit information. Return only the translated sentence(s), with no prefix/suffix and no markdown.';
@@ -240,14 +234,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
     const { shortcuts, updateShortcut, resetShortcuts } = useShortcuts();
 
-    // Profile Engine State
     const queryClient = useQueryClient();
-    const { data: profileStatus = { hasProfile: false, profileMode: false } } = useProfileStatus();
-    const { data: profileData } = useProfileData(activeTab === 'profile');
-    const uploadResume = useUploadResume();
-    const { isEnabled: knowledgeMode, toggle: toggleKnowledge } = useKnowledgeMode();
-    const profileUploading = uploadResume.isLoading;
-    const profileError = uploadResume.error instanceof Error ? uploadResume.error.message : '';
 
     // General Settings (queries + main event subscriptions)
     const { data: isUndetectable = false } = useQuery<boolean>(
@@ -1018,7 +1005,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                         }}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'profile' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <BookOpen size={16} /> Your Background
+                                        <BookOpen size={16} /> Knowledge
                                     </button>
 
                                     <button
@@ -1415,176 +1402,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                 </div>
                             )}
                             {activeTab === 'profile' && (
-                                <div className="space-y-6 animated fadeIn">
-                                    {/* Profile Header */}
-                                    <div className="bg-bg-item-surface rounded-xl border border-border-subtle flex flex-col justify-between overflow-hidden">
-                                        <div className="flex flex-col justify-between min-h-[160px]">
-
-                                            {/* Header */}
-                                            <div className="p-5 pb-4">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-full bg-bg-input border border-border-subtle flex items-center justify-center text-text-primary shadow-sm hover:scale-105 transition-transform duration-300">
-                                                            <span className="font-bold text-sm tracking-tight">
-                                                                {profileData?.identity?.name ? profileData.identity.name.charAt(0).toUpperCase() : 'U'}
-                                                            </span>
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="text-sm font-bold text-text-primary tracking-tight">
-                                                                {profileData?.identity?.name || 'Your Background'}
-                                                            </h4>
-                                                            <p className="text-xs text-text-secondary mt-0.5 tracking-wide">
-                                                                {profileData?.identity?.email || 'Add your resume to personalize interview support around your experience.'}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex items-center gap-3">
-                                                        {profileStatus.hasProfile && (
-                                                            <button
-                                                                onClick={async () => {
-                                                                    if (!confirm('Are you sure you want to delete your resume? This will clear your profile data.')) return;
-                                                                    try {
-                                                                        await window.electronAPI?.profileDelete?.();
-                                                                        queryClient.invalidateQueries(['profile']);
-                                                                    } catch (e) { console.error('Failed to delete profile:', e); }
-                                                                }}
-                                                                className="text-[12px] font-medium text-text-tertiary hover:text-state-danger transition-colors px-3 py-1.5 rounded-full hover:bg-state-danger-soft"
-                                                            >
-                                                                Delete Profile
-                                                            </button>
-                                                        )}
-
-                                                        {/* High-fidelity Toggle */}
-                                                        <div className={`flex items-center gap-2 bg-bg-input px-3 py-1.5 rounded-full border border-border-subtle ${!profileStatus.hasProfile ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                                                            <span className="text-xs font-medium text-text-secondary">Use your background in suggestions</span>
-                                                            <div
-                                                                onClick={() => {
-                                                                    if (!profileStatus.hasProfile) return;
-                                                                    toggleKnowledge.mutate(!knowledgeMode);
-                                                                }}
-                                                                className={`w-9 h-5 rounded-full relative transition-colors ${!profileStatus.hasProfile ? 'opacity-40 cursor-not-allowed bg-bg-toggle-switch' : knowledgeMode ? 'bg-accent-primary' : 'bg-bg-toggle-switch border border-border-muted'}`}
-                                                            >
-                                                                <div className={`absolute top-1 left-1 w-3 h-3 rounded-full bg-white transition-transform ${knowledgeMode ? 'translate-x-4' : 'translate-x-0'}`} />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Data Metrics & Extracted Skills */}
-                                            <div className="p-5 pt-0 mt-auto">
-                                                <div className="flex items-center justify-between bg-bg-input border border-border-subtle py-4 px-6 rounded-2xl shadow-sm">
-                                                    <div className="flex flex-col items-center justify-center flex-1">
-                                                        <span className="text-[20px] font-bold text-text-primary tracking-tight leading-none mb-1">{profileData?.experienceCount || 0}</span>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-state-success shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
-                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Experience</span>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="h-8 w-px bg-border-subtle/60" />
-
-                                                    <div className="flex flex-col items-center justify-center flex-1">
-                                                        <span className="text-[20px] font-bold text-text-primary tracking-tight leading-none mb-1">{profileData?.projectCount || 0}</span>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-state-info shadow-[0_0_8px_rgba(59,130,246,0.4)]" />
-                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Projects</span>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="h-8 w-px bg-border-subtle/60" />
-
-                                                    <div className="flex flex-col items-center justify-center flex-1">
-                                                        <span className="text-[20px] font-bold text-text-primary tracking-tight leading-none mb-1">{profileData?.nodeCount || 0}</span>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.4)]" />
-                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Profile Summary</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {profileData?.skills && profileData.skills.length > 0 && (
-                                                    <div className="mt-5">
-                                                        <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">
-Core Skills
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-1.5">
-                                                            {profileData.skills.slice(0, 15).map((skill: string, i: number) => (
-                                                                <span key={i} className="text-[10px] font-medium text-text-secondary px-2 py-1 rounded-md border border-border-subtle bg-bg-input">
-                                                                    {skill}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Upload Area */}
-                                    <div className="mt-5">
-                                        <div className={`bg-bg-item-surface rounded-xl border transition-all ${profileUploading ? 'border-accent-primary/50 ring-1 ring-accent-primary/20' : 'border-border-subtle'}`}>
-                                            <div className="p-5 flex items-center justify-between">
-                                                <div className="flex items-center gap-4 min-w-0">
-                                                    <div className="w-10 h-10 rounded-lg bg-bg-input border border-border-subtle flex items-center justify-center text-text-tertiary shrink-0">
-                                                        {profileUploading ? <RefreshCw size={20} className="animate-spin text-accent-primary" /> : <Upload size={20} />}
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <h4 className="text-sm font-bold text-text-primary mb-0.5 truncate pr-4">
-                                                            {profileStatus.hasProfile ? 'Refresh Resume' : 'Add Resume'}
-                                                        </h4>
-                                                        {profileUploading ? (
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="h-[4px] w-[100px] bg-bg-input rounded-full overflow-hidden">
-                                                                    <div className="h-full bg-accent-primary rounded-full animate-pulse" style={{ width: '50%' }} />
-                                                                </div>
-                                                                <span className="text-[10px] text-text-secondary tracking-wide">Reviewing your resume...</span>
-                                                            </div>
-                                                        ) : (
-                                                            <p className="text-xs text-text-secondary truncate pr-4">
-                                                                Add your resume to personalize prep, suggestions, and role alignment.
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <button
-                                                    onClick={async () => {
-                                                        const fileResult = await window.electronAPI?.profileSelectFile?.();
-                                                        if (fileResult?.filePath) {
-                                                            uploadResume.mutate(fileResult.filePath);
-                                                        }
-                                                    }}
-                                                    disabled={profileUploading}
-                                                    className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap shrink-0 ${profileUploading ? 'bg-bg-input text-text-tertiary cursor-wait border border-border-subtle' : 'bg-text-primary text-bg-main hover:opacity-90 shadow-sm'}`}
-                                                >
-                                                    {profileUploading ? 'Uploading...' : 'Choose File'}
-                                                </button>
-                                            </div>
-
-                                            {profileError && (
-                                                <div className="px-5 pb-4">
-                                                    <div className="px-3 py-2 bg-state-danger-soft border border-state-danger-border rounded-lg flex items-center gap-2 text-[11px] text-state-danger font-medium">
-                                                        <X size={12} /> {profileError}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* JD List Manager */}
-                                    <div className="mt-5">
-                                        <JDListManager onSelectFile={() => window.electronAPI?.profileSelectFile?.()} />
-                                    </div>
-
-                                    <div className="mt-5">
-                                        <NotesSettings />
-                                    </div>
-
-                                    <ProfileVisualizer profileData={profileData} />
-
-                                </div>
+                                <KnowledgeSettings onClose={onClose} />
                             )}
                             {activeTab === 'ai-providers' && (
                                 <AIProvidersSettings />

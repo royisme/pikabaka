@@ -24,7 +24,7 @@ Transcript second-pass correction needs no model (it merges reopened turns); the
 
 ## Proposed structure (option A, "federated")
 
-Tab ids stay, labels change: General, Audio & Translation, **AI functions** (`ai-providers`), **Provider setup** (new id), Shortcuts, Your Background, About.
+Tab ids stay, labels change: General, Audio & Translation, **AI functions** (`ai-providers`), **Provider setup** (new id), Shortcuts, Knowledge, About.
 
 - **Provider setup**: the services Pika connects to. The model is the one in quotio's provider list (`../../ops/quotio`, `Views/Components/CustomProviderSheet.swift` and its Custom Providers list): one row per provider the user has added, never a fixed list of companies (owner feedback, 2026-10-27; `electron/services/aiConnections.ts` already says Pika is not tied to any provider and that a connection is a type, a host and a key). Every provider speaks one of three interfaces, so the user picks the **interface**, not a company.
   - Language model providers: one row per configured provider: the name the user typed, the interface ("OpenAI compatible", "Anthropic compatible", "Gemini compatible"), the host, a state in words and a mark (Key saved, No key, Test failed), and a delete button (two presses: the row asks "Delete <name>?" first). Clicking the row opens the editor. Add provider opens the same editor: Interface (three choices, which fills the default Base URL), Name, Base URL, API key, **Custom headers (optional)** with Add header and an empty state, Test, Save, Cancel. OpenAI, Groq, OpenRouter, DeepSeek, a gateway of your own, Ollama and LM Studio are all "OpenAI compatible" and need no row of their own and no preset chip. There is no sample or default name in the product: the list starts with what the user has configured.
@@ -35,7 +35,7 @@ Tab ids stay, labels change: General, Audio & Translation, **AI functions** (`ai
   No thresholds, languages, prompts, folders or model choices here.
 - **AI functions**: one row per model setting that is not about audio: Quick answers (connection, model, Fetch, Save, collapsed Test, a line naming every job it serves, answer language, collapsed answer style), Summaries, Agent (image checkbox, workspace folder), Proactive help (mode, decision model, a read-only line saying cards use the Agent model, collapsed threshold, cooldown and decision log), Search index (Automatic or own, status always visible, collapsed rebuild).
 - **Audio & Translation**: devices, speech (service and model, languages), translation (enabled, target, connection and model, Test; source, display, prompt and segmentation under Advanced). Keys and accounts are links to Provider setup.
-- **Your Background** is being rethought, not kept as it is: Pika also has to search everyday meetings and the user's materials, not only a resume. See `docs/design-knowledge.md`. The Search index setting moves there, so AI functions has four rows (Quick answers, Summaries, Agent, Proactive help).
+- **Knowledge** is being rethought, not kept as a resume page: Pika also has to search everyday meetings and the user's materials, not only a resume. See `docs/design-knowledge.md`. The Search index setting moves there, so AI functions has four rows (Quick answers, Summaries, Agent, Proactive help).
 
 Rejected, option B: one "AI functions" page with all seven rows, including speech and translation. It rebuilds the overloaded page and separates devices from recognition.
 
