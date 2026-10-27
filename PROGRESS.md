@@ -2,6 +2,11 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-27: AI functions mapped against provider setup (branch `ai-split`)
+
+- Source-only investigation (GPT, commit `a69d308`): about 30 AI call sites reduce to seven model settings (Quick answers, Summaries, Agent, Proactive decision, Translation, Search index, Speech); the "Quick answers" name hides that it also serves vision, RAG answers, resume and role analysis, interview prep and live compaction. Proposed split and the pure-move versus behaviour-change line: `docs/design-ai-settings-split.md`. Nothing built.
+- Verified and recorded: `CredentialsManager` stores keys in a plaintext `credentials.json`, while the README says the OS keychain and "never in plaintext config files"; the owner chose system encryption (a separate task). Also confirmed in source: a language change rebuilds the Groq speech config and drops the chosen model; the project rule "never switch models on its own" has exceptions (automatic embeddings, OpenAI speech alternatives, a missing speech key falling back to Google, deleting an Agent connection making it inherit Quick answers).
+
 ## 2026-10-27: settings cleanup, step C (branch `settings-cleanup`)
 
 - Sidebar labels and order are now General, Audio & Translation, Models & Agent, Shortcuts, Your Background, About (tab ids unchanged). The audio tab is three cards: Devices (input with level test, system audio source with test tone and a one-line note that it applies from the next meeting, the SCK toggle now macOS-only), Speech recognition (provider, model, key, region, languages) and Translation (enable, display, languages, connection and model, Test; the prompt editor, Reset and the segmentation profile are under a collapsed Advanced disclosure that is not persisted). The agent workspace chooser moved from the audio tab to Models & Agent, under the Agent model row.
