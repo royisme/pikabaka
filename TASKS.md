@@ -13,7 +13,7 @@ Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR 
 
 ## Settings cleanup (owner-approved dispatch, `docs/design-settings-cleanup.md`)
 
-- Next, on `settings-cleanup` (stacked on `update-card`): A, fix the Soniox Save bug and the Settings wording that does not match the code; B, cut the shortcuts to six default-bound ones and make the recorder keyboard-operable, with conflicts refused and registration failures shown; C, reorder the audio page and remove the retired opacity preview. No migration for old users (owner decision). Done when: both typechecks, lint and tap exit 0 for each step.
+- Done on `settings-cleanup`: A (Soniox Save fixed, Settings wording made true to the code) and B (six default shortcuts, five optional unbound ones, eleven removed with their handlers; a keyboard-operable recorder that refuses conflicts and shows registration failures in words). Next: C, reorder the audio page and remove the retired opacity preview. No migration for old users (owner decision). Done when: both typechecks, lint and tap exit 0 for each step.
 - Then: owner checks the shortcuts with another app focused, the recorder with the keyboard only, Soniox with a real key, and the audio page in both themes.
 
 ## Updates card (owner-approved dispatch, `docs/design-auto-update.md`, section "Updates card")

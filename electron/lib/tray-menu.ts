@@ -52,14 +52,10 @@ export function updateTrayMenu(appState: AppState) {
   if (!state.tray) return;
 
   const keybindManager = KeybindManager.getInstance();
-  const screenshotAccel = keybindManager.getKeybind('general:take-screenshot') || 'CommandOrControl+H';
-
-  console.log('[Main] updateTrayMenu called. Screenshot Accelerator:', screenshotAccel);
-
   // Update tooltip for verification
   state.tray.setToolTip('Pika');
 
-  // Helper to format accelerator for display (e.g. CommandOrControl+H -> Cmd+H)
+  // Helper to format accelerator for display (e.g. CommandOrControl+B -> Cmd+B)
   const formatAccel = (accel: string) => {
     return accel
       .replace('CommandOrControl', 'Cmd')
@@ -69,7 +65,6 @@ export function updateTrayMenu(appState: AppState) {
       .replace(/\+/g, '+');
   };
 
-  const displayScreenshot = formatAccel(screenshotAccel);
   // We can also get the toggle visibility shortcut if desired
   const toggleKb = keybindManager.getKeybind('general:toggle-visibility');
   const toggleAccel = toggleKb || 'CommandOrControl+B';
@@ -92,8 +87,7 @@ export function updateTrayMenu(appState: AppState) {
       type: 'separator'
     },
     {
-      label: `Take Screenshot (${displayScreenshot})`,
-      accelerator: screenshotAccel,
+      label: 'Take Screenshot',
       click: async () => {
         try {
           const screenshotPath = await appState.takeScreenshot()

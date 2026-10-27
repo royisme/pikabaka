@@ -227,14 +227,6 @@ const SettingsPopup = () => {
                         <Camera className={`w-3.5 h-3.5 transition-colors ${iconInactiveClass}`} />
                         <span className={`text-[12px] transition-colors ${labelInactiveClass}`}>Take screenshot</span>
                     </div>
-                    <div className="flex gap-1">
-                        {/* Dynamic Keys for Take Screenshot */}
-                        {(shortcuts.takeScreenshot || ['⌘', 'H']).map((key, index) => (
-                            <div key={index} className={`px-1.5 py-0.5 rounded border text-[11px] font-medium min-w-[20px] text-center ${shortcutKeyClass}`}>
-                                {key}
-                            </div>
-                        ))}
-                    </div>
                 </div>
 
                 <div className={`h-px my-0.5 mx-2 ${dividerClass}`} />

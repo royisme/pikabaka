@@ -9,6 +9,15 @@ export interface AgentApprovalRequest { id: string; meetingId: string; tool: 'ba
 export type AgentApprovalEvent = { type: 'requested'; request: AgentApprovalRequest } | { type: 'settled'; id: string; allowed: boolean }
 export interface AgentProactiveCard { id: string; meetingId: string; segmentId: string; kind: string; text: string; time: number }
 
+export interface KeybindStatus {
+  id: string
+  label: string
+  accelerator: string
+  isGlobal: boolean
+  defaultAccelerator: string
+  registered: boolean
+}
+
 export interface ElectronAPI {
   updateContentDimensions: (dimensions: {
     width: number
@@ -294,10 +303,10 @@ export interface ElectronAPI {
   setDonationComplete: () => Promise<{ success: boolean }>;
 
   // Keybind Management
-  getKeybinds: () => Promise<Array<{ id: string; label: string; accelerator: string; isGlobal: boolean; defaultAccelerator: string }>>
-  setKeybind: (id: string, accelerator: string) => Promise<boolean>
-  resetKeybinds: () => Promise<Array<{ id: string; label: string; accelerator: string; isGlobal: boolean; defaultAccelerator: string }>>
-  onKeybindsUpdate: (callback: (keybinds: Array<any>) => void) => () => void
+  getKeybinds: () => Promise<KeybindStatus[]>
+  setKeybind: (id: string, accelerator: string) => Promise<{ success: boolean; error?: string }>
+  resetKeybinds: () => Promise<KeybindStatus[]>
+  onKeybindsUpdate: (callback: (keybinds: KeybindStatus[]) => void) => () => void
   onGlobalShortcut: (callback: (data: { action: string }) => void) => () => void
 
   // Profile Engine API

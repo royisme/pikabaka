@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron"
+import type { KeybindStatus, KeybindResult } from './services/KeybindManager'
 
 type PreloadAgentEvent = { meetingId: string } & (
   | { type: 'run_started' | 'run_settled' }
@@ -272,10 +273,10 @@ interface ElectronAPI {
   onChatStreamError: (callback: (data: { requestId: string; error: string }) => void) => () => void
 
   // Keybind Management
-  getKeybinds: () => Promise<Array<{ id: string; label: string; accelerator: string; isGlobal: boolean; defaultAccelerator: string }>>
-  setKeybind: (id: string, accelerator: string) => Promise<boolean>
-  resetKeybinds: () => Promise<Array<{ id: string; label: string; accelerator: string; isGlobal: boolean; defaultAccelerator: string }>>
-  onKeybindsUpdate: (callback: (keybinds: Array<any>) => void) => () => void
+  getKeybinds: () => Promise<KeybindStatus[]>
+  setKeybind: (id: string, accelerator: string) => Promise<KeybindResult>
+  resetKeybinds: () => Promise<KeybindStatus[]>
+  onKeybindsUpdate: (callback: (keybinds: KeybindStatus[]) => void) => () => void
 
   // Global shortcut events (stealth: fired even when window is not focused)
   onGlobalShortcut: (callback: (data: { action: string }) => void) => () => void
@@ -1084,11 +1085,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   // Keybind Management
-  getKeybinds: () => ipcRenderer.invoke('keybinds:get-all'),
-  setKeybind: (id: string, accelerator: string) => ipcRenderer.invoke('keybinds:set', id, accelerator),
-  resetKeybinds: () => ipcRenderer.invoke('keybinds:reset'),
-  onKeybindsUpdate: (callback: (keybinds: Array<any>) => void) => {
-    const subscription = (_: any, keybinds: any) => callback(keybinds)
+  getKeybinds: (): Promise<KeybindStatus[]> => ipcRenderer.invoke('keybinds:get-all'),
+  setKeybind: (id: string, accelerator: string): Promise<KeybindResult> => ipcRenderer.invoke('keybinds:set', id, accelerator),
+  resetKeybinds: (): Promise<KeybindStatus[]> => ipcRenderer.invoke('keybinds:reset'),
+  onKeybindsUpdate: (callback: (keybinds: KeybindStatus[]) => void) => {
+    const subscription = (_: Electron.IpcRendererEvent, keybinds: KeybindStatus[]) => callback(keybinds)
     ipcRenderer.on('keybinds:update', subscription)
     return () => {
       ipcRenderer.removeListener('keybinds:update', subscription)

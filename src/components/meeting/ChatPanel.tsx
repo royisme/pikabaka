@@ -548,7 +548,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <HelpCircle className="w-3 h-3 opacity-65" /> <span className="hidden min-[560px]:inline">Follow-up</span>
           </button>
           {onCaptureScreen && (
-            <button onClick={onCaptureScreen} aria-label="Screenshot" title={`Screenshot of the screen, attached to your next question${shortcuts.takeScreenshot.length ? ` (${shortcuts.takeScreenshot.join('+')})` : ''}`} className={`ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press ${quickActionClass}`} style={appearance.chipStyle}>
+            <button onClick={onCaptureScreen} aria-label="Screenshot" title="Screenshot of the screen, attached to your next question" className={`ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-full border overlay-hairline transition-colors active:scale-95 duration-200 interaction-base interaction-press ${quickActionClass}`} style={appearance.chipStyle}>
               <Monitor className="w-3 h-3 opacity-65" aria-hidden="true" />
             </button>
           )}

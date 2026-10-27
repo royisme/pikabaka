@@ -1,94 +1,80 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useId, useState } from 'react';
+import { useQuery } from 'react-query';
+import { SHORTCUT_IDS, type ShortcutConfig } from '../../hooks/useShortcuts';
+import type { KeybindStatus } from '../../types/electron';
 
 interface KeyRecorderProps {
+    actionId: keyof ShortcutConfig;
+    label: string;
     currentKeys: string[];
-    onSave: (keys: string[]) => void;
+    onSave: (keys: string[]) => Promise<{ success: boolean; error?: string }>;
     className?: string;
 }
 
-export const KeyRecorder: React.FC<KeyRecorderProps> = ({ currentKeys, onSave, className }) => {
+export const KeyRecorder: React.FC<KeyRecorderProps> = ({ actionId, label, currentKeys, onSave, className }) => {
+    // The parent owns fetching and events; each row only observes the shared list.
+    const { data: keybinds = [] } = useQuery<KeybindStatus[]>(['keybinds'], { enabled: false });
+    const registered = keybinds.find(kb => kb.id === SHORTCUT_IDS[actionId])?.registered;
     const [isRecording, setIsRecording] = useState(false);
-    const [recordedKeys, setRecordedKeys] = useState<string[]>([]);
-    const inputRef = useRef<HTMLDivElement>(null);
+    const [error, setError] = useState<{ keys: string; message: string } | null>(null);
+    const errorId = useId();
+    const savedKeys = currentKeys.join('+');
+    const message = (error?.keys === savedKeys ? error.message : '') ||
+        (currentKeys.length > 0 && registered === false
+            ? 'Not active: another app may be using this key combination'
+            : '');
 
-    useEffect(() => {
-        if (isRecording && inputRef.current) {
-            inputRef.current.focus();
+    const save = async (keys: string[]) => {
+        setIsRecording(false);
+        setError(null);
+        try {
+            const result = await onSave(keys);
+            if (!result.success) setError({ keys: savedKeys, message: result.error || 'Could not save this shortcut' });
+        } catch (error) {
+            setError({ keys: savedKeys, message: error instanceof Error ? error.message : 'Could not save this shortcut' });
         }
-    }, [isRecording]);
+    };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (!isRecording) return;
         e.preventDefault();
         e.stopPropagation();
-
-        const key = e.key;
-        const code = e.code;
-        const meta = e.metaKey;
-        const ctrl = e.ctrlKey;
-        const alt = e.altKey;
-        const shift = e.shiftKey;
-
-        // Ignore modifier key presses alone if possible, but we need to show them
-        const modifiers = [];
-        if (meta) modifiers.push('⌘');
-        if (ctrl) modifiers.push('⌃');
-        if (alt) modifiers.push('⌥');
-        if (shift) modifiers.push('⇧');
-
-        let mainKey = '';
-        if (key !== 'Meta' && key !== 'Control' && key !== 'Alt' && key !== 'Shift') {
-            if (code.startsWith('Key')) mainKey = key.toUpperCase();
-            else if (code.startsWith('Digit')) mainKey = key;
-            else if (code === 'Space') mainKey = 'Space';
-            else if (key === 'Enter') mainKey = 'Enter';
-            else if (key === 'Backspace') mainKey = 'Backspace';
-            else if (key.startsWith('Arrow')) mainKey = key;
-            else mainKey = key.toUpperCase();
-        }
-
-        if (mainKey) {
-            setRecordedKeys([...modifiers, mainKey]);
+        if (e.key === 'Escape') {
             setIsRecording(false);
-            onSave([...modifiers, mainKey]);
-        } else {
-            // Just modifiers pressed so far
-            setRecordedKeys([...modifiers]);
+            return;
         }
+        if (['Meta', 'Control', 'Alt', 'Shift'].includes(e.key)) return;
+
+        const keys = [];
+        if (e.metaKey) keys.push('⌘');
+        if (e.ctrlKey) keys.push('⌃');
+        if (e.altKey) keys.push('⌥');
+        if (e.shiftKey) keys.push('⇧');
+        keys.push(e.code === 'Space' ? 'Space' : e.key.length === 1 ? e.key.toUpperCase() : e.key);
+        void save(keys);
     };
 
     return (
-        <div
-            className={`relative flex items-center gap-1.5 group ${className || ''}`}
-            onClick={() => setIsRecording(true)}
-        >
-            {isRecording ? (
-                <div
-                    ref={inputRef}
-                    tabIndex={0}
+        <>
+            <div className={`flex items-center justify-end gap-2 ${className || ''}`}>
+                <button
+                    type="button"
+                    aria-label={`Change shortcut: ${label}`}
+                    aria-describedby={message ? errorId : undefined}
+                    onClick={() => { setError(null); setIsRecording(true); }}
                     onKeyDown={handleKeyDown}
                     onBlur={() => setIsRecording(false)}
-                    className="flex items-center gap-1 bg-bg-input border border-accent-primary text-accent-primary px-2 py-1 rounded-md text-xs font-sans shadow-sm outline-none min-w-[60px] justify-center"
+                    className={`flex items-center gap-1 min-h-7 px-2 py-1 rounded-md border text-xs font-sans ${isRecording ? 'bg-bg-input border-accent-primary text-accent-primary' : 'bg-bg-input border-border-subtle text-text-secondary hover:border-text-tertiary'}`}
                 >
-                    {recordedKeys.length > 0 ? recordedKeys.join(' + ') : 'Press keys...'}
-                </div>
-            ) : (
-                <div className="flex items-center gap-1">
-                    {currentKeys.map((k, i) => {
-                        let displayKey = k;
-                        if (k === 'ArrowUp') displayKey = '↑';
-                        else if (k === 'ArrowDown') displayKey = '↓';
-                        else if (k === 'ArrowLeft') displayKey = '←';
-                        else if (k === 'ArrowRight') displayKey = '→';
-
-                        return (
-                            <span key={i} className="bg-bg-input text-text-secondary h-6 min-w-[26px] px-1.5 rounded-md text-xs font-sans flex items-center justify-center shadow-sm border border-border-subtle group-hover:border-text-tertiary transition-colors">
-                                {displayKey}
-                            </span>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
+                    {isRecording ? 'Press keys…' : currentKeys.length === 0 ? 'Not set' : currentKeys.map(key => ({ ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[key] || key)).join(' + ')}
+                </button>
+                {currentKeys.length > 0 && (
+                    <button type="button" aria-label={`Clear shortcut: ${label}`} onClick={() => void save([])} className="text-xs text-text-secondary hover:text-text-primary">
+                        Clear
+                    </button>
+                )}
+            </div>
+            {message && <p id={errorId} role="status" className="col-span-2 text-xs text-state-danger-strong">✕ {message}</p>}
+        </>
     );
 };

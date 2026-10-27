@@ -16,7 +16,7 @@ Real-time transcription, AI-suggested answers, and screenshot reasoning — runn
 
 ---
 
-Pika listens to your meetings, transcribes both sides of the conversation in under 500 ms, and quietly suggests answers powered by the LLM you choose — OpenAI, Claude, Gemini, Groq, or fully offline with Ollama. Bring your own API key, keep your audio on your machine, and customize every shortcut.
+Pika listens to your meetings, transcribes both sides of the conversation in under 500 ms, and quietly suggests answers powered by the LLM you choose — OpenAI, Claude, Gemini, Groq, or fully offline with Ollama. Bring your own API key, keep your audio on your machine, and customize the overlay's global shortcuts.
 
 If you've been looking for an **open-source alternative to Cluely, Granola, or Otter** that respects your privacy and your wallet, Pika is built for you.
 
@@ -61,7 +61,7 @@ Full demo video: [`demo/out/pika-demo.mp4`](demo/out/pika-demo.mp4) · Built wit
 - **Local RAG memory** — past meetings indexed with `sqlite-vec`; search and recall without sending data anywhere.
 - **Screenshot reasoning** — capture full screen or a region, pipe it to a vision model, get an answer in seconds.
 - **Stealth overlay** — disguise the process name and hide the window from screen-sharing.
-- **Configurable everything** — every shortcut, every provider, every key in your OS keychain.
+- **Configurable controls** — customize the overlay's global shortcuts and choose your AI providers.
 - **Cross-platform** — macOS (Apple Silicon + Intel) and Windows 10/11.
 
 ## Install
@@ -159,7 +159,7 @@ Only if you choose a cloud STT/LLM provider. Pair Ollama with a local STT engine
 In your OS keychain — Keychain Access on macOS, Credential Manager on Windows. Never in plaintext config files.
 
 **How is Pika different from Cluely?**
-Open source under AGPL-3.0, no subscription, you bring your own API key, and you can run completely offline with Ollama. Every shortcut and provider is configurable.
+Open source under AGPL-3.0, no subscription, you bring your own API key, and you can run completely offline with Ollama. The overlay's global shortcuts and AI providers are configurable.
 
 **Why "stealth mode"?**
 The overlay can be hidden from screen-sharing tools so private notes during a sales demo don't show on the customer's screen. It's a privacy feature, not a permission to break rules — please use Pika ethically and respect any policies that apply to your conversations.

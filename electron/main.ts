@@ -239,16 +239,6 @@ export class AppState {
         } else if (actionId === 'general:toggle-mouse-passthrough') {
           // Adapted from public PR #113 — verify premium interaction
           this.toggleOverlayMousePassthrough();
-        } else if (actionId === 'general:take-screenshot') {
-          const screenshotPath = await this.takeScreenshot(false);
-          const preview = await this.getImagePreview(screenshotPath);
-          const mainWindow = this.getMainWindow();
-          if (mainWindow) {
-            mainWindow.webContents.send("screenshot-taken", {
-              path: screenshotPath,
-              preview
-            });
-          }
         } else if (actionId === 'general:selective-screenshot') {
           const screenshotPath = await this.takeSelectiveScreenshot(false);
           const preview = await this.getImagePreview(screenshotPath);
@@ -260,51 +250,17 @@ export class AppState {
               preview
             });
           }
-        } else if (actionId === 'general:capture-and-process') {
-          // Single-trigger: capture current screen then immediately request AI analysis
-          const screenshotPath = await this.takeScreenshot(false);
-          const preview = await this.getImagePreview(screenshotPath);
-          // Ensure the window is visible so the user can see the response without stealing focus
-          this.showMainWindow(true);
-          // win.focus() can cause macOS to re-activate the app. Re-hide the dock
-          // if we are in undetectable mode.
-          if (process.platform === 'darwin' && this.isUndetectable) {
-            app.dock.hide();
-          }
-          const mainWindow = this.getMainWindow();
-          if (mainWindow) {
-            mainWindow.webContents.send("capture-and-process", {
-              path: screenshotPath,
-              preview
-            });
-          }
 
         // --- STEALTH SHORTCUTS: no focus, no show, pure IPC dispatch ---
 
         // Chat actions — fire into the renderer without focusing the window
         } else if (
           actionId === 'chat:whatToAnswer' ||
-          actionId === 'chat:clarify' ||
-          actionId === 'chat:followUp' ||
-          actionId === 'chat:answer' ||
-          actionId === 'chat:codeHint' ||
-          actionId === 'chat:brainstorm' ||
-          actionId === 'chat:dynamicAction4' ||
-          actionId === 'chat:scrollUp' ||
-          actionId === 'chat:scrollDown' ||
           actionId === 'translation:toggle' ||
           actionId === 'translation:toggle-original'
         ) {
           const actionMap: Record<string, string> = {
             'chat:whatToAnswer': 'whatToAnswer',
-            'chat:clarify': 'clarify',
-            'chat:followUp': 'followUp',
-            'chat:answer': 'answer',
-            'chat:codeHint': 'codeHint',
-            'chat:brainstorm': 'brainstorm',
-            'chat:dynamicAction4': 'dynamicAction4',
-            'chat:scrollUp': 'scrollUp',
-            'chat:scrollDown': 'scrollDown',
             'translation:toggle': 'toggleTranslation',
             'translation:toggle-original': 'toggleOriginal',
           };
@@ -328,13 +284,6 @@ export class AppState {
           this.windowHelper.moveWindowRight();
 
         // General actions that are now global (stealth)
-        } else if (actionId === 'general:process-screenshots') {
-          const allWindows = BrowserWindow.getAllWindows();
-          allWindows.forEach(win => {
-            if (!win.isDestroyed()) {
-              win.webContents.send('global-shortcut', { action: 'processScreenshots' });
-            }
-          });
         } else if (actionId === 'general:reset-cancel') {
           const allWindows = BrowserWindow.getAllWindows();
           allWindows.forEach(win => {

@@ -829,6 +829,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [hasStoredIbmWatsonKey, setHasStoredIbmWatsonKey] = useState(false);
     const [sttSonioxKey, setSttSonioxKey] = useState('');
     const [hasStoredSonioxKey, setHasStoredSonioxKey] = useState(false);
+    const sttKey = {
+        google: '', groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey,
+        elevenlabs: sttElevenLabsKey, azure: sttAzureKey, ibmwatson: sttIbmKey,
+        soniox: sttSonioxKey,
+    }[sttProvider];
     const [isSttDropdownOpen, setIsSttDropdownOpen] = useState(false);
     const sttDropdownRef = React.useRef<HTMLDivElement>(null);
     const [transcriptTranslationEnabled, setTranscriptTranslationEnabled] = useState(false);
@@ -1095,17 +1100,12 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
     const handleTestSttConnection = async () => {
         if (sttProvider === 'google') return;
-        const keyMap: Record<string, string> = {
-            groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey,
-            elevenlabs: sttElevenLabsKey, azure: sttAzureKey, ibmwatson: sttIbmKey,
-            soniox: sttSonioxKey,
-        };
         const hasStoredMap: Record<string, boolean> = {
             groq: hasStoredSttGroqKey, openai: hasStoredSttOpenaiKey, deepgram: hasStoredDeepgramKey,
             elevenlabs: hasStoredElevenLabsKey, azure: hasStoredAzureKey, ibmwatson: hasStoredIbmWatsonKey,
             soniox: hasStoredSonioxKey,
         };
-        const keyToTest = keyMap[sttProvider] || '';
+        const keyToTest = sttKey;
         // Allow test with empty local key if a stored key exists (backend will use it)
         if (!keyToTest.trim() && !hasStoredMap[sttProvider]) {
             setSttTestStatus('error');
@@ -1321,10 +1321,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     ) : (
                                                         <Ghost size={18} className="text-text-primary" />
                                                     )}
-                                                    <h3 className="text-lg font-bold text-text-primary">{isUndetectable ? 'Undetectable' : 'Detectable'}</h3>
+                                                    <h3 className="text-lg font-bold text-text-primary">Undetectable mode: {isUndetectable ? 'on' : 'off'}</h3>
                                                 </div>
                                                 <p className="text-xs text-text-secondary">
-                                                    Pika is currently {isUndetectable ? 'undetectable' : 'detectable'} by screen-sharing. <button className="text-state-info hover:underline">Supported apps here</button>
+                                                    Requests capture exclusion on Windows and macOS. macOS apps using ScreenCaptureKit can still capture Pika. Not supported on Linux.
                                                 </p>
                                             </div>
                                             <div
@@ -1456,15 +1456,15 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     </div>
                                                 </div>
 
-                                                {/* Interviewer Transcript */}
+                                                {/* Live transcript */}
                                                 <div className="flex items-center justify-between px-4 py-3">
                                                     <div className="flex items-center gap-4">
                                                         <div className="w-10 h-10 bg-bg-item-surface rounded-lg border border-border-subtle flex items-center justify-center text-text-tertiary">
                                                             <MessageSquare size={20} />
                                                         </div>
                                                         <div>
-                                                            <h3 className="text-sm font-bold text-text-primary">Interviewer Transcript</h3>
-                                                            <p className="text-xs text-text-secondary mt-0.5">Show real-time transcription of the interviewer</p>
+                                                            <h3 className="text-sm font-bold text-text-primary">Live transcript</h3>
+                                                            <p className="text-xs text-text-secondary mt-0.5">Show the live transcript for both the interviewer and you</p>
                                                         </div>
                                                     </div>
                                                     <div
@@ -1539,7 +1539,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         </div>
                                                         <div>
                                                             <h3 className="text-sm font-bold text-text-primary">AI Response Language</h3>
-                                                            <p className="text-xs text-text-secondary mt-0.5">Language for AI suggestions and notes</p>
+                                                            <p className="text-xs text-text-secondary mt-0.5">Reading language for quick answers and proactive cards; adds a translation when it differs from your speaking-language setting.</p>
                                                         </div>
                                                     </div>
 
@@ -1635,9 +1635,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <h3 className="text-lg font-bold text-text-primary">Process Disguise</h3>
                                             </div>
                                             <p className="text-xs text-text-secondary">
-                                                Disguise Pika as another application to prevent detection during screen sharing.
+                                                Changes Pika's process name and window titles, with platform-specific icons. This does not exclude it from screen capture.
                                                 <span className="block mt-1 text-text-tertiary">
-                                                    Select a disguise to be automatically applied when Undetectable mode is on.
+                                                    Your choice applies immediately, even with Undetectable mode off.
                                                 </span>
                                             </p>
                                         </div>
@@ -1873,20 +1873,21 @@ Core Skills
                                     </div>
 
                                     <div className="bg-bg-card border border-border-subtle rounded-2xl p-4 md:p-5">
-                                        {[
+                                        {([
                                             { id: 'toggleVisibility', label: 'Show or hide Pika' },
-                                            { id: 'whatToAnswer', label: 'What should I answer?' },
-                                            { id: 'captureAndProcess', label: 'Capture screen and ask AI' },
-                                            { id: 'processScreenshots', label: 'Process current screenshots' },
-                                            { id: 'resetCancel', label: 'Reset or cancel' },
+                                            { id: 'toggleMousePassthrough', label: 'Toggle click-through' },
+                                            { id: 'whatToAnswer', label: 'What to say' },
+                                            { id: 'selectiveScreenshot', label: 'Capture Selected Area' },
                                             { id: 'toggleTranslation', label: 'Turn translation on or off' },
-                                            { id: 'toggleOriginal', label: 'Show or hide the original text' },
-                                        ].map((item) => (
-                                            <div key={item.id} className="flex items-center justify-between py-2 border-b border-border-subtle/50 last:border-b-0">
+                                            { id: 'resetCancel', label: 'Stop generation' },
+                                        ] as const).map((item) => (
+                                            <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 py-2 border-b border-border-subtle last:border-b-0">
                                                 <span className="text-sm text-text-secondary">{item.label}</span>
                                                 <KeyRecorder
-                                                    currentKeys={shortcuts[item.id as keyof typeof shortcuts]}
-                                                    onSave={(keys) => updateShortcut(item.id as any, keys)}
+                                                    actionId={item.id}
+                                                    label={item.label}
+                                                    currentKeys={shortcuts[item.id]}
+                                                    onSave={(keys) => updateShortcut(item.id, keys)}
                                                 />
                                             </div>
                                         ))}
@@ -1901,54 +1902,26 @@ Core Skills
                                                 <ChevronRight size={15} className={`transition-transform ${showMoreShortcuts ? 'rotate-90' : ''}`} />
                                                 More shortcuts
                                             </span>
-                                            <span className="px-2 py-0.5 rounded-full bg-bg-subtle text-[11px] text-text-tertiary font-medium">15</span>
+                                            <span className="px-2 py-0.5 rounded-full bg-bg-subtle text-[11px] text-text-tertiary font-medium">5</span>
                                         </button>
 
                                         {showMoreShortcuts && (
                                             <div className="mt-4">
-                                                {[
-                                                    {
-                                                        title: 'AI actions',
-                                                        items: [
-                                                            { id: 'clarify', label: 'Clarify the question' },
-                                                            { id: 'followUp', label: 'Generate a follow-up' },
-                                                            { id: 'dynamicAction4', label: 'Recap or brainstorm' },
-                                                            { id: 'answer', label: 'Answer or record' },
-                                                            { id: 'codeHint', label: 'Get a code hint' },
-                                                            { id: 'brainstorm', label: 'Brainstorm approaches' },
-                                                            { id: 'scrollUp', label: 'Scroll up' },
-                                                            { id: 'scrollDown', label: 'Scroll down' },
-                                                        ],
-                                                    },
-                                                    {
-                                                        title: 'Window',
-                                                        items: [
-                                                            { id: 'moveWindowUp', label: 'Move up' },
-                                                            { id: 'moveWindowDown', label: 'Move down' },
-                                                            { id: 'moveWindowLeft', label: 'Move left' },
-                                                            { id: 'moveWindowRight', label: 'Move right' },
-                                                        ],
-                                                    },
-                                                    {
-                                                        title: 'Other',
-                                                        items: [
-                                                            { id: 'toggleMousePassthrough', label: 'Toggle mouse passthrough' },
-                                                            { id: 'takeScreenshot', label: 'Full screenshot' },
-                                                            { id: 'selectiveScreenshot', label: 'Selective screenshot' },
-                                                        ],
-                                                    },
-                                                ].map((group) => (
-                                                    <div key={group.title} className="border-t border-border-subtle pt-3 first:border-t-0 first:pt-0">
-                                                        <div className="text-[10px] uppercase tracking-wider text-text-tertiary font-medium mb-1 mt-3 first:mt-0">{group.title}</div>
-                                                        {group.items.map((item) => (
-                                                            <div key={item.id} className="flex items-center justify-between py-2 border-b border-border-subtle/50 last:border-b-0">
-                                                                <span className="text-sm text-text-secondary">{item.label}</span>
-                                                                <KeyRecorder
-                                                                    currentKeys={shortcuts[item.id as keyof typeof shortcuts]}
-                                                                    onSave={(keys) => updateShortcut(item.id as any, keys)}
-                                                                />
-                                                            </div>
-                                                        ))}
+                                                {([
+                                                    { id: 'toggleOriginal', label: 'Show or hide the original text' },
+                                                    { id: 'moveWindowUp', label: 'Move window up' },
+                                                    { id: 'moveWindowDown', label: 'Move window down' },
+                                                    { id: 'moveWindowLeft', label: 'Move window left' },
+                                                    { id: 'moveWindowRight', label: 'Move window right' },
+                                                ] as const).map((item) => (
+                                                    <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 py-2 border-b border-border-subtle last:border-b-0">
+                                                        <span className="text-sm text-text-secondary">{item.label}</span>
+                                                        <KeyRecorder
+                                                            actionId={item.id}
+                                                            label={item.label}
+                                                            currentKeys={shortcuts[item.id]}
+                                                            onSave={(keys) => updateShortcut(item.id, keys)}
+                                                        />
                                                     </div>
                                                 ))}
                                             </div>
@@ -1974,8 +1947,8 @@ Core Skills
                                                         options={[
                                                             { id: 'google', label: 'Google Cloud', badge: googleServiceAccountPath ? 'Saved' : null, recommended: true, desc: 'gRPC streaming via Service Account', color: 'blue', icon: <Mic size={14} /> },
                                                             { id: 'groq', label: 'Groq Whisper', badge: hasStoredSttGroqKey ? 'Saved' : null, recommended: true, desc: 'Ultra-fast REST transcription', color: 'orange', icon: <Mic size={14} /> },
-                                                            { id: 'openai', label: 'OpenAI Whisper', badge: hasStoredSttOpenaiKey ? 'Saved' : null, desc: 'OpenAI-compatible Whisper API', color: 'green', icon: <Mic size={14} /> },
-                                                            { id: 'deepgram', label: 'Deepgram Nova-3', badge: hasStoredDeepgramKey ? 'Saved' : null, recommended: true, desc: 'High-accuracy REST transcription', color: 'purple', icon: <Mic size={14} /> },
+                                                            { id: 'openai', label: 'OpenAI', badge: hasStoredSttOpenaiKey ? 'Saved' : null, desc: 'Streaming transcription with REST fallback', color: 'green', icon: <Mic size={14} /> },
+                                                            { id: 'deepgram', label: 'Deepgram', badge: hasStoredDeepgramKey ? 'Saved' : null, recommended: true, desc: 'Streaming transcription with a configurable model', color: 'purple', icon: <Mic size={14} /> },
                                                             { id: 'elevenlabs', label: 'ElevenLabs Scribe', badge: hasStoredElevenLabsKey ? 'Saved' : null, desc: 'Scribe v2 Realtime API', color: 'teal', icon: <Mic size={14} /> },
                                                             { id: 'azure', label: 'Azure Speech', badge: hasStoredAzureKey ? 'Saved' : null, desc: 'Microsoft Cognitive Services STT', color: 'cyan', icon: <Mic size={14} /> },
                                                             { id: 'ibmwatson', label: 'IBM Watson', badge: hasStoredIbmWatsonKey ? 'Saved' : null, desc: 'IBM Watson cloud STT service', color: 'indigo', icon: <Mic size={14} /> },
@@ -1992,7 +1965,7 @@ Core Skills
                                                     <SttModelPicker
                                                         provider={sttProvider}
                                                         model={sttModelDraft[sttProvider] ?? ''}
-                                                        apiKey={({ groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey, elevenlabs: sttElevenLabsKey, soniox: sttSonioxKey } as Record<string, string>)[sttProvider] ?? ''}
+                                                        apiKey={sttKey}
                                                         onChange={(model) => { setSttModelDraft({ ...sttModelDraft, [sttProvider]: model }); setSpeechResult(null); }}
                                                     />
                                                     <p className="text-[10px] text-text-tertiary">Leave empty for the default. The key above is used to fetch the list; a saved key works too.</p>
@@ -2042,15 +2015,7 @@ Core Skills
                                                     <div className="flex gap-2">
                                                         <input
                                                             type="password"
-                                                            value={
-                                                                sttProvider === 'groq' ? sttGroqKey
-                                                                    : sttProvider === 'openai' ? sttOpenaiKey
-                                                                        : sttProvider === 'elevenlabs' ? sttElevenLabsKey
-                                                                            : sttProvider === 'azure' ? sttAzureKey
-                                                                                : sttProvider === 'ibmwatson' ? sttIbmKey
-                                                                                    : sttProvider === 'soniox' ? sttSonioxKey
-                                                                                        : sttDeepgramKey
-                                                            }
+                                                            value={sttKey}
                                                             onChange={(e) => {
                                                                 if (sttProvider === 'groq') setSttGroqKey(e.target.value);
                                                                 else if (sttProvider === 'openai') setSttOpenaiKey(e.target.value);
@@ -2078,21 +2043,8 @@ Core Skills
                                                             className="flex-1 bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
                                                         />
                                                         <button
-                                                            onClick={() => {
-                                                                const keyMap: Record<string, string> = {
-                                                                    groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey,
-                                                                    elevenlabs: sttElevenLabsKey, azure: sttAzureKey, ibmwatson: sttIbmKey,
-                                                                };
-                                                                handleSttKeySubmit(sttProvider as any, keyMap[sttProvider] || '');
-                                                            }}
-                                                            disabled={sttSaving || !(() => {
-                                                                const keyMap: Record<string, string> = {
-                                                                    groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey,
-                                                                    elevenlabs: sttElevenLabsKey, azure: sttAzureKey, ibmwatson: sttIbmKey,
-                                                                    soniox: sttSonioxKey,
-                                                                };
-                                                                return (keyMap[sttProvider] || '').trim();
-                                                            })()}
+                                                            onClick={() => handleSttKeySubmit(sttProvider, sttKey)}
+                                                            disabled={sttSaving || !sttKey.trim()}
                                                             className={`px-5 py-2.5 rounded-lg text-xs font-medium transition-colors ${sttSaved
                                                                 ? 'bg-state-success-soft text-state-success'
                                                                 : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-50'
@@ -2152,44 +2104,47 @@ Core Skills
                                                         </div>
                                                     )}
 
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex flex-wrap items-center gap-3">
                                                         <button
                                                             onClick={handleTestSttConnection}
                                                             disabled={sttTestStatus === 'testing'}
                                                             className="text-xs bg-bg-input hover:bg-bg-elevated text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-2 disabled:opacity-50"
                                                         >
                                                             {sttTestStatus === 'testing' ? (
-                                                                <><RefreshCw size={12} className="animate-spin" /> Testing...</>
+                                                                <><span aria-hidden="true">●</span> Checking key...</>
                                                             ) : sttTestStatus === 'success' ? (
-                                                                <><Check size={12} className="text-state-success" /> Connected</>
+                                                                <><Check size={12} className="text-state-success" /> The key is accepted</>
                                                             ) : (
-                                                                <>Test Connection</>
+                                                                <>Test key</>
                                                             )}
                                                         </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                const urls: Record<string, string> = {
-                                                                    groq: 'https://console.groq.com/keys',
-                                                                    openai: 'https://platform.openai.com/api-keys',
-                                                                    deepgram: 'https://console.deepgram.com',
-                                                                    elevenlabs: 'https://elevenlabs.io/app/settings/api-keys',
-                                                                    azure: 'https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeech',
-                                                                    ibmwatson: 'https://cloud.ibm.com/catalog/services/speech-to-text'
-                                                                };
-                                                                if (urls[sttProvider]) {
-                                                                    // @ts-ignore
-                                                                    window.electronAPI?.openExternal(urls[sttProvider]);
-                                                                }
-                                                            }}
-                                                            className="text-xs text-text-tertiary hover:text-text-primary flex items-center gap-1 transition-colors ml-1"
-                                                            title="Get API Key"
-                                                        >
-                                                            <ExternalLink size={12} />
-                                                        </button>
+                                                        {sttProvider !== 'soniox' && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    const urls: Record<string, string> = {
+                                                                        groq: 'https://console.groq.com/keys',
+                                                                        openai: 'https://platform.openai.com/api-keys',
+                                                                        deepgram: 'https://console.deepgram.com',
+                                                                        elevenlabs: 'https://elevenlabs.io/app/settings/api-keys',
+                                                                        azure: 'https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeech',
+                                                                        ibmwatson: 'https://cloud.ibm.com/catalog/services/speech-to-text'
+                                                                    };
+                                                                    if (urls[sttProvider]) {
+                                                                        // @ts-ignore
+                                                                        window.electronAPI?.openExternal(urls[sttProvider]);
+                                                                    }
+                                                                }}
+                                                                className="text-xs text-text-tertiary hover:text-text-primary flex items-center gap-1 transition-colors ml-1"
+                                                                title="Get API Key"
+                                                            >
+                                                                <ExternalLink size={12} />
+                                                            </button>
+                                                        )}
                                                         {sttTestStatus === 'error' && (
-                                                            <span className="text-xs text-state-danger">{sttTestError}</span>
+                                                            <span className="text-xs text-text-primary">✕ {sttTestError}</span>
                                                         )}
                                                     </div>
+                                                    <p className="text-[11px] text-text-tertiary">Checks the key, not the selected model or languages.</p>
                                                 </div>
                                             )}
 
@@ -2348,8 +2303,8 @@ Core Skills
                                                             </option>
                                                         ))}
                                                     </select>
-                                                    <p className="text-[10px] text-text-tertiary leading-snug">
-                                                        Translation always targets the language below. Source is auto-detected; this hint only nudges the model on short or ambiguous segments.
+                                                    <p className="text-[11px] text-text-tertiary leading-snug">
+                                                        Guides the translation model. When no language is detected, this is also used to skip translation if it matches the target language.
                                                     </p>
                                                 </div>
                                                 <div className="space-y-1.5">
