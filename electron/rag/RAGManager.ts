@@ -97,13 +97,25 @@ export class RAGManager {
         const chunks = chunkTranscript(meetingId, cleaned);
         console.log(`[RAGManager] Created ${chunks.length} chunks`);
 
+        // Finish queued writes before replacing their rows (including any fallback reset).
+        await this.embeddingPipeline.processQueue();
+        if (!this.db.prepare('SELECT 1 FROM meetings WHERE id = ?').get(meetingId)) return { chunkCount: 0 };
+        this.db.transaction(() => {
+            this.deleteMeetingChunks(meetingId);
+            // With no surviving summary vector, the full set can use the current provider.
+            this.db.prepare(`
+                UPDATE meetings SET embedding_provider = NULL, embedding_dimensions = NULL
+                WHERE id = ? AND NOT EXISTS (
+                    SELECT 1 FROM chunk_summaries WHERE meeting_id = ? AND embedding IS NOT NULL
+                )
+            `).run(meetingId, meetingId);
+            this.vectorStore.saveChunks(chunks);
+        })();
+
         if (chunks.length === 0) {
             console.log(`[RAGManager] No chunks to save for meeting ${meetingId}`);
             return { chunkCount: 0 };
         }
-
-        // 3. Save chunks to database
-        this.vectorStore.saveChunks(chunks);
 
         // 4. Save summary if provided
         if (summary) {
@@ -250,17 +262,8 @@ export class RAGManager {
             console.log('[RAGManager] Embedding pipeline not ready, skipping live indexing');
             return;
         }
-        
-        // Ensure meeting row exists in DB to satisfy foreign key constraints for chunks
-        try {
-            this.db.prepare(`
-                INSERT OR IGNORE INTO meetings (id, title, start_time, duration_ms, summary_json, created_at, source, is_processed)
-                VALUES (?, 'Live Meeting', ?, 0, '{}', ?, 'manual', 0)
-            `).run(meetingId, Date.now(), new Date().toISOString());
-        } catch (e) {
-            console.warn('[RAGManager] Failed to create transient meeting row for live indexing', e);
-        }
 
+        if (!this.db.prepare('SELECT 1 FROM meetings WHERE id = ?').get(meetingId)) return;
         this.liveIndexer.start(meetingId);
     }
 
@@ -282,6 +285,10 @@ export class RAGManager {
         await this.liveIndexer.stop();
     }
 
+    getActiveLiveMeetingId(): string | null {
+        return this.liveIndexer.getActiveMeetingId();
+    }
+
     /**
      * Check if JIT indexing is active for a meeting.
      */
@@ -296,27 +303,21 @@ export class RAGManager {
      * Delete RAG data for a meeting
      */
     deleteMeetingData(meetingId: string): void {
-        // 1. Delete from vector store (chunks and summaries)
-        this.vectorStore.deleteChunksForMeeting(meetingId);
-        
-        // 2. Clear embedding queue for this meeting to prevent "Chunk not found" errors on re-processing
-        try {
-            const info = this.db.prepare('DELETE FROM embedding_queue WHERE meeting_id = ?').run(meetingId);
-            if (info.changes > 0) {
-                console.log(`[RAGManager] Cleared ${info.changes} items from embedding_queue for meeting ${meetingId}`);
-            }
-        } catch (e) {
-            console.warn(`[RAGManager] Failed to clear embedding_queue for meeting ${meetingId}`, e);
+        this.db.transaction(() => {
+            this.deleteMeetingChunks(meetingId);
+            this.db.prepare('DELETE FROM embedding_queue WHERE meeting_id = ?').run(meetingId);
+        })();
+    }
+
+    private deleteMeetingChunks(meetingId: string): void {
+        // Include dynamically provisioned dimensions, not just the built-in tiers.
+        const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[];
+        for (const { name } of tables) {
+            if (!/^vec_chunks_\d+$/.test(name)) continue;
+            this.db.prepare(`DELETE FROM ${name} WHERE chunk_id IN (SELECT id FROM chunks WHERE meeting_id = ?)`).run(meetingId);
         }
-        
-        // 3. Clean up transient meeting row if it was a live session
-        try {
-            if (meetingId === 'live-meeting-current') {
-                this.db.prepare('DELETE FROM meetings WHERE id = ?').run(meetingId);
-            }
-        } catch (e) {
-            console.warn('[RAGManager] Failed to delete transient meeting row', e);
-        }
+        this.db.prepare('DELETE FROM embedding_queue WHERE meeting_id = ? AND chunk_id IS NOT NULL').run(meetingId);
+        this.db.prepare('DELETE FROM chunks WHERE meeting_id = ?').run(meetingId);
     }
 
     /**

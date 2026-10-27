@@ -797,6 +797,7 @@ export class AppState {
     // The meeting row exists before any audio, so each assembled line is saved as it happens.
     this.currentMeetingId = this.intelligenceManager.startMeeting(metadata);
     if (this.currentMeetingId) {
+      this.ragManager?.startLiveIndexing(this.currentMeetingId);
       void this.getMeetingAgent().open(this.currentMeetingId).catch(error => reportAgentError(error));
       void refreshGate();
     }
@@ -833,11 +834,6 @@ export class AppState {
         // Start Microphone
         this.microphoneCapture?.start();
         this.googleSTT_User?.start();
-
-        // Start JIT RAG live indexing
-        if (this.ragManager) {
-          this.ragManager.startLiveIndexing('live-meeting-current');
-        }
 
         if (this._verboseLogging) {
           const requestedInput = metadata?.audio?.inputDeviceId || 'default';
@@ -893,50 +889,29 @@ export class AppState {
       getGate().stop(agentMeetingId);
       await this.getMeetingAgent().stop(agentMeetingId).catch(error => reportAgentError(error, agentMeetingId));
     }
+    // The live indexer drains in the background so stopping is not held up by an embedding request.
+    // Only a meeting too short to be kept waits for it, because its vectors must be removed before
+    // persistence deletes the record.
+    const drained = (this.ragManager?.stopLiveIndexing() ?? Promise.resolve())
+      .catch(error => console.error('[Main] Live indexing drain failed:', error instanceof Error ? error.message : 'unknown error'));
+    if (agentMeetingId) {
+      const meeting = DatabaseManager.getInstance().getMeetingDetails(agentMeetingId);
+      if (meeting?.startTimeMs !== undefined && stoppedAtMs - meeting.startTimeMs < 1000) {
+        await drained;
+        // Remove vectors while chunk ids still exist, before the short-record cascade.
+        this.ragManager?.deleteMeetingData(agentMeetingId);
+      }
+    }
     const meetingId = await this.intelligenceManager.stopMeeting(stoppedAtMs);
     this.currentMeetingId = null;
     if (agentMeetingId && !meetingId) {
       await this.getMeetingAgent().deleteStore(agentMeetingId).catch(error => reportAgentError(error, agentMeetingId));
     }
 
-    // ─── Background post-processing ──────────────────────────────────────────
-    // These are the previously blocking operations that caused the stop-button
-    // delay. They are pure background tasks with no UI dependency:
-    //   • stopLiveIndexing flushes the JIT RAG live stream
-    //   • processCompletedMeetingForRAG embeds the full meeting into the vector store
-    //   • deleteMeetingData cleans up provisional JIT chunks
-    // Chain them sequentially in the background so ordering is preserved,
-    // but the IPC call returns immediately and the UI transitions without delay.
-    const ragManager = this.ragManager;
     if (meetingId) {
-      (async () => {
-        try {
-          if (ragManager) {
-            await ragManager.stopLiveIndexing();
-            console.log('[Main] Live RAG indexing stopped.');
-          }
-          await this.processCompletedMeetingForRAG(meetingId);
-          // Guard: only delete live-meeting-current provisional chunks if no new
-          // meeting has started while we were processing. If a new meeting IS active,
-          // 'live-meeting-current' now belongs to that session — leave it alone.
-          if (ragManager && !this.isMeetingActive) {
-            ragManager.deleteMeetingData('live-meeting-current');
-            console.log('[Main] JIT RAG provisional chunks cleaned up.');
-          } else if (this.isMeetingActive) {
-            console.log('[Main] New meeting started during cleanup — skipping live-meeting-current deletion.');
-          }
-        } catch (err) {
-          console.error('[Main] Background post-meeting RAG processing failed:', err);
-        }
-      })();
-    } else {
-      // Meeting was too short — still flush the live indexer and clean up
-      if (ragManager) {
-        ragManager.stopLiveIndexing().catch(() => {});
-        if (!this.isMeetingActive) ragManager.deleteMeetingData('live-meeting-current');
-      }
+      // The full-transcript index replaces the live chunks, so it starts after the drain.
+      void drained.then(() => this.processCompletedMeetingForRAG(meetingId));
     }
-    // ─────────────────────────────────────────────────────────────────────────
   }
 
   private async processCompletedMeetingForRAG(meetingId: string): Promise<void> {

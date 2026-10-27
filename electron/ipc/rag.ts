@@ -77,8 +77,8 @@ export function registerRagHandlers(appState: AppState): void {
       return { fallback: true };
     }
 
-    // Check if JIT indexing is active and has chunks
-    if (!ragManager.isLiveIndexingActive('live-meeting-current')) {
+    const meetingId = ragManager.getActiveLiveMeetingId();
+    if (!meetingId) {
       return { fallback: true };
     }
 
@@ -87,7 +87,7 @@ export function registerRagHandlers(appState: AppState): void {
     activeRAGQueries.set(queryKey, abortController);
 
     try {
-      const stream = ragManager.queryMeeting('live-meeting-current', query, abortController.signal);
+      const stream = ragManager.queryMeeting(meetingId, query, abortController.signal);
 
       for await (const chunk of stream) {
         if (abortController.signal.aborted) break;
