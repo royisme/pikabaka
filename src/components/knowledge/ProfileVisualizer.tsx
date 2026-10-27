@@ -14,15 +14,15 @@ type ProfileProject = ProfileData['projects'][number];
 type ProfileEducation = ProfileData['education'][number];
 
 const cardClass = 'bg-bg-item-surface rounded-xl border border-border-subtle p-4';
-const labelClass = 'text-[10px] font-bold text-text-primary uppercase tracking-wide';
+const labelClass = 'text-[11px] font-bold text-text-primary uppercase tracking-wide';
 const inputClass =
   'bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary focus:ring-1 focus:ring-accent-primary focus:border-accent-primary outline-none w-full';
 const tagClass =
-  'text-[10px] font-medium text-text-secondary px-2 py-1 rounded-md border border-border-subtle bg-bg-input';
+  'text-[11px] font-medium text-text-secondary px-2 py-1 rounded-md border border-border-subtle bg-bg-input';
 const ghostButtonClass =
   'inline-flex items-center gap-1.5 text-[11px] font-medium text-text-tertiary hover:text-text-primary transition-colors';
-const primaryButtonClass =
-  'inline-flex items-center gap-1.5 rounded-lg bg-text-primary px-3 py-2 text-[11px] font-medium text-bg-main transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50';
+const saveButtonClass =
+  'inline-flex items-center gap-1.5 rounded-lg border border-border-subtle px-3 py-2 text-xs font-medium text-text-primary hover:bg-bg-input disabled:cursor-not-allowed disabled:opacity-50';
 
 const cloneProfileData = (profileData: ProfileData): EditableProfileData => ({
   ...profileData,
@@ -241,7 +241,7 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ profileData }) => 
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-text-primary">Your Background</h2>
+        <h2 className="text-sm font-bold text-text-primary">Knowledge</h2>
         <div className="flex items-center gap-3">
           {isEditing ? (
             <>
@@ -253,7 +253,7 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ profileData }) => 
                 type="button"
                 onClick={handleSave}
                 disabled={editProfile.isLoading}
-                className={primaryButtonClass}
+                className={saveButtonClass}
               >
                 <Save size={12} />
                 {editProfile.isLoading ? 'Saving...' : 'Save'}
@@ -324,7 +324,7 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ profileData }) => 
             </div>
           ) : (
             <div className="flex flex-col gap-1">
-              <h3 className="text-lg font-semibold text-text-primary">{identity?.name}</h3>
+              <h3 className="text-sm font-semibold text-text-primary">{identity?.name}</h3>
               {latestRole && <p className="text-sm text-accent-primary">{latestRole}</p>}
               <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                 {identity?.location && <span className="text-xs text-text-secondary">{identity.location}</span>}
@@ -339,19 +339,19 @@ export const ProfileEditor: React.FC<ProfileEditorProps> = ({ profileData }) => 
       <div className={cardClass}>
         <div className="mb-3 grid grid-cols-4 gap-4">
           <div className="flex flex-col items-center">
-            <span className="text-lg font-semibold text-text-primary">{totalExperienceYears}</span>
+            <span className="text-sm font-semibold text-text-primary">{totalExperienceYears}</span>
             <span className="text-xs text-text-secondary">Years</span>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-lg font-semibold text-text-primary">{experienceCount}</span>
+            <span className="text-sm font-semibold text-text-primary">{experienceCount}</span>
             <span className="text-xs text-text-secondary">Experience</span>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-lg font-semibold text-text-primary">{projectCount}</span>
+            <span className="text-sm font-semibold text-text-primary">{projectCount}</span>
             <span className="text-xs text-text-secondary">Projects</span>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-lg font-semibold text-text-primary">{nodeCount}</span>
+            <span className="text-sm font-semibold text-text-primary">{nodeCount}</span>
             <span className="text-xs text-text-secondary">Highlights</span>
           </div>
         </div>

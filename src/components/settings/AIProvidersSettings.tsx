@@ -1,7 +1,6 @@
 import ConnectionsSettings from './ConnectionsSettings';
 import ModelUsesSettings from './ModelUsesSettings';
 import WorkspaceSettings from './WorkspaceSettings';
-import SearchIndexSettings from './SearchIndexSettings';
 import ProactiveHelpSettings from './ProactiveHelpSettings';
 
 export const AIProvidersSettings = () => (
@@ -13,8 +12,8 @@ export const AIProvidersSettings = () => (
             <ModelUsesSettings job="summary" />
             <ModelUsesSettings job="agent" />
             <WorkspaceSettings />
+            <p className="text-xs text-text-secondary">The search index is under Knowledge.</p>
         </section>
-        <SearchIndexSettings />
         <ProactiveHelpSettings />
     </div>
 );

@@ -2,6 +2,24 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-27: Knowledge tab, step K1 (branch `knowledge-tab`)
+
+- Settings > Your Background is now Knowledge (tab id `profile` unchanged) with three local pages. Sources lists what exists today with real numbers only: the recorded-meetings count from the launcher's recent-meetings call (the call is capped at 50, so a full result says "The latest 50"; it is not an indexed count) and the saved notes (characters, Edit, Remove). Index holds the Search index controls, moved from Models & Agent, and its text now says meetings (transcripts and summaries), notes, resume and roles are indexed. Interview profile holds the resume, the background switch, target roles, prep and the profile editor, marked "only for interview practice"; the fake upload percentage and the spinner are gone (the button says "Uploading…"). `SettingsOverlay.tsx` shrank from 2,250 to about 2,070 lines. No stored data, IPC or setting changed.
+- Not in K1 (later steps): document import, per-source rows and re-index, the Use when answering switches (K4), neutral notes wording (K4).
+- Checks: both typechecks, lint and tap (1392 assertions; 17 new server-render checks in `test/unit/knowledge-settings.test.ts`) exit 0. Browser preview with a mocked `electronAPI`: Sources (empty and with notes), Index and Interview profile in the dark theme; Sources with notes in the light theme. Not run: the real app, real index status, upload, delete profile.
+- Found, not changed: the profile status and profile read handlers swallow backend errors as false or null; the profile editor logs Save failures without showing them; "Each recorded meeting is queued for indexing" is the most the code guarantees (live indexing and summary freshness have known gaps, steps K2 and K3).
+- Owner: look at the three pages in both themes in the running app; edit and remove notes; add a resume and refresh it; Delete Profile; open meeting history from Sources.
+
+## 2026-10-27: Settings cleanup merged, Knowledge and AI split approved (branch `ai-split`)
+
+- PR #50 (settings cleanup: six default shortcuts, a keyboard-operable recorder, Soniox Save, Settings wording, the audio page) merged as `5b804c0`.
+- The owner approved option A for both designs: a Knowledge tab over meetings and materials with an optional interview profile (`docs/design-knowledge.md`), and a Provider setup page that lists one row per configured provider with the interface picked from a dropdown, plus optional custom headers (`docs/design-ai-settings-split.md`). Materials are never searched by default: a Use when answering switch per kind of source replaces the per-question Sources chip. The work is queued in `TASKS.md` as K1 to K5 and S1 to S6, one at a time.
+
+## 2026-10-27: AI functions mapped against provider setup (branch `ai-split`)
+
+- Source-only investigation (GPT, commit `a69d308`): about 30 AI call sites reduce to seven model settings (Quick answers, Summaries, Agent, Proactive decision, Translation, Search index, Speech); the "Quick answers" name hides that it also serves vision, RAG answers, resume and role analysis, interview prep and live compaction. Proposed split and the pure-move versus behaviour-change line: `docs/design-ai-settings-split.md`. Nothing built.
+- Verified and recorded: `CredentialsManager` stores keys in a plaintext `credentials.json`, while the README says the OS keychain and "never in plaintext config files"; the owner chose system encryption (a separate task). Also confirmed in source: a language change rebuilds the Groq speech config and drops the chosen model; the project rule "never switch models on its own" has exceptions (automatic embeddings, OpenAI speech alternatives, a missing speech key falling back to Google, deleting an Agent connection making it inherit Quick answers).
+
 ## 2026-10-27: settings cleanup, step C (branch `settings-cleanup`)
 
 - Sidebar labels and order are now General, Audio & Translation, Models & Agent, Shortcuts, Your Background, About (tab ids unchanged). The audio tab is three cards: Devices (input with level test, system audio source with test tone and a one-line note that it applies from the next meeting, the SCK toggle now macOS-only), Speech recognition (provider, model, key, region, languages) and Translation (enable, display, languages, connection and model, Test; the prompt editor, Reset and the segmentation profile are under a collapsed Advanced disclosure that is not persisted). The agent workspace chooser moved from the audio tab to Models & Agent, under the Agent model row.
