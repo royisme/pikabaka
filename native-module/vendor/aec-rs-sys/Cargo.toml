@@ -1,0 +1,9 @@
+[package]
+name = "aec-rs-sys"
+version = "1.0.0"
+edition = "2021"
+license = "MIT AND BSD-3-Clause"
+links = "speexdsp"
+
+[build-dependencies]
+cc = "1"

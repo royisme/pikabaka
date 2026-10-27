@@ -28,9 +28,8 @@ pub const VAD_PREROLL_CHUNKS: usize = 3;
 /// VAD hangover duration in milliseconds
 pub const VAD_HANGOVER_MS: u128 = 500;
 
-/// DSP thread poll interval in milliseconds (fallback timeout)
-/// Primary wakeup is via Condvar signal from audio callbacks.
-/// This only triggers if no audio arrives within the interval.
+/// DSP thread poll interval in milliseconds.
+/// Callbacks only fill the ring buffers; they never lock to wake the DSP thread.
 pub const DSP_POLL_MS: u64 = 5;
 
 /// Ring buffer size in samples

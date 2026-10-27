@@ -8,6 +8,14 @@ Stack, folders and the pipelines that matter for the conversation UI and live tr
 2. **React renderer** (`src/`): Vite, React, TypeScript, Tailwind. React Query and local `useState`; no Redux or Zustand. Entry `src/main.tsx`; `src/App.tsx` switches on window mode (main, settings, cropper).
 3. **Rust native module** (`native-module/`, crate `natively-audio`): low-latency audio capture with cpal, WebRTC VAD, rubato resampling and silence suppression. Speaker capture is CoreAudio/ScreenCaptureKit on macOS and WASAPI on Windows. Built by `scripts/build-native.js`.
 
+## Native echo cancellation
+
+`native-module/src/echo_cancellation.rs` owns a process-wide, bounded speaker reference and a per-microphone SpeexDSP echo state. The system DSP thread copies ungated mono PCM into the reference without waiting for the microphone; its existing output signal, frame size and buffering are unchanged. The microphone DSP thread aligns the reference, converts it to the microphone's hardware rate, cancels echo in 20ms frames with a 250ms filter, then runs the existing silence/VAD gate. Hardware-rate PCM and `get_sample_rate()` remain the STT contract; `resampler.rs` is not in this capture path.
+
+Alignment uses sample-count clocks anchored to DSP arrival times, a fixed 40ms reference lead and 60ms microphone-only lookahead while reference frames are fresh. Missing, incomplete, stopped or 100ms-old reference data bypasses cancellation; a capture restart clears the reference and resets the adaptive filter. A zero reference bypasses too, after allowing the previous echo's 250ms tail to drain. No setting, IPC or NAPI surface is added. The text-level `electron/lib/echo-filter.ts` remains unchanged.
+
+`native-module/vendor/aec-rs-sys` is an echo-only adaptation of aec-rs-sys 1.0.0: unchanged BSD-licensed SpeexDSP/KISS FFT C sources, a portable `cc` build and fixed echo bindings instead of CMake/bindgen. Only a C compiler is needed by the new dependency. Alignment and real-device latency still require owner checks (issue #39).
+
 ## IPC boundary
 
 A channel exists in four places and they move together:
