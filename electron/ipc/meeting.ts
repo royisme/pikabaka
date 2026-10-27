@@ -3,10 +3,6 @@ import { AppState } from "../main"
 import { DatabaseManager } from "../db/DatabaseManager"
 import { safeHandle } from "./safeHandle"
 
-interface FollowUpEmailInput {
-  [key: string]: any
-}
-
 export function registerMeetingHandlers(appState: AppState): void {
   // ==========================================
   // Meeting Lifecycle Handlers
@@ -85,46 +81,6 @@ export function registerMeetingHandlers(appState: AppState): void {
       }
     } catch {
       console.warn(`[IPC] Invalid URL in open-external: ${url}`);
-    }
-  });
-
-  safeHandle("generate-followup-email", async (_, input: FollowUpEmailInput) => {
-    try {
-      const { FOLLOWUP_EMAIL_PROMPT, GROQ_FOLLOWUP_EMAIL_PROMPT } = require('../llm/prompts');
-      const { buildFollowUpEmailPromptInput } = require('../utils/emailUtils');
-
-      const llmHelper = appState.processingHelper.getLLMHelper();
-      const contextString = buildFollowUpEmailPromptInput(input);
-      const geminiPrompt = `${FOLLOWUP_EMAIL_PROMPT}\n\nMEETING DETAILS:\n${contextString}`;
-      const groqPrompt = `${GROQ_FOLLOWUP_EMAIL_PROMPT}\n\nMEETING DETAILS:\n${contextString}`;
-      const emailBody = await llmHelper.chatWithGemini(geminiPrompt, undefined, undefined, true, groqPrompt);
-
-      return emailBody;
-    } catch (error: any) {
-      console.error("Error generating follow-up email:", error);
-      throw error;
-    }
-  });
-
-  safeHandle("extract-emails-from-transcript", async (_, transcript: Array<{ text: string }>) => {
-    try {
-      const { extractEmailsFromTranscript } = require('../utils/emailUtils');
-      return extractEmailsFromTranscript(transcript);
-    } catch (error: any) {
-      console.error("Error extracting emails:", error);
-      return [];
-    }
-  });
-
-  safeHandle("open-mailto", async (_, { to, subject, body }: { to: string; subject: string; body: string }) => {
-    try {
-      const { buildMailtoLink } = require('../utils/emailUtils');
-      const mailtoUrl = buildMailtoLink(to, subject, body);
-      await shell.openExternal(mailtoUrl);
-      return { success: true };
-    } catch (error: any) {
-      console.error("Error opening mailto:", error);
-      return { success: false, error: error.message };
     }
   });
 }

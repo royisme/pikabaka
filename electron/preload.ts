@@ -192,9 +192,6 @@ interface ElectronAPI {
   seedDemo: () => Promise<{ success: boolean }>
 
   // Follow-up Email
-  generateFollowupEmail: (input: any) => Promise<string>
-  extractEmailsFromTranscript: (transcript: Array<{ text: string }>) => Promise<string[]>
-  openMailto: (params: { to: string; subject: string; body: string }) => Promise<{ success: boolean; error?: string }>
 
   // Audio Test
   startAudioTest: (deviceId?: string) => Promise<{ success: boolean }>
@@ -895,9 +892,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   seedDemo: () => ipcRenderer.invoke('seed-demo'),
 
   // Follow-up Email
-  generateFollowupEmail: (input: any) => ipcRenderer.invoke('generate-followup-email', input),
-  extractEmailsFromTranscript: (transcript: Array<{ text: string }>) => ipcRenderer.invoke('extract-emails-from-transcript', transcript),
-  openMailto: (params: { to: string; subject: string; body: string }) => ipcRenderer.invoke('open-mailto', params),
 
   // Audio Test
   startAudioTest: (deviceId?: string) => ipcRenderer.invoke('start-audio-test', deviceId),
