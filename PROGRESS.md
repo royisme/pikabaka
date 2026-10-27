@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-27: auto-update decided (branch `auto-update`)
+
+- Found that a packaged build cannot update: `build.publish` is null (no `app-update.yml`, no `latest-mac.yml`), `scripts/release.js` does not upload the feed, releases v2.2.0 to v2.4.0 carry no installers, and the release-notes request goes to `royisme/pika` (404). Details and the decision are in `docs/design-auto-update.md`.
+- Chose to fix `electron-updater` (GitHub provider, background download, no automatic restart, notice held during a meeting). Velopack and update.electronjs.org were studied and rejected; the reasons are in the design file. Not built yet: this entry only records the decision.
+- Owner: 2.2 to 2.4 installs have no feed address and need one manual install of the first build that contains this change.
+
 ## 2026-10-27: native acoustic echo cancellation (branch `echo-cancel`, issue #39)
 
 - Added a process-wide ungated speaker reference and per-microphone SpeexDSP cancellation before the existing silence/VAD gate. The system signal and frame/buffering path stay unchanged; publishing never waits for a microphone lock. Removed unused Condvar locking from the CPAL data callbacks: all new reference/DSP work stays on the background threads. No audio samples or transcripts are logged.
