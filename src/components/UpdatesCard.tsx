@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery } from 'react-query';
-import { ArrowDownCircle, ArrowUpCircle, CheckCircle, AlertCircle, LoaderCircle } from 'lucide-react';
 import packageJson from '../../package.json';
 import { useMainEvent } from '../hooks/useMainEvent';
+import { describeUpdateError } from '../lib/updateError';
 
 type UpdateStatus =
     | { kind: 'idle' | 'checking' | 'uptodate' }
@@ -74,9 +74,10 @@ export const UpdatesCard: React.FC = () => {
         : status.kind === 'uptodate' ? 'Up to date'
         : status.kind === 'downloading' ? `Downloading version ${status.version}${status.percent === undefined ? '' : ` · ${Math.round(status.percent)}%`}`
         : status.kind === 'ready' ? `Version ${status.version} is ready to install`
-        : status.kind === 'error' ? 'Could not check for updates'
+        : status.kind === 'error' ? describeUpdateError(status.message).summary
         : 'Not checked yet';
-    const StatusIcon = busy ? LoaderCircle : ready ? ArrowUpCircle : status.kind === 'error' ? AlertCircle : CheckCircle;
+    const errorDetail = status.kind === 'error' ? describeUpdateError(status.message).detail : null;
+    const actionLabel = ready ? 'Restart & Install' : status.kind === 'checking' ? 'Checking…' : status.kind === 'downloading' ? 'Downloading…' : 'Check Now';
 
     const showError = (error: unknown) => {
         setEventStatus({ kind: 'error', message: error instanceof Error ? error.message : String(error) });
@@ -107,10 +108,7 @@ export const UpdatesCard: React.FC = () => {
 
     return (
         <section className="rounded-xl border border-border-subtle bg-bg-item-surface p-6">
-            <h5 className="flex items-center gap-2 text-sm font-semibold text-text-primary mb-5">
-                <ArrowDownCircle size={18} className="text-accent-primary" aria-hidden="true" />
-                Updates
-            </h5>
+            <h5 className="text-sm font-semibold text-text-primary mb-5">Updates</h5>
             <div className="flex items-center justify-between gap-4 text-xs mb-4">
                 <span className="text-text-secondary">Current version</span>
                 <span className="font-mono text-text-primary">v{packageJson.version}</span>
@@ -130,14 +128,14 @@ export const UpdatesCard: React.FC = () => {
             </div>
             <div className="border-t border-border-subtle mt-5" />
             <div className="h-16 flex items-center justify-between gap-4">
-                <div className="min-w-0 flex items-center gap-2" role="status">
-                    {status.kind !== 'idle' && (
-                        <StatusIcon size={16} aria-hidden="true" className={`shrink-0 ${busy ? 'animate-spin text-text-secondary' : status.kind === 'error' ? 'text-state-danger' : 'text-state-success'}`} />
-                    )}
+                <div className="min-w-0 flex items-start gap-2" role="status">
+                    {status.kind === 'uptodate' && <span aria-hidden="true" className="mt-[5px] w-2 h-2 shrink-0 rounded-full bg-state-success" />}
+                    {ready && <span aria-hidden="true" className="mt-[5px] w-2 h-2 shrink-0 rounded-full bg-accent-primary" />}
+                    {status.kind === 'error' && <span aria-hidden="true" className="text-xs leading-snug text-state-danger shrink-0">✕</span>}
                     <div className="min-w-0">
-                        <p className="text-xs text-text-primary truncate" title={statusText}>{statusText}</p>
-                        {status.kind === 'error' && (
-                            <p className="text-[11px] text-text-tertiary truncate mt-1" title={status.message}>{status.message}</p>
+                        <p className={`text-xs leading-snug ${status.kind === 'idle' ? 'text-text-secondary' : 'text-text-primary'}`}>{statusText}</p>
+                        {errorDetail && (
+                            <p className="text-[11px] text-text-tertiary truncate mt-1" title={status.kind === 'error' ? status.message : undefined}>{errorDetail}</p>
                         )}
                     </div>
                 </div>
@@ -147,7 +145,7 @@ export const UpdatesCard: React.FC = () => {
                     disabled={busy}
                     className={`shrink-0 px-3 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-wait ${ready ? 'bg-accent-primary text-on-primary hover:bg-accent-secondary' : 'bg-bg-component text-text-primary hover:bg-bg-input'}`}
                 >
-                    {ready ? 'Restart & Install' : 'Check Now'}
+                    {actionLabel}
                 </button>
             </div>
             <div className="flex items-center justify-between gap-4 text-[11px] text-text-tertiary">

@@ -59,29 +59,33 @@ Automated checks cannot do these, and the agent did not:
 
 ## Updates card (About tab)
 
-The one-button "Version" row in Settings > General is replaced by an Updates card in Settings > About. It copies the structure of the Updates card in quotio (`../../ops/quotio`, `Quotio/Views/Screens/SettingsScreen.swift`, `UpdateSettingsSection`, and its `screenshots/about.png`): a titled card with an icon, a switch for automatic checks, a status line with one action on the right, and a "Last checked" line. Pika keeps its own tokens, type and spacing (`DESIGN.md`); only the layout and behaviour are copied. quotio's "Receive beta updates" switch is not copied: Pika has no beta channel.
+The one-button "Version" row in Settings > General is replaced by an Updates card in Settings > About. It copies the structure of the Updates card in quotio (`../../ops/quotio`, `Quotio/Views/Screens/SettingsScreen.swift`, `UpdateSettingsSection`, and its `screenshots/about.png`): a titled card, a switch for automatic checks, a status line with one action on the right, and a "Last checked" line. Pika keeps its own tokens, type and spacing (`DESIGN.md`); only the layout and behaviour are copied. quotio's "Receive beta updates" switch is not copied: Pika has no beta channel.
 
 ```
-(down-arrow circle)  Updates
+Updates
 Current version                          v2.4.0   (mono)
 Automatically check for updates            [switch]
 -------------------------------------------------
-(state icon) <status text>           [action button]
+<status text>                        [action button]
 Last checked                          26 sec ago
 ```
 
+The card follows `DESIGN.md`: no decorative icon, no spinner (a working state says so in words on its button), state shown by a dot or a glyph plus words, only tokens of the base family, and at most one filled control. The one filled control is `Restart & Install`; `Check Now` is not filled.
+
 Status line (one fixed-height row, so the card never changes height between states):
 
-| State | Icon and text | Action on the right |
+| State | Mark and text | Action on the right |
 | --- | --- | --- |
-| nothing checked yet | none, text "Not checked yet" | `Check Now` |
-| checking | spinner, "Checking for updates" | `Check Now`, disabled |
-| up to date | green check, "Up to date" | `Check Now` |
-| downloading | spinner, "Downloading version X" and the percent | `Check Now`, disabled |
-| ready | green up-arrow, "Version X is ready to install" | `Restart & Install` (primary) |
-| error | danger icon, "Could not check for updates", the real error text on a small line under it | `Check Now` |
+| nothing checked yet | no mark, "Not checked yet" in secondary text | `Check Now` |
+| checking | no mark, "Checking for updates" | `Checking…`, disabled |
+| up to date | `state-success` dot, "Up to date" | `Check Now` |
+| downloading | no mark, "Downloading version X" and the percent | `Downloading…`, disabled |
+| ready | `accent-primary` dot, "Version X is ready to install" | `Restart & Install` (the filled control) |
+| error | `✕` in `state-danger`, a readable sentence, and under it the first line of the real error | `Check Now` |
 
-"Last checked" shows a relative time ("26 sec ago", "3 hours ago") or "Never", and refreshes every 30 s while the card is open. It is the time of the last check that finished, kept in memory by the main process, not saved to disk; the 10-second check after launch fills it in.
+Errors are readable (`src/lib/updateError.ts`, `describeUpdateError`): the main process reports one long string (a Chromium code, an HTTP status, a stack), so the card shows a sentence that says what to do (no connection, the release has no update files yet, GitHub is limiting requests or having problems, the download failed verification, not enough disk space, or a generic line) and keeps the first line of the real message below it, with the whole text as the tooltip. The cause is never hidden.
+
+"Last checked" shows a relative time ("26 sec ago", "3 hr ago") or "Never", and refreshes every 30 s while the card is open. It is the time of the last check that finished, kept in memory by the main process, not saved to disk; the 10-second check after launch fills it in.
 
 Behaviour:
 
