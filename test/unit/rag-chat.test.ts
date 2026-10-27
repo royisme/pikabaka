@@ -4,6 +4,40 @@ import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-requir
 import type { AppState } from '../../electron/main';
 import type { LLMHelper } from '../../electron/core/LLMHelper';
 
+t.test('live query captures the real active id and keeps its existing IPC payloads', async t => {
+    type Event = { sender: { send: (channel: string, data: unknown) => void } };
+    let queryLive!: (event: Event, params: { query: string }) => Promise<unknown>;
+    const { registerRagHandlers } = mockRequire(path.resolve('electron/ipc/rag.ts'), {
+        [path.resolve('electron/ipc/safeHandle.ts')]: { safeHandle: (channel: string, listener: unknown) => {
+            if (channel === 'rag:query-live') queryLive = listener as typeof queryLive;
+        } },
+        [path.resolve('electron/db/DatabaseManager.ts')]: { DatabaseManager: {} },
+    }) as typeof import('../../electron/ipc/rag');
+    let activeId: string | null = 'real-meeting-a';
+    const ids: string[] = [];
+    const rag = {
+        isReady: () => true,
+        getActiveLiveMeetingId: () => activeId,
+        queryMeeting: async function* (id: string) {
+            ids.push(id);
+            activeId = 'real-meeting-b';
+            yield 'Invented live reply';
+        },
+    };
+    registerRagHandlers({ getRAGManager: () => rag } as unknown as AppState);
+    const sent: unknown[] = [];
+    const event = { sender: { send: (channel: string, data: unknown) => sent.push({ channel, data }) } };
+    t.same(await queryLive(event, { query: 'Invented question' }), { success: true });
+    t.same(ids, ['real-meeting-a'], 'query uses one captured indexer identity, never a provisional id');
+    t.same(sent, [
+        { channel: 'rag:stream-chunk', data: { live: true, chunk: 'Invented live reply' } },
+        { channel: 'rag:stream-complete', data: { live: true } },
+    ]);
+    activeId = null;
+    t.same(await queryLive(event, { query: 'Invented question' }), { fallback: true });
+    t.same(ids, ['real-meeting-a'], 'no active identity means no live query');
+});
+
 t.test('meeting chat keeps role-separated turns, its exact context prompt and provider cancellation', async t => {
     type Params = { requestId: string; meetingId: string; messages: Array<{ role: 'user' | 'assistant'; content: string }>; context: string };
     type Event = { sender: { send: (channel: string, data: { chunk?: string; error?: string }) => void } };
