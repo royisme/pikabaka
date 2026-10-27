@@ -13,25 +13,29 @@ Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR 
 
 ## Knowledge tab (owner-approved, `docs/design-knowledge.md`, option A chosen 2026-10-27)
 
-One step at a time, each one branch and one PR (they all touch `SettingsOverlay.tsx` or its children). Delegated to GPT, reviewed by the agent.
+One step at a time, each one branch and one PR (they share `SettingsOverlay.tsx`, `main.ts` or the RAG files). Delegated to GPT, reviewed by the agent. The plan was reviewed independently by gpt-6-astra on 2026-10-27 (`.pi-runs/plan-review/report.md`, git-ignored); the split below follows it.
 
-- K1 `knowledge-tab` (done, PR open): the Knowledge tab replaces Your Background (tab id `profile` stays): Sources, Index and Interview profile as local pages; the Search index controls move here from AI functions; fix the "only transcripts" text; drop the fake upload percentage and spinner; no resume needed to use the tab. Pure UI, no stored data or IPC change, no sample data (real counts only from existing queries, else "Unknown"). Done when: both typechecks, lint and tap exit 0 and the page renders in a browser preview in both themes.
-- K2 `live-index-fix`: index live meetings under the real meeting id, remove the stale `source` insert, record the embedding provider on live writes, flush the last segments (fewer than three). Tests with a fake provider on a fresh schema.
-- K3 `summary-index`: refresh the summary-derived search after the summary is final, including recovery and edits.
-- K4 `material-notes`: neutral material lookup separate from the candidate prompt, an agent `search_materials` tool over the existing notes, and the Use when answering switches on the Sources page (new settings keys, default: past meetings on, materials and profile off).
-- K5 `material-import`: generic document import with a `material` type and index provenance columns, plus IPC for source lists. Owner approval of the schema first. Folders are not planned.
+- K1 `knowledge-tab` (done, PR #51): the Knowledge tab replaces Your Background (tab id `profile` stays): Sources, Index and Interview profile; the Search index controls moved here; no stored data or IPC change; real numbers only.
+- K2a `live-index` (in progress): make live indexing safe: a forced stop drains one or two pending segments after an in-flight batch, a batch advances only to its captured boundary, a stopped batch cannot touch the next session, writes record the provider and dimensions they used. No identity change. Fake provider and synthetic SQLite tests.
+- K2b `live-meeting-id`: index under the real meeting id, remove the stale `source` insert, replace (not append) the meeting's live chunks with the full-transcript chunks after it ends, skip live indexing when the record was not created. Needs K2a.
+- K3a `summary-refresh`: a safe summary-only refresh (stale-result suppression, idempotent queueing, old native vectors removed, empty content removes the derived summary). K3b `summary-hooks`: call it after a successful final commit, a successful recovery commit and a successful summary edit. Needs K2.
+- K5a `material-status`: provenance and index status for the existing notes (embedding provider, dimensions, indexed time, error; Unknown for old rows) and a same-dimension model-switch guard. Persisted-shape change: owner approval of the schema first.
+- K4a `answer-sources`: the Use when answering settings (new keys; past meetings on, materials and interview profile off) enforced in every retrieval path. K4b `material-notes`: the neutral notes lookup and the agent `search_materials` tool. K4c: labels and the Sources page switches. Needs K5a.
+- K5b `material-import`: generic document import (a `material` type, source-list IPC). Owner approval first. Folders are not planned.
+- K6 (not scheduled): combined source-labelled retrieval, per-source retry and Re-index all, accurate deletion of a meeting's or a role's vector rows.
 
 ## AI settings split (`docs/design-ai-settings-split.md`, option A approved)
 
-Starts after K1 is merged (it also edits `AIProvidersSettings.tsx`); one step at a time, same delegation. The preview is in `.pi-runs/ai-split-preview/` (git-ignored).
+One step at a time, same delegation and review. Starts after K1 is merged (S1a branches from it); preview in `.pi-runs/ai-split-preview/` (git-ignored).
 
-- S1 `provider-list`: Provider setup page: language model providers as one row per configured provider (name, interface, host, state in words and a mark, delete with a second press), an Interface dropdown first in the Add and Edit form, no vendor rows and no presets, built-ins shown only when they have a key or a host override. Pure UI over the existing connection storage; no headers yet.
-- S2 `answer-style`: answer language and style move beside Quick answers.
-- S3 `speech-list`: speech-to-text providers as a list in Provider setup; Audio & Translation offers only the ones set up.
-- S4 `decision-setup`: the proactive help URL, key, Remove and Save move to Provider setup.
-- S5 `custom-headers`: optional custom headers on a custom provider (a new persisted field, approved): the three SDK clients in `LLMHelper`, the model-list request, and the Agent's pi-ai model (support not yet checked in `electron/agent/models.ts`); header values are secrets.
+- S1a `provider-setup` (in progress): a Provider setup tab (new id `providers`) holding the existing Connections component unchanged; Models & Agent links to it. Pure relocation.
+- S1b `provider-list`: one row per configured provider, an Interface dropdown first, no presets. Waits for the owner to decide how built-ins and deletion work (proposed policy in the design file: configured built-ins listed, job pickers list configured providers plus the one a job names, built-in name and interface read-only, a custom provider cannot be deleted while a job names it, nothing ever clears or reassigns a job). Also needs the disk-write failure of `CredentialsManager` reported, since a UI test cannot prove a durable Save.
+- S2 `answer-style`: answer language and style beside Quick answers (pure move).
+- S3a `speech-list`: speech providers as a list in Provider setup (control extraction, one credential slot per service as today). S3b: Audio & Translation offers only configured services with a setup state when none; decide and test the Google substitution and OpenAI model alternatives in `audio-pipeline.ts` (behaviour change).
+- S4 `decision-setup`: the proactive help URL and key to Provider setup with a Test of the endpoint; each page saves only its own fields.
+- S5a `headers-backend`: custom headers, dormant: the field, validation, every request sink and projection listed in the design file, secret redaction, embedding provider rebuild; no editor yet. S5b: the editor.
 - S6 `translation-part`: translation as its own component, the "also used by" lines, collapsed diagnostics.
-- Separate tasks the owner approved: (a) store API keys with Electron `safeStorage` (system encryption), which changes the stored credential format and needs its own design and a migration decision; the README says keys are in the OS keychain but `CredentialsManager` writes a plaintext `credentials.json`, so do not publish that README claim as true until this lands; (b) after the split, fix the behaviour problems in the design file (Groq model reset on a language change, decision Test deadline, Agent Test fallback, template interview-prep answers, made-up company rating, automatic model alternatives policy).
+- Separate tasks the owner approved: (a) store API keys with Electron `safeStorage` (system encryption): changes the stored credential format, needs its own design and a migration decision; the README says keys are in the OS keychain but `CredentialsManager` writes a plaintext `credentials.json`, so do not publish that README claim as true until this lands; (b) after the split, the behaviour problems in the design file (Groq model reset on a language change, decision Test deadline, Agent Test fallback, template interview-prep answers, made-up company rating, automatic model alternatives policy).
 
 ## Settings cleanup (owner-approved dispatch, `docs/design-settings-cleanup.md`)
 

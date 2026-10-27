@@ -1,6 +1,6 @@
 # Knowledge
 
-Status: option A approved by the owner on 2026-10-27; built step by step (see `TASKS.md`). Nothing is built. Evidence is a source-only investigation (GPT, commit `fdd71df`); every claim below was cited there by file and line, and none was run.
+Status: option A approved by the owner on 2026-10-27; built step by step (the queue and the status of each step are in `TASKS.md`; K1 is built). It was reviewed independently by gpt-6-astra the same day; the corrections below come from that review. Evidence is a source-only investigation (GPT, commit `fdd71df`); every claim below was cited there by file and line, and none was run.
 
 ## Why it is not a rename
 
@@ -29,13 +29,15 @@ Rejected, option B: a launcher "Library" with a source browser and a cited-resul
 
 The preview tags every piece that needs new code. Pure UI moves (the tab, the Search index controls, disclosing the resume) need no new behaviour and no stored change. New behaviour with no new stored shape: neutral material lookup separate from the candidate prompt, an agent `search_materials` tool, a combined source-labelled retrieval, live-index and summary-index repairs, accurate delete and re-index. Needing the owner first (the switch keys are already approved): a `material` document type, indexing provenance columns on `knowledge_documents` (`embedding_provider`, `embedding_dimensions`, `indexed_at`, `index_error`), new IPC for source lists, and folders (not proposed now).
 
-## Steps (each one a branch and one PR)
+## Steps
 
-1. Knowledge tab: extract the current profile branch into `KnowledgeSettings.tsx`, keep the id `profile`, add Sources, Index and Interview profile as local pages, move the Search index controls from AI functions, correct the "only transcripts" text, drop the fake upload percentage and spinner. No stored data or IPC change; works without a resume.
-2. Repair live search identity: index under the real meeting id, remove the stale `source` insert, record the provider on live writes, flush the last under three segments.
-3. Refresh summary-derived search after the summary is final, including recovery and edits.
-4. Notes without interview framing: a neutral material lookup, an agent `search_materials` tool over the existing notes, source labels.
-5. Material index status and generic import (document type, provenance columns, IPC). Owner approval gate before this step.
+The ordered queue is in `TASKS.md`. Corrections from the review that shape it:
+
+- K2 (live indexing) is two steps. K2a first makes the live indexer safe: a forced stop drains one or two pending segments after any in-flight batch, a batch advances only to the boundary it captured, a stopped batch cannot touch the next session, and each write records the provider and dimensions of the provider it actually used. K2b then indexes under the real meeting id, removes the stale `source` insert (the meeting row is created by `MeetingPersistence`, so the insert is redundant) and, after the meeting ends, replaces that meeting's live chunks with the full-transcript chunks instead of appending a second copy. Skip live indexing when the record could not be created. Order matters: switching to the real id before the stop and drain races are fixed would corrupt indexing.
+- K3 (summary-derived search) is two steps and its reason is different from what was first written. An ordinary stop does not embed the placeholder (an empty summary is skipped); the real gaps are that the summary index is never refreshed after the final summary, after recovery or after an edit, and that a refresh needs care: replacing the summary text changes its vector identity, an older in-flight embed must not attach to newer text, the queue's NULL-keyed job does not deduplicate, and old native vectors must be removed. K3a is that safe refresh; K3b calls it after a successful final commit, a successful recovery commit and a successful edit. "Final" means committed metadata, not "the model returned".
+- Material provenance comes before expanded material retrieval. Material vectors are checked by dimension only, so a same-dimension model switch can return unrelated evidence; K5a (provenance and index status for the existing notes) therefore precedes K4.
+- K4 is three steps: the Use when answering settings and their enforcement in every retrieval path (the agent's past-meeting search, global chat, quick answers and their fallback, the profile interceptor), then the neutral notes lookup and the agent's `search_materials`, then the labels. "Materials" means notes and imported documents; the interview profile (resume and roles) is its own switch. Current-meeting context never depends on the Past meetings switch. Turning a kind off must hold on every path, including fallbacks.
+- Combined retrieval, per-source retry, accurate deletion (a meeting or a role leaves vector rows behind) and Re-index all are real gaps not yet assigned to a step; they are listed in `TASKS.md` as K6 so nothing is promised that no step delivers.
 
 ## Decisions
 
