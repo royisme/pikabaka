@@ -6,7 +6,8 @@
 // package.json + creates the git tag + creates the empty GitHub Release).
 // This script picks the version from package.json, builds the signed +
 // notarized macOS artifacts, validates them, and uploads them to the
-// matching GitHub Release.
+// matching GitHub Release, including latest-mac.yml so installed apps can
+// update themselves.
 //
 // Pre-flight checks:
 //   • Current branch is main, working tree clean, in sync with origin
@@ -105,6 +106,7 @@ const artifactPatterns = [
     `${productName}-${version}-arm64.dmg.blockmap`,
     `${productName}-${version}-arm64-mac.zip`,
     `${productName}-${version}-arm64-mac.zip.blockmap`,
+    'latest-mac.yml',
 ];
 const artifacts = artifactPatterns.map((name) => path.join(releaseDir, name));
 const missing = artifacts.filter((p) => !fs.existsSync(p));
@@ -123,5 +125,6 @@ step('Done');
 const releaseUrl = sh(`gh release view ${tag} --json url -q .url`);
 console.log(`\n✓ Released ${tag}`);
 console.log(`  ${releaseUrl}`);
+console.log('  The GitHub release includes latest-mac.yml so installed apps can update themselves.');
 console.log(`\n  Users now download Pika-${version}-arm64.dmg, mount, drag to Applications, and run.`);
 console.log('  Gatekeeper validates the stapled .app offline — no xattr workaround needed.');

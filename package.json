@@ -147,7 +147,11 @@
       "deleteAppDataOnUninstall": false,
       "artifactName": "${productName}-Setup-${version}.${ext}"
     },
-    "publish": null
+    "publish": {
+      "provider": "github",
+      "owner": "royisme",
+      "repo": "pikabaka"
+    }
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",

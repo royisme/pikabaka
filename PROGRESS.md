@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-27: auto-update (branch `auto-update`)
+
+- Found that a packaged build could not update: `build.publish` was null (no `app-update.yml`, no `latest-mac.yml`), `scripts/release.js` did not upload the feed, releases v2.2.0 to v2.4.0 carry no installers, and the release-notes request went to `royisme/pika` (404). Decision and reasons (Velopack and update.electronjs.org rejected): `docs/design-auto-update.md`.
+- Built: GitHub `publish` config; `latest-mac.yml` in the upload list; check 10 s after start and every 4 h when packaged (stopped once a download finished); background download, install on quit, no OS notification; the finished-download notice is held while a meeting is active and shown when it ends; the modal opens only for a finished download ("Restart & Install" / "Not Now"); the Finder workaround and the manual-update views are deleted; release notes now read from `royisme/pikabaka`.
+- Checks: both typechecks, lint and tap (1265 assertions) exit 0. An unsigned `electron-builder --mac zip --arm64` run exits 0 and writes `latest-mac.yml` (url and sha512 of the zip) and `Resources/app-update.yml` (github, `royisme/pikabaka`). Not run: signing, notarization, a real release upload, a real update.
+- Known gap: after "Check for updates" finds an update, Settings still shows "Update Available" and its button calls `downloadUpdate` and closes Settings, although the download already started; the modal appears when it finishes.
+- Owner: 2.2 to 2.4 installs have no feed address and need one manual install of the first build that has this change. The checks to do by hand are listed in `docs/design-auto-update.md`.
+
 ## 2026-10-27: native acoustic echo cancellation (branch `echo-cancel`, issue #39)
 
 - Added a process-wide ungated speaker reference and per-microphone SpeexDSP cancellation before the existing silence/VAD gate. The system signal and frame/buffering path stay unchanged; publishing never waits for a microphone lock. Removed unused Condvar locking from the CPAL data callbacks: all new reference/DSP work stays on the background threads. No audio samples or transcripts are logged.
