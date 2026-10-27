@@ -71,6 +71,8 @@ Consequence: a translated line appears after the flush delay plus one full LLM r
 
 Meetings start manually from the launcher. `MeetingPersistence` creates the row before capture, assembled transcript turns and usage are written incrementally, and stop or startup recovery completes the row without rewriting its children. Recovery preserves the stored start time and any provided title. New databases have no event-link or meeting-origin columns; existing unused nullable columns are left untouched and ignored by row mappings. No schema migration removes them.
 
+Live indexing uses that same persisted id; a failed record creation starts no live index. The main process owns the stop fence: it awaits the live drain before persistence can delete a short record or another meeting can start, and removes a short meeting's derived chunks/vectors before the record's cascade removes their ids. `RAGManager` owns full-transcript replacement: it finishes queued writes, then replaces only that meeting's transcript chunks, chunk queue entries and vectors across all provisioned dimensions in one transaction. The record, transcripts, interactions and existing summary index survive; provider metadata is cleared for the replacement only when no summary vector survives.
+
 The follow-up email modal keeps transcript-based recipient lookup and manual entry; it has no external attendee lookup.
 
 ## Tests
