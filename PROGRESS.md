@@ -2,6 +2,10 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-27: settings cleanup decided (branch `settings-cleanup`)
+
+- A source-only audit of Settings and all shortcuts (GPT, commit `b73679c`) found no dead shortcut handler but too many global shortcuts (22, all OS-wide, six even in launcher mode), three duplicates, a click-only recorder that swaps conflicts silently, a Soniox Save button that always saved an empty key, and Settings text that contradicts the code. Owner decision: six default shortcuts, delete the rest, no migration for old users. Decisions and steps: `docs/design-settings-cleanup.md`. Not built yet: this entry records the decision.
+
 ## 2026-10-27: Updates card in Settings > About (branch `update-card`)
 
 - Settings' one-button "Version" row is gone. About now has an Updates card copied from quotio's layout (design: `docs/design-auto-update.md`, "Updates card"): current version, a switch "Automatically check for updates", one status line with one action (`Check Now`, or `Restart & Install` once a download finished), and "Last checked". No beta switch (Pika has no beta channel). The card never calls `download-update`, which closes the gap noted under the auto-update entry.
