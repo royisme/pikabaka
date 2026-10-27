@@ -26,10 +26,14 @@ Transcript second-pass correction needs no model (it merges reopened turns); the
 
 Tab ids stay, labels change: General, Audio & Translation, **AI functions** (`ai-providers`), **Provider setup** (new id), Shortcuts, Your Background, About.
 
-- **Provider setup**: who Pika connects to, and nothing else. Three collapsed groups: Connections (the existing list, editor and Test), Speech services (service to edit, Google service-account file or the key, Azure region, Test), Decision service (URL, key, Remove, Save, Test). No thresholds, languages, prompts, folders or model choices.
+- **Provider setup**: the services Pika connects to, grouped by what they do, never by company (owner feedback, 2026-10-27; `electron/services/aiConnections.ts` already says Pika is not tied to any provider and that a connection is a type, a host and a key). Three groups, each a list of what is set up plus an Add form that starts with a **Type** select:
+  - Language models: the connections. Types are OpenAI-compatible, Anthropic and Gemini; the host fills in the type's default and can be changed; Name, key, Test, Remove key, Delete. No vendor rows and no preset chips. The four built-in records (`gemini`, `openai`, `claude`, `groq`) stay in storage because jobs may already name them; the list shows only those that have a key or a host override, plus every custom one, and Add always creates a custom connection.
+  - Speech-to-text: the same pattern. Add speech service starts with a Type (Deepgram, Soniox, OpenAI transcription, Groq Whisper, ElevenLabs Scribe, Azure Speech, IBM Watson, Google Cloud Speech) and the fields change with it (key; key and region; a service-account file). Audio & Translation then offers only the services set up here, so a call never falls back to another service silently.
+  - Decision service (proactive help): base URL, key, Remove, Save. A separate kind of service, not a connection.
+  No thresholds, languages, prompts, folders or model choices here.
 - **AI functions**: one row per model setting that is not about audio: Quick answers (connection, model, Fetch, Save, collapsed Test, a line naming every job it serves, answer language, collapsed answer style), Summaries, Agent (image checkbox, workspace folder), Proactive help (mode, decision model, a read-only line saying cards use the Agent model, collapsed threshold, cooldown and decision log), Search index (Automatic or own, status always visible, collapsed rebuild).
 - **Audio & Translation**: devices, speech (service and model, languages), translation (enabled, target, connection and model, Test; source, display, prompt and segmentation under Advanced). Keys and accounts are links to Provider setup.
-- **Your Background** keeps personal documents. It says it uses Quick answers and the Search index.
+- **Your Background** is being rethought, not kept as it is: Pika also has to search everyday meetings and the user's materials, not only a resume. See `docs/design-knowledge.md` once the investigation lands.
 
 Rejected, option B: one "AI functions" page with all seven rows, including speech and translation. It rebuilds the overloaded page and separates devices from recognition.
 
