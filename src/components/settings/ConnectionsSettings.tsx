@@ -1,244 +1,164 @@
-import React, { useState } from 'react';
-import { useQuery, useQueryClient } from 'react-query';
+import React, { useContext, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from 'react-query';
 import type { AiConnectionType, AiConnectionView } from '../../types/electron';
-
-const TYPE_LABEL: Record<AiConnectionType, string> = {
-    openai: 'OpenAI-compatible',
-    anthropic: 'Anthropic',
-    gemini: 'Gemini',
-};
+import { connectionNeedsKey } from '../../../electron/services/aiConnections';
+import { configuredProvider, interfaceLabel, ProviderNavigation } from './ConnectionModelPicker';
 
 const TYPE_HINT: Record<AiConnectionType, string> = {
-    openai: 'OpenAI, Groq, OpenRouter, DeepSeek, a gateway of your own: anything that serves /chat/completions and /models.',
-    anthropic: 'Claude, or a service that speaks the Anthropic Messages API.',
-    gemini: 'Google Gemini, or a service that speaks the Gemini API.',
+    openai: 'OpenAI, Groq, OpenRouter, DeepSeek, a gateway of your own, Ollama and LM Studio speak this interface.',
+    anthropic: 'Claude and compatible services speak this interface.',
+    gemini: 'Gemini speaks this interface.',
 };
-
-const HOST_PLACEHOLDER: Record<AiConnectionType, string> = {
-    openai: 'https://api.example.com/v1',
+const DEFAULT_HOST: Record<AiConnectionType, string> = {
+    openai: 'https://api.openai.com/v1',
     anthropic: 'https://api.anthropic.com',
     gemini: 'https://generativelanguage.googleapis.com',
 };
+const field = 'w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary';
+const smallButton = 'min-h-9 px-3 py-2 rounded-lg text-xs font-medium border border-border-subtle bg-bg-component text-text-secondary hover:text-text-primary disabled:opacity-50';
+type TestResult = { success: boolean; message: string };
+type Uses = Array<{ name: string; connectionId: string }>;
 
-// Presets only fill in the form; a connection is always just a type, a host and a key.
-const PRESETS: Array<{ label: string; name: string; type: AiConnectionType; baseUrl: string }> = [
-    { label: 'OpenRouter', name: 'OpenRouter', type: 'openai', baseUrl: 'https://openrouter.ai/api/v1' },
-    { label: 'DeepSeek', name: 'DeepSeek', type: 'openai', baseUrl: 'https://api.deepseek.com/v1' },
-    { label: 'Together', name: 'Together AI', type: 'openai', baseUrl: 'https://api.together.xyz/v1' },
-    { label: 'Ollama (local)', name: 'Ollama (local)', type: 'openai', baseUrl: 'http://localhost:11434/v1' },
-    { label: 'LM Studio', name: 'LM Studio', type: 'openai', baseUrl: 'http://localhost:1234/v1' },
-];
-
-interface Draft {
-    id?: string;
-    name: string;
-    type: AiConnectionType;
-    baseUrl: string;
-    apiKey: string;
-    builtin: boolean;
-    hasApiKey: boolean;
+export function ProviderList({ connections, uses, results, busyId, confirmId, canDelete = true, onEdit, onRemove, onConfirm }: {
+    connections: AiConnectionView[]; uses: Uses; results: Record<string, TestResult>;
+    busyId?: string; confirmId?: string; canDelete?: boolean;
+    onEdit: (c: AiConnectionView) => void; onRemove: (c: AiConnectionView) => void; onConfirm: (id?: string) => void;
+}) {
+    const visible = connections.filter(configuredProvider);
+    return <div>
+        {!visible.length && <p className="p-4 text-xs text-text-secondary">No providers yet. Add one to use a model.</p>}
+        {visible.map(c => {
+            const usedBy = uses.filter(use => use.connectionId === c.id).map(use => use.name);
+            const result = results[c.id];
+            return <div key={c.id} className="p-4 border-t border-border-subtle flex flex-wrap items-center gap-3">
+                <button type="button" onClick={() => onEdit(c)} disabled={!!busyId} className="min-w-0 flex-1 basis-full sm:basis-0 text-left space-y-1">
+                    <span className="block text-sm font-medium text-text-primary break-words [overflow-wrap:anywhere]">{c.name}</span>
+                    <span className="block text-xs text-text-secondary break-words [overflow-wrap:anywhere]">{interfaceLabel[c.type]} · {c.baseUrl.replace(/^https?:\/\//i, '')}</span>
+                    <span className="flex items-center gap-1.5 text-[11px] text-text-secondary">
+                        <span aria-hidden="true" className={`inline-block w-2 h-2 rounded-full ${c.hasApiKey ? 'bg-state-success' : 'border border-text-tertiary'}`} />
+                        {c.hasApiKey ? 'Key saved' : connectionNeedsKey(c.baseUrl) ? 'No key' : 'No key needed'}
+                    </span>
+                    {result && <span className="block text-xs text-text-primary break-words [overflow-wrap:anywhere]">{result.success ? '●' : '✕ Test failed:'} {result.message}</span>}
+                    {!c.builtin && usedBy.length > 0 && <span className="block text-[11px] text-text-secondary">Used by {usedBy.join(', ')}</span>}
+                </button>
+                {c.builtin ? <button type="button" disabled={!!busyId} onClick={() => onRemove(c)} className={smallButton}>{busyId === c.id ? 'Saving…' : 'Remove key and reset host'}</button>
+                    : confirmId === c.id ? <div className="flex flex-wrap items-center gap-2 text-xs text-text-primary min-w-0">
+                        <span className="break-words [overflow-wrap:anywhere]">Delete {c.name}?</span>
+                        <button type="button" disabled={!!busyId || !canDelete || !!usedBy.length} onClick={() => onRemove(c)} className={smallButton}>{busyId === c.id ? 'Deleting…' : 'Delete'}</button>
+                        <button type="button" disabled={!!busyId} onClick={() => onConfirm()} className={smallButton}>Keep</button>
+                    </div> : <button type="button" aria-label={`Delete ${c.name}`} disabled={!!busyId || !canDelete || !!usedBy.length} onClick={() => onConfirm(c.id)} className={smallButton}>Delete</button>}
+            </div>;
+        })}
+    </div>;
 }
 
-const field = 'w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors';
-const smallButton = 'h-9 px-3 rounded-lg text-xs font-medium border border-border-subtle text-text-secondary hover:text-text-primary transition-colors';
-
-interface ConnectionsSettingsProps {
-    /** Called after a connection was saved or deleted, so the page can refresh what depends on it. */
-    onChanged?: () => void;
+export function ProviderEditor({ connection, onClose, onSaved, onTest, onBusy, disabled = false }: {
+    connection?: AiConnectionView; disabled?: boolean; onClose: () => void; onSaved: () => void;
+    onTest: (result: TestResult) => void; onBusy: (busy: boolean) => void;
+}) {
+    const [draft, setDraft] = useState({
+        id: connection?.id, type: connection?.type ?? 'openai' as AiConnectionType,
+        name: connection?.name ?? '', baseUrl: connection?.baseUrl ?? DEFAULT_HOST.openai, apiKey: '',
+    });
+    const save = useMutation(async () => {
+        const result = await window.electronAPI.aiConnectionSave({ ...draft, apiKey: draft.apiKey || undefined });
+        if (!result.success) throw new Error(result.error || 'Could not save provider');
+    });
+    const test = useMutation(async () => {
+        const result = await window.electronAPI.aiConnectionModels({ id: draft.id, type: draft.type, baseUrl: draft.baseUrl, apiKey: draft.apiKey || undefined });
+        if (!result.success) throw new Error(result.error || 'Could not fetch models');
+        return `The host lists ${result.models?.length ?? 0} models.`;
+    });
+    const busy = disabled || save.isLoading || test.isLoading;
+    const change = (next: Partial<typeof draft>) => { setDraft({ ...draft, ...next }); save.reset(); test.reset(); };
+    return <section className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-3">
+        <h4 className="text-sm font-bold text-text-primary">{connection ? `Edit ${connection.name}` : 'Add provider'}</h4>
+        <fieldset disabled={busy} className="space-y-3 min-w-0">
+            <label className="block text-xs text-text-secondary space-y-1">Interface
+                {connection ? <input readOnly value={interfaceLabel[draft.type]} className={field} /> : <select value={draft.type} onChange={e => {
+                    const type = e.target.value as AiConnectionType;
+                    change({ type, baseUrl: DEFAULT_HOST[type] });
+                }} className={field}>{(Object.keys(interfaceLabel) as AiConnectionType[]).map(type => <option key={type} value={type}>{interfaceLabel[type]}</option>)}</select>}
+            </label>
+            <p className="text-[11px] text-text-tertiary">{TYPE_HINT[draft.type]}</p>
+            <label className="block text-xs text-text-secondary space-y-1">Name<input value={draft.name} readOnly={connection?.builtin} onChange={e => change({ name: e.target.value })} className={field} /></label>
+            <label className="block text-xs text-text-secondary space-y-1">Base URL<input value={draft.baseUrl} onChange={e => change({ baseUrl: e.target.value })} className={field} /></label>
+            <label className="block text-xs text-text-secondary space-y-1">API key<input type="password" autoComplete="off" value={draft.apiKey} onChange={e => change({ apiKey: e.target.value })} placeholder={connection?.hasApiKey ? 'Saved. Leave empty to keep it.' : 'Optional for a local address'} className={field} /></label>
+        </fieldset>
+        <p className="text-[11px] text-text-secondary">Asks the host for its model list. It does not check a model, images or tools.</p>
+        <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={busy} className={smallButton} onClick={() => test.mutate(undefined, {
+                onSuccess: message => onTest({ success: true, message }),
+                onError: error => onTest({ success: false, message: (error as Error).message }),
+            })}>{test.isLoading ? 'Testing…' : 'Test'}</button>
+            <button type="button" disabled={busy} className="min-h-9 px-4 py-2 rounded-lg text-xs bg-primary text-on-primary disabled:opacity-50" onClick={() => {
+                onBusy(true);
+                save.mutate(undefined, { onSuccess: onSaved, onSettled: () => onBusy(false) });
+            }}>{save.isLoading ? 'Saving…' : 'Save'}</button>
+            <button type="button" disabled={disabled || save.isLoading} onClick={onClose} className={smallButton}>Cancel</button>
+        </div>
+        <div aria-live="polite" className="text-xs text-text-primary break-words [overflow-wrap:anywhere]">
+            {test.isError ? <p>✕ Test failed: {(test.error as Error).message}</p> : test.data ? <p>● {test.data}</p> : null}
+            {save.isError && <p role="alert">✕ {(save.error as Error).message}</p>}
+        </div>
+    </section>;
 }
 
-/**
- * Where models are reached: a type (the wire protocol), a host and a key. Nothing here is tied to one
- * provider: a connection of the OpenAI-compatible type can be OpenAI, Groq, OpenRouter or your own gateway.
- * What a model is used for (the agent, translation, chat) is chosen apart, in "Where models are used".
- */
-const ConnectionsSettings: React.FC<ConnectionsSettingsProps> = ({ onChanged }) => {
+const ConnectionsSettings: React.FC<{ onChanged?: () => void }> = ({ onChanged }) => {
     const queryClient = useQueryClient();
-    const { data: connections = [] } = useQuery<AiConnectionView[]>(['ai-connections'], () => window.electronAPI.aiConnectionsList());
-    const [draft, setDraft] = useState<Draft | null>(null);
-    const [error, setError] = useState('');
-    const [check, setCheck] = useState<{ state: 'idle' | 'busy' | 'ok' | 'error'; message: string }>({ state: 'idle', message: '' });
-
-    // Everything that reads the list is told through the query cache; the page is told through the callback.
+    const navigation = useContext(ProviderNavigation);
+    const connections = useQuery(['ai-connections'], () => window.electronAPI.aiConnectionsList());
+    const uses = useQuery(['connection-uses'], async () => {
+        const [chat, summary, agent, embedding, translation] = await Promise.all([
+            window.electronAPI.chatModelGet(), window.electronAPI.summaryModelGet(), window.electronAPI.agentModelGet(),
+            window.electronAPI.embeddingUseGet(), window.electronAPI.getTranscriptTranslationSettings(),
+        ]);
+        return [
+            { name: 'Quick answers', connectionId: chat.connectionId }, { name: 'Summaries', connectionId: summary.connectionId },
+            { name: 'Agent', connectionId: agent.connectionId }, { name: 'Search index', connectionId: embedding.connectionId },
+            { name: 'Translation', connectionId: translation.provider },
+        ];
+    });
+    const [editor, setEditor] = useState<AiConnectionView | string | null>(navigation?.editorId ?? null);
+    const [saving, setSaving] = useState(false);
+    const [confirmId, setConfirmId] = useState<string>();
+    const [results, setResults] = useState<Record<string, TestResult>>({});
     const changed = () => {
         void queryClient.invalidateQueries(['ai-connections']);
+        void queryClient.invalidateQueries(['connection-models']);
         onChanged?.();
     };
-
-    const edit = (connection: AiConnectionView) => {
-        setError('');
-        setCheck({ state: 'idle', message: '' });
-        setDraft({
-            id: connection.id,
-            name: connection.name,
-            type: connection.type,
-            baseUrl: connection.customBaseUrl || !connection.builtin ? connection.baseUrl : '',
-            apiKey: '',
-            builtin: connection.builtin,
-            hasApiKey: connection.hasApiKey,
-        });
-    };
-
-    const add = (preset?: { name: string; type: AiConnectionType; baseUrl: string }) => {
-        setError('');
-        setCheck({ state: 'idle', message: '' });
-        setDraft({ name: preset?.name ?? '', type: preset?.type ?? 'openai', baseUrl: preset?.baseUrl ?? '', apiKey: '', builtin: false, hasApiKey: false });
-    };
-
-    const save = async () => {
-        if (!draft) return;
-        setError('');
-        const result = await window.electronAPI.aiConnectionSave({
-            id: draft.id,
-            name: draft.name,
-            type: draft.type,
-            baseUrl: draft.baseUrl,
-            // An untouched key field leaves the stored key as it is.
-            ...(draft.apiKey ? { apiKey: draft.apiKey } : {}),
-        });
-        if (!result.success) {
-            setError(result.error || 'Could not save');
-            return;
-        }
-        setDraft(null);
+    const remove = useMutation(async (c: AiConnectionView) => {
+        const result = c.builtin
+            ? await window.electronAPI.aiConnectionSave({ id: c.id, baseUrl: '', apiKey: '' })
+            : await window.electronAPI.aiConnectionDelete(c.id);
+        if (!result.success) throw new Error(result.error || 'Could not remove provider');
+    }, { onSuccess: (_, c) => {
+        setConfirmId(undefined);
+        if (editor === c.id || (typeof editor === 'object' && editor?.id === c.id)) setEditor(null);
+        setResults(previous => { const next = { ...previous }; delete next[c.id]; return next; });
         changed();
-    };
-
-    const removeKey = async () => {
-        if (!draft?.id) return;
-        const result = await window.electronAPI.aiConnectionSave({ id: draft.id, name: draft.name, type: draft.type, baseUrl: draft.baseUrl, apiKey: '' });
-        if (result.success) {
-            setDraft({ ...draft, hasApiKey: false, apiKey: '' });
-            changed();
-        }
-    };
-
-    const remove = async () => {
-        if (!draft?.id || draft.builtin) return;
-        await window.electronAPI.aiConnectionDelete(draft.id);
-        setDraft(null);
-        changed();
-    };
-
-    // Fetching the models doubles as the test: the host answered and accepted the key.
-    const fetchModels = async () => {
-        if (!draft) return;
-        setCheck({ state: 'busy', message: 'Asking the host…' });
-        const result = await window.electronAPI.aiConnectionModels({
-            id: draft.id,
-            type: draft.type,
-            baseUrl: draft.baseUrl,
-            ...(draft.apiKey ? { apiKey: draft.apiKey } : {}),
-        });
-        setCheck(
-            result.success
-                ? { state: 'ok', message: `Connected. The host lists ${result.models?.length ?? 0} models.` }
-                : { state: 'error', message: result.error || 'Could not reach the host' }
-        );
-    };
-
-    return (
-        <div className="space-y-5">
-            <div>
-                <h3 className="text-sm font-bold text-text-primary mb-1">Connections</h3>
-                <p className="text-xs text-text-secondary mb-2">
-                    Where models are reached: a type, a host and a key. Any host works, so Pika is not tied to one provider. Choose which connection and model each job uses under Models &amp; Agent.
-                </p>
+    } });
+    const selected = typeof editor === 'object' ? editor ?? undefined : connections.data?.find(c => c.id === editor);
+    const busy = saving || remove.isLoading;
+    return <div className="space-y-5">
+        <section className="bg-bg-item-surface rounded-xl border border-border-subtle">
+            <div className="p-4 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-sm font-bold text-text-primary">Language model providers</h3>
+                <button type="button" disabled={busy} onClick={() => { remove.reset(); setEditor('add'); }} className={smallButton}>Add provider</button>
             </div>
-
-            <div className="space-y-2">
-                {connections.map((connection) => (
-                    <div key={connection.id} className="bg-bg-item-surface rounded-xl px-4 py-3 border border-border-subtle flex items-center gap-3">
-                        <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-text-primary truncate">{connection.name}</span>
-                                <span className="text-[11px] text-text-tertiary shrink-0">{TYPE_LABEL[connection.type]}</span>
-                            </div>
-                            <p className="text-[11px] text-text-tertiary font-mono truncate">{connection.baseUrl}</p>
-                        </div>
-                        <span className={`text-[11px] shrink-0 ${connection.hasApiKey ? 'text-state-success' : 'text-text-tertiary'}`}>
-                            {connection.hasApiKey ? 'Key saved' : 'No key'}
-                        </span>
-                        <button onClick={() => edit(connection)} className={smallButton}>Edit</button>
-                    </div>
-                ))}
-            </div>
-
-            {!draft && (
-                <div className="flex flex-wrap items-center gap-2">
-                    {(Object.keys(TYPE_LABEL) as AiConnectionType[]).map((type) => (
-                        <button key={type} onClick={() => add({ name: '', type, baseUrl: '' })} className={smallButton}>
-                            + {TYPE_LABEL[type]}
-                        </button>
-                    ))}
-                    <span className="text-[11px] text-text-tertiary">or start from</span>
-                    {PRESETS.map((preset) => (
-                        <button key={preset.label} onClick={() => add(preset)} className={smallButton}>{preset.label}</button>
-                    ))}
-                </div>
-            )}
-
-            {draft && (
-                <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-4">
-                    <h4 className="text-sm font-bold text-text-primary">{draft.id ? `Edit ${draft.name}` : 'New connection'}</h4>
-
-                    {!draft.builtin && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-text-secondary block">Name</label>
-                                <input type="text" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="My gateway" className={field} />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-text-secondary block">Type</label>
-                                <select value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value as AiConnectionType })} className={field}>
-                                    {(Object.keys(TYPE_LABEL) as AiConnectionType[]).map((type) => (
-                                        <option key={type} value={type}>{TYPE_LABEL[type]}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    )}
-                    <p className="text-[11px] text-text-tertiary leading-snug">{TYPE_HINT[draft.type]}</p>
-
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-text-secondary block">Host</label>
-                        <input
-                            type="text"
-                            value={draft.baseUrl}
-                            onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })}
-                            placeholder={draft.builtin ? 'Leave empty for the default host' : HOST_PLACEHOLDER[draft.type]}
-                            className={field}
-                        />
-                        {draft.type === 'openai' && <p className="text-[11px] text-text-tertiary">Include the version path your host uses, usually /v1. A bare host gets /v1 added.</p>}
-                    </div>
-
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-text-secondary block">API key</label>
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="password"
-                                value={draft.apiKey}
-                                onChange={(e) => setDraft({ ...draft, apiKey: e.target.value })}
-                                placeholder={draft.hasApiKey ? 'Saved. Type to replace.' : 'Optional for a local address'}
-                                autoComplete="off"
-                                className={field}
-                            />
-                            {draft.hasApiKey && <button onClick={removeKey} className={`${smallButton} shrink-0 h-11`}>Remove key</button>}
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <button onClick={save} className="px-4 py-2 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary transition-colors">Save</button>
-                        <button onClick={fetchModels} disabled={check.state === 'busy'} className={smallButton}>Test and fetch models</button>
-                        <button onClick={() => setDraft(null)} className={smallButton}>Cancel</button>
-                        {draft.id && !draft.builtin && <button onClick={remove} className={`${smallButton} text-state-danger`}>Delete</button>}
-                    </div>
-                    {check.message && <p className={`text-[11px] ${check.state === 'error' ? 'text-state-danger' : 'text-text-tertiary'}`}>{check.message}</p>}
-                    {error && <p className="text-[11px] text-state-danger">{error}</p>}
-                </div>
-            )}
-        </div>
-    );
+            {connections.isLoading ? <p className="p-4 text-xs text-text-secondary">Loading providers…</p> : connections.isError ? <p role="alert" className="p-4 text-xs text-text-primary">✕ {(connections.error as Error).message}</p> : <ProviderList
+                connections={connections.data ?? []} uses={uses.data ?? []} results={results} busyId={busy ? remove.variables?.id ?? 'saving' : undefined}
+                confirmId={confirmId} canDelete={uses.isSuccess && !uses.isFetching}
+                onEdit={c => { remove.reset(); setEditor(c); }} onRemove={c => remove.mutate(c)} onConfirm={setConfirmId}
+            />}
+            {uses.isError && <p role="alert" className="p-4 text-xs text-text-primary">✕ Could not check provider uses: {(uses.error as Error).message}</p>}
+            {remove.isError && <p role="alert" className="p-4 text-xs text-text-primary">✕ {(remove.error as Error).message}</p>}
+        </section>
+        {(editor === 'add' || selected) && <ProviderEditor key={selected?.id ?? 'add'} connection={selected} disabled={remove.isLoading}
+            onClose={() => setEditor(null)} onBusy={setSaving} onSaved={() => { setEditor(null); changed(); }}
+            onTest={result => { if (selected) setResults(previous => ({ ...previous, [selected.id]: result })); }}
+        />}
+    </div>;
 };
-
 export default ConnectionsSettings;

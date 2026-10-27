@@ -2,7 +2,7 @@ import { BrowserWindow } from "electron"
 import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
 import { CredentialsManager } from "../services/CredentialsManager"
-import { CONNECTION_TYPES, type ConnectionType } from "../services/aiConnections"
+import { CONNECTION_TYPES, isBuiltinConnection, type ConnectionType } from "../services/aiConnections"
 import { fetchConnectionModels } from "../utils/connectionModels"
 
 // Connections (type, host, key) and the agent's own model. The key never leaves the main process:
@@ -23,7 +23,20 @@ export function registerConnectionHandlers(appState: AppState): void {
     return { success: true, id: result.id }
   })
 
-  safeHandle("ai-connection-delete", async (_, id: string) => ({ success: typeof id === 'string' && CredentialsManager.getInstance().deleteConnection(id) }))
+  safeHandle("ai-connection-delete", async (_, id: string) => {
+    if (typeof id !== 'string') return { success: false, error: 'Invalid connection' }
+    if (isBuiltinConnection(id)) return { success: false, error: 'Built-in providers cannot be deleted. Remove key and reset host instead.' }
+    const cm = CredentialsManager.getInstance()
+    const uses = [
+      ['Quick answers', cm.getModelUse('chat').connectionId],
+      ['Summaries', cm.getModelUse('summary').connectionId],
+      ['Agent', cm.getAgentUse().connectionId],
+      ['Search index', cm.getEmbeddingUse().connectionId],
+      ['Translation', cm.getTranscriptTranslationProvider()],
+    ].filter(([, connectionId]) => connectionId === id).map(([name]) => name)
+    if (uses.length) return { success: false, error: `Used by ${uses.join(', ')}` }
+    return cm.deleteConnection(id) ? { success: true } : { success: false, error: 'That provider does not exist' }
+  })
 
   // Fetch the models a connection serves: a saved one by id, or a draft (type, host, key) before saving.
   safeHandle("ai-connection-models", async (_, input: { id?: string; type?: ConnectionType; baseUrl?: string; apiKey?: string }) => {

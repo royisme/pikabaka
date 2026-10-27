@@ -1,5 +1,5 @@
 import SttModelPicker, { STT_MODEL_DEFAULTS } from './settings/SttModelPicker';
-import ConnectionModelPicker from './settings/ConnectionModelPicker';
+import ConnectionModelPicker, { ProviderNavigation } from './settings/ConnectionModelPicker';
 import TranslationTest from './settings/TranslationTest';
 import AnswerStyleSettings from './settings/AnswerStyleSettings';
 import KnowledgeSettings from './settings/KnowledgeSettings';
@@ -221,14 +221,18 @@ interface SettingsOverlayProps {
 
 const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, initialTab = 'general' }) => {
     const isLight = useResolvedTheme() === 'light';
-    const [activeTab, setActiveTab] = useState(initialTab);
+    const initialProviderId = initialTab.startsWith('providers:') ? initialTab.slice('providers:'.length) : undefined;
+    const initialSection = initialProviderId ? 'providers' : initialTab;
+    const [activeTab, setActiveTab] = useState(initialSection);
+    const [providerEditorId, setProviderEditorId] = useState(initialProviderId);
     const [showMoreShortcuts, setShowMoreShortcuts] = useState<boolean>(false);
 
     // Sync active tab when modal opens or initialTab prop changes
     const [prevOpenState, setPrevOpenState] = useState({ isOpen, initialTab });
     if (isOpen && (!prevOpenState.isOpen || initialTab !== prevOpenState.initialTab)) {
         setPrevOpenState({ isOpen, initialTab });
-        setActiveTab(initialTab);
+        setActiveTab(initialSection);
+        setProviderEditorId(initialProviderId);
     } else if (!isOpen && prevOpenState.isOpen) {
         setPrevOpenState({ isOpen, initialTab });
     }
@@ -938,6 +942,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     }, [isOpen, activeTab, selectedInput, setPreferredInputId]);
 
     return (
+        <ProviderNavigation.Provider value={{ editorId: providerEditorId, open: (id) => { setProviderEditorId(id); setActiveTab('providers'); } }}>
         <AnimatePresence>
             {isOpen && (
                 <motion.div
@@ -995,7 +1000,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                         <FlaskConical size={16} /> Models &amp; Agent
                                     </button>
                                     <button
-                                        onClick={() => setActiveTab('providers')}
+                                        onClick={() => { setProviderEditorId(undefined); setActiveTab('providers'); }}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'providers' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
                                         <Settings size={16} /> Provider setup
@@ -1412,10 +1417,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                 <KnowledgeSettings onClose={onClose} />
                             )}
                             {activeTab === 'ai-providers' && (
-                                <AIProvidersSettings onOpenProviders={() => setActiveTab('providers')} />
+                                <AIProvidersSettings onOpenProviders={() => { setProviderEditorId(undefined); setActiveTab('providers'); }} />
                             )}
                             {activeTab === 'providers' && (
-                                <ProviderSetupSettings onOpenModels={() => setActiveTab('ai-providers')} />
+                                <ProviderSetupSettings key={providerEditorId ?? 'list'} onOpenModels={() => setActiveTab('ai-providers')} />
                             )}
                             {activeTab === 'keybinds' && (
                                 <div className="space-y-3 animated fadeIn select-text pb-4">
@@ -2072,6 +2077,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             )
             }
         </AnimatePresence >
+        </ProviderNavigation.Provider>
     );
 };
 

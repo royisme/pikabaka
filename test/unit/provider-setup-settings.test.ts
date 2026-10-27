@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import * as ReactQuery from 'react-query';
 import * as FramerMotion from 'framer-motion';
+import type { AiConnectionView } from '../../src/types/electron';
 import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 
 // Only browser stores are stubbed; the Settings pages and their children render for real.
@@ -26,9 +27,9 @@ const { default: SettingsOverlay } = mockRequire(path.resolve('src/components/Se
     [path.resolve('src/utils/platformUtils.ts')]: { isMac: true, isWindows: false },
 }) as typeof import('../../src/components/SettingsOverlay');
 
-function renderSettings(initialTab: string) {
+function renderSettings(initialTab: string, connections: AiConnectionView[] = []) {
     const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
-    client.setQueryData(['ai-connections'], []);
+    client.setQueryData(['ai-connections'], connections);
     const html = renderToStaticMarkup(React.createElement(
         QueryClientProvider,
         { client },
@@ -64,16 +65,28 @@ t.test('Settings preserves the sidebar order and every initialTab id', t => {
     t.end();
 });
 
-t.test('Provider setup alone renders the existing Connections with presets and a model-jobs link', t => {
+t.test('Provider setup alone renders the provider list without presets and with a model-jobs link', t => {
     const html = renderSettings('providers');
     t.match(html, /<h3[^>]*>Provider setup<\/h3>/);
-    t.match(html, /<h3[^>]*>Connections<\/h3>/);
+    t.match(html, /<h3[^>]*>Language model providers<\/h3>/);
     t.match(html, /The services Pika connects to\. Which model does which job is set under <button\b[^>]*>Models &amp; Agent<\/button>\./);
-    t.match(html, 'Choose which connection and model each job uses under Models &amp; Agent.');
-    t.match(html, '>Ollama (local)</button>', 'the existing presets remain available');
-    t.match(html, '>LM Studio</button>');
+    t.match(html, 'No providers yet. Add one to use a model.');
+    t.match(html, '>Add provider</button>');
+    t.notMatch(html, '>Ollama (local)</button>', 'S1b removes presets');
+    t.notMatch(html, '>LM Studio</button>');
     t.notMatch(html, '>Where models are used</h3>');
     t.notMatch(html, '>Search index</h3>', 'the search index is not moved here');
+    t.end();
+});
+
+t.test('floating picker repair section opens the named hidden built-in editor', t => {
+    const html = renderSettings('providers:openai', [{
+        id: 'openai', name: 'OpenAI', type: 'openai', baseUrl: 'https://api.openai.com/v1',
+        builtin: true, customBaseUrl: false, hasApiKey: false,
+    }]);
+    t.match(html, '>Edit OpenAI</h4>');
+    t.match(html, 'No providers yet. Add one to use a model.');
+    t.same(sidebarButtons(html).filter(button => button.attributes.includes('bg-bg-item-active text-text-primary')).map(button => button.label), ['Provider setup']);
     t.end();
 });
 
