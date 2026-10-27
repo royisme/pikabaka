@@ -9,6 +9,7 @@ export interface AppSettings {
     disguiseMode?: 'terminal' | 'settings' | 'activity' | 'none';
     verboseLogging?: boolean;
     actionButtonMode?: 'recap' | 'brainstorm';
+    autoCheckUpdates?: boolean;
     transcriptAssemblerProfile?: 'sentence_bias' | 'low_latency' | 'coherent';
 }
 

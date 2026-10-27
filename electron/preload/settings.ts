@@ -39,6 +39,8 @@ export function settingsChannels() {
         ipcRenderer.removeListener('disguise-changed', subscription)
       }
     },
+    getUpdateState: () => ipcRenderer.invoke("get-update-state"),
+    setAutoCheckUpdates: (enabled: boolean) => ipcRenderer.invoke("set-auto-check-updates", enabled),
     checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
     downloadUpdate: () => ipcRenderer.invoke("download-update"),
     restartAndInstall: () => ipcRenderer.invoke("quit-and-install-update"),

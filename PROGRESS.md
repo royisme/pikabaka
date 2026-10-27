@@ -2,12 +2,21 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-27: Updates card in Settings > About (branch `update-card`)
+
+- Settings' one-button "Version" row is gone. About now has an Updates card copied from quotio's layout (design: `docs/design-auto-update.md`, "Updates card"): current version, a switch "Automatically check for updates", one status line with one action (`Check Now`, or `Restart & Install` once a download finished), and "Last checked". No beta switch (Pika has no beta channel). The card never calls `download-update`, which closes the gap noted under the auto-update entry.
+- New persisted key `autoCheckUpdates` in `settings.json` (owner approved; a missing key means on, so no migration). New IPC channels `get-update-state` and `set-auto-check-updates`. The main process keeps the last-check time and the available/downloaded versions in memory only. When the switch is off, the check 10 s after launch and the 4-hourly check are skipped; `Check Now` still works.
+- Owner feedback applied: error text is readable (`src/lib/updateError.ts`: a sentence that says what to do, the first line of the real error under it, the whole text as the tooltip), and the card follows `DESIGN.md` (no decorative icon, no spinner, a dot or ✕ plus words, one filled control).
+- Checks: both typechecks, lint and tap (1294 assertions, 18 new in `test/unit/auto-updater.test.ts`, 11 in `test/unit/update-error.test.ts`) exit 0. Browser preview with a mocked `electronAPI`: up to date, checking, downloading with percent, ready, error (a 404 for the feed file) and not-available, in the dark and light themes. The card height stays 249 px in every state. Not run: the real app, a packaged build, a real update.
+- Known gap: if a download finishes while Settings is open during a meeting, the card keeps saying "Downloading" until it is reopened, because the finished-download event is held back until the meeting ends. Rare, left as is.
+- Owner: look at the card in the running app in both themes; try the switch off, relaunch, and confirm no check runs until `Check Now`.
+
 ## 2026-10-27: auto-update (branch `auto-update`)
 
 - Found that a packaged build could not update: `build.publish` was null (no `app-update.yml`, no `latest-mac.yml`), `scripts/release.js` did not upload the feed, releases v2.2.0 to v2.4.0 carry no installers, and the release-notes request went to `royisme/pika` (404). Decision and reasons (Velopack and update.electronjs.org rejected): `docs/design-auto-update.md`.
 - Built: GitHub `publish` config; `latest-mac.yml` in the upload list; check 10 s after start and every 4 h when packaged (stopped once a download finished); background download, install on quit, no OS notification; the finished-download notice is held while a meeting is active and shown when it ends; the modal opens only for a finished download ("Restart & Install" / "Not Now"); the Finder workaround and the manual-update views are deleted; release notes now read from `royisme/pikabaka`.
 - Checks: both typechecks, lint and tap (1265 assertions) exit 0. An unsigned `electron-builder --mac zip --arm64` run exits 0 and writes `latest-mac.yml` (url and sha512 of the zip) and `Resources/app-update.yml` (github, `royisme/pikabaka`). Not run: signing, notarization, a real release upload, a real update.
-- Known gap: after "Check for updates" finds an update, Settings still shows "Update Available" and its button calls `downloadUpdate` and closes Settings, although the download already started; the modal appears when it finishes.
+- Known gap, closed by the Updates card (branch `update-card`): after "Check for updates" found an update, Settings still showed "Update Available" and its button called `downloadUpdate`, although the download had already started.
 - Owner: 2.2 to 2.4 installs have no feed address and need one manual install of the first build that has this change. The checks to do by hand are listed in `docs/design-auto-update.md`.
 
 ## 2026-10-27: native acoustic echo cancellation (branch `echo-cancel`, issue #39)

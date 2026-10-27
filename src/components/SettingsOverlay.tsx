@@ -9,12 +9,10 @@ import { useQuery, useQueryClient } from 'react-query';
 import { useWindowEvent } from '../hooks/useWindowEvent';
 import { useMainEvent } from '../hooks/useMainEvent';
 import { useLocalStorageValue } from '../hooks/useLocalStorageValue';
-import packageJson from '../../package.json';
 import {
     X, Mic, Speaker, Monitor, Keyboard, BookOpen, Upload,
-    ArrowDown,
     RotateCcw, Eye, Layout, MessageSquare,
-    ChevronDown, ChevronUp, ChevronRight, Check, BadgeCheck, Power, Palette, Ghost, Sun, Moon, RefreshCw, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink, Trash2,
+    ChevronDown, ChevronUp, ChevronRight, Check, Power, Palette, Ghost, Sun, Moon, RefreshCw, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink, Trash2,
     Pencil, MapPin, HelpCircle, Zap, SlidersHorizontal, PointerOff,
     AlertCircle, Shield
 } from 'lucide-react';
@@ -446,7 +444,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
     const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
     const [isAiLangDropdownOpen, setIsAiLangDropdownOpen] = useState(false);
-    const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'uptodate' | 'error'>('idle');
     const themeDropdownRef = useRef<HTMLDivElement>(null);
     const aiLangDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -1166,43 +1163,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
 
 
-    const handleCheckForUpdates = async () => {
-        if (updateStatus === 'checking') return;
-        setUpdateStatus('checking');
-        try {
-            await window.electronAPI.checkForUpdates();
-        } catch (error) {
-            console.error("Failed to check for updates:", error);
-            setUpdateStatus('error');
-            setTimeout(() => setUpdateStatus('idle'), 3000);
-        }
-    };
-
-    useEffect(() => {
-        if (!isOpen) return;
-
-        const unsubs = [
-            window.electronAPI.onUpdateChecking(() => {
-                setUpdateStatus('checking');
-            }),
-            window.electronAPI.onUpdateAvailable(() => {
-                setUpdateStatus('available');
-                // Don't close settings - let user see the button change to "Update Available"
-            }),
-            window.electronAPI.onUpdateNotAvailable(() => {
-                setUpdateStatus('uptodate');
-                setTimeout(() => setUpdateStatus('idle'), 3000);
-            }),
-            window.electronAPI.onUpdateError((err) => {
-                console.error('[Settings] Update error:', err);
-                setUpdateStatus('error');
-                setTimeout(() => setUpdateStatus('idle'), 3000);
-            })
-        ];
-
-        return () => unsubs.forEach(unsub => unsub());
-    }, [isOpen, onClose]);
-
     // Use the native mic test path so device IDs stay consistent with the meeting runtime.
     useEffect(() => {
         if (isOpen && activeTab === 'audio') {
@@ -1616,69 +1576,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
                                                 <AnswerStyleSettings />
 
-                                                {/* Version */}
-                                                <div className="flex items-start justify-between gap-4 px-4 py-3">
-                                                    <div className="flex items-start gap-4">
-                                                        <div className="w-10 h-10 bg-bg-item-surface rounded-lg border border-border-subtle flex items-center justify-center text-text-tertiary shrink-0">
-                                                            <BadgeCheck size={20} />
-                                                        </div>
-                                                        <div>
-                                                            <h3 className="text-sm font-bold text-text-primary">Version</h3>
-                                                            <p className="text-xs text-text-secondary mt-0.5">
-                                                                You are currently using Pika version {packageJson.version}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        onClick={async () => {
-                                                            if (updateStatus === 'available') {
-                                                                try {
-                                                                    // @ts-ignore
-                                                                    await window.electronAPI.downloadUpdate();
-                                                                    onClose(); // Close settings to show the banner
-                                                                } catch (err) {
-                                                                    console.error("Failed to start download:", err);
-                                                                }
-                                                            } else {
-                                                                handleCheckForUpdates();
-                                                            }
-                                                        }}
-                                                        disabled={updateStatus === 'checking'}
-                                                        className={`px-5 py-2 rounded-lg text-[13px] font-bold transition-all flex items-center gap-2 shrink-0 ${updateStatus === 'checking' ? 'bg-bg-input text-text-tertiary cursor-wait' :
-                                                            updateStatus === 'available' ? 'bg-accent-primary text-on-primary hover:bg-accent-secondary shadow-lg shadow-blue-500/20' :
-                                                                updateStatus === 'uptodate' ? 'bg-state-success-soft text-state-success border border-state-success-border' :
-                                                                    updateStatus === 'error' ? 'bg-state-danger-soft text-state-danger border border-state-danger-border' :
-                                                                        'bg-bg-component hover:bg-bg-input text-text-primary'
-                                                            }`}
-                                                    >
-                                                        {updateStatus === 'checking' ? (
-                                                            <>
-                                                                <RefreshCw size={14} className="animate-spin" />
-                                                                Checking...
-                                                            </>
-                                                        ) : updateStatus === 'available' ? (
-                                                            <>
-                                                                <ArrowDown size={14} />
-                                                                Update Available
-                                                            </>
-                                                        ) : updateStatus === 'uptodate' ? (
-                                                            <>
-                                                                <Check size={14} />
-                                                                Up to date
-                                                            </>
-                                                        ) : updateStatus === 'error' ? (
-                                                            <>
-                                                                <X size={14} />
-                                                                Error
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <RefreshCw size={14} />
-                                                                Check for updates
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                </div>
                                             </div>
                                             </div>
 

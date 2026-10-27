@@ -11,6 +11,11 @@ Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR 
 - Done on `auto-update`: `build.publish` is the GitHub provider, `scripts/release.js` uploads `latest-mac.yml`, updates download in the background, never restart the app on their own, the finished-download notice waits during a meeting, the unsigned-app Finder branch and the manual-update modal views are gone, and `ReleaseNotesManager` asks `royisme/pikabaka`. Both typechecks, lint and tap exit 0; an unsigned `electron-builder --mac zip` run writes `latest-mac.yml` and a packaged `app-update.yml`.
 - Then: owner builds N+1, uploads it, and checks the update from a packaged N build, and that the modal waits during a meeting. Real signing, notarization, GitHub and a real update cannot be run by the agent.
 
+## Updates card (owner-approved dispatch, `docs/design-auto-update.md`, section "Updates card")
+
+- Done on `update-card` (stacked on `auto-update`, PR #48): the Settings > General "Version" button is replaced by an Updates card in Settings > About, copied from quotio's layout: automatic-check switch (`autoCheckUpdates`, default on), status line with one action, "Last checked". Both typechecks, lint and tap exit 0; every state renders in a browser preview with a mocked `electronAPI`, in both themes.
+- Then: owner checks the card in both themes and the real states with a packaged build.
+
 ## Acoustic echo cancellation (issue #39, owner-approved dispatch)
 
 - Done on `echo-cancel`: native SpeexDSP cancellation before the microphone's VAD/STT path, an ungated system reference, fixed latency compensation and passthrough without fresh reference data. The text echo filter and NAPI/IPC/settings contracts are unchanged. Synthetic echo attenuation and double-talk tests pass; macOS arm64 and x86_64 release builds pass.
