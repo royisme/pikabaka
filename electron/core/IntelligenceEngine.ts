@@ -238,7 +238,7 @@ export class IntelligenceEngine extends EventEmitter {
             if (!this.whatToAnswerLLM) {
                 if (!this.answerLLM) {
                     this.setMode('idle');
-                    return "Please configure your API Keys in Settings to use this feature.";
+                    return "Please configure your API Keys in Settings, Provider setup to use this feature.";
                 }
                 const context = this.session.getFormattedContext(180);
                 const answer = await this.answerLLM.generate(question || '', context);
@@ -663,7 +663,7 @@ export class IntelligenceEngine extends EventEmitter {
         try {
             if (!this.codeHintLLM) {
                 this.setMode('idle');
-                return "Please configure your API Keys in Settings to use this feature.";
+                return "Please configure your API Keys in Settings, Provider setup to use this feature.";
             }
 
             // Resolve question context from available sources (priority order)
@@ -742,7 +742,7 @@ export class IntelligenceEngine extends EventEmitter {
         try {
             if (!this.brainstormLLM) {
                 this.setMode('idle');
-                return "Please configure your API Keys in Settings to use this feature.";
+                return "Please configure your API Keys in Settings, Provider setup to use this feature.";
             }
 
             let context = this.session.getFormattedContext(180);

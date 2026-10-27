@@ -954,11 +954,11 @@ Unlock the **Undetectability** add-on to keep Pika invisible during screen shari
 # API Setup
 
 1. Open **Settings**
-2. Scroll to **Credentials**
+2. Open **Provider setup**
 3. Add your API keys:
    - **Gemini**
    - **Groq**
-4. To enable real-time transcription, select the location of your **Google Cloud service account JSON file**.
+4. To enable real-time transcription, open **Audio & Translation** and select the location of your **Google Cloud service account JSON file**.
 
 If you don’t already have one, follow the steps below to create it.
 
@@ -988,7 +988,7 @@ If you don’t already have one, follow the steps below to create it.
 - Select **JSON**
 - Download the file
 
-**Once downloaded, return to Settings → Credentials in Pika and select this file to complete setup.**
+**Once downloaded, return to Settings → Audio & Translation in Pika and select this file to complete setup.**
 
 # Free Google Cloud Credit (New Users)
 
