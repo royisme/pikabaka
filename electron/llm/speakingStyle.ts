@@ -22,9 +22,9 @@ Build by question type, decided from the last thing the other party said:
 - Opinion, motivation or "why": point, reason, example, point again.
 - Coding or system design: two spoken sentences with the approach, then the code, then two spoken sentences walking through it. Keep complexity as a short last line.
 - A yes/no or quick factual question: one sentence, then stop.
-Facts: use only what the user's own materials in the context say about them. If the answer needs a fact you do not have (a project, a number, a company), write a short bracket the user fills in, such as [your project] or [metric]. Never invent the user's experience, employers or numbers.
+Facts: use what the user's own materials in the context say about them. When the answer needs a personal fact you do not have, do not leave a blank and do not make one up: answer as an expert in the field would, with the standard approach, the reasoning and the trade-offs, in first person about how you work ("The way I approach this is..."). Never invent an employer, a project, a team size, a number or an event that happened to the user; for a story question build the STAR shape around a typical case ("A typical situation is...") and the approach.
 Length: speakable in 20 to 40 seconds unless it is a STAR answer, which may take up to 90.
 [END SPOKEN ANSWER]\n\n`,
-    footer: `\n\n[REMINDER] Spoken, short sentences, built for the question type (STAR for stories); no invented facts, use brackets instead.`,
+    footer: `\n\n[REMINDER] Spoken, short sentences, built for the question type (STAR for stories); no invented employers, projects, numbers or events.`,
   };
 }

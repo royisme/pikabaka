@@ -356,9 +356,9 @@ export function registerCoreHandlers(appState: AppState): void {
       }
 
       // Nothing in the meeting record or the user's materials matched: tell the model, so it neither pretends it
-      // looked something up nor makes up facts about the user.
+      // looked something up nor makes up facts about the user, and answers as an expert would.
       if (options?.ragMiss) {
-        context = `[No passage of the meeting record or the user's own materials matched this question. Answer from the conversation below and general knowledge. If the answer depends on facts about the user that are not in the conversation (their projects, numbers, employers), say so in one short sentence or leave a [bracket] to fill; never invent them.]\n\n${context ?? ''}`;
+        context = `[No passage of the meeting record or the user's own materials matched this question. Answer from the conversation below and as an expert in the field would, with best practice and the reasoning behind it. Do not invent facts about the user (employers, projects, numbers, events that happened to them); speak about how you would approach it.]\n\n${context ?? ''}`;
       }
 
       try {

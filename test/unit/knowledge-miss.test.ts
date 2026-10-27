@@ -41,8 +41,10 @@ t.test('passages that are not about the question are dropped, and nothing is inv
   const result = await orchestrator({ scores: [0.12, 0.08] }).processQuestion('Tell me about the hardest outage you handled');
   t.equal(result?.knowledgeMiss, true);
   t.equal(result?.contextBlock, '');
-  t.match(result?.systemPromptInjection, /Do NOT invent projects/);
-  t.match(result?.systemPromptInjection, /Not in your notes:/);
+  t.match(result?.systemPromptInjection, /senior practitioner/);
+  t.match(result?.systemPromptInjection, /Do not invent a past/);
+  t.notMatch(result?.systemPromptInjection, /Not in your notes/);
+  t.notMatch(result?.systemPromptInjection, /square brackets/);
 });
 
 t.test('a passage that matches is used as background and is not a miss', async (t) => {

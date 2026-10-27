@@ -15,8 +15,9 @@ t.test('the instruction asks for STAR on stories, spoken sentences, and brackets
   const { header, footer } = speakingStyleInstruction('');
   t.match(header, /STAR/);
   t.match(header, /"S ·".*"T ·".*"A ·".*"R ·"/s);
-  t.match(header, /short bracket the user fills in/);
-  t.match(header, /Never invent the user's experience/);
+  t.match(header, /answer as an expert in the field would/);
+  t.match(header, /Never invent an employer, a project, a team size, a number or an event/);
+  t.notMatch(header, /bracket/);
   t.match(header, /Borrow only that manner/);
-  t.match(footer, /no invented facts/);
+  t.match(footer, /no invented employers, projects, numbers or events/);
 });

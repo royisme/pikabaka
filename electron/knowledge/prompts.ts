@@ -188,9 +188,9 @@ Tone: Professional but conversational, not robotic.
 Return ONLY the response text, no quotes or explanation.`;
 }
 
-/** The user's materials have nothing for this question: answer without inventing, and say what is missing. */
+/** The user's materials have nothing for this question: answer as an expert in the field would, without inventing a past. */
 export function buildNoMatchPrompt(question: string, identitySummary: string, depthInstruction: string): string {
-  return `You are helping a job candidate answer an interview question, but the candidate's own materials (resume and notes) contain nothing relevant to it.
+  return `You are helping a job candidate answer an interview question. The candidate's own materials (resume and notes) have nothing relevant to it, so answer it the way a senior practitioner in this field would: with the approach experts and industry best practice agree on, the reasoning behind it and the trade-offs, concrete enough to sound like someone who has done the work.
 
 ${depthInstruction}
 
@@ -199,10 +199,10 @@ Candidate identity: ${identitySummary}
 Interview question: ${question}
 
 Instructions:
-- Answer in first person as the candidate, as lines the candidate can say out loud
-- Do NOT invent projects, employers, teams, numbers or outcomes. Use only general principles, the identity above, and what the conversation itself says
-- Wherever a personal fact is needed, write a short placeholder in [square brackets], such as [your project] or [the result]
-- End with one separate line that starts with "Not in your notes:" and names, in a few words, the personal fact that would make this answer specific, so the candidate can add it to their notes`;
+- Write it as lines the candidate can say out loud, in first person, about how they approach and decide ("The way I approach this is...", "What I check first is...")
+- Be specific and practical: name the standard technique, the first step, the main risk, how you would verify it
+- Do not invent a past: no made-up employers, projects, team sizes, numbers or results, and do not claim an event happened to the candidate. For a "tell me about a time" question, build the STAR shape around a typical case ("A typical situation is...", "In a case like that I...") and the approach, not around a fabricated event
+- No placeholders in brackets and no notes to the candidate: give the answer`;
 }
 
 export function buildContextEnhancementPrompt(
