@@ -19,50 +19,15 @@ interface UpdateModalProps {
     updateInfo: any;
     parsedNotes: ParsedReleaseNotes | null;
     onDismiss: () => void;
-    onInstall: () => void;
-    downloadProgress: number;
-    status: 'idle' | 'downloading' | 'ready' | 'error' | 'instructions';
-    errorMessage?: string | null;
-    instructionsArch?: 'arm64' | 'x64' | null;
+    status: 'idle' | 'ready';
 }
-
-const CopyBlock = ({ command }: { command: string }) => {
-    const [copied, setCopied] = React.useState(false);
-    const handleCopy = () => {
-        navigator.clipboard.writeText(command);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-    return (
-        <div className="flex items-center justify-between bg-black/20 rounded-lg pl-3 pr-1.5 py-1.5 border border-white/[0.03] group hover:border-white/10 transition-colors mt-1.5 mb-2.5 w-full">
-            <code className="text-[10px] font-mono text-blue-400 truncate mr-2 select-all overflow-hidden whitespace-nowrap">
-                {command}
-            </code>
-            <button
-                onClick={handleCopy}
-                className="h-6 px-2.5 rounded-md bg-white/5 hover:bg-white/10 active:bg-white/15 flex items-center justify-center transition-colors border border-white/5 flex-shrink-0"
-                title="Copy to clipboard"
-            >
-                {copied ? (
-                    <span className="text-[10px] font-semibold text-state-success">Copied</span>
-                ) : (
-                    <span className="text-[10px] font-medium text-white/50 group-hover:text-white/80">Copy</span>
-                )}
-            </button>
-        </div>
-    );
-};
 
 const UpdateModal: React.FC<UpdateModalProps> = ({
     isOpen,
     updateInfo,
     parsedNotes,
     onDismiss,
-    onInstall,
-    downloadProgress,
-    status,
-    errorMessage,
-    instructionsArch
+    status
 }) => {
     // Helper to format version string
     const formatVersion = (v: string) => {
@@ -76,27 +41,13 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
 
     const showFallback = !parsedNotes || (!parsedNotes.summary && (!parsedNotes.sections || parsedNotes.sections.length === 0));
 
-    const [copied, setCopied] = React.useState(false);
-
-    // Auto-switch to progress view if status changes to downloading AND it was user-initiated
-    const handleUpdateClick = () => {
-        onInstall();
-    };
-
-    const handleCopyCommand = () => {
-        navigator.clipboard.writeText('xattr -cr /Applications/Pika.app');
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
     // Auto-scroll logic
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
     const isUserInteractionRef = React.useRef(false);
     const animationFrameRef = React.useRef<number>();
 
     React.useEffect(() => {
-        // Only run if not downloading/error and we have notes
-        if (status === 'downloading' || status === 'error' || showFallback || !isOpen) return;
+        if (showFallback || !isOpen) return;
 
         const scroll = () => {
             if (isUserInteractionRef.current || !scrollContainerRef.current) return;
@@ -156,142 +107,14 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                         className="relative w-[510px] h-[380px] bg-[#1E1E1E]/90 backdrop-blur-2xl rounded-xl shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] border border-white/[0.08] overflow-hidden flex flex-col"
                     >
                         {/* Content Container */}
-                        {status === 'error' ? (
-                            <div className="p-8 flex flex-col items-center justify-center h-full text-center">
-                                <div className="space-y-2 mb-6">
-                                    <h2 className="text-[17px] font-semibold text-white tracking-tight">
-                                        Update Failed
-                                    </h2>
-                                    {errorMessage && (
-                                        <p className="text-[13px] text-state-danger font-medium">
-                                            {errorMessage}
-                                        </p>
-                                    )}
-                                    <p className="text-[13px] text-white/40">
-                                        Check your internet connection or download the update manually from GitHub.
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={onDismiss}
-                                    className="px-5 py-[6px] bg-white/10 hover:bg-white/20 text-white text-[13px] font-medium rounded-lg transition-colors"
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        ) : status === 'instructions' ? (
-                            <div className="p-8 flex flex-col h-full relative text-left w-full max-w-full">
-                                <div className="space-y-1.5 mb-5 text-center mt-2">
-                                    <h2 className="text-[17px] font-semibold text-white tracking-tight">
-                                        Manual Update Required
-                                    </h2>
-                                    <p className="text-[13px] text-white/40 font-medium leading-relaxed">
-                                        The download has started in your browser. Follow these steps to install the update:
-                                    </p>
-                                </div>
-                                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 mb-4 space-y-2 w-full">
-                                    <div className="space-y-1 w-full">
-                                        <p className="text-[12px] font-medium text-white/80">1. Clear quarantine on the downloaded file:</p>
-                                        <CopyBlock command={`xattr -cr ~/Downloads/Pika-${displayVersion.replace('v', '')}-${instructionsArch || 'arm64'}.dmg`} />
-                                    </div>
-                                    <div className="space-y-1 mt-1 pl-0.5">
-                                        <p className="text-[12px] font-medium text-white/80">2. Open the file and install Pika.</p>
-                                    </div>
-                                    <div className="space-y-1 mt-3 w-full">
-                                        <p className="text-[12px] font-medium text-white/80">3. Clear quarantine on the installed app:</p>
-                                        <CopyBlock command="xattr -cr /Applications/Pika.app" />
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-center mt-auto w-full">
-                                    <button
-                                        onClick={onDismiss}
-                                        className="px-6 py-[6px] bg-white/10 hover:bg-white/20 text-white text-[13px] font-medium rounded-lg transition-colors w-[200px]"
-                                    >
-                                        Done
-                                    </button>
-                                </div>
-                            </div>
-                        ) : status === 'downloading' ? (
-                            <div className="p-8 flex flex-col items-center justify-center h-full text-center relative">
-
-                                {/* 1. Header Text */}
-                                <div className="space-y-1.5 mb-8">
-                                    <h2 className="text-[17px] font-semibold text-white tracking-tight">
-                                        Downloading Update...
-                                    </h2>
-                                    <p className="text-[13px] text-white/40 font-medium">
-                                        {downloadProgress < 100 ? 'Please wait while we prepare the update.' : 'Finalizing package...'}
-                                    </p>
-                                </div>
-
-                                {/* 2. Premium Troubleshooting Card */}
-                                <div
-                                    tabIndex={-1}
-                                    className="w-full max-w-[360px] bg-white/[0.03] rounded-xl border border-white/[0.06] p-3.5 flex flex-col gap-2.5 text-left mb-8 outline-none focus:outline-none focus:ring-0"
-                                >
-                                    <div className="flex items-start gap-2.5">
-                                        <div className="w-5 h-5 rounded-full bg-state-warning-soft flex items-center justify-center flex-shrink-0 mt-0.5">
-                                            <span className="text-[10px] text-state-warning">!</span>
-                                        </div>
-                                        <div className="space-y-0.5">
-                                            <p className="text-[12px] font-medium text-white/80 leading-tight">
-                                                If macOS says "App is damaged"
-                                            </p>
-                                            <p className="text-[11px] text-white/40 leading-snug">
-                                                Move app to Applications folder, then run:
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Code Block with Copy */}
-                                    <div className="flex items-center justify-between bg-black/20 rounded-lg pl-3 pr-1.5 py-1.5 border border-white/[0.03] group hover:border-white/10 transition-colors">
-                                        <code className="text-[10px] font-mono text-blue-400 truncate mr-2 select-all">
-                                            xattr -cr /Applications/Pika.app
-                                        </code>
-                                        <button
-                                            onClick={handleCopyCommand}
-                                            className="h-6 px-2.5 rounded-md bg-white/5 hover:bg-white/10 active:bg-white/15 flex items-center justify-center transition-colors border border-white/5"
-                                            title="Copy to clipboard"
-                                        >
-                                            {copied ? (
-                                                <span className="text-[10px] font-semibold text-state-success">Copied</span>
-                                            ) : (
-                                                <span className="text-[10px] font-medium text-white/50 group-hover:text-white/80">Copy</span>
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* 3. Progress Bar */}
-                                <div className="w-full max-w-[260px] space-y-2.5 mb-2">
-                                    <div className="h-[5px] w-full bg-white/10 rounded-full overflow-hidden">
-                                        <motion.div
-                                            initial={{ width: 0 }}
-                                            animate={{ width: `${downloadProgress}%` }}
-                                            transition={{ ease: "linear", duration: 0.2 }}
-                                            className="h-full bg-[#007AFF] rounded-full shadow-[0_0_10px_rgba(0,122,255,0.5)]"
-                                        />
-                                    </div>
-                                    <p className="text-[11px] font-medium text-white/30 tabular-nums">
-                                        {Math.round(downloadProgress)}% Complete
-                                    </p>
-                                </div>
-
-                                <button
-                                    onClick={onDismiss}
-                                    className="text-[13px] font-medium text-white/30 hover:text-white/60 transition-colors mt-auto mb-1"
-                                >
-                                    Hide
-                                </button>
-                            </div>
-                        ) : (
                             <div className="p-7 pb-4 flex flex-col gap-2 h-full min-h-0">
                                 {/* Header Group */}
                                 <div className="flex flex-col gap-0.5 text-center relative flex-shrink-0 pt-1">
                                     <h2 className="text-[19px] font-semibold text-white tracking-tight">
-                                        Update Available
+                                        Update Ready
                                     </h2>
                                     <p className="text-[13px] text-white/50 font-medium tracking-wide">
-                                        Version {displayVersion} is ready to install.
+                                        Version {displayVersion} is downloaded and ready to install.
                                     </p>
                                 </div>
 
@@ -347,24 +170,14 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                     </button>
 
                                     {/* Primary Action - Right Aligned, System Blue */}
-                                    {status === 'ready' ? (
-                                        <button
-                                            onClick={() => window.electronAPI.restartAndInstall()}
-                                            className="px-5 py-[6px] bg-[#007AFF] hover:bg-[#0062CC] text-white text-[13px] font-medium rounded-lg shadow-sm transition-colors"
-                                        >
-                                            Restart & Install
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={handleUpdateClick}
-                                            className="px-5 py-[6px] bg-[#007AFF] hover:bg-[#0062CC] text-white text-[13px] font-medium rounded-lg shadow-sm transition-colors"
-                                        >
-                                            Update Now
-                                        </button>
-                                    )}
+                                    <button
+                                        onClick={() => window.electronAPI.restartAndInstall()}
+                                        className="px-5 py-[6px] bg-[#007AFF] hover:bg-[#0062CC] text-white text-[13px] font-medium rounded-lg shadow-sm transition-colors"
+                                    >
+                                        Restart & Install
+                                    </button>
                                 </div>
                             </div>
-                        )}
                     </motion.div>
                 </div>
             )}

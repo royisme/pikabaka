@@ -47,6 +47,7 @@ import {
   quitAndInstallUpdate as quitAndInstallUpdateFn,
   checkForUpdates as checkForUpdatesFn,
   downloadUpdate as downloadUpdateFn,
+  flushPendingUpdateNotice,
 } from "./lib/auto-updater"
 import {
   type BufferedTranscriptTurn,
@@ -413,6 +414,7 @@ export class AppState {
 
   private broadcastMeetingState(): void {
     this.broadcast('meeting-state-changed', { isActive: this.isMeetingActive });
+    if (!this.isMeetingActive) flushPendingUpdateNotice(this);
   }
 
   private async bootstrapOllamaEmbeddings() {

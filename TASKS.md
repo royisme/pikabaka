@@ -8,7 +8,7 @@ Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR 
 
 ## Auto-update (owner-approved dispatch, `docs/design-auto-update.md`)
 
-- Next, on `auto-update`: set `build.publish` to the GitHub provider, upload `latest-mac.yml` from `scripts/release.js`, download in the background, never restart on its own, hold the finished-download notice during a meeting, delete the unsigned-app Finder branch and the manual-update modal view, fix the `ReleaseNotesManager` repository name. Done when: both typechecks, lint and tap exit 0, and an unsigned `electron-builder --mac zip` run writes `latest-mac.yml` and a packaged `app-update.yml` (see the design file for the commands).
+- Done on `auto-update`: `build.publish` is the GitHub provider, `scripts/release.js` uploads `latest-mac.yml`, updates download in the background, never restart the app on their own, the finished-download notice waits during a meeting, the unsigned-app Finder branch and the manual-update modal views are gone, and `ReleaseNotesManager` asks `royisme/pikabaka`. Both typechecks, lint and tap exit 0; an unsigned `electron-builder --mac zip` run writes `latest-mac.yml` and a packaged `app-update.yml`.
 - Then: owner builds N+1, uploads it, and checks the update from a packaged N build, and that the modal waits during a meeting. Real signing, notarization, GitHub and a real update cannot be run by the agent.
 
 ## Acoustic echo cancellation (issue #39, owner-approved dispatch)
