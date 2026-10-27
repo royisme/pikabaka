@@ -6,6 +6,12 @@ The work queue in small steps, one at a time. GitHub issues hold the evidence an
 
 Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR that says `Fixes #N` for its issue.
 
+## Acoustic echo cancellation (issue #39, owner-approved dispatch)
+
+- Done on `echo-cancel`: native SpeexDSP cancellation before the microphone's VAD/STT path, an ungated system reference, fixed latency compensation and passthrough without fresh reference data. The text echo filter and NAPI/IPC/settings contracts are unchanged. Synthetic echo attenuation and double-talk tests pass; macOS arm64 and x86_64 release builds pass.
+- Next: owner checks speakers on, a video playing and a call in progress, temporarily commenting out the text filter for the check only: no video sentences in Me, overlapping own speech still transcribed, no added Interviewer latency. Real devices, STT services, Windows and packaged builds were not exercised. Check stop/restart and microphone-only capture too; calibrate the fixed delay if needed before adding an estimator.
+- Checks: both typechecks and lint exit 0; tap exits 1 only for the known missing DOCX fixture. Optional Rust Clippy exits 101 on five pre-existing findings in untouched silence-suppression/SCK code; native tests and release builds exit 0. See `PROGRESS.md`.
+
 ## AI settings completion (owner-approved dispatch)
 
 - Phase A done: Fast Response Mode and cURL providers removed end to end. Both typechecks and lint exit 0; tests exit 1 only for the missing DOCX fixture. Owner runtime checks remain.

@@ -6,19 +6,24 @@ extern crate napi_derive;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use napi::bindgen_prelude::*;
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use ringbuf::traits::Consumer;
 
 pub mod audio_config;
+mod echo_cancellation;
 pub mod license;
 pub mod microphone;
 pub mod silence_suppression;
 pub mod speaker;
 
 use crate::audio_config::DSP_POLL_MS;
+use crate::echo_cancellation::{
+    reference_is_recent, CaptureClock, MicrophoneEchoCanceller, ReferenceWriter,
+    MICROPHONE_LOOKAHEAD_MS,
+};
 use crate::silence_suppression::{FrameAction, SilenceSuppressionConfig, SilenceSuppressor};
 
 // ============================================================================
@@ -88,6 +93,7 @@ impl SystemAudioCapture {
         // ★ ALL init + DSP runs in background thread — start() returns INSTANTLY
         // This prevents the 5-7 second main-thread block from SCK initialization.
         self.capture_thread = Some(thread::spawn(move || {
+            let echo_reference = ReferenceWriter::new();
             // 1. SCK Init (takes 5-7 seconds — runs OFF main thread)
             println!("[SystemAudioCapture] Background init starting...");
             let input = match speaker::SpeakerInput::new(device_id) {
@@ -152,6 +158,7 @@ impl SystemAudioCapture {
             let chunk_size = (native_rate as usize / 1000) * 20;
             let mut frame_buffer: Vec<i16> = Vec::with_capacity(chunk_size * 4);
             let mut raw_batch: Vec<f32> = Vec::with_capacity(4096);
+            let mut clock = CaptureClock::default();
 
             loop {
                 if stop_signal.load(Ordering::Relaxed) {
@@ -165,6 +172,7 @@ impl SystemAudioCapture {
 
                 // Convert f32 -> i16 at native sample rate
                 if !raw_batch.is_empty() {
+                    clock.observe(frame_buffer.len(), raw_batch.len(), native_rate, Instant::now());
                     for &f in &raw_batch {
                         let scaled = (f * 32767.0).clamp(-32768.0, 32767.0);
                         frame_buffer.push(scaled as i16);
@@ -172,9 +180,11 @@ impl SystemAudioCapture {
                     raw_batch.clear();
                 }
 
-                // Process in 20ms chunks through the two-stage gate
+                // Tap BEFORE gating: suppressed frames and silence still belong in the reference.
                 while frame_buffer.len() >= chunk_size {
                     let frame: Vec<i16> = frame_buffer.drain(0..chunk_size).collect();
+                    let start = clock.take_frame(chunk_size, native_rate);
+                    echo_reference.publish(&frame, native_rate, start);
 
                     let (action, speech_ended) = suppressor.process(&frame);
 
@@ -332,8 +342,10 @@ impl MicrophoneCapture {
                 ..SilenceSuppressionConfig::for_microphone()
             });
 
-            // 20ms chunks at native rate
-            let chunk_size = (native_rate as usize / 1000) * 20;
+            // Keep hardware-rate PCM and the existing 20ms STT frame contract.
+            let chunk_size = native_rate as usize * 20 / 1000;
+            let mut echo = MicrophoneEchoCanceller::new(native_rate, chunk_size);
+            let mut clock = CaptureClock::default();
             let mut frame_buffer: Vec<i16> = Vec::with_capacity(chunk_size * 4);
             let mut raw_batch: Vec<f32> = Vec::with_capacity(4096);
 
@@ -351,6 +363,7 @@ impl MicrophoneCapture {
 
                 // 2. Convert f32 -> i16 at native sample rate
                 if !raw_batch.is_empty() {
+                    clock.observe(frame_buffer.len(), raw_batch.len(), native_rate, Instant::now());
                     for &f in &raw_batch {
                         let scaled = (f * 32767.0).clamp(-32768.0, 32767.0);
                         frame_buffer.push(scaled as i16);
@@ -358,10 +371,17 @@ impl MicrophoneCapture {
                     raw_batch.clear();
                 }
 
-                // 3. Process in 20ms chunks through the two-stage gate
-                while frame_buffer.len() >= chunk_size {
-                    let frame: Vec<i16> = frame_buffer.drain(0..chunk_size).collect();
-
+                // 3. Only the microphone waits for a late system tap. Without a
+                // fresh reference there is no extra buffering or signal change.
+                let lookahead = if reference_is_recent(Instant::now()) {
+                    native_rate as usize * MICROPHONE_LOOKAHEAD_MS / 1000
+                } else {
+                    0
+                };
+                while frame_buffer.len() >= chunk_size + lookahead {
+                    let mut frame: Vec<i16> = frame_buffer.drain(0..chunk_size).collect();
+                    let start = clock.take_frame(chunk_size, native_rate);
+                    echo.process(&mut frame, start);
                     let (action, speech_ended) = suppressor.process(&frame);
 
                     match action {
