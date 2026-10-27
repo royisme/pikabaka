@@ -30,7 +30,7 @@ Existing 2.2 to 2.4 installs have no `app-update.yml`, so they cannot update. Th
 - An update downloads in the background (`autoDownload = true`). There is no modal while it downloads and no OS notification (`checkForUpdates`, not `checkForUpdatesAndNotify`).
 - When the download finishes, the modal opens with "Restart & Install" and "Not Now". Nothing restarts the app on its own. If the user quits normally, the update installs on quit (`autoInstallOnAppQuit = true`).
 - While a meeting is active, the finished-download notice waits. It is shown when the meeting ends. A restart in the middle of a call would lose the live transcript.
-- Background errors are written to the log only. The modal has no error view. Settings keeps its own "Check for updates" button, which already shows checking, up to date and error states.
+- Background errors are written to the log only. The modal has no error view. The About tab has an Updates card (below) that shows checking, downloading, ready and error states.
 
 ## Release contract
 
@@ -56,3 +56,40 @@ Automated checks cannot do these, and the agent did not:
 2. Install a packaged build of version N (one built with this change). Launch it and wait, or press "Check for updates" in Settings. Confirm it downloads silently and the modal then offers "Restart & Install", and that after restart `app.getVersion()` is N+1 and the app still opens (Gatekeeper accepts it).
 3. On the second update after an install, read the log line from `MacUpdater` and the download size: it should say differential download and fetch far less than the full `.zip`. Report the size.
 4. During an active meeting, confirm the modal does not appear, and that it appears after the meeting ends.
+
+## Updates card (About tab)
+
+The one-button "Version" row in Settings > General is replaced by an Updates card in Settings > About. It copies the structure of the Updates card in quotio (`../../ops/quotio`, `Quotio/Views/Screens/SettingsScreen.swift`, `UpdateSettingsSection`, and its `screenshots/about.png`): a titled card with an icon, a switch for automatic checks, a status line with one action on the right, and a "Last checked" line. Pika keeps its own tokens, type and spacing (`DESIGN.md`); only the layout and behaviour are copied. quotio's "Receive beta updates" switch is not copied: Pika has no beta channel.
+
+```
+(down-arrow circle)  Updates
+Current version                          v2.4.0   (mono)
+Automatically check for updates            [switch]
+-------------------------------------------------
+(state icon) <status text>           [action button]
+Last checked                          26 sec ago
+```
+
+Status line (one fixed-height row, so the card never changes height between states):
+
+| State | Icon and text | Action on the right |
+| --- | --- | --- |
+| nothing checked yet | none, text "Not checked yet" | `Check Now` |
+| checking | spinner, "Checking for updates" | `Check Now`, disabled |
+| up to date | green check, "Up to date" | `Check Now` |
+| downloading | spinner, "Downloading version X" and the percent | `Check Now`, disabled |
+| ready | green up-arrow, "Version X is ready to install" | `Restart & Install` (primary) |
+| error | danger icon, "Could not check for updates", the real error text on a small line under it | `Check Now` |
+
+"Last checked" shows a relative time ("26 sec ago", "3 hours ago") or "Never", and refreshes every 30 s while the card is open. It is the time of the last check that finished, kept in memory by the main process, not saved to disk; the 10-second check after launch fills it in.
+
+Behaviour:
+
+- The switch saves the setting `autoCheckUpdates` in `settings.json` (`SettingsManager`), default on. When off, the check 10 seconds after launch and the 4-hourly check are skipped; `Check Now` still works. This adds one persisted key (owner approved on 2026-10-27); a missing key means on, so no migration.
+- The card asks the main process for its state when it opens (`get-update-state`), because the update may have been found or downloaded before Settings was opened, or the user may have chosen "Not Now" in the modal. It then follows the existing events (`update-checking`, `update-available`, `update-not-available`, `download-progress`, `update-downloaded`, `update-error`).
+- `Restart & Install` uses the existing `quit-and-install-update`. The card never calls `download-update` (the download starts on its own), which closes the gap noted for the Settings button.
+- A finished download that waits for a meeting to end (see Behaviour above) still counts as "ready" in the card, since the user opened Settings on purpose.
+
+Files: new `src/components/UpdatesCard.tsx`, rendered in `src/components/AboutSection.tsx`; remove the Version row, `updateStatus`, `handleCheckForUpdates` and the update subscriptions from `src/components/SettingsOverlay.tsx`; `electron/lib/auto-updater.ts` (read the setting, keep the last-check time and the downloading/downloaded state, `getUpdateState`), `electron/ipc/core.ts`, `electron/preload.ts`, `electron/preload/settings.ts` or the matching preload file, `electron/preload/types.ts`, `src/types/electron.d.ts` (new IPC channels `get-update-state` and `set-auto-check-updates`), `electron/services/SettingsManager.ts` (the key).
+
+Owner checks by hand: the card in the light and the dark theme at the normal Settings width; each state in the table (use a packaged build for the real ones); the switch off, then relaunch and confirm no check runs until `Check Now`.

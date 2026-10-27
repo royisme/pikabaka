@@ -2,6 +2,10 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-27: updates card decided (branch `update-card`)
+
+- Owner asked that Settings' "check for updates" copy quotio's update settings. Decided: an Updates card in the About tab (design in `docs/design-auto-update.md`, "Updates card"), with the automatic-check switch (new persisted key `autoCheckUpdates`, default on, owner approved) and without quotio's beta switch (Pika has no beta channel). Not built yet: this entry records the decision.
+
 ## 2026-10-27: auto-update (branch `auto-update`)
 
 - Found that a packaged build could not update: `build.publish` was null (no `app-update.yml`, no `latest-mac.yml`), `scripts/release.js` did not upload the feed, releases v2.2.0 to v2.4.0 carry no installers, and the release-notes request went to `royisme/pika` (404). Decision and reasons (Velopack and update.electronjs.org rejected): `docs/design-auto-update.md`.
