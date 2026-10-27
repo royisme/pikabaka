@@ -35,7 +35,7 @@ Tab ids stay, labels change: General, Audio & Translation, **AI functions** (`ai
   No thresholds, languages, prompts, folders or model choices here.
 - **AI functions**: one row per model setting that is not about audio: Quick answers (connection, model, Fetch, Save, collapsed Test, a line naming every job it serves, answer language, collapsed answer style), Summaries, Agent (image checkbox, workspace folder), Proactive help (mode, decision model, a read-only line saying cards use the Agent model, collapsed threshold, cooldown and decision log), Search index (Automatic or own, status always visible, collapsed rebuild).
 - **Audio & Translation**: devices, speech (service and model, languages), translation (enabled, target, connection and model, Test; source, display, prompt and segmentation under Advanced). Keys and accounts are links to Provider setup.
-- **Your Background** is being rethought, not kept as it is: Pika also has to search everyday meetings and the user's materials, not only a resume. See `docs/design-knowledge.md` once the investigation lands.
+- **Your Background** is being rethought, not kept as it is: Pika also has to search everyday meetings and the user's materials, not only a resume. See `docs/design-knowledge.md`. The Search index setting moves there, so AI functions has four rows (Quick answers, Summaries, Agent, Proactive help).
 
 Rejected, option B: one "AI functions" page with all seven rows, including speech and translation. It rebuilds the overloaded page and separates devices from recognition.
 
