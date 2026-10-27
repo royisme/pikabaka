@@ -3,6 +3,7 @@ import ConnectionModelPicker from './settings/ConnectionModelPicker';
 import TranslationTest from './settings/TranslationTest';
 import AnswerStyleSettings from './settings/AnswerStyleSettings';
 import KnowledgeSettings from './settings/KnowledgeSettings';
+import ProviderSetupSettings from './settings/ProviderSetupSettings';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
 import { useWindowEvent } from '../hooks/useWindowEvent';
@@ -994,6 +995,12 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                         <FlaskConical size={16} /> Models &amp; Agent
                                     </button>
                                     <button
+                                        onClick={() => setActiveTab('providers')}
+                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'providers' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
+                                    >
+                                        <Settings size={16} /> Provider setup
+                                    </button>
+                                    <button
                                         onClick={() => setActiveTab('keybinds')}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'keybinds' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
@@ -1405,7 +1412,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                 <KnowledgeSettings onClose={onClose} />
                             )}
                             {activeTab === 'ai-providers' && (
-                                <AIProvidersSettings />
+                                <AIProvidersSettings onOpenProviders={() => setActiveTab('providers')} />
+                            )}
+                            {activeTab === 'providers' && (
+                                <ProviderSetupSettings onOpenModels={() => setActiveTab('ai-providers')} />
                             )}
                             {activeTab === 'keybinds' && (
                                 <div className="space-y-3 animated fadeIn select-text pb-4">
@@ -1674,7 +1684,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     </label>
                                                     {sttProvider === 'openai' && (
                                                         <p className="text-[11px] text-text-tertiary mb-1.5">
-                                                            This key is separate from the OpenAI connection key in Models &amp; Agent.
+                                                            This key is separate from the OpenAI connection key in Provider setup.
                                                         </p>
                                                     )}
                                                     <div className="flex gap-2">
@@ -1968,7 +1978,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     onChange={(next) => { setTranscriptTranslationProvider(next.connectionId); setTranscriptTranslationModel(next.model); }}
                                                 />
                                                 <p className="text-[11px] text-text-tertiary">
-                                                    Add connections and their API keys in Models &amp; Agent.
+                                                    Add connections and their API keys in Provider setup.
                                                 </p>
                                                 <TranslationTest
                                                     provider={transcriptTranslationProvider}

@@ -103,7 +103,7 @@ You only need **one** LLM provider and **one** STT provider to get started. All 
 | Local server | Fully offline, no key required | Ollama, LM Studio, vLLM: add an OpenAI-compatible connection with a local address |
 | Custom       | Any OpenAI, Anthropic or Gemini compatible host | Your own base URL and key |
 
-Each job (quick answers, summaries, agent) uses the connection and model id you choose; Pika never switches to another model on its own. The search index (embeddings) has its own model setting.
+Add LLM connections and their API keys in Settings > Provider setup. Choose the connection and model id for each job (quick answers, summaries, agent) in Settings > Models & Agent; Pika never switches to another model on its own. The search index (embeddings) has its own model setting under Knowledge.
 
 ### STT Providers
 

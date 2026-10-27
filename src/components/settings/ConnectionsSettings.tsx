@@ -142,7 +142,7 @@ const ConnectionsSettings: React.FC<ConnectionsSettingsProps> = ({ onChanged }) 
             <div>
                 <h3 className="text-sm font-bold text-text-primary mb-1">Connections</h3>
                 <p className="text-xs text-text-secondary mb-2">
-                    Where models are reached: a type, a host and a key. Any host works, so Pika is not tied to one provider. The next section chooses which connection and model each job uses.
+                    Where models are reached: a type, a host and a key. Any host works, so Pika is not tied to one provider. Choose which connection and model each job uses under Models &amp; Agent.
                 </p>
             </div>
 
