@@ -1,5 +1,7 @@
 nodeLinker: hoisted
 allowBuilds:
+  # Reached through pi-ai; its only install script is `echo 'preinstall: no-op'`, so it is refused on purpose.
+  '@google/genai': false
   better-sqlite3: true
   core-js: true
   electron-winstaller: true
