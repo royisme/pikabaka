@@ -1,6 +1,6 @@
 # Knowledge (replaces "Your Background")
 
-Status: proposed on 2026-10-27, waiting for the owner to approve the page design in the preview. Nothing is built. Evidence is a source-only investigation (GPT, commit `fdd71df`); every claim below was cited there by file and line, and none was run.
+Status: option A approved by the owner on 2026-10-27; built step by step (see `TASKS.md`). Nothing is built. Evidence is a source-only investigation (GPT, commit `fdd71df`); every claim below was cited there by file and line, and none was run.
 
 ## Why it is not a rename
 
@@ -21,13 +21,13 @@ Settings tab "Knowledge" (the tab id `profile` stays so every caller keeps worki
 - **Index**: the Search index model setting moves here from AI functions (Automatic or a provider, one model for both meetings and materials), what is indexed per kind (indexed of total, last indexed, model), a Needs attention list with the real error and Retry, Re-index all. "Queued" is never shown as "done"; sources indexed before this view existed show Unknown.
 - **Interview profile (optional)**: the current resume, target roles, interview prep and profile editor, unchanged, behind one disclosure page that says it is only for interview practice. Interview features are kept, not extended (`docs/design-agent-platform.md`, D1).
 
-Asking: next to every composer (meeting chat, global chat) a quiet Sources chip chooses what may be searched for that question: This meeting, Past meetings, Materials, Interview profile. Defaults: a meeting question uses this meeting; the launcher search uses past meetings; materials and the profile are opt-in. The choice lives in memory per composer and is sent with each request; it is not stored.
+Using sources when answering: each kind of source on the Sources page has a **Use when answering** switch. Past meetings are on; materials and the interview profile are off until the user turns them on (owner decision, 2026-10-27: nothing the user adds is ever searched by default). It is a global setting, not a per-question choice: a per-question "Sources" chip in the composer was considered and left for later (it adds a control to the overlay, which is read for one to three seconds and has a tight chrome budget, and it needs per-request scope fields on several IPC channels; if it is ever added, the launcher's global chat is the place, not the overlay). The switches are one new persisted settings key per kind in `settings.json` (a missing key means the default above), approved by the owner.
 
 Rejected, option B: a launcher "Library" with a source browser and a cited-results screen, Settings only configuring the index. Larger (navigation, a source reader, citation events). Choose it later if browsing sources becomes a daily activity.
 
 ## Marking what is new
 
-The preview tags every piece that needs new code. Pure UI moves (the tab, the Search index controls, disclosing the resume) need no new behaviour and no stored change. New behaviour with no new stored shape: neutral material lookup separate from the candidate prompt, an agent `search_materials` tool, a combined source-labelled retrieval, live-index and summary-index repairs, accurate delete and re-index. Needing the owner first: a `material` document type, indexing provenance columns on `knowledge_documents` (`embedding_provider`, `embedding_dimensions`, `indexed_at`, `index_error`), new IPC for source lists and the per-request scope, and folders (not proposed now).
+The preview tags every piece that needs new code. Pure UI moves (the tab, the Search index controls, disclosing the resume) need no new behaviour and no stored change. New behaviour with no new stored shape: neutral material lookup separate from the candidate prompt, an agent `search_materials` tool, a combined source-labelled retrieval, live-index and summary-index repairs, accurate delete and re-index. Needing the owner first (the switch keys are already approved): a `material` document type, indexing provenance columns on `knowledge_documents` (`embedding_provider`, `embedding_dimensions`, `indexed_at`, `index_error`), new IPC for source lists, and folders (not proposed now).
 
 ## Steps (each one a branch and one PR)
 
@@ -37,6 +37,6 @@ The preview tags every piece that needs new code. Pure UI moves (the tab, the Se
 4. Notes without interview framing: a neutral material lookup, an agent `search_materials` tool over the existing notes, source labels.
 5. Material index status and generic import (document type, provenance columns, IPC). Owner approval gate before this step.
 
-## Decisions waiting for the owner
+## Decisions
 
-Option A or B; whether materials may ever be searched by default (the proposal: never, opt in per question); the `material` type and the provenance columns; how deletes should behave (removing a meeting also removes its index, with a clear confirmation); folders later or never.
+Option A: chosen by the owner on 2026-10-27. Materials are never searched by default: decided (the switch above). Still open: the `material` type and the provenance columns (step 5 waits for this); how deletes should behave (the proposal: removing a meeting also removes its index, with a clear confirmation); folders later or never.

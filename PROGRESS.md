@@ -2,6 +2,11 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-27: Settings cleanup merged, Knowledge and AI split approved (branch `ai-split`)
+
+- PR #50 (settings cleanup: six default shortcuts, a keyboard-operable recorder, Soniox Save, Settings wording, the audio page) merged as `5b804c0`.
+- The owner approved option A for both designs: a Knowledge tab over meetings and materials with an optional interview profile (`docs/design-knowledge.md`), and a Provider setup page that lists one row per configured provider with the interface picked from a dropdown, plus optional custom headers (`docs/design-ai-settings-split.md`). Materials are never searched by default: a Use when answering switch per kind of source replaces the per-question Sources chip. The work is queued in `TASKS.md` as K1 to K5 and S1 to S6, one at a time.
+
 ## 2026-10-27: AI functions mapped against provider setup (branch `ai-split`)
 
 - Source-only investigation (GPT, commit `a69d308`): about 30 AI call sites reduce to seven model settings (Quick answers, Summaries, Agent, Proactive decision, Translation, Search index, Speech); the "Quick answers" name hides that it also serves vision, RAG answers, resume and role analysis, interview prep and live compaction. Proposed split and the pure-move versus behaviour-change line: `docs/design-ai-settings-split.md`. Nothing built.

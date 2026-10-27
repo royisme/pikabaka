@@ -11,10 +11,27 @@ Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR 
 - Done on `auto-update`: `build.publish` is the GitHub provider, `scripts/release.js` uploads `latest-mac.yml`, updates download in the background, never restart the app on their own, the finished-download notice waits during a meeting, the unsigned-app Finder branch and the manual-update modal views are gone, and `ReleaseNotesManager` asks `royisme/pikabaka`. Both typechecks, lint and tap exit 0; an unsigned `electron-builder --mac zip` run writes `latest-mac.yml` and a packaged `app-update.yml`.
 - Then: owner builds N+1, uploads it, and checks the update from a packaged N build, and that the modal waits during a meeting. Real signing, notarization, GitHub and a real update cannot be run by the agent.
 
-## AI settings split (`docs/design-ai-settings-split.md`)
+## Knowledge tab (owner-approved, `docs/design-knowledge.md`, option A chosen 2026-10-27)
 
-- Next: the owner looks at the page preview (Provider setup revised twice on 2026-10-27: a list with one row per configured provider, the interface picked first, optional custom headers, modelled on quotio) and picks option A or B; "Your Background" becomes a Knowledge tab (Sources, Index, optional Interview profile) over meetings and materials: `docs/design-knowledge.md`, awaiting the owner's approval of the preview. Then five steps, each one branch and one PR: (1) Provider setup page with the existing Connections moved in; (2) answer language and style beside Quick answers; (3) proactive help URL and key to Provider setup; (4) speech keys, file and region to Provider setup; (5) translation component, "also used by" lines, collapsed diagnostics. No stored key or channel changes.
-- Separate tasks the owner approved: (a) store API keys with Electron `safeStorage` (system encryption), which changes the stored credential format and needs its own design and a migration decision; the README says keys are in the OS keychain, but `CredentialsManager` writes a plaintext `credentials.json`, so do not release the README claim as true until this lands; (b) after the split, fix the behaviour problems listed in the design file (Groq model reset on a language change, decision Test deadline, Agent Test fallback, template interview-prep answers, made-up company rating, automatic model alternatives policy).
+One step at a time, each one branch and one PR (they all touch `SettingsOverlay.tsx` or its children). Delegated to GPT, reviewed by the agent.
+
+- K1 `knowledge-tab` (next): the Knowledge tab replaces Your Background (tab id `profile` stays): Sources, Index and Interview profile as local pages; the Search index controls move here from AI functions; fix the "only transcripts" text; drop the fake upload percentage and spinner; no resume needed to use the tab. Pure UI, no stored data or IPC change, no sample data (real counts only from existing queries, else "Unknown"). Done when: both typechecks, lint and tap exit 0 and the page renders in a browser preview in both themes.
+- K2 `live-index-fix`: index live meetings under the real meeting id, remove the stale `source` insert, record the embedding provider on live writes, flush the last segments (fewer than three). Tests with a fake provider on a fresh schema.
+- K3 `summary-index`: refresh the summary-derived search after the summary is final, including recovery and edits.
+- K4 `material-notes`: neutral material lookup separate from the candidate prompt, an agent `search_materials` tool over the existing notes, and the Use when answering switches on the Sources page (new settings keys, default: past meetings on, materials and profile off).
+- K5 `material-import`: generic document import with a `material` type and index provenance columns, plus IPC for source lists. Owner approval of the schema first. Folders are not planned.
+
+## AI settings split (`docs/design-ai-settings-split.md`, option A approved)
+
+Starts after K1 lands (it also edits `AIProvidersSettings.tsx`); one step at a time, same delegation. The preview is in `.pi-runs/ai-split-preview/` (git-ignored).
+
+- S1 `provider-list`: Provider setup page: language model providers as one row per configured provider (name, interface, host, state in words and a mark, delete with a second press), an Interface dropdown first in the Add and Edit form, no vendor rows and no presets, built-ins shown only when they have a key or a host override. Pure UI over the existing connection storage; no headers yet.
+- S2 `answer-style`: answer language and style move beside Quick answers.
+- S3 `speech-list`: speech-to-text providers as a list in Provider setup; Audio & Translation offers only the ones set up.
+- S4 `decision-setup`: the proactive help URL, key, Remove and Save move to Provider setup.
+- S5 `custom-headers`: optional custom headers on a custom provider (a new persisted field, approved): the three SDK clients in `LLMHelper`, the model-list request, and the Agent's pi-ai model (support not yet checked in `electron/agent/models.ts`); header values are secrets.
+- S6 `translation-part`: translation as its own component, the "also used by" lines, collapsed diagnostics.
+- Separate tasks the owner approved: (a) store API keys with Electron `safeStorage` (system encryption), which changes the stored credential format and needs its own design and a migration decision; the README says keys are in the OS keychain but `CredentialsManager` writes a plaintext `credentials.json`, so do not publish that README claim as true until this lands; (b) after the split, fix the behaviour problems in the design file (Groq model reset on a language change, decision Test deadline, Agent Test fallback, template interview-prep answers, made-up company rating, automatic model alternatives policy).
 
 ## Settings cleanup (owner-approved dispatch, `docs/design-settings-cleanup.md`)
 
