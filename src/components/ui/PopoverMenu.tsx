@@ -11,7 +11,7 @@ export interface PopoverMenuItem {
     role?: 'menuitem' | 'menuitemradio' | 'menuitemcheckbox';
     /** Receives the trigger's rectangle, so a window the item opens can be placed under it. */
     onSelect: (triggerRect: DOMRect) => void;
-    /** Extra classes, for example `min-[480px]:hidden` to show an item only in a narrow window. */
+    /** Extra classes, for example `min-[560px]:hidden` to show an item only in a narrow window. */
     className?: string;
     separatorBefore?: boolean;
 }

@@ -30,7 +30,7 @@ The overlay is read for one to three seconds mid-call. These rules come from the
 **Layout**
 - Controls never move the page. Loading, streaming and errors show on the control itself or in a reserved slot, not as a row that appears and disappears.
 - Check a layout at the 380px minimum and the 600px default overlay width, with long text. Wrap or truncate with `min-w-0`; do not rely on fixed widths.
-- At 380px nothing in the bar or the composer is cut off or needs horizontal scrolling; below 480px labels give way to icons and menus.
+- At 380px nothing in the bar or the composer is cut off or needs horizontal scrolling; below 560px labels give way to icons and menus.
 - Interactive elements inside a `draggable-area` need `no-drag`.
 
 **Type and colour**
