@@ -11,6 +11,13 @@ What is done, what is broken, what is unverified. `TASKS.md` is what to do next;
 - Found, not changed: `embedMeetingSummary` has no provider-compatibility guard (K3a).
 - Owner: a real call with an immediate stop and start, then search during and after; K2b is still needed for live search to work.
 
+## 2026-10-27: Provider setup tab, step S1a (branch `provider-setup`, stacked on `knowledge-tab`)
+
+- Settings has a new tab, Provider setup (id `providers`, after Models & Agent), holding the existing Connections component unchanged apart from its help text. Models & Agent keeps its four job rows and shows a line with a button that opens Provider setup; Provider setup links back. Every existing tab id and `initialTab` caller works. Messages that sent the user to the wrong tab were corrected: adding a connection or a key says Provider setup (error text in the intelligence engine, the audio tab's OpenAI key note and translation hint, the README, the built-in guide meeting), choosing a model for a job still says Models & Agent. No stored data, key, IPC or behaviour changed; Connections still lists all four built-ins and the presets (that is S1b).
+- Checks: both typechecks, lint and tap (1421 assertions; 29 new in `test/unit/provider-setup-settings.test.ts`: tab order and ids, Connections on Provider setup, the job rows and the link without Connections on Models & Agent) exit 0. Browser preview of the new tab in the dark theme. Not run: the real app, real keys, light theme, narrow width.
+- Found, not changed: the demo guide meeting is seeded once, so an installation that already has it keeps the old destination wording.
+- Owner: both themes and narrow Settings; both page links with the keyboard; add, edit, Test and Save a connection as before.
+
 ## 2026-10-27: Knowledge tab, step K1 (branch `knowledge-tab`)
 
 - Settings > Your Background is now Knowledge (tab id `profile` unchanged) with three local pages. Sources lists what exists today with real numbers only: the recorded-meetings count from the launcher's recent-meetings call (the call is capped at 50, so a full result says "The latest 50"; it is not an indexed count) and the saved notes (characters, Edit, Remove). Index holds the Search index controls, moved from Models & Agent, and its text now says meetings (transcripts and summaries), notes, resume and roles are indexed. Interview profile holds the resume, the background switch, target roles, prep and the profile editor, marked "only for interview practice"; the fake upload percentage and the spinner are gone (the button says "Uploading…"). `SettingsOverlay.tsx` shrank from 2,250 to about 2,070 lines. No stored data, IPC or setting changed.
