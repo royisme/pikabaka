@@ -12,6 +12,7 @@ import { LLMHelper } from './core/LLMHelper';
 import { SessionTracker } from './core/SessionTracker';
 import { IntelligenceEngine } from './core/IntelligenceEngine';
 import { MeetingPersistence } from './core/MeetingPersistence';
+import type { RAGManager } from './rag/RAGManager';
 
 // Re-export types for backward compatibility
 export type { TranscriptSegment, SuggestionTrigger, ContextItem } from './core/SessionTracker';
@@ -32,11 +33,11 @@ export class IntelligenceManager extends EventEmitter {
     private engine: IntelligenceEngine;
     private persistence: MeetingPersistence;
 
-    constructor(llmHelper: LLMHelper) {
+    constructor(llmHelper: LLMHelper, getRAGManager: () => RAGManager | null = () => null) {
         super();
         this.session = new SessionTracker();
         this.engine = new IntelligenceEngine(llmHelper, this.session);
-        this.persistence = new MeetingPersistence(this.session, llmHelper);
+        this.persistence = new MeetingPersistence(this.session, llmHelper, getRAGManager);
 
         // Forward all engine events through the facade
         this.forwardEngineEvents();
