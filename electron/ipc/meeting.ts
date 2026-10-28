@@ -48,6 +48,12 @@ export function registerMeetingHandlers(appState: AppState): void {
 
   safeHandle("delete-meeting", async (_, id: string) => {
     await appState.getMeetingAgent().deleteStore(id);
+    try {
+      appState.getRAGManager()?.deleteMeetingData(id);
+    } catch (error) {
+      // A search-index cleanup failure (for example sqlite-vec not loaded) must not keep the user from deleting the meeting.
+      console.warn('[Meeting] Could not clear the search index for a deleted meeting:', error instanceof Error ? error.message : error);
+    }
     return DatabaseManager.getInstance().deleteMeeting(id);
   });
 

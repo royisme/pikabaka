@@ -1,7 +1,7 @@
 // electron/rag/EmbeddingPipeline.ts
 // Post-meeting embedding generation with queue-based retry logic
 // Uses pluggable IEmbeddingProvider (Gemini, OpenAI, or Ollama)
-// On provider exhaustion, automatically falls back to LocalEmbeddingProvider (on-device).
+// Exhausted jobs fail without changing the meeting's provider or existing vectors.
 
 import Database from 'better-sqlite3';
 import { VectorStore } from './VectorStore';
@@ -24,10 +24,8 @@ const RETRY_DELAY_BASE_MS = 2000;
  */
 export class EmbeddingPipeline {
     private provider: IEmbeddingProvider | null = null;
-    /** Always available on-device fallback (MiniLM). Null only if the bundled model is corrupted. */
+    /** Local provider used only if primary initialization fails. */
     private fallbackProvider: IEmbeddingProvider | null = null;
-    /** Set of meeting IDs that have been downgraded to local fallback after primary provider exhaustion. */
-    private fallbackMeetings = new Set<string>();
     private db: Database.Database;
     private vectorStore: VectorStore;
     private processingPromise: Promise<void> | null = null;
@@ -62,7 +60,6 @@ export class EmbeddingPipeline {
             // Finish in-flight writes before a forced model switch changes index metadata.
             if (options?.force) await Promise.all([this.processingPromise, ...this.liveBatches]);
             this.provider = null;
-            if (options?.force) this.fallbackMeetings.clear();
             await this._doInitialize(config);
         })();
         return this.initPromise;
@@ -85,9 +82,7 @@ export class EmbeddingPipeline {
     }
 
     private async _doInitialize(config: AppAPIConfig): Promise<void> {
-        // ── Step 1: Eagerly init the local fallback FIRST, independently of the primary.
-        // This guarantees fallbackProvider is set even if the primary throws,
-        // so activateMeetingFallback() is always safe to call.
+        // Initialize the local provider independently so primary initialization can recover.
         try {
             const local = new LocalEmbeddingProvider();
             if (await local.isAvailable()) {
@@ -202,8 +197,6 @@ export class EmbeddingPipeline {
      * Called when meeting ends
      */
     async queueMeeting(meetingId: string): Promise<void> {
-        const meeting = this.db.prepare('SELECT embedding_provider FROM meetings WHERE id = ?').get(meetingId) as { embedding_provider: string | null } | undefined;
-        if (meeting?.embedding_provider === null) this.fallbackMeetings.delete(meetingId);
         // Get chunks without embeddings
         const chunks = this.vectorStore.getChunksWithoutEmbeddings(meetingId);
 
@@ -259,10 +252,7 @@ export class EmbeddingPipeline {
     }
 
     /**
-     * Process pending embeddings from queue.
-     * If an item exhausts MAX_RETRIES with the primary provider, the entire
-     * meeting is transparently downgraded to LocalEmbeddingProvider (on-device)
-     * and its queue is reset so it re-embeds from scratch at the correct dimensions.
+     * Process pending embeddings from queue, retaining exhausted jobs as failed.
      */
     processQueue(): Promise<void> {
         this.processingPromise ??= this._processQueue().finally(() => { this.processingPromise = null; });
@@ -286,12 +276,10 @@ export class EmbeddingPipeline {
         }
 
         while (true) {
-            // Fetch next pending item. Items marked for local fallback (retry_count = -1)
-            // are also eligible, so we use a broad filter.
             const pending = this.db.prepare(`
                 SELECT * FROM embedding_queue
                 WHERE status = 'pending'
-                  AND (retry_count < ? OR retry_count = -1)
+                  AND retry_count < ?
                 ORDER BY created_at ASC
                 LIMIT 1
             `).get(MAX_RETRIES) as any;
@@ -301,21 +289,13 @@ export class EmbeddingPipeline {
                 break;
             }
 
-            // Determine which provider to use
-            const useFallback =
-                pending.retry_count === -1 ||
-                this.fallbackMeetings.has(pending.meeting_id);
-            const activeProvider = useFallback ? this.fallbackProvider : this.provider;
-
+            const activeProvider = this.provider;
             if (!activeProvider) {
-                // Cannot proceed — no provider at all (fallback also unavailable).
-                // Reset item back to 'pending' so it can be retried when keys are configured.
-                // Do NOT mark as 'failed' — that is a terminal state that can't be recovered.
+                // Initialization may have changed the provider while the previous job was in flight.
                 this.db.prepare(
-                    `UPDATE embedding_queue SET status = 'pending', error_message = 'No provider available' WHERE id = ?`
+                    `UPDATE embedding_queue SET error_message = 'No provider available' WHERE id = ?`
                 ).run(pending.id);
-                // Break the loop — there is nothing we can do until a provider becomes available.
-                console.warn('[EmbeddingPipeline] No provider available (not even local fallback). Stopping queue processing.');
+                console.warn('[EmbeddingPipeline] No provider available. Stopping queue processing.');
                 break;
             }
 
@@ -339,90 +319,26 @@ export class EmbeddingPipeline {
                 `).run(new Date().toISOString(), pending.id);
 
             } catch (error: any) {
-                const newRetryCount = (pending.retry_count === -1 ? 0 : pending.retry_count) + 1;
+                const newRetryCount = pending.retry_count + 1;
                 console.error(
                     `[EmbeddingPipeline] Error processing queue item ${pending.id} ` +
                     `(retry ${newRetryCount}/${MAX_RETRIES}, provider: ${activeProvider.name}):`,
                     error.message
                 );
 
-                if (!useFallback && newRetryCount >= MAX_RETRIES && this.fallbackProvider) {
-                    // Primary provider exhausted. Downgrade the meeting to local fallback.
-                    await this.activateMeetingFallback(pending.meeting_id);
-                } else {
-                    // Still have retries remaining — back-off and retry.
-                    this.db.prepare(`
-                        UPDATE embedding_queue
-                        SET status = 'pending', retry_count = retry_count + 1, error_message = ?
-                        WHERE id = ?
-                    `).run(error.message, pending.id);
+                const exhausted = newRetryCount >= MAX_RETRIES;
+                this.db.prepare(`
+                    UPDATE embedding_queue
+                    SET status = ?, retry_count = ?, error_message = ?
+                    WHERE id = ?
+                `).run(exhausted ? 'failed' : 'pending', newRetryCount, error.message, pending.id);
 
-                    // Exponential backoff (skip for fallback items already reset)
-                    if (!useFallback) {
-                        const delay = RETRY_DELAY_BASE_MS * Math.pow(2, pending.retry_count);
-                        await this.delay(delay);
-                    }
+                if (!exhausted) {
+                    const delay = RETRY_DELAY_BASE_MS * Math.pow(2, pending.retry_count);
+                    await this.delay(delay);
                 }
             }
         }
-    }
-
-    /**
-     * Downgrade a meeting to on-device (local) embedding after primary provider exhaustion.
-     * 1. Clears all PENDING/PROCESSING embeddings so dimension mismatch cannot occur.
-     *    Already-completed items are left alone to avoid redundant re-embedding.
-     * 2. Resets non-completed queue items for the meeting back to pending with sentinel retry_count=-1
-     *    so processQueue knows to use fallbackProvider unconditionally.
-     * 3. Notifies the renderer so the user sees an informative toast.
-     */
-    private async activateMeetingFallback(meetingId: string): Promise<void> {
-        if (!this.fallbackProvider) {
-            // Should never happen — guard exists in the caller, but be defensive.
-            console.error(`[EmbeddingPipeline] Cannot activate fallback for ${meetingId}: no local fallback provider available.`);
-            return;
-        }
-        // Capture in a local const so TypeScript can narrow the type (class fields can't be narrowed).
-        const fallback = this.fallbackProvider;
-
-        console.warn(
-            `[EmbeddingPipeline] Primary provider exhausted for meeting ${meetingId}. ` +
-            `Activating local fallback (${fallback.name}).`
-        );
-
-        // 1. Clear existing (potentially partial) embeddings to prevent dimension clash.
-        //    This is safe because we re-embed all chunks from scratch via the fallback.
-        this.vectorStore.clearEmbeddingsForMeeting(meetingId);
-
-        // 2. Reset ALL non-failed queue items for this meeting back to pending with
-        //    sentinel retry_count=-1. We include previously 'completed' items here
-        //    because clearEmbeddingsForMeeting() just wiped their stored BLOBs, so
-        //    their 'completed' status is now stale — they MUST be re-embedded.
-        //    status='failed' items (retry_count >= MAX_RETRIES) stay failed to avoid
-        //    an infinite retry loop.
-        this.db.prepare(`
-            UPDATE embedding_queue
-            SET status = 'pending', retry_count = -1,
-                error_message = 'Falling back to local embedding'
-            WHERE meeting_id = ?
-              AND status != 'failed'
-        `).run(meetingId);
-
-        // 3. Track at runtime (avoids a DB read per item in processQueue)
-        this.fallbackMeetings.add(meetingId);
-
-        // 4. Notify the renderer
-        try {
-            const { BrowserWindow } = require('electron');
-            BrowserWindow.getAllWindows().forEach((win: any) => {
-                if (!win.isDestroyed()) {
-                    win.webContents.send('embedding:fallback-activated', {
-                        meetingId,
-                        fallbackProvider: fallback.name,
-                        reason: 'Primary embedding provider failed after max retries'
-                    });
-                }
-            });
-        } catch (_) { /* non-fatal */ }
     }
 
     /**
@@ -562,15 +478,10 @@ export class EmbeddingPipeline {
             else if (row.status === 'failed') result.failed = row.count;
         }
 
-        // Also count 'pending' items that have exhausted primary retries but haven't yet
-        // activated the local fallback (retry_count >= MAX_RETRIES, NOT a sentinel).
-        // These are effectively stalled — surface them as "failed" in the UI so the
-        // user knows they need attention, but note that activateMeetingFallback will
-        // move them to retry_count=-1 when the pipeline processes them.
-        // IMPORTANT: exclude the fallback-sentinel (retry_count = -1) from this count.
+        // Older exhausted jobs may still be pending; report them as failed without double-counting.
         const effectivelyStalled = this.db.prepare(`
             SELECT COUNT(*) as count FROM embedding_queue 
-            WHERE status = 'pending' AND retry_count >= ? AND retry_count != -1
+            WHERE status = 'pending' AND retry_count >= ?
         `).get(MAX_RETRIES) as any;
 
         // Add stalled count on top of explicit status='failed' count (don't overwrite)
