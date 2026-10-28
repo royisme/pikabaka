@@ -2,6 +2,11 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: mutation check added to the finishing checklist (branch `mutation-check`)
+
+- `docs/development.md` gains a "Mutation check" section and a step in "Finishing a change": when a change adds or changes tests for production logic, run `mutator` on the changed files from a scratch worktree and report the survivors. A review aid on the changed functions, not a CI gate or a repository score; the tool stays outside the repository and `package.json`.
+- Basis: a trial on K3a (`embedMeetingSummary`: 10 of 14 mutants killed; every survivor was equivalent, a log line or an unreachable `?.`). tap with tsx writes only line 1 per file to lcov, so the command uses `--no-coverage` and only the changed functions are read. Not run in CI and not tried on the renderer.
+
 ## 2026-10-28: Answer controls beside Quick answers, step S2 (branch `answer-style`, uncommitted)
 
 - Answer language and How answers sound moved from General into the Quick answers row. `AnswerLanguageSetting` owns the existing language IPC queries/save, English-first ordering, unchanged labels/codes and optimistic selection with rollback; failures now show the real message. The native select is keyboard-accessible. Style has a plain, initially collapsed disclosure with `aria-expanded`; its draft survives closing it. General keeps theme, transcript, permissions, opacity and the other non-answer settings; no empty section remains.
