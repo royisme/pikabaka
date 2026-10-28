@@ -61,39 +61,35 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
 
   if (sttProvider === 'deepgram') {
     const apiKey = CredentialsManager.getInstance().getDeepgramApiKey();
-    if (apiKey) {
+    if (apiKey?.trim()) {
       console.log(`[Main] Using DeepgramStreamingSTT for ${speaker}`);
       stt = new DeepgramStreamingSTT(apiKey);
     } else {
-      console.warn(`[Main] No API key for Deepgram STT, falling back to GoogleSTT`);
-      stt = new GoogleSTT();
+      throw new Error('Deepgram is not configured: add its key in Provider setup.');
     }
   } else if (sttProvider === 'soniox') {
     const apiKey = CredentialsManager.getInstance().getSonioxApiKey();
-    if (apiKey) {
+    if (apiKey?.trim()) {
       console.log(`[Main] Using SonioxStreamingSTT for ${speaker}`);
       stt = new SonioxStreamingSTT(apiKey);
     } else {
-      console.warn(`[Main] No API key for Soniox STT, falling back to GoogleSTT`);
-      stt = new GoogleSTT();
+      throw new Error('Soniox is not configured: add its key in Provider setup.');
     }
   } else if (sttProvider === 'elevenlabs') {
     const apiKey = CredentialsManager.getInstance().getElevenLabsApiKey();
-    if (apiKey) {
+    if (apiKey?.trim()) {
       console.log(`[Main] Using ElevenLabsStreamingSTT for ${speaker}`);
       stt = new ElevenLabsStreamingSTT(apiKey);
     } else {
-      console.warn(`[Main] No API key for ElevenLabs STT, falling back to GoogleSTT`);
-      stt = new GoogleSTT();
+      throw new Error('ElevenLabs is not configured: add its key in Provider setup.');
     }
   } else if (sttProvider === 'openai') {
     const apiKey = CredentialsManager.getInstance().getOpenAiSttApiKey();
-    if (apiKey) {
+    if (apiKey?.trim()) {
       console.log(`[Main] Using OpenAIStreamingSTT (WebSocket+REST fallback) for ${speaker}`);
       stt = new OpenAIStreamingSTT(apiKey);
     } else {
-      console.warn(`[Main] No API key for OpenAI STT, falling back to GoogleSTT`);
-      stt = new GoogleSTT();
+      throw new Error('OpenAI is not configured: add its key in Provider setup.');
     }
   } else if (sttProvider === 'groq' || sttProvider === 'azure' || sttProvider === 'ibmwatson') {
     let apiKey: string | undefined;
@@ -111,14 +107,17 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
       region = CredentialsManager.getInstance().getIbmWatsonRegion();
     }
 
-    if (apiKey) {
+    if (apiKey?.trim()) {
       console.log(`[Main] Using RestSTT (${sttProvider}) for ${speaker}`);
       stt = new RestSTT(sttProvider, apiKey, modelOverride, region);
     } else {
-      console.warn(`[Main] No API key for ${sttProvider} STT, falling back to GoogleSTT`);
-      stt = new GoogleSTT();
+      const name = sttProvider === 'groq' ? 'Groq' : sttProvider === 'azure' ? 'Azure' : 'IBM Watson';
+      throw new Error(`${name} is not configured: add its key in Provider setup.`);
     }
   } else {
+    if (!CredentialsManager.getInstance().getGoogleServiceAccountPath()) {
+      throw new Error('Google Cloud is not configured: choose its service-account file in Provider setup.');
+    }
     stt = new GoogleSTT();
   }
 
@@ -263,6 +262,7 @@ export function setupSystemAudioPipeline(appState: AppState): void {
 
   } catch (err) {
     console.error('[Main] Failed to setup System Audio Pipeline:', err);
+    throw err;
   }
 }
 

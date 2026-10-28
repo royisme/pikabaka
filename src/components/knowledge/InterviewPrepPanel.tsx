@@ -88,7 +88,7 @@ const InterviewPrepContent: React.FC<InterviewPrepPanelProps> = ({
             <div className="bg-state-danger-soft border border-state-danger-border rounded-xl p-4 text-center">
               <AlertTriangle size={20} className="mx-auto text-state-danger mb-2" />
               <p className="text-sm text-state-danger font-medium">Couldn’t generate prep</p>
-              <p className="text-xs text-text-secondary mt-1">{(prepErrorObj as Error | undefined)?.message}</p>
+              <p className="text-xs text-text-secondary mt-1 break-words [overflow-wrap:anywhere]">{(prepErrorObj as Error | undefined)?.message}</p>
               <button
                 onClick={() => { void refetch(); }}
                 className="mt-3 px-4 py-1.5 rounded-full text-xs font-medium bg-state-danger-soft text-state-danger hover:bg-state-danger-soft transition-colors"

@@ -284,7 +284,9 @@ export function registerSttHandlers(appState: AppState): void {
                 resolve({ success: true });
               }
             } catch {
-              resolve({ success: true });
+              const firstLine = msg.toString().split(/\r?\n/, 1)[0].trim().slice(0, 200);
+              const safeLine = firstLine.split(apiKey).join('***');
+              resolve({ success: false, error: `The service sent a reply that is not JSON: ${safeLine || '(empty reply)'}` });
             }
             ws.close();
           });

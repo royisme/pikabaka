@@ -204,6 +204,7 @@ export function registerRagHandlers(appState: AppState): void {
     const status = ragManager?.getEmbeddingPipeline().getStatus() ?? { providerName: null, dimensions: null, usingSelected: false };
     return {
       ...status,
+      ...(ragManager?.getIndexRecoveryStatus() ?? { meetingCount: 0, failedMeetings: 0, firstError: null }),
       selectedLabel: use.connectionId ? `${connection?.name ?? use.connectionId}: ${use.model}` : null,
       incompatible: status.providerName ? ragManager!.getIncompatibleMeetingsCount(status.providerName) : 0,
     };
@@ -221,6 +222,27 @@ export function registerRagHandlers(appState: AppState): void {
     }
   });
 
+  let reindexAll: Promise<{ success: boolean; error?: string }> | null = null;
+  safeHandle('rag:reindex-all', () => {
+    reindexAll ??= (async () => {
+      try {
+        const ragManager = appState.getRAGManager();
+        if (!ragManager) throw new Error('RAGManager not initialized');
+        await ragManager.reindexAllMeetings();
+        const knowledge = appState.getKnowledgeOrchestrator();
+        if (knowledge) {
+          await knowledge.setNotes(knowledge.getNotes());
+          const error = knowledge.getStatus().notesIndex?.error;
+          if (error) throw new Error(error);
+        }
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    })().finally(() => { reindexAll = null; });
+    return reindexAll;
+  });
+
   // Get RAG queue status
   safeHandle("rag:get-queue-status", async () => {
     const ragManager = appState.getRAGManager();
@@ -228,12 +250,16 @@ export function registerRagHandlers(appState: AppState): void {
     return ragManager.getQueueStatus();
   });
 
-  // Retry pending embeddings
+  // User retry includes terminal failures; startup still resumes only pending work.
   safeHandle("rag:retry-embeddings", async () => {
-    const ragManager = appState.getRAGManager();
-    if (!ragManager) return { success: false };
-    await ragManager.retryPendingEmbeddings();
-    return { success: true };
+    try {
+      const ragManager = appState.getRAGManager();
+      if (!ragManager) throw new Error('RAGManager not initialized');
+      await ragManager.retryFailedEmbeddings();
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
   });
 
   // ==========================================

@@ -122,7 +122,7 @@ export interface ElectronAPI {
 
   embeddingUseGet: () => Promise<{ connectionId: string; model: string }>
   embeddingUseSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
-  embeddingStatus: () => Promise<{ providerName: string | null; dimensions: number | null; usingSelected: boolean; selectedLabel: string | null; incompatible: number }>
+  embeddingStatus: () => Promise<{ providerName: string | null; dimensions: number | null; usingSelected: boolean; selectedLabel: string | null; incompatible: number; meetingCount: number; failedMeetings: number; firstError: string | null }>
   agentGateTest: (draft: { model?: string; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; help?: number; kind?: string; latencyMs?: number; error?: string }>
   agentModelGet: () => Promise<{ connectionId: string; model: string; supportsImages: boolean }>
   agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; error?: string }>
@@ -272,6 +272,7 @@ export interface ElectronAPI {
   // Provider Compatibility
   onIncompatibleProviderWarning: (callback: (data: { count: number, oldProvider: string, newProvider: string }) => void) => () => void;
   reindexIncompatibleMeetings: () => Promise<{ success: boolean; error?: string }>;
+  reindexAllMeetings: () => Promise<{ success: boolean; error?: string }>;
 
   // Theme API
   getThemeMode: () => Promise<{ mode: 'system' | 'light' | 'dark', resolved: 'light' | 'dark' }>
@@ -299,7 +300,7 @@ export interface ElectronAPI {
   ragCancelQuery: (options: { meetingId?: string; global?: boolean }) => Promise<{ success: boolean }>
   ragIsMeetingProcessed: (meetingId: string) => Promise<boolean>
   ragGetQueueStatus: () => Promise<{ pending: number; processing: number; completed: number; failed: number }>
-  ragRetryEmbeddings: () => Promise<{ success: boolean }>
+  ragRetryEmbeddings: () => Promise<{ success: boolean; error?: string }>
   onRAGStreamChunk: (callback: (data: { meetingId?: string; global?: boolean; chunk: string }) => void) => () => void
   onRAGStreamComplete: (callback: (data: { meetingId?: string; global?: boolean }) => void) => () => void
   onRAGStreamError: (callback: (data: { meetingId?: string; global?: boolean; error: string }) => void) => () => void
