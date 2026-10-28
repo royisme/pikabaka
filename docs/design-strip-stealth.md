@@ -93,6 +93,8 @@ Each step is one branch whose PR contains only that step, updates `TASKS.md` and
 
 ## 5. Living with `royisme/meetingCopa`
 
+**Owner decision, 2026-10-28: the private repository is frozen at the gate** (the commit of public `main` pushed to `private` once every earlier step is merged) and takes none of steps 0-4 or the broader removal. Later public fixes it wants are cherry-picked by hand. The recipe below is kept only for the case that the owner later decides to follow public `main` again.
+
 Pika lands PRs as merge commits. **A plain merge of public `main` into the private repository raises no conflict and silently deletes the disguise there.** For each removal PR the private repo does not want, merge up to the commit before it, record it as merged without taking it, then continue:
 
 ```
