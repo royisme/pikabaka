@@ -1,3 +1,5 @@
+import { redactConnectionError } from '../services/connectionSecrets';
+import type { Connection } from '../services/aiConnections';
 import { classifyTranslationError } from "../transcript/translationError";
 import { formatTranslationTiming } from "../transcript/translationStream";
 import { splitAtLastSentence } from "../transcript/sentences";
@@ -482,7 +484,7 @@ type TranslationConfig = {
   sourceLanguageKey: string;
   targetLanguageKey: string;
   /** The connection chosen for translation (any type and host), when it exists and can be used. */
-  connection?: { type: 'openai' | 'anthropic' | 'gemini'; baseUrl: string; apiKey: string };
+  connection?: Pick<Connection, 'type' | 'baseUrl' | 'apiKey' | 'headers'>;
   isConfigured: boolean;
 };
 
@@ -497,7 +499,7 @@ function resolveTranslationConfig(
   const model: string = (override?.model ?? cm.getTranscriptTranslationModel()).trim();
   const prompt: string = override?.prompt ?? cm.getTranscriptTranslationPrompt();
   const resolved = cm.resolveConnection(provider);
-  const connection = resolved && cm.isConnectionReady(provider) ? { type: resolved.type, baseUrl: resolved.baseUrl, apiKey: resolved.apiKey } : undefined;
+  const connection = resolved && cm.isConnectionReady(provider) ? { type: resolved.type, baseUrl: resolved.baseUrl, apiKey: resolved.apiKey, headers: resolved.headers } : undefined;
   const shouldTranslate = forceTranslate ? true : cm.getTranscriptTranslationEnabled();
   return {
     displayMode: cm.getTranscriptTranslationDisplayMode(),
@@ -801,8 +803,7 @@ export async function testTranslation(
     if (!translatedText.trim()) return { success: false, sample, totalMs: endedAt - startedAt, error: 'The model answered with no text.' };
     return { success: true, sample, translatedText, firstTokenMs: firstTokenAt === null ? undefined : firstTokenAt - startedAt, totalMs: endedAt - startedAt };
   } catch (error: unknown) {
-    // The sample is invented, so a provider's message is safe to show; it says why the model cannot be used.
-    const message = error instanceof Error ? error.message : String(error);
+    const message = redactConnectionError(error, config.connection).message;
     const status = Number((error as { status?: unknown } | null)?.status);
     return {
       success: false,

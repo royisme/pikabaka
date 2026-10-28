@@ -62,6 +62,16 @@ t.test('authentication errors cannot expose the chosen connection key', async t 
     t.equal(result.error, 'auth: Invalid API key: [redacted]');
 });
 
+t.test('header values, including overlapping and JSON-escaped secrets, are redacted before truncation', async t => {
+    const headers = { 'X-One': 'fake-key-long-secret', 'X-Two': 'fake-"quoted"-secret', 'X-Spaced': ' fake-spaced-secret ' };
+    const result = await runModelTest((async function* () {
+        throw new Error(`Echo fake-key-long-secret fake-key ${JSON.stringify(headers['X-Two'])} fake-spaced-secret`);
+    })(), 'fake-key', headers);
+    t.equal(result.success, false);
+    t.notMatch(result.error, /fake-|quoted|long-secret/);
+    t.equal(result.error, 'other: Echo [redacted] [redacted] "[redacted]" [redacted]');
+});
+
 t.test('model-test uses the unsaved row or inherits the exact saved Quick answers row without writing', async t => {
     const manager = Object.create(CredentialsManager.prototype) as CredentialsManager;
     Reflect.set(manager, 'credentials', {

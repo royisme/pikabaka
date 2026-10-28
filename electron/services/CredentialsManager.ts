@@ -4,6 +4,7 @@
  */
 
 import { BUILTIN_CONNECTIONS, CONNECTION_TYPES, connectionNeedsKey, isBuiltinConnection, normalizeBaseUrl, type Connection, type ConnectionType, type ConnectionView } from './aiConnections';
+import { editConnectionHeaders, type HeaderEdit } from './connectionHeaders';
 import fs from 'fs';
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT } from '../transcript/translationExecutor';
@@ -17,6 +18,7 @@ export interface OpenAICompatibleProvider {
     type?: ConnectionType;
     baseUrl: string;
     apiKey: string;
+    headers?: Record<string, string>;
     /** Model id for chat/completions (set via Fetch Models or manually). */
     preferredModel?: string;
 }
@@ -483,12 +485,15 @@ export class CredentialsManager {
         }
         const custom = this.getOpenAICompatibleProviders().find(p => p.id === id);
         if (!custom) return undefined;
+        const result = editConnectionHeaders(custom.headers);
+        if ('error' in result) return undefined;
         return {
             id,
             name: custom.name,
             type: custom.type && CONNECTION_TYPES.includes(custom.type) ? custom.type : 'openai',
             baseUrl: normalizeBaseUrl(custom.baseUrl) ?? custom.baseUrl,
             apiKey: custom.apiKey || '',
+            ...(result.headers ? { headers: result.headers } : {}),
             builtin: false,
         };
     }
@@ -507,6 +512,7 @@ export class CredentialsManager {
                 baseUrl: connection.baseUrl,
                 customBaseUrl: !!builtin && connection.baseUrl !== builtin.defaultBaseUrl,
                 hasApiKey: connection.apiKey !== '',
+                ...(connection.headers ? { headers: Object.keys(connection.headers).map(name => ({ name, set: true as const })) } : {}),
                 builtin: !!builtin,
             }];
         });
@@ -523,10 +529,11 @@ export class CredentialsManager {
      * a custom one takes a name, a type and a host. A missing `apiKey` leaves the stored key as it is.
      * Returns the id, or the reason it was refused.
      */
-    public saveConnection(input: { id?: string; name?: string; type?: ConnectionType; baseUrl?: string; apiKey?: string }): { id: string } | { error: string } {
+    public saveConnection(input: { id?: string; name?: string; type?: ConnectionType; baseUrl?: string; apiKey?: string; headerEdits?: HeaderEdit[] }): { id: string } | { error: string } {
         const baseUrl = (input.baseUrl ?? '').trim();
         if (baseUrl && !normalizeBaseUrl(baseUrl)) return { error: 'The host must be an http or https address without a query or credentials' };
         if (input.id && isBuiltinConnection(input.id)) {
+            if (input.headerEdits !== undefined) return { error: 'Custom headers are not supported for built-in connections' };
             const id = input.id;
             const overrides = { ...(this.credentials.connectionBaseUrls || {}) };
             if (baseUrl) overrides[id] = normalizeBaseUrl(baseUrl)!;
@@ -546,9 +553,11 @@ export class CredentialsManager {
         if (!name || name.length > 80) return { error: 'Give the connection a name' };
         if (!input.type || !CONNECTION_TYPES.includes(input.type)) return { error: 'Choose a type' };
         if (!baseUrl) return { error: 'A custom connection needs a host' };
-        const list = this.credentials.openaiCompatibleProviders || (this.credentials.openaiCompatibleProviders = []);
+        const list = this.credentials.openaiCompatibleProviders || [];
         const existing = input.id ? list.find(p => p.id === input.id) : undefined;
         if (input.id && !existing) return { error: 'That connection does not exist' };
+        const result = editConnectionHeaders(existing?.headers, input.headerEdits);
+        if ('error' in result) return result;
         const entry: OpenAICompatibleProvider = {
             id: existing?.id ?? `conn-${randomUUID().slice(0, 8)}`,
             name,
@@ -556,9 +565,11 @@ export class CredentialsManager {
             baseUrl: normalizeBaseUrl(baseUrl)!,
             apiKey: input.apiKey === undefined ? existing?.apiKey ?? '' : input.apiKey.trim(),
             ...(existing?.preferredModel ? { preferredModel: existing.preferredModel } : {}),
+            ...(result.headers ? { headers: result.headers } : {}),
         };
         if (existing) list[list.indexOf(existing)] = entry;
         else list.push(entry);
+        this.credentials.openaiCompatibleProviders = list;
         this.saveCredentials();
         return { id: entry.id };
     }
@@ -722,8 +733,9 @@ export class CredentialsManager {
             }
 
             console.log('[CredentialsManager] No stored credentials found, starting fresh');
-        } catch (error) {
-            console.error('[CredentialsManager] Failed to load credentials:', error);
+        } catch {
+            // JSON parse errors can quote the stored secrets.
+            console.error('[CredentialsManager] Failed to load credentials');
             this.credentials = {};
         }
     }

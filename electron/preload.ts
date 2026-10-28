@@ -13,7 +13,9 @@ type PreloadThreadLine = { id: string; role: 'user' | 'assistant' | 'tool'; text
 
 // Types for the exposed Electron API
 type AiConnectionType = 'openai' | 'anthropic' | 'gemini'
-interface AiConnectionView { id: string; name: string; type: AiConnectionType; baseUrl: string; customBaseUrl: boolean; hasApiKey: boolean; builtin: boolean }
+type HeaderEdit = { op: 'keep' | 'remove'; name: string } | { op: 'set'; name: string; value: string }
+type HeaderState = { name: string; set: true }
+interface AiConnectionView { id: string; name: string; type: AiConnectionType; baseUrl: string; customBaseUrl: boolean; hasApiKey: boolean; headers?: HeaderState[]; builtin: boolean }
 interface AgentApprovalRequest { id: string; meetingId: string; tool: 'bash' | 'write' | 'edit' | 'read'; target: string; detail?: string; folder: string; outside?: boolean }
 type AgentApprovalEvent = { type: 'requested'; request: AgentApprovalRequest } | { type: 'settled'; id: string; allowed: boolean }
 interface AgentProactiveCard { id: string; meetingId: string; segmentId: string; kind: string; text: string; time: number }
@@ -66,7 +68,7 @@ interface ElectronAPI {
   analyzeImageFile: (path: string) => Promise<void>
   quitApp: () => Promise<void>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
-  getStoredCredentials: () => Promise<{ hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: string; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; hasSonioxKey: boolean }>
+  getStoredCredentials: () => Promise<{ connectionHeaders?: Record<string, HeaderState[]>; hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: string; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; hasSonioxKey: boolean }>
   testTranscriptTranslation: (draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => Promise<{ success: boolean; sample: string; translatedText?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
   getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both' }>
   setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) => Promise<{ success: boolean }>
@@ -82,9 +84,9 @@ interface ElectronAPI {
   agentWorkspacePick: () => Promise<{ canceled: boolean; root?: string; error?: string }>
   agentWorkspaceClear: () => Promise<{ success: boolean }>
   aiConnectionsList: () => Promise<AiConnectionView[]>
-  aiConnectionSave: (input: { id?: string; name?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; id?: string; error?: string }>
+  aiConnectionSave: (input: { id?: string; name?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string; headerEdits?: HeaderEdit[] }) => Promise<{ success: boolean; id?: string; error?: string }>
   aiConnectionDelete: (id: string) => Promise<{ success: boolean; error?: string }>
-  aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
+  aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string; headerEdits?: HeaderEdit[] }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
   agentTest: (draft: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; reply?: string; toolCalls?: boolean | null; totalMs?: number; error?: string }>
   modelTest: (draft: { job: 'chat' | 'summary'; connectionId: string; model: string }) => Promise<{ success: boolean; reply?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
 
@@ -582,9 +584,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   agentWorkspacePick: () => ipcRenderer.invoke("agent-workspace-pick"),
   agentWorkspaceClear: () => ipcRenderer.invoke("agent-workspace-clear"),
   aiConnectionsList: () => ipcRenderer.invoke("ai-connections-list"),
-  aiConnectionSave: (input: { id?: string; name?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => ipcRenderer.invoke("ai-connection-save", input),
+  aiConnectionSave: (input: { id?: string; name?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string; headerEdits?: HeaderEdit[] }) => ipcRenderer.invoke("ai-connection-save", input),
   aiConnectionDelete: (id: string) => ipcRenderer.invoke("ai-connection-delete", id),
-  aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => ipcRenderer.invoke("ai-connection-models", input),
+  aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string; headerEdits?: HeaderEdit[] }) => ipcRenderer.invoke("ai-connection-models", input),
   agentTest: (draft: { connectionId: string; model: string; supportsImages?: boolean }) => ipcRenderer.invoke("agent-test", draft),
   modelTest: (draft: { job: 'chat' | 'summary'; connectionId: string; model: string }) => ipcRenderer.invoke("model-test", draft),
 

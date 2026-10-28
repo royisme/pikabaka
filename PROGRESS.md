@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: dormant custom headers, step S5a (branch `headers-backend`)
+
+- Custom providers retain optional headers across unrelated saves; explicit keep/set/remove edits are validated in the main process (32 headers, 8192 total bytes; SDK-owned auth is reserved). List/status payloads expose names and set marks, never values. All three SDK clients, model lists and pi-ai models, both embedding protocols and the translation projection carry headers; selected-embedding transport changes force a rebuild.
+- Shared redaction covers model/Agent/translation Tests, SDK error boundaries and summary logs; corrupt credential JSON logs no content. Failing tests were observed before fixes; synthetic stores, SDK/HTTP loopback requests and fetch stubs verify storage, validation, transport, redaction and real embedding-provider replacement. Both typechecks, lint and full tap pass.
+- No UI, encryption, dependency, channel, speech, decision, Tavily or Automatic embedding change. Owner: real gateways/keys, restart, Windows and packaged app. Mutation check unavailable (`mutator` absent); Node 26 tests shim the removed SlowBuffer API for the installed Google auth dependency. Existing swallowed credential write failures remain SEC1; pi-durable still persists raw model error details internally (not exposed by Pika's classified Agent events).
+
 ## 2026-10-28: material provenance and notes index status, step K5a (branch `material-status`)
 
 - Four owner-approved nullable columns are added with guarded, idempotent ALTERs; old rows remain NULL/Unknown. Knowledge vector writes replace native/BLOB vectors and provenance in one transaction. Failures retain the previous vectors/provenance and store only the first line of the thrown error; background logs carry the document id, not the error body or source text.
