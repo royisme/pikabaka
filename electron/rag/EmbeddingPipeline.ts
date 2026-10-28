@@ -225,8 +225,7 @@ export class EmbeddingPipeline {
             for (const chunk of chunks) {
                 insert.run(meetingId, chunk.id);
             }
-            // Also queue summary (chunk_id = NULL means summary)
-            insert.run(meetingId, null);
+            this.queueMeetingSummary(meetingId);
         });
 
         queueAll();
@@ -241,6 +240,22 @@ export class EmbeddingPipeline {
         this.processQueue().catch(err => {
             console.error('[EmbeddingPipeline] Queue processing error:', err);
         });
+    }
+
+    /**
+     * NULL chunk ids bypass SQLite's unique constraint, so deduplicate summary work explicitly.
+     */
+    queueMeetingSummary(meetingId: string): void {
+        this.db.transaction(() => {
+            const queued = this.db.prepare(`
+                SELECT 1 FROM embedding_queue
+                WHERE meeting_id = ? AND chunk_id IS NULL AND status IN ('pending', 'processing')
+            `).get(meetingId);
+            if (queued) return;
+            this.db.prepare(`
+                INSERT INTO embedding_queue (meeting_id, chunk_id, status) VALUES (?, NULL, 'pending')
+            `).run(meetingId);
+        })();
     }
 
     /**
@@ -500,7 +515,7 @@ export class EmbeddingPipeline {
         // Get summary text
         const row = this.db.prepare(
             'SELECT summary_text FROM chunk_summaries WHERE meeting_id = ?'
-        ).get(meetingId) as any;
+        ).get(meetingId) as { summary_text: string } | undefined;
 
         if (!row) {
             console.log(`[EmbeddingPipeline] No summary for meeting ${meetingId}, skipping`);
@@ -508,20 +523,26 @@ export class EmbeddingPipeline {
         }
 
         const embedding = await p.embed(row.summary_text);
-        this.vectorStore.storeSummaryEmbedding(meetingId, embedding);
-
-        // P2-8: record provider metadata on the meeting row so that provider-switch
-        // compatibility checks (which gate search queries by embedding_provider) also
-        // cover meetings whose only embedding is a summary (no chunks).
-        try {
+        const stored = this.db.transaction(() => {
+            const current = this.db.prepare(
+                'SELECT summary_text FROM chunk_summaries WHERE meeting_id = ?'
+            ).get(meetingId) as { summary_text: string } | undefined;
+            if (!current || current.summary_text !== row.summary_text) return false;
+            const meeting = this.db.prepare(
+                'SELECT embedding_provider, embedding_dimensions FROM meetings WHERE id = ?'
+            ).get(meetingId) as { embedding_provider: string | null; embedding_dimensions: number | null } | undefined;
+            if (meeting?.embedding_provider != null &&
+                (meeting.embedding_provider !== p.name || meeting.embedding_dimensions !== p.dimensions)) {
+                throw new Error('Meeting embeddings use a different provider; rebuild required');
+            }
+            this.vectorStore.storeSummaryEmbedding(meetingId, embedding);
             this.db.prepare(
                 'UPDATE meetings SET embedding_provider = ?, embedding_dimensions = ? WHERE id = ? AND embedding_provider IS NULL'
             ).run(p.name, p.dimensions, meetingId);
-        } catch (e) {
-            // Non-fatal — metadata is for safety filtering, not critical path
-        }
+            return true;
+        })();
 
-        console.log(`[EmbeddingPipeline] Embedded summary for meeting ${meetingId} via ${p.name}`);
+        if (stored) console.log(`[EmbeddingPipeline] Embedded summary for meeting ${meetingId} via ${p.name}`);
     }
 
     /**
