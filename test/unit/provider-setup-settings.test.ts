@@ -7,6 +7,7 @@ import * as ReactQuery from 'react-query';
 import * as FramerMotion from 'framer-motion';
 import type { AiConnectionView } from '../../src/types/electron';
 import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
+import { gateHost, gateSettings } from '../helpers/gateSettingsHost';
 
 // Only browser stores are stubbed; the Settings pages and their children render for real.
 Object.defineProperty(globalThis, 'window', {
@@ -94,6 +95,14 @@ t.test('Provider setup lists only speech services with a saved key or account be
     t.end();
 });
 
+t.test('Provider setup places a separate Decision service section below speech, not a model provider', t => {
+    const html = renderSettings('providers');
+    t.match(html, /<h3[^>]*>Decision service<\/h3>/);
+    t.ok(html.indexOf('>Speech-to-text providers</h3>') < html.indexOf('>Decision service</h3>'));
+    t.match(html, 'A separate kind of service, not a language model provider.');
+    t.end();
+});
+
 t.test('floating picker repair section opens the named hidden built-in editor', t => {
     const html = renderSettings('providers:openai', [{
         id: 'openai', name: 'OpenAI', type: 'openai', baseUrl: 'https://api.openai.com/v1',
@@ -166,6 +175,15 @@ t.test('Audio still offers every service, uses saved keys for model Fetch, and i
     t.equal(link.props.type, 'button');
     (link.props.onClick as () => void)();
     t.ok(elements(draw()).some(element => typeof element.type === 'function' && element.type.name === 'ProviderSetupSettings'), 'the link changes the actual Settings page');
+    const providerPage = elements(draw()).find(element => typeof element.type === 'function' && element.type.name === 'ProviderSetupSettings')!;
+    (providerPage.props.onOpenModels as () => void)();
+    const modelsPage = elements(draw()).find(element => typeof element.type === 'function' && element.type.name === 'AIProvidersSettings')!;
+    const modelsTree = (modelsPage.type as (props: Element['props']) => React.ReactNode)(modelsPage.props);
+    const proactive = elements(modelsTree).find(element => typeof element.type === 'function' && element.type.name === 'ProactiveHelpSettings')!;
+    const host = gateHost('ProactiveHelpSettings', {}, gateSettings, proactive.props.onOpenProviders as () => void);
+    t.teardown(host.unmount);
+    host.click('Provider setup');
+    t.ok(elements(draw()).some(element => typeof element.type === 'function' && element.type.name === 'ProviderSetupSettings'), 'Proactive help forwards navigation through its parent and opens the actual Provider setup page');
     t.end();
 });
 

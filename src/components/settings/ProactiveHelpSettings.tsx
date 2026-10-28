@@ -21,22 +21,20 @@ function percent(value?: number): string {
  * Settings for the proactive-help gate: which decision model judges the conversation, when it may
  * speak up, and the log of its latest decisions (no speech text is kept in it).
  */
-const ProactiveHelpSettings: React.FC = () => {
+const ProactiveHelpSettings = ({ onOpenProviders }: { onOpenProviders: () => void }) => {
     const queryClient = useQueryClient();
     const settings = useQuery(['agent-gate-settings'], () => window.electronAPI.agentGateGetSettings());
     const status = useQuery<Status>(['agent-gate-status'], () => window.electronAPI.agentGateStatus());
     const log = useQuery<AgentGateDecision[]>(['agent-gate-log'], () => window.electronAPI.agentGateLog());
 
-    // What is typed is a draft over the saved settings; the key is only ever typed, never read back.
-    const [draft, setDraft] = useState<{ mode?: Mode; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }>({});
+    // What is typed is a draft over the saved settings.
+    const [draft, setDraft] = useState<{ mode?: Mode; model?: string; threshold?: number; cooldownSeconds?: number }>({});
     const saved = settings.data;
     const mode: Mode = draft.mode ?? saved?.mode ?? 'log';
     const model = draft.model ?? saved?.model ?? '';
-    const baseUrl = draft.baseUrl ?? saved?.baseUrl ?? '';
-    const apiKey = draft.apiKey ?? '';
+    const baseUrl = saved?.baseUrl ?? '';
     const threshold = draft.threshold ?? saved?.threshold ?? 0.7;
     const cooldownSeconds = draft.cooldownSeconds ?? saved?.cooldownSeconds ?? 120;
-    const hasApiKey = saved?.hasApiKey ?? false;
     const decisions = log.data ?? [];
 
     const refreshAll = async () => {
@@ -52,11 +50,8 @@ const ProactiveHelpSettings: React.FC = () => {
             const result = await window.electronAPI.agentGateSetSettings({
                 mode,
                 model,
-                baseUrl,
                 threshold,
                 cooldownSeconds,
-                // An untouched key field leaves the stored key as it is.
-                ...(apiKey ? { apiKey } : {}),
             });
             if (!result.success) throw new Error(result.error || 'Could not save');
         },
@@ -68,16 +63,8 @@ const ProactiveHelpSettings: React.FC = () => {
         }
     );
 
-    // The test uses what is typed (saved or not); an untouched key field uses the saved key.
-    const test = useMutation(() => window.electronAPI.agentGateTest({ model, baseUrl, ...(apiKey ? { apiKey } : {}) }));
-
-    const clearKey = useMutation(
-        async () => {
-            const result = await window.electronAPI.agentGateSetSettings({ apiKey: '' });
-            if (!result.success) throw new Error(result.error || 'Could not remove the key');
-        },
-        { onSuccess: refreshAll }
-    );
+    // The test uses the draft model with the saved service URL and key.
+    const test = useMutation(() => window.electronAPI.agentGateTest({ model, baseUrl }));
 
     // "Saved!" shows while the draft is empty after a successful save, so it clears itself when you edit again.
     const showSaved = save.isSuccess && Object.keys(draft).length === 0;
@@ -109,36 +96,13 @@ const ProactiveHelpSettings: React.FC = () => {
                     <p className="text-[11px] text-text-tertiary leading-snug">{MODE_HELP[mode]}</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-text-secondary block">Decision model</label>
-                        <input type="text" value={model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} placeholder="Model id" className={input} />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-text-secondary block">Base URL</label>
-                        <input type="text" value={baseUrl} onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })} placeholder="http://localhost:3425/v1" className={input} />
-                    </div>
-                </div>
-                <p className="text-[11px] text-text-tertiary leading-snug">Requests go to the base URL followed by /systemone.</p>
-
                 <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-text-secondary block">API key</label>
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="password"
-                            value={apiKey}
-                            onChange={(e) => setDraft({ ...draft, apiKey: e.target.value })}
-                            placeholder={hasApiKey ? 'Saved. Type to replace.' : 'Optional for a local address'}
-                            autoComplete="off"
-                            className={input}
-                        />
-                        {hasApiKey && (
-                            <button onClick={() => clearKey.mutate()} className="shrink-0 h-11 px-3 rounded-lg text-xs font-medium border border-border-subtle text-text-secondary hover:text-text-primary transition-colors">
-                                Remove
-                            </button>
-                        )}
-                    </div>
+                    <label className="text-xs font-medium text-text-secondary block">Decision model</label>
+                    <input type="text" value={model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} placeholder="Model id" className={input} />
                 </div>
+                <p className="text-xs text-text-secondary">
+                    The decision service address and key are in <button type="button" onClick={onOpenProviders} className="text-primary hover:underline">Provider setup</button>.
+                </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-1.5">
@@ -202,7 +166,7 @@ const ProactiveHelpSettings: React.FC = () => {
                         )}
                     </div>
                 )}
-                {(save.error || clearKey.error) ? <p className="text-[11px] text-state-danger">{((save.error || clearKey.error) as Error).message}</p> : null}
+                {save.error ? <p className="text-[11px] text-state-danger">{(save.error as Error).message}</p> : null}
 
                 <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
