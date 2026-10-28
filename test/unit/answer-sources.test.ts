@@ -367,3 +367,32 @@ for (const stream of [false, true]) {
     });
 }
 
+
+t.test('knowledge mode needs the mode flag and an opted-in kind that has stored content', async t => {
+    const full = await knowledge(t);
+    const notesOnly = await knowledge(t, false, true);
+    const resumeOnly = await knowledge(t);
+    resumeOnly.orchestrator.deleteDocumentsByType(DocType.NOTES);
+    for (const [materials, profile] of [[false, false], [true, false], [false, true], [true, true]]) {
+        for (const f of [full, notesOnly, resumeOnly]) {
+            f.manager.set('answerUsesMaterials', materials);
+            f.manager.set('answerUsesProfile', profile);
+        }
+        t.equal(full.orchestrator.isKnowledgeMode(), materials || profile);
+        t.equal(notesOnly.orchestrator.isKnowledgeMode(), materials, 'the profile switch cannot make notes count');
+        t.equal(resumeOnly.orchestrator.isKnowledgeMode(), profile, 'the materials switch cannot make a resume count');
+    }
+    full.orchestrator.setKnowledgeMode(false);
+    t.equal(full.orchestrator.isKnowledgeMode(), false, 'opted-in kinds do not switch the mode on by themselves');
+});
+
+for (const stream of [false, true]) {
+    t.test(`${stream ? 'stream' : 'non-stream'} chat answers normally when no knowledge store is attached, even with every kind opted in`, async t => {
+        const f = await knowledge(t);
+        f.manager.set('answerUsesMaterials', true);
+        f.manager.set('answerUsesProfile', true);
+        f.helper.setKnowledgeOrchestrator(null as never);
+        t.equal(await f.ask(stream), 'Invented model reply.');
+        t.match(f.prompts[0], 'Invented live transcript context.');
+    });
+}
