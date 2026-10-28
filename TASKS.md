@@ -6,6 +6,28 @@ The work queue in small steps, one at a time. GitHub issues hold the evidence an
 
 Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR that says `Fixes #N` for its issue.
 
+## Execution order (owner, 2026-10-28)
+
+The owner's order of work: finish and merge every open step below, sync `main` to the private repository `royisme/meetingCopa` (remote `private`), and only then start the removal of the interview framing from the public product (track X). Each wave is at most two steps that touch different files; every step is one branch and one PR, GPT implements at `max` thinking, the agent reviews (reads the diff, re-runs the four checks, runs the mutation check on changed production functions) and Haiku merges. Waves are limited by GPT's five-hour quota window, not by the plan.
+
+| Wave | Steps (parallel) | Files they own | Needs from the owner first |
+| --- | --- | --- | --- |
+| 1 | K3b `summary-hooks` and S3a `speech-list` | `electron/core/MeetingPersistence.ts`, `electron/ipc/meeting.ts`, RAG; renderer settings (Provider setup) | none |
+| 2 | K5a `material-status` and S4 `decision-setup` | `knowledge_documents` columns and the knowledge store; agent-gate settings IPC and Provider setup | none (K5a schema approved 2026-10-27) |
+| 3 | K4a `answer-sources` and S5a `headers-backend` | new settings keys and retrieval paths; credentials, connection projections and request sinks | none |
+| 4 | K4b+K4c `material-notes` and S5b `headers-editor` | agent tool and the Knowledge Sources page; the Provider setup editor | none |
+| 5 | S6 `translation-part` and B1 `behaviour-fixes` | translation settings component; behaviour bugs listed below | B1 policy answers (below) |
+| 6 | S3b `speech-configured` and K6 `index-recovery` | Audio & Translation selection and `audio-pipeline.ts`; Search index retry, Re-index all, and the two leftover vector paths | S3b: the Google substitution decision |
+| 7 | SEC1 `key-storage` (alone: it rewrites the credential file) | `CredentialsManager`, its IPC readers | SEC1 migration decision; K5b only if the owner approves it |
+
+- **B1 `behaviour-fixes`** (one PR, behaviour changes the owner approved on 2026-10-27 as a separate task after the split): the Groq model reset when the language changes; the proactive decision Test deadline (5 s test, 2 s live); the Agent Test using saved settings when the draft is incomplete; template answers for interview prep and the made-up company rating (against "never invent data"); the Soniox test passing on a non-JSON reply; saving a speech key ignoring a failed result; a blank draft Test URL reusing the saved host; the embedding-init rejection that is unhandled in the RAG constructor; the deferred audio reconfiguration that lacks a session check after its await.
+- **K6 `index-recovery`** now also owns: V1 made an exhausted job terminal (`failed`) with no way to retry it, so it needs the per-source retry and Re-index all; `DatabaseManager.clearAllData` (flush-database) and `processMeeting` -> `saveSummary` still leave native vectors behind (V1 report).
+- **SEC1 `key-storage`** also owns: `CredentialsManager` swallowing disk-write errors, and making the README keychain claim true (or correcting it first).
+- **Gate before track X:** every step above merged, `main` pushed to `private` (`git push private main`), the owner's open acceptance items listed in one place in `PROGRESS.md`.
+- **Track X (after the gate, design in progress):** (X1) remove the process disguise and rename the Undetectable framing to "Hide from screen share" while keeping content protection and the `isUndetectable` key (owner decision 2026-10-28; Opus design to be saved as `docs/design-strip-stealth.md`); (X2...) the broader removal of the interview feature from the public product (about 4,000 lines under `electron/knowledge/*` and `src/components/knowledge/*`, 18 IPC channels, core prompts, the Interview profile page, launcher copy), one reviewed step at a time after the owner approves the contracts it changes.
+
+Owner decisions still open (defaults in brackets; none blocks waves 1 to 4): S3b, when a configured speech service is missing, never substitute another service silently [show "not configured" and let the user choose]; SEC1, on first start after the update encrypt the existing plaintext credentials with `safeStorage`, verify, then delete the plaintext, and keep plaintext with a visible notice where `safeStorage` is unavailable [yes]; K5b material import [approve or drop]; the `package.json` license field says ISC while `LICENSE` and the README say AGPL-3.0 [align to AGPL-3.0].
+
 ## Auto-update (owner-approved dispatch, `docs/design-auto-update.md`)
 
 - Done on `auto-update`: `build.publish` is the GitHub provider, `scripts/release.js` uploads `latest-mac.yml`, updates download in the background, never restart the app on their own, the finished-download notice waits during a meeting, the unsigned-app Finder branch and the manual-update modal views are gone, and `ReleaseNotesManager` asks `royisme/pikabaka`. Both typechecks, lint and tap exit 0; an unsigned `electron-builder --mac zip` run writes `latest-mac.yml` and a packaged `app-update.yml`.
@@ -32,7 +54,7 @@ One step at a time, same delegation and review. Starts after K1 is merged (S1a b
 
 - S1a `provider-setup` (done, PR open, stacked on K1): a Provider setup tab (new id `providers`) holding the existing Connections component unchanged; Models & Agent links to it. Pure relocation.
 - S1b `provider-list` (done, PR open; owner acceptance pending): configured built-ins plus every custom provider, Interface first, no presets; pickers retain their named provider and link to its editor. Built-ins have read-only identity and a key/host reset; referenced customs cannot be deleted (named jobs, enforced in IPC), and no job is reassigned. Both typechecks, lint and tap (1517 assertions) exit 0. `CredentialsManager` still swallows disk-write errors, so durable Save is not proven. Owner: both themes, narrow/long rows, keyboard actions, real keys and restart. Next: S2.
-- S2 `answer-style` (done in worktree, uncommitted; owner acceptance pending): answer language and collapsed style beside Quick answers; the language component owns the unchanged IPC and General has no answer state. Both typechecks, lint and tap exit 0. Owner: both themes, narrow Settings, keyboard actions and restart persistence. Next: S3a.
+- S2 `answer-style` (done, PR #57; owner acceptance pending): answer language and collapsed style beside Quick answers; the language component owns the unchanged IPC and General has no answer state. Both typechecks, lint and tap exit 0. Owner: both themes, narrow Settings, keyboard actions and restart persistence. Next: S3a.
 - S3a `speech-list`: speech providers as a list in Provider setup (control extraction, one credential slot per service as today). S3b: Audio & Translation offers only configured services with a setup state when none; decide and test the Google substitution and OpenAI model alternatives in `audio-pipeline.ts` (behaviour change).
 - S4 `decision-setup`: the proactive help URL and key to Provider setup with a Test of the endpoint; each page saves only its own fields.
 - S5a `headers-backend`: custom headers, dormant: the field, validation, every request sink and projection listed in the design file, secret redaction, embedding provider rebuild; no editor yet. S5b: the editor.
