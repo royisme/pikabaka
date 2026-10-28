@@ -40,6 +40,7 @@ export class KnowledgeOrchestrator {
   private generateContentFn: GenerateContentFn | null = null;
   private embedFn: EmbedFn | null = null;
   private embedQueryFn: EmbedQueryFn | null = null;
+  private embeddingStatusFn: (() => { providerName: string | null; dimensions: number | null } | null) | null = null;
   private knowledgeMode: boolean = false;
 
   private cachedProfileData: ProfileData | null = null;
@@ -83,6 +84,10 @@ export class KnowledgeOrchestrator {
     this.embedQueryFn = fn;
   }
 
+  setEmbeddingStatusFn(fn: NonNullable<KnowledgeOrchestrator['embeddingStatusFn']>): void {
+    this.embeddingStatusFn = fn;
+  }
+
   async ingestDocument(filePath: string, docType: DocType): Promise<{ success: boolean; error?: string }> {
     try {
       if (!this.generateContentFn || !this.profileExtractor || !this.jdAnalyzer) {
@@ -120,7 +125,7 @@ export class KnowledgeOrchestrator {
 
       if (this.embedFn && chunkIds.length > 0) {
         void this.embedChunksBackground(
-          chunkIds.map((id, index) => ({ id, text: chunks[index].text }))
+          docId, chunkIds.map((id, index) => ({ id, text: chunks[index].text }))
         );
       }
 
@@ -142,8 +147,9 @@ export class KnowledgeOrchestrator {
 
   getStatus(): KnowledgeStatus {
     const resumeDoc = this.db.getDocumentByType(DocType.RESUME);
+    const notesIndex = this.getNotesIndexStatus();
     if (!resumeDoc) {
-      return { hasResume: false, activeMode: false, jdCount: 0 };
+      return { hasResume: false, activeMode: false, jdCount: 0, notesIndex };
     }
 
     let resumeSummary: KnowledgeStatus['resumeSummary'];
@@ -160,9 +166,26 @@ export class KnowledgeOrchestrator {
 
     return {
       hasResume: true,
+      notesIndex,
       activeMode: this.knowledgeMode,
       resumeSummary,
       jdCount: this.db.countDocumentsByType(DocType.JD),
+    };
+  }
+
+  private getNotesIndexStatus(): KnowledgeStatus['notesIndex'] {
+    const doc = this.db.getDocumentByType(DocType.NOTES);
+    if (!doc) return null;
+    const active = this.embeddingStatusFn?.();
+    const known = doc.embedding_provider != null && doc.embedding_dimensions != null;
+    const mismatch = known && active?.providerName != null && active.dimensions != null
+      && (doc.embedding_provider !== active.providerName || doc.embedding_dimensions !== active.dimensions);
+    return {
+      state: mismatch ? 'needs-reindex' : doc.index_error ? 'not-indexed' : known && doc.indexed_at ? 'indexed' : 'unknown',
+      provider: doc.embedding_provider ?? null,
+      dimensions: doc.embedding_dimensions ?? null,
+      indexedAt: doc.indexed_at ?? null,
+      error: doc.index_error ?? null,
     };
   }
 
@@ -183,8 +206,14 @@ export class KnowledgeOrchestrator {
    * Saves the notes as a document of their own: each line becomes a passage that is embedded, so a
    * question about it finds it the way it finds the resume. An empty text removes them.
    */
-  setNotes(text: string): void {
+  async setNotes(text: string): Promise<void> {
     const clean = text.replace(/\r\n?/g, '\n').trim().slice(0, NOTES_MAX_LENGTH);
+    const existing = this.db.getDocumentByType(DocType.NOTES);
+    if (clean && existing?.raw_text === clean) {
+      if (this.embedFn) await this.embedChunksBackground(existing.id, this.db.getChunksForDoc(existing.id));
+      this.knowledgeMode = true;
+      return;
+    }
     this.vectorStore.clearEmbeddings(DocType.NOTES);
     if (!clean) {
       this.db.deleteDocumentsByType(DocType.NOTES);
@@ -196,7 +225,7 @@ export class KnowledgeOrchestrator {
       .map((line) => ({ text: line, metadata: { docType: DocType.NOTES, section: 'notes' } }));
     const chunkIds = this.db.saveChunks(docId, chunks);
     if (this.embedFn && chunkIds.length > 0) {
-      void this.embedChunksBackground(chunkIds.map((id, index) => ({ id, text: chunks[index].text })));
+      await this.embedChunksBackground(docId, chunkIds.map((id, index) => ({ id, text: chunks[index].text })));
     }
     this.knowledgeMode = true;
   }
@@ -482,9 +511,11 @@ export class KnowledgeOrchestrator {
 
       let searchedWithoutMatch = false;
       if (this.embedQueryFn && this.vectorStore.hasEmbeddings()) {
-        const queryEmbedding = await this.embedQueryFn(message);
+        const { embedding: queryEmbedding, provider, dimensions } = await this.embedQueryFn(message);
+        const active = this.embeddingStatusFn?.();
+        const modelChanged = active && (active.providerName !== provider || active.dimensions !== dimensions);
         // Below this similarity a passage is not about the question: it is dropped, not sent as "background".
-        const results = this.vectorStore.searchSimilar(queryEmbedding, 5).filter((result) => result.score >= MIN_MATCH_SCORE);
+        const results = modelChanged ? [] : this.vectorStore.searchSimilar(queryEmbedding, 5, provider).filter((result) => result.score >= MIN_MATCH_SCORE);
         searchedWithoutMatch = results.length === 0;
 
         if (results.length > 0) {
@@ -699,12 +730,14 @@ export class KnowledgeOrchestrator {
     return 'general';
   }
 
-  private async embedChunksBackground(chunks: Array<{ id: number; text: string }>): Promise<void> {
+  private async embedChunksBackground(docId: number, chunks: Array<{ id: number; text: string }>): Promise<void> {
     try {
-      await this.vectorStore.storeEmbeddings(chunks, this.embedFn!);
+      await this.vectorStore.storeEmbeddings(docId, chunks, this.embedFn!);
       console.log(`[KnowledgeOrchestrator] Embedded ${chunks.length} chunks`);
     } catch (error) {
-      console.error('[KnowledgeOrchestrator] Background embedding error:', error);
+      const message = (error instanceof Error ? error.message : String(error)).split(/[\r\n]/, 1)[0];
+      this.db.getDb().prepare('UPDATE knowledge_documents SET index_error = ? WHERE id = ?').run(message, docId);
+      console.error(`[KnowledgeOrchestrator] Background embedding failed for document ${docId}`);
     }
   }
 

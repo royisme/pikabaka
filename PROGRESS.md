@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: material provenance and notes index status, step K5a (branch `material-status`)
+
+- Four owner-approved nullable columns are added with guarded, idempotent ALTERs; old rows remain NULL/Unknown. Knowledge vector writes replace native/BLOB vectors and provenance in one transaction. Failures retain the previous vectors/provenance and store only the first line of the thrown error; background logs carry the document id, not the error body or source text.
+- Knowledge retrieval checks provider and dimensions before limiting results, on native and JS paths; Unknown retains dimension-only compatibility. A model switch neither deletes nor re-embeds a document. The shared upload path records provenance too; meeting retrieval and interview-specific logic are unchanged.
+- The existing `profile:get-status` reply adds notes status, with all preload/renderer types updated. Sources shows words plus a mark, provider/dimensions, indexed time or the real error. Notes Save waits for the indexing attempt and invalidates status; saving unchanged notes re-embeds the existing source without discarding its previous index. Model Save also invalidates notes status.
+- Checks: both typechecks, lint (930 warnings, no errors) and full tap (2530 assertions) exit 0. The 23 new cases cover fresh/legacy schemas, success/failure, rollback, stale results, provider/dimension switches, Unknown compatibility, replacement/cleanup, limit filtering, IPC and all four rendered statuses. Schema, embedding, guard and UI tests were observed failing for the intended missing behavior before their fixes.
+- Found, not changed: automatic providers expose coarse names (`openai`, `gemini`) rather than model ids; native knowledge scoring uses `1 - distance`, while JS uses cosine. Mutation check not run: `mutator` is unavailable. Owner: both themes, narrow Settings/long errors, real-provider failures, model switches and restart. No app, real provider/device, Windows or packaged build was run.
+
 ## 2026-10-28: vector integrity, step V1 (branch `vector-integrity`)
 
 - `VectorStore` owns all-dimension native cleanup, reused by scoped chunk/summary clears and meeting deletion. The existing delete IPC handler now clears RAG data before the record cascade; short meetings already use that cleanup. Native writes delete then insert and propagate errors through the existing embedding transactions.

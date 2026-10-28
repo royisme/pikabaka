@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron"
 import type { KeybindStatus, KeybindResult } from './services/KeybindManager'
+import type { NotesIndexStatus } from './knowledge/types'
 
 type PreloadAgentEvent = { meetingId: string } & (
   | { type: 'run_started' | 'run_settled' }
@@ -288,7 +289,7 @@ interface ElectronAPI {
 
   // Profile Engine API
   profileUploadResume: (filePath: string) => Promise<{ success: boolean; error?: string }>;
-  profileGetStatus: () => Promise<{ hasProfile: boolean; profileMode: boolean; name?: string; role?: string; totalExperienceYears?: number }>;
+  profileGetStatus: () => Promise<{ hasProfile: boolean; profileMode: boolean; name?: string; role?: string; totalExperienceYears?: number; notesIndex?: NotesIndexStatus | null }>;
   profileSetMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
   profileDelete: () => Promise<{ success: boolean; error?: string }>;
   profileGetProfile: () => Promise<any>;

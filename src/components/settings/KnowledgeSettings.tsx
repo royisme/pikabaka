@@ -20,6 +20,7 @@ const KnowledgeSettings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const meetings = useQuery(['recent-meetings'], () => window.electronAPI.getRecentMeetings());
     const notes = useQuery(['profile-notes'], () => window.electronAPI.profileGetNotes());
     const profileStatus = useProfileStatus();
+    const notesIndex = profileStatus.data?.notesIndex;
     const profile = useProfileData(page === 'Interview profile');
     const profileData = profile.data;
     const hasProfile = profileStatus.data?.hasProfile;
@@ -32,7 +33,10 @@ const KnowledgeSettings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         },
         {
             onSuccess: async () => {
-                await queryClient.invalidateQueries(['profile-notes']);
+                await Promise.all([
+                    queryClient.invalidateQueries(['profile-notes']),
+                    queryClient.invalidateQueries(['profile', 'status']),
+                ]);
                 setEditingNotes(false);
             },
         }
@@ -81,11 +85,24 @@ const KnowledgeSettings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         </div>
                         <div className="border-t border-border-subtle pt-3 space-y-3">
                             <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div className="space-y-1">
+                                <div className="min-w-0 flex-1 space-y-1">
                                     <h4 className="text-sm font-semibold text-text-primary">Notes</h4>
                                     <p className="text-[11px] text-text-secondary" aria-live="polite">
                                         {notes.error ? `✕ ${String(notes.error instanceof Error ? notes.error.message : notes.error)}` : notes.data !== undefined ? `${notes.data ? '● Saved' : '○ Empty'} · ${notes.data.length} characters` : '● Loading notes…'}
                                     </p>
+                                    {notes.data && (
+                                        <p className="text-xs text-text-primary break-words" aria-live="polite">
+                                            {profileStatus.error ? `✕ ${String(profileStatus.error instanceof Error ? profileStatus.error.message : profileStatus.error)}`
+                                                : profileStatus.isLoading ? '● Loading index status…'
+                                                : notesIndex?.state === 'indexed' ? '✓ Indexed'
+                                                : notesIndex?.state === 'not-indexed' ? '✕ Not indexed'
+                                                : notesIndex?.state === 'needs-reindex' ? '▲ Needs re-index: the active embedding model differs'
+                                                : '○ Unknown: index provenance was not recorded'}
+                                            {notesIndex?.provider && ` · ${notesIndex.provider} · ${notesIndex.dimensions} dimensions`}
+                                            {notesIndex?.state === 'indexed' && notesIndex.indexedAt && <> · <time dateTime={notesIndex.indexedAt}>{new Date(notesIndex.indexedAt).toLocaleString()}</time></>}
+                                            {notesIndex?.error && ` · ${notesIndex.error}`}
+                                        </p>
+                                    )}
                                 </div>
                                 {notes.data && (
                                     <div className="flex flex-wrap gap-2">

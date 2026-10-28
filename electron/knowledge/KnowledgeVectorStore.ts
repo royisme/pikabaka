@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { DocType, EmbedFn, ChunkRow } from './types';
+import { DocType, EmbedFn, ChunkRow, KnowledgeEmbedding } from './types';
 
 export interface ScoredChunk {
   id: number;
@@ -23,31 +23,43 @@ export class KnowledgeVectorStore {
    * Store embeddings for chunks. Called after document ingestion.
    */
   async storeEmbeddings(
+    docId: number,
     chunks: Array<{ id: number; text: string }>,
     embedFn: EmbedFn
   ): Promise<void> {
+    if (chunks.length === 0) return;
+    const vectors: Array<KnowledgeEmbedding & { id: number }> = [];
     for (const chunk of chunks) {
-      const embedding = await embedFn(chunk.text);
-      if (!Array.isArray(embedding) || embedding.length === 0) {
-        continue;
+      const result = await embedFn(chunk.text);
+      if (!this.isValidDim(result.dimensions) || result.embedding.length !== result.dimensions) {
+        throw new Error('Embedding dimensions do not match the provider.');
       }
-
-      const blob = this.embeddingToBlob(embedding);
-      this.db.prepare('UPDATE knowledge_chunks SET embedding = ? WHERE id = ?').run(blob, chunk.id);
-
-      const dim = embedding.length;
-      this.embeddingDim = this.embeddingDim ?? dim;
-
-      if (this.ensureVecTableForDim(dim)) {
-        try {
-          this.db.prepare(
-            `INSERT OR REPLACE INTO vec_knowledge_${dim}(chunk_id, embedding) VALUES (?, ?)`
-          ).run(BigInt(chunk.id), blob);
-        } catch (error) {
-          console.warn(`[KnowledgeVectorStore] Failed to insert into vec_knowledge_${dim}:`, error);
+      if (vectors.length && (result.provider !== vectors[0].provider || result.dimensions !== vectors[0].dimensions)) {
+        throw new Error('Embedding provider changed while indexing. Save the document again to retry.');
+      }
+      vectors.push({ ...result, id: chunk.id });
+    }
+    const { provider, dimensions } = vectors[0];
+    const native = this.ensureVecTableForDim(dimensions);
+    this.db.transaction(() => {
+      // A replaced/deleted source must not receive an older background result.
+      const current = this.db.prepare('SELECT id FROM knowledge_chunks WHERE doc_id = ? ORDER BY chunk_index').all(docId) as Array<{ id: number }>;
+      if (current.length !== chunks.length || current.some((chunk, index) => chunk.id !== chunks[index].id)) return;
+      const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name GLOB 'vec_knowledge_*'").all() as Array<{ name: string }>;
+      for (const { name } of tables) {
+        if (!/^vec_knowledge_\d+$/.test(name)) continue;
+        this.db.prepare(`DELETE FROM ${name} WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE doc_id = ?)`).run(docId);
+      }
+      for (const vector of vectors) {
+        const blob = this.embeddingToBlob(vector.embedding);
+        this.db.prepare('UPDATE knowledge_chunks SET embedding = ? WHERE id = ?').run(blob, vector.id);
+        if (native) {
+          this.db.prepare(`INSERT INTO vec_knowledge_${dimensions}(chunk_id, embedding) VALUES (?, ?)`).run(BigInt(vector.id), blob);
         }
       }
-    }
+      this.db.prepare(`UPDATE knowledge_documents SET embedding_provider = ?, embedding_dimensions = ?, indexed_at = ?, index_error = NULL WHERE id = ?`)
+        .run(provider, dimensions, new Date().toISOString(), docId);
+    })();
   }
 
   /**
@@ -57,18 +69,19 @@ export class KnowledgeVectorStore {
   searchSimilar(
     queryEmbedding: number[],
     limit: number,
+    providerName: string,
     docType?: DocType
   ): ScoredChunk[] {
     if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0 || limit <= 0) {
       return [];
     }
 
-    const nativeResults = this.searchSimilarNative(queryEmbedding, limit, docType);
+    const nativeResults = this.searchSimilarNative(queryEmbedding, limit, providerName, docType);
     if (nativeResults) {
       return nativeResults;
     }
 
-    return this.searchSimilarJS(queryEmbedding, limit, docType);
+    return this.searchSimilarJS(queryEmbedding, limit, providerName, docType);
   }
 
   /**
@@ -134,6 +147,7 @@ export class KnowledgeVectorStore {
   private searchSimilarNative(
     queryEmbedding: number[],
     limit: number,
+    providerName: string,
     docType?: DocType
   ): ScoredChunk[] | null {
     const dim = queryEmbedding.length;
@@ -144,14 +158,14 @@ export class KnowledgeVectorStore {
     }
 
     try {
-      const fetchLimit = docType ? limit * 4 : limit;
+      const compatible = this.compatibleChunks(providerName, dim, docType);
       const vecRows = this.db.prepare(`
         SELECT chunk_id, distance
         FROM vec_knowledge_${dim}
-        WHERE embedding MATCH ?
+        WHERE embedding MATCH ? AND chunk_id IN (${compatible.sql})
         ORDER BY distance
         LIMIT ?
-      `).all(queryBlob, fetchLimit) as Array<{ chunk_id: number; distance: number }>;
+      `).all(queryBlob, ...compatible.params, limit) as Array<{ chunk_id: number; distance: number }>;
 
       if (vecRows.length === 0) {
         return [];
@@ -206,23 +220,14 @@ export class KnowledgeVectorStore {
   private searchSimilarJS(
     queryEmbedding: number[],
     limit: number,
+    providerName: string,
     docType?: DocType
   ): ScoredChunk[] {
-    let query = `
-      SELECT id, text, metadata, doc_type, embedding
-      FROM knowledge_chunks
-      WHERE embedding IS NOT NULL
-    `;
-    const params: Array<string> = [];
-
-    if (docType) {
-      query += ' AND doc_type = ?';
-      params.push(docType);
-    }
-
-    query += ' ORDER BY doc_id, chunk_index';
-
-    const rows = this.db.prepare(query).all(...params) as Array<Pick<ChunkRow, 'id' | 'text' | 'metadata' | 'doc_type'> & { embedding: Buffer | null }>;
+    const compatible = this.compatibleChunks(providerName, queryEmbedding.length, docType);
+    const rows = this.db.prepare(`
+      SELECT id, text, metadata, doc_type, embedding FROM knowledge_chunks
+      WHERE id IN (${compatible.sql}) ORDER BY doc_id, chunk_index
+    `).all(...compatible.params) as Array<Pick<ChunkRow, 'id' | 'text' | 'metadata' | 'doc_type'> & { embedding: Buffer | null }>;
     if (rows.length === 0) {
       return [];
     }
@@ -250,6 +255,17 @@ export class KnowledgeVectorStore {
     return scored
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
+  }
+
+  private compatibleChunks(providerName: string, dimensions: number, docType?: DocType) {
+    return {
+      sql: `SELECT c.id FROM knowledge_chunks c JOIN knowledge_documents d ON d.id = c.doc_id
+        WHERE length(c.embedding) = ?
+          AND (d.embedding_provider IS NULL OR d.embedding_dimensions IS NULL
+            OR (d.embedding_provider = ? AND d.embedding_dimensions = ?))
+          ${docType ? 'AND d.doc_type = ?' : ''}`,
+      params: [dimensions * 4, providerName, dimensions, ...(docType ? [docType] : [])],
+    };
   }
 
   private ensureVecTableForDim(dim: number): boolean {

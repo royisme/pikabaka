@@ -71,6 +71,31 @@ function loadRegisterKnowledgeHandlers(options?: {
   };
 }
 
+t.test('profile:get-status keeps its legacy fields and adds the notes index status', async t => {
+  const notesIndex = { state: 'needs-reindex' as const, provider: 'example:amber', dimensions: 3, indexedAt: '2026-10-27T12:34:56.000Z', error: null };
+  const harness = loadRegisterKnowledgeHandlers({ orchestrator: {
+    getStatus: () => ({ hasResume: false, activeMode: false, jdCount: 0, notesIndex }),
+  } });
+  const result = await harness.invoke('profile:get-status');
+  t.equal(result.hasProfile, false);
+  t.equal(result.profileMode, false);
+  t.same(result.notesIndex, notesIndex);
+});
+
+t.test('profile:set-notes waits for the saved index result before replying', async t => {
+  let finish!: () => void;
+  let saved = false;
+  const harness = loadRegisterKnowledgeHandlers({ orchestrator: {
+    setNotes: async () => { await new Promise<void>(resolve => { finish = resolve; }); saved = true; },
+  } });
+  const result = harness.invoke('profile:set-notes', 'Invented lantern inventory.');
+  await new Promise(setImmediate);
+  t.equal(saved, false);
+  finish();
+  t.same(await result, { success: true });
+  t.equal(saved, true, 'the next status read observes the completed attempt');
+});
+
 t.test('set-tavily-api-key rejects invalid prefix and persists valid values', async (t) => {
   const harness = loadRegisterKnowledgeHandlers();
 
