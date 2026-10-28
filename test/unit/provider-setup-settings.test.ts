@@ -129,7 +129,7 @@ t.test('Audio keeps speech selection but replaces account/key fields with a plai
     t.end();
 });
 
-t.test('Audio still offers every service, uses saved keys for model Fetch, and its setup link opens Provider setup', t => {
+t.test('Audio offers every configured service, uses saved keys for model Fetch, and its setup link opens Provider setup', t => {
     const state: unknown[] = [];
     let index = 0;
     const client = new QueryClient();
@@ -144,7 +144,10 @@ t.test('Audio still offers every service, uses saved keys for model Fetch, and i
             },
             useEffect: noop, useRef: (value: unknown) => ({ current: value }), useMemo: (fn: () => unknown) => fn(),
         },
-        'react-query': { ...ReactQuery, useQueryClient: () => client, useQuery: () => ({}) },
+        'react-query': { ...ReactQuery, useQueryClient: () => client, useQuery: (key: string[]) => key[0] === 'speech-credentials' ? { data: {
+            googleServiceAccountPath: '/synthetic/account.json', hasSttGroqKey: true, hasSttOpenaiKey: true,
+            hasDeepgramKey: true, hasElevenLabsKey: true, hasAzureKey: true, hasIbmWatsonKey: true, hasSonioxKey: true,
+        } } : {} },
         'framer-motion': FramerMotion,
         [path.resolve('src/hooks/useShortcuts.ts')]: { useShortcuts: () => ({ shortcuts: {}, updateShortcut: noop, resetShortcuts: noop }) },
         [path.resolve('src/hooks/useMainEvent.ts')]: { useMainEvent: noop },

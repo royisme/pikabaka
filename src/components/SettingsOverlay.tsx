@@ -1,4 +1,5 @@
 import SttModelPicker, { STT_MODEL_DEFAULTS } from './settings/SttModelPicker';
+import { speechServices } from './settings/SpeechProvidersSettings';
 import ConnectionModelPicker, { ProviderNavigation } from './settings/ConnectionModelPicker';
 import TranslationTest from './settings/TranslationTest';
 import KnowledgeSettings from './settings/KnowledgeSettings';
@@ -507,11 +508,14 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     // STT Provider settings
     const [sttProvider, setSttProvider] = useState<'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'>('google');
     const [transcriptAssemblerProfile, setTranscriptAssemblerProfile] = useState<TranscriptAssemblerProfile>('sentence_bias');
-    const { data: speechCredentials } = useQuery(
+    const { data: speechCredentials, error: speechCredentialsError } = useQuery(
         ['speech-credentials'],
         () => window.electronAPI.getStoredCredentials(),
         { enabled: isOpen && !!window.electronAPI?.getStoredCredentials }
     );
+    const configuredSpeechServices = speechServices.filter(service => speechCredentials && service.configured(speechCredentials));
+    const speechServiceConfigured = configuredSpeechServices.some(service => service.id === sttProvider);
+    const selectedSpeechService = speechServices.find(service => service.id === sttProvider);
     const [isSttDropdownOpen, setIsSttDropdownOpen] = useState(false);
     const sttDropdownRef = React.useRef<HTMLDivElement>(null);
     const [transcriptTranslationEnabled, setTranscriptTranslationEnabled] = useState(false);
@@ -586,14 +590,15 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         setSpeechSaving(true);
         setSpeechResult(null);
         try {
+            // Switch first: saving a model rebuilds the pipeline, and the old service may have no key.
+            // @ts-ignore
+            const providerResult = await api.setSttProvider?.(sttProvider);
+            if (providerResult && !providerResult.success) throw new Error(providerResult.error || 'The service was not saved');
             const wantModel = (sttModelDraft[sttProvider] ?? '').trim();
             if (sttProvider in STT_MODEL_DEFAULTS) {
                 const modelResult = await api.setSttModel(sttProvider, wantModel);
                 if (!modelResult.success) throw new Error(modelResult.error || 'The model was not saved');
             }
-            // @ts-ignore
-            const providerResult = await api.setSttProvider?.(sttProvider);
-            if (providerResult && !providerResult.success) throw new Error(providerResult.error || 'The service was not saved');
             await api.setRecognitionLanguage(recognitionLanguage, 'interviewer');
             await api.setRecognitionLanguage(userRecognitionLanguage || recognitionLanguage, 'user');
 
@@ -1349,7 +1354,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             <div className="bg-bg-card rounded-xl border border-border-subtle p-4 space-y-3">
                                                 <label className="text-xs font-medium text-text-secondary block">Speech Provider</label>
                                                 <div className="relative">
-                                                    <ProviderSelect
+                                                    {configuredSpeechServices.length > 0 && <ProviderSelect
                                                         value={sttProvider}
                                                         onChange={(val) => handleSttProviderChange(val as any)}
                                                         options={[
@@ -1361,13 +1366,19 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             { id: 'azure', label: 'Azure Speech', badge: speechCredentials?.hasAzureKey ? 'Saved' : null, desc: 'Microsoft Cognitive Services STT', icon: <Mic size={14} /> },
                                                             { id: 'ibmwatson', label: 'IBM Watson', badge: speechCredentials?.hasIbmWatsonKey ? 'Saved' : null, desc: 'IBM Watson cloud STT service', icon: <Mic size={14} /> },
                                                             { id: 'soniox', label: 'Soniox', badge: speechCredentials?.hasSonioxKey ? 'Saved' : null, recommended: true, desc: '60+ languages, multilingual, domain context', icon: <Mic size={14} /> },
-                                                        ]}
-                                                    />
+                                                        ].filter(option => configuredSpeechServices.some(service => service.id === option.id))}
+                                                    />}
+                                                    {!!speechCredentialsError ? <p role="alert" className="text-xs text-text-primary break-words">✕ {(speechCredentialsError as Error).message}</p>
+                                                        : !speechCredentials ? <p className="text-xs text-text-secondary">Loading speech providers…</p>
+                                                        : <>
+                                                            {!speechServiceConfigured && <p className="text-xs text-text-primary">✕ {selectedSpeechService?.name}: not configured</p>}
+                                                            {!configuredSpeechServices.length && <p className="text-xs text-text-secondary">No speech services configured.</p>}
+                                                        </>}
                                                 </div>
                                             </div>
 
                                             {/* Model (services that let you choose one) */}
-                                            {sttProvider in STT_MODEL_DEFAULTS && (
+                                            {speechServiceConfigured && sttProvider in STT_MODEL_DEFAULTS && (
                                                 <div className="bg-bg-card rounded-xl border border-border-subtle p-4 space-y-2">
                                                     <label className="text-xs font-medium text-text-secondary block">Model</label>
                                                     <SttModelPicker
@@ -1445,7 +1456,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex flex-wrap items-center gap-3">
                                                     <button
                                                         onClick={handleSaveSpeechSettings}
-                                                        disabled={speechSaving}
+                                                        disabled={speechSaving || !speechServiceConfigured}
                                                         className="px-5 py-2.5 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-50 transition-colors"
                                                     >
                                                         {speechSaving ? '● Saving...' : 'Save speech settings'}
