@@ -175,3 +175,31 @@ t.test('a thrown embedding error becomes only the fixed tool failure', async t =
     t.notMatch(JSON.stringify(result), /Synthetic provider/);
     t.end();
 });
+
+t.test('the lookup needs both a query embedder and stored note vectors, and works without a status function', async t => {
+    const f = materials(t);
+    const text = 'Invented violet note passage.';
+    await f.manager.saveChunks(f.manager.insertDocument(DocType.NOTES, 'unindexed.txt', text, null), [{ text, metadata: { docType: DocType.NOTES } }]);
+    t.same(await f.orchestrator.searchMaterials(question), [], 'notes without vectors give nothing');
+    t.same(f.embedded, [], 'and nothing is embedded for them');
+
+    const g = materials(t);
+    await g.add(DocType.NOTES, 'notes.txt', [text], [[1, 0, 0]]);
+    Reflect.set(g.orchestrator, 'embedQueryFn', null);
+    t.same(await g.orchestrator.searchMaterials(question), [], 'vectors without a query embedder give nothing');
+
+    const h = materials(t);
+    await h.add(DocType.NOTES, 'notes.txt', [text], [[1, 0, 0]]);
+    Reflect.set(h.orchestrator, 'embeddingStatusFn', null);
+    t.match(await h.orchestrator.searchMaterials(question), [{ text, source: 'notes.txt' }], 'no status function means no model-change check');
+});
+
+t.test('a model change while the query was embedded returns nothing, whether the provider or the dimensions differ', async t => {
+    const f = materials(t);
+    await f.add(DocType.NOTES, 'notes.txt', ['Invented violet note passage.'], [[1, 0, 0]]);
+    t.equal((await f.orchestrator.searchMaterials(question)).length, 1, 'unchanged model finds the note');
+    f.orchestrator.setEmbeddingStatusFn(() => ({ providerName: 'example:other', dimensions: query.dimensions }));
+    t.same(await f.orchestrator.searchMaterials(question), [], 'another provider');
+    f.orchestrator.setEmbeddingStatusFn(() => ({ providerName: query.provider, dimensions: 4 }));
+    t.same(await f.orchestrator.searchMaterials(question), [], 'other dimensions');
+});
