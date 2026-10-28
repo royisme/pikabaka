@@ -29,6 +29,9 @@ async function setup(t: Test, native: boolean) {
     sqliteVec.load(db);
     db.exec(`
         CREATE TABLE app_state (key TEXT PRIMARY KEY, value TEXT);
+        CREATE TABLE transcripts (id INTEGER PRIMARY KEY, meeting_id TEXT, content TEXT, speaker TEXT, timestamp_ms INTEGER);
+        CREATE TABLE ai_interactions (id INTEGER PRIMARY KEY, meeting_id TEXT, type TEXT, timestamp INTEGER,
+            user_query TEXT, ai_response TEXT, metadata_json TEXT);
         CREATE TABLE meetings (id TEXT PRIMARY KEY, title TEXT, is_processed INTEGER DEFAULT 1,
             embedding_provider TEXT, embedding_dimensions INTEGER);
         CREATE TABLE chunks (id INTEGER PRIMARY KEY AUTOINCREMENT, meeting_id TEXT REFERENCES meetings(id) ON DELETE CASCADE,
@@ -89,7 +92,11 @@ async function setup(t: Test, native: boolean) {
         [file('rag/EmbeddingProviderResolver')]: { EmbeddingProviderResolver: { resolve: async () => p } },
         electron: { BrowserWindow: { getAllWindows: () => [{ isDestroyed: () => false, webContents: { send: (channel: string) => sent.push(channel) } }] } },
     }) as { EmbeddingPipeline: typeof Pipeline };
+    const { DatabaseManager } = mockRequire(file('db/DatabaseManager'), { electron: {} }) as { DatabaseManager: typeof DBManager };
+    const databaseManager = Object.create(DatabaseManager.prototype) as DBManager;
+    Reflect.set(databaseManager, 'db', db);
     const { RAGManager } = mockRequire(file('rag/RAGManager'), {
+        [file('db/DatabaseManager')]: { DatabaseManager: { getInstance: () => databaseManager } },
         [file('rag/VectorStore')]: { VectorStore }, [file('rag/EmbeddingPipeline')]: { EmbeddingPipeline },
     }) as { RAGManager: typeof Manager };
     const manager = new RAGManager({ db, dbPath, extPath: sqliteVec.getLoadablePath() });
@@ -111,21 +118,160 @@ async function setup(t: Test, native: boolean) {
             native: nativeRows(id),
         };
     };
-    const jobs = () => db.prepare('SELECT * FROM embedding_queue ORDER BY id').all();
+    const jobs = () => db.prepare('SELECT * FROM embedding_queue ORDER BY id').all() as Array<{
+        meeting_id: string; chunk_id: number | null; status: string; retry_count: number; error_message: string | null;
+    }>;
     const queue = (kind: 'chunk' | 'summary') => db.prepare(
         "INSERT INTO embedding_queue (meeting_id, chunk_id, status) VALUES ('meeting-a', ?, 'pending')"
     ).run(kind === 'chunk' ? 1 : null);
-    const { DatabaseManager } = mockRequire(file('db/DatabaseManager'), { electron: {} }) as { DatabaseManager: typeof DBManager };
-    const databaseManager = Object.create(DatabaseManager.prototype) as DBManager;
-    Reflect.set(databaseManager, 'db', db);
     t.teardown(async () => { await pipeline.processQueue(); await store.destroy(); db.close(); });
     return { db, store, manager, pipeline, p, inputs, requests, sent, state, jobs, queue, nativeRows, databaseManager,
         localEmbeds: () => localEmbeds,
     };
 }
 
+async function ragHandlers(manager: Manager, orchestrator?: unknown) {
+    const handlers = new Map<string, (...args: unknown[]) => Promise<unknown>>();
+    const { registerRagHandlers } = mockRequire(file('ipc/rag'), {
+        [file('main')]: {},
+        [file('services/CredentialsManager')]: { CredentialsManager: { getInstance: () => ({ getEmbeddingUse: () => ({ connectionId: '', model: '' }) }) } },
+        [file('ipc/safeHandle')]: { safeHandle: (channel: string, handler: (...args: unknown[]) => Promise<unknown>) => handlers.set(channel, handler) },
+    }) as typeof import('../../electron/ipc/rag');
+    registerRagHandlers({ getRAGManager: () => manager, getKnowledgeOrchestrator: () => orchestrator } as Parameters<typeof registerRagHandlers>[0]);
+    return handlers;
+}
+
 for (const native of [true, false]) {
     const mode = native ? 'native' : 'JS';
+    t.test(`${mode}: flush removes every meeting vector including orphans, but preserves knowledge`, async t => {
+        const f = await setup(t, native);
+        f.db.exec(`CREATE TABLE knowledge_documents (id INTEGER PRIMARY KEY, raw_text TEXT);
+            INSERT INTO knowledge_documents VALUES (1, 'Invented retained notes.');
+            CREATE VIRTUAL TABLE vec_knowledge_3 USING vec0(chunk_id INTEGER PRIMARY KEY, embedding float[3]);`);
+        f.db.prepare('INSERT INTO vec_knowledge_3 VALUES (?, ?)').run(1n, blob(oldVector));
+        f.db.exec(`INSERT INTO transcripts VALUES (1, 'meeting-a', 'Invented line.', 'Speaker', 1000);
+            INSERT INTO ai_interactions (id, meeting_id) VALUES (1, 'meeting-a');`);
+        f.queue('summary');
+        for (const dim of dims) f.db.prepare(`INSERT INTO vec_chunks_${dim} VALUES (?, ?)`).run(999n, blob(vector(dim)));
+        t.equal(f.databaseManager.clearAllData(), true);
+        for (const table of ['meetings', 'chunks', 'chunk_summaries', 'embedding_queue', 'transcripts', 'ai_interactions',
+            ...dims.flatMap(dim => [`vec_chunks_${dim}`, `vec_summaries_${dim}`])]) {
+            t.same(f.db.prepare(`SELECT * FROM ${table}`).all(), [], `${table} is empty`);
+        }
+        t.match(f.db.prepare('SELECT * FROM knowledge_documents').all(), [{ raw_text: 'Invented retained notes.' }]);
+        t.same(f.db.prepare('SELECT * FROM vec_knowledge_3').all(), [{ chunk_id: 1, embedding: blob(oldVector) }]);
+    });
+
+    t.test(`${mode}: processMeeting summary replacement removes the previous summary native id`, async t => {
+        const f = await setup(t, native);
+        await f.manager.processMeeting('meeting-a', [
+            { speaker: 'Speaker', text: 'Invented amber lanterns now need another shelf.', timestamp: 1000 },
+        ], 'Invented replacement shelf approved.');
+        await f.pipeline.processQueue();
+        const summaries = f.db.prepare('SELECT * FROM chunk_summaries WHERE meeting_id = ?').all('meeting-a') as { id: number; embedding: Buffer }[];
+        t.equal(summaries.length, 1);
+        t.same(summaries[0].embedding, blob(newVector));
+        t.not(summaries[0].id, 1);
+        for (const dim of dims) {
+            const rows = f.db.prepare(`SELECT * FROM vec_summaries_${dim} WHERE summary_id != 2`).all();
+            t.same(rows, native && dim === 3 ? [{ summary_id: summaries[0].id, embedding: blob(newVector) }] : []);
+        }
+        t.match(f.state(2).summaries, [{ id: 2, summary_text: 'Cobalt shelf approved.', embedding: blob(oldVector) }]);
+    });
+
+    t.test(`${mode}: Re-index all queues each vector once and atomically replaces each meeting`, async t => {
+        const f = await setup(t, native);
+        f.p.name = 'active:new-index';
+        f.p.dimensions = 2;
+        const inputs: string[] = [];
+        let release!: () => void;
+        let started!: () => void;
+        const waiting = new Promise<void>(resolve => { release = resolve; });
+        const entered = new Promise<void>(resolve => { started = resolve; });
+        const before = f.state();
+        const other = f.state(2);
+        f.p.embed = async text => { inputs.push(text); started(); await waiting; return [0, 1]; };
+        const handlers = await ragHandlers(f.manager);
+        const first = handlers.get('rag:reindex-all')!();
+        const second = handlers.get('rag:reindex-all')!();
+        await entered;
+        t.same(f.state(), before, 'old BLOBs, native vectors and metadata survive while embedding');
+        t.same(f.state(2), other);
+        t.equal(f.jobs().length, 4, 'one job for each chunk and summary, not two copies');
+        t.same(f.pipeline.getQueueStatus(), { pending: 2, processing: 2, completed: 0, failed: 0 });
+        release();
+        t.same(await Promise.all([first, second]), [{ success: true }, { success: true }]);
+        t.same(inputs.sort(), ['Amber lanterns stay.', 'Amber shelf approved.', 'Cobalt lanterns stay.', 'Cobalt shelf approved.'].sort());
+        t.same(f.pipeline.getQueueStatus(), { pending: 0, processing: 0, completed: 4, failed: 0 });
+        for (const id of [1, 2]) {
+            const state = f.state(id);
+            t.match(state.meeting, { embedding_provider: 'active:new-index', embedding_dimensions: 2 });
+            t.match(state.chunks, [{ embedding: blob([0, 1]) }]);
+            t.match(state.summaries, [{ embedding: blob([0, 1]) }]);
+            t.same(state.native, { chunks: dims.map(() => []), summaries: dims.map(() => []) }, 'all old dimensions are gone only after replacement');
+        }
+        if (native) {
+            t.equal((f.db.prepare('SELECT COUNT(*) AS count FROM vec_chunks_2').get() as { count: number }).count, 2);
+            t.equal((f.db.prepare('SELECT COUNT(*) AS count FROM vec_summaries_2').get() as { count: number }).count, 2);
+        }
+    });
+
+    t.test(`${mode}: a failed full rebuild preserves the old meeting and Retry failed finishes it`, async t => {
+        const f = await setup(t, native);
+        const before = f.state();
+        f.p.name = 'active:new-index';
+        let attempts = 0;
+        f.p.embed = async () => { if (++attempts % 2 === 0) throw new Error('Synthetic rebuild quota exceeded'); return newVector; };
+        const handlers = await ragHandlers(f.manager);
+        t.same(await handlers.get('rag:reindex-all')!(), { success: true });
+        t.same(f.state(), before, 'no partial rebuild, including after three attempts');
+        t.match(f.jobs().slice(0, 2), [{ status: 'failed', retry_count: 3 }, { status: 'failed', retry_count: 3 }]);
+        f.p.embed = async () => newVector;
+        const PipelineClass = f.pipeline.constructor as typeof Pipeline;
+        const restarted = new PipelineClass(f.db, f.store);
+        await restarted.initialize({});
+        Reflect.set(restarted, 'delay', async () => {});
+        Reflect.set(f.manager, 'embeddingPipeline', restarted);
+        t.same(await handlers.get('rag:retry-embeddings')!(), { success: true });
+        t.match(f.state().meeting, { embedding_provider: 'active:new-index' });
+        t.match(f.state().chunks, [{ embedding: blob(newVector) }]);
+        t.match(f.state().summaries, [{ embedding: blob(newVector) }]);
+        t.equal(f.pipeline.getQueueStatus().failed, 0);
+    });
+
+    t.test(`${mode}: retry deduplicates historical failed summary jobs without touching completed jobs`, async t => {
+        const f = await setup(t, native);
+        f.db.exec(`INSERT INTO embedding_queue (meeting_id, chunk_id, status, retry_count) VALUES
+            ('meeting-a', NULL, 'failed', 3), ('meeting-a', NULL, 'failed', 3), ('meeting-b', 2, 'completed', 0);`);
+        const handlers = await ragHandlers(f.manager);
+        await Promise.all([handlers.get('rag:retry-embeddings')!(), handlers.get('rag:retry-embeddings')!()]);
+        t.same(f.inputs, ['Amber shelf approved.']);
+        t.match(f.jobs(), [{ meeting_id: 'meeting-a', chunk_id: null, status: 'completed' }, { meeting_id: 'meeting-b', status: 'completed' }]);
+    });
+
+    t.test(`${mode}: Retry failed indexes only failed jobs, resets retries and is safe twice`, async t => {
+        const f = await setup(t, native);
+        const handlers = await ragHandlers(f.manager);
+        f.db.exec(`INSERT INTO embedding_queue (meeting_id, chunk_id, status, retry_count, error_message) VALUES
+            ('meeting-a', 1, 'failed', 3, 'Synthetic quota exceeded\nInvented second error line'),
+            ('meeting-a', NULL, 'failed', 3, 'Synthetic quota exceeded'),
+            ('meeting-b', 2, 'completed', 0, NULL);`);
+        const before = f.state(2);
+        const status = await handlers.get('embedding-status')!();
+        t.match(status, { failedMeetings: 1, firstError: 'Synthetic quota exceeded', meetingCount: 2 });
+        t.same(await Promise.all([handlers.get('rag:retry-embeddings')!(), handlers.get('rag:retry-embeddings')!()]), [{ success: true }, { success: true }]);
+        t.same(f.inputs, ['Amber lanterns stay.', 'Amber shelf approved.']);
+        t.match(f.jobs(), [
+            { meeting_id: 'meeting-a', chunk_id: 1, status: 'completed', retry_count: 0, error_message: null },
+            { meeting_id: 'meeting-a', chunk_id: null, status: 'completed', retry_count: 0, error_message: null },
+            { meeting_id: 'meeting-b', chunk_id: 2, status: 'completed', retry_count: 0 },
+        ]);
+        t.same(f.state(2), before, 'completed meeting was not requeued');
+        t.match(f.state().chunks, [{ embedding: blob(newVector) }]);
+        t.match(f.state().summaries, [{ embedding: blob(newVector) }]);
+        t.match(await handlers.get('embedding-status')!(), { failedMeetings: 0, firstError: null });
+    });
+
     for (const kind of ['chunk', 'summary'] as const) {
         t.test(`${mode}: re-embedding a ${kind} replaces its vector and queries the new content`, async t => {
             const f = await setup(t, native);
@@ -277,6 +423,58 @@ for (const kind of ['chunk', 'summary'] as const) {
     });
 }
 
+t.test('Re-index all derives missing passages and summary from every saved record', async t => {
+    const f = await setup(t, true);
+    f.db.exec(`ALTER TABLE meetings ADD COLUMN summary_json TEXT;
+        INSERT INTO meetings (id, title, is_processed) VALUES ('never-indexed', 'Invented never-indexed meeting', 1);
+        INSERT INTO transcripts VALUES (1, 'never-indexed', 'Invented violet lanterns need a new shelf.', 'Speaker', 1000);`);
+    f.db.prepare('UPDATE meetings SET summary_json = ? WHERE id = ?').run(JSON.stringify({ detailedSummary: {
+        keyPoints: ['Invented violet lanterns need a shelf.'], actionItems: ['Build a violet shelf.'],
+    } }), 'never-indexed');
+    const handlers = await ragHandlers(f.manager);
+    t.same(await handlers.get('rag:reindex-all')!(), { success: true });
+    t.match(f.db.prepare('SELECT * FROM chunks WHERE meeting_id = ?').all('never-indexed'), [{
+        cleaned_text: 'Invented violet lanterns need a new shelf.', embedding: blob(newVector),
+    }]);
+    t.match(f.db.prepare('SELECT * FROM chunk_summaries WHERE meeting_id = ?').all('never-indexed'), [{
+        summary_text: 'Invented violet lanterns need a shelf.. Action: Build a violet shelf.', embedding: blob(newVector),
+    }]);
+    t.match(f.jobs().filter(job => job.meeting_id === 'never-indexed'), [{ status: 'completed' }, { status: 'completed' }]);
+    t.equal(f.jobs().length, 6);
+});
+
+t.test('a full rebuild native storage failure rolls back every vector and provider metadata', async t => {
+    const f = await setup(t, true);
+    const before = f.state();
+    f.p.name = 'active:replacement';
+    f.db.exec(`CREATE TEMP TRIGGER deny_rebuild BEFORE UPDATE OF embedding ON chunk_summaries
+        WHEN NEW.meeting_id = 'meeting-a' BEGIN SELECT RAISE(ABORT, 'Synthetic summary storage refused'); END;`);
+    const handlers = await ragHandlers(f.manager);
+    t.same(await handlers.get('rag:reindex-all')!(), { success: true });
+    t.same(f.state(), before, 'even the chunk writes and native deletions rolled back');
+    t.match(f.jobs().slice(0, 2), [{ status: 'failed', error_message: 'Synthetic summary storage refused' }, { status: 'failed' }]);
+    f.db.exec('DROP TRIGGER deny_rebuild');
+    t.same(await handlers.get('rag:retry-embeddings')!(), { success: true });
+    t.match(f.state().meeting, { embedding_provider: 'active:replacement' });
+    t.match(f.state().chunks, [{ embedding: blob(newVector) }]);
+    t.match(f.state().summaries, [{ embedding: blob(newVector) }]);
+});
+
+t.test('SQL summary replacement and flush still succeed when sqlite-vec cannot be loaded', async t => {
+    const f = await setup(t, true);
+    const unloaded = new Database(f.db.name);
+    t.teardown(() => unloaded.close());
+    const StoreClass = f.store.constructor as typeof Store;
+    const store = new StoreClass(unloaded, f.db.name, '');
+    store.saveSummary('meeting-a', 'Invented offline summary replacement.');
+    t.match(f.db.prepare('SELECT * FROM chunk_summaries WHERE meeting_id = ?').get('meeting-a'), { summary_text: 'Invented offline summary replacement.', embedding: null });
+    Reflect.set(f.databaseManager, 'db', unloaded);
+    t.equal(f.databaseManager.clearAllData(), true);
+    for (const table of ['meetings', 'chunks', 'chunk_summaries', 'embedding_queue', 'transcripts', 'ai_interactions']) {
+        t.same(f.db.prepare(`SELECT * FROM ${table}`).all(), []);
+    }
+});
+
 t.test('a search-index cleanup failure does not stop a meeting from being deleted', async t => {
     const f = await setup(t, true);
     const handlers = new Map<string, (...args: unknown[]) => Promise<unknown>>();
@@ -324,4 +522,59 @@ t.test('queue status counts exhausted pending rows as stalled without double-cou
     t.same(f.pipeline.getQueueStatus(), { pending: 2, processing: 1, completed: 1, failed: 3 });
     t.same(f.jobs(), before, 'status reporting does not rewrite jobs');
     Reflect.set(f.pipeline, 'provider', null);
+});
+
+t.test('Re-index all fills only what is missing and never rewrites an existing chunk or summary', async t => {
+    const f = await setup(t, true);
+    f.db.exec(`ALTER TABLE meetings ADD COLUMN summary_json TEXT;
+        INSERT INTO meetings (id, title, is_processed) VALUES ('chunks-only', 'Invented chunks-only meeting', 1), ('summary-only', 'Invented summary-only meeting', 1);
+        INSERT INTO chunks VALUES (3, 'chunks-only', 0, 'Speaker', 1000, 2000, 'Invented existing chunk text.', 3, NULL);
+        INSERT INTO chunk_summaries VALUES (3, 'summary-only', 'Invented existing summary text.', NULL);
+        INSERT INTO transcripts VALUES (1, 'chunks-only', 'Invented transcript that must not replace the chunk.', 'Speaker', 1000),
+            (2, 'summary-only', 'Invented transcript that becomes the missing chunk.', 'Speaker', 1000);`);
+    const keyPoints = JSON.stringify({ detailedSummary: { keyPoints: ['Invented derived key point.'], actionItems: [] } });
+    f.db.prepare('UPDATE meetings SET summary_json = ? WHERE id IN (?, ?)').run(keyPoints, 'chunks-only', 'summary-only');
+    const handlers = await ragHandlers(f.manager);
+    t.same(await handlers.get('rag:reindex-all')!(), { success: true });
+    t.match(f.db.prepare('SELECT cleaned_text FROM chunks WHERE meeting_id = ?').all('chunks-only'), [{ cleaned_text: 'Invented existing chunk text.' }], 'existing chunks stay');
+    t.match(f.db.prepare('SELECT summary_text FROM chunk_summaries WHERE meeting_id = ?').all('chunks-only'), [{ summary_text: /Invented derived key point/ }], 'the missing summary is derived');
+    t.match(f.db.prepare('SELECT cleaned_text FROM chunks WHERE meeting_id = ?').all('summary-only'), [{ cleaned_text: 'Invented transcript that becomes the missing chunk.' }], 'the missing chunk is derived');
+    t.match(f.db.prepare('SELECT summary_text FROM chunk_summaries WHERE meeting_id = ?').all('summary-only'), [{ summary_text: 'Invented existing summary text.' }], 'an existing summary is not replaced');
+});
+
+for (const changed of ['chunk', 'summary'] as const) {
+    t.test(`a meeting whose ${changed} changes while it is being re-embedded is retried, not stored stale`, async t => {
+        const f = await setup(t, true);
+        const embedded: string[] = [];
+        f.p.name = 'active:new-index';
+        f.p.embed = async (text: string) => {
+            embedded.push(text);
+            if (embedded.length === 1) {
+                if (changed === 'chunk') f.db.prepare("UPDATE chunks SET cleaned_text = 'Invented edited chunk text.' WHERE id = 1").run();
+                else f.db.prepare("UPDATE chunk_summaries SET summary_text = 'Invented edited summary text.' WHERE meeting_id = 'meeting-a'").run();
+            }
+            return newVector;
+        };
+        const handlers = await ragHandlers(f.manager);
+        t.same(await handlers.get('rag:reindex-all')!(), { success: true });
+        t.ok(embedded.includes(changed === 'chunk' ? 'Invented edited chunk text.' : 'Invented edited summary text.'), 'the retry embeds the edited text');
+        t.match(f.jobs().filter(job => job.meeting_id === 'meeting-a'), [{ status: 'completed', retry_count: 1 }, { status: 'completed', retry_count: 1 }], 'the first attempt was rejected');
+    });
+}
+
+t.test('the Retry failed and Re-index all handlers return the real failure and share one run', async t => {
+    const retry = await ragHandlers({ retryFailedEmbeddings: async () => { throw new Error('Synthetic retry failure'); } } as unknown as Manager);
+    t.same(await retry.get('rag:retry-embeddings')!(), { success: false, error: 'Synthetic retry failure' });
+
+    let runs = 0;
+    const manager = { reindexAllMeetings: async () => { runs++; await new Promise(resolve => setTimeout(resolve, 10)); } } as unknown as Manager;
+    const withoutIndex = await ragHandlers(manager, { getNotes: () => '', setNotes: async () => {}, getStatus: () => ({}) });
+    const [first, second] = await Promise.all([withoutIndex.get('rag:reindex-all')!(), withoutIndex.get('rag:reindex-all')!()]);
+    t.same([first, second], [{ success: true }, { success: true }], 'a user without a notes index still succeeds');
+    t.equal(runs, 1, 'two presses at once share one run');
+
+    const failing = await ragHandlers(manager, { getNotes: () => 'Invented note.', setNotes: async () => {}, getStatus: () => ({ notesIndex: { error: 'Synthetic notes failure' } }) });
+    t.same(await failing.get('rag:reindex-all')!(), { success: false, error: 'Synthetic notes failure' });
+    const missing = await ragHandlers(undefined as unknown as Manager);
+    t.same(await missing.get('rag:reindex-all')!(), { success: false, error: 'RAGManager not initialized' });
 });

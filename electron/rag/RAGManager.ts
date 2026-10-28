@@ -13,6 +13,8 @@ import type { AppAPIConfig } from './EmbeddingProviderResolver';
 import { RAGRetriever } from './RAGRetriever';
 import { LiveRAGIndexer } from './LiveRAGIndexer';
 import { buildRAGPrompt, NO_CONTEXT_FALLBACK, NO_GLOBAL_CONTEXT_FALLBACK } from './prompts';
+import { buildMeetingSummaryText } from './meetingSummaryIndex';
+import { DatabaseManager } from '../db/DatabaseManager';
 
 export interface RAGManagerConfig extends AppAPIConfig {
     db: Database.Database;
@@ -37,6 +39,7 @@ export class RAGManager {
     private liveIndexer: LiveRAGIndexer;
     /** Guards against concurrent reprocessMeeting() calls for the same meeting ID. */
     private _reprocessInFlight = new Set<string>();
+    private reindexAllPromise: Promise<void> | null = null;
 
     constructor(config: RAGManagerConfig) {
         this.db = config.db;
@@ -262,6 +265,24 @@ export class RAGManager {
         return this.embeddingPipeline.getQueueStatus();
     }
 
+    getIndexRecoveryStatus(): { meetingCount: number; failedMeetings: number; firstError: string | null } {
+        const { count: meetingCount } = this.db.prepare('SELECT COUNT(*) AS count FROM meetings').get() as { count: number };
+        const { count: failedMeetings } = this.db.prepare(`
+            SELECT COUNT(DISTINCT meeting_id) AS count FROM embedding_queue
+            WHERE status = 'failed' AND meeting_id IN (SELECT id FROM meetings)
+        `).get() as { count: number };
+        const failure = this.db.prepare(`
+            SELECT error_message FROM embedding_queue
+            WHERE status = 'failed' AND error_message IS NOT NULL AND meeting_id IN (SELECT id FROM meetings)
+            ORDER BY id LIMIT 1
+        `).get() as { error_message: string } | undefined;
+        return { meetingCount, failedMeetings, firstError: failure?.error_message.split(/[\r\n]/, 1)[0] ?? null };
+    }
+
+    retryFailedEmbeddings(): Promise<void> {
+        return this.embeddingPipeline.retryFailedEmbeddings();
+    }
+
     /**
      * Retry pending embeddings
      */
@@ -448,6 +469,34 @@ export class RAGManager {
         } catch (error) {
             console.error('[RAGManager] Failed to cleanup stale queue items:', error);
         }
+    }
+
+    reindexAllMeetings(): Promise<void> {
+        this.reindexAllPromise ??= this.reindexAll().finally(() => { this.reindexAllPromise = null; });
+        return this.reindexAllPromise;
+    }
+
+    private async reindexAll(): Promise<void> {
+        await this.embeddingPipeline.processQueue();
+        if (!this.embeddingPipeline.isReady()) throw new Error('No active embedding provider available');
+        const meetings = this.db.prepare('SELECT id FROM meetings ORDER BY id').all() as { id: string }[];
+        this.db.transaction(() => {
+            for (const { id } of meetings) {
+                const hasChunks = this.db.prepare('SELECT 1 FROM chunks WHERE meeting_id = ?').get(id);
+                const hasSummary = this.db.prepare('SELECT 1 FROM chunk_summaries WHERE meeting_id = ?').get(id);
+                if (!hasChunks || !hasSummary) {
+                    const meeting = DatabaseManager.getInstance().getMeetingDetails(id);
+                    if (!meeting) continue;
+                    if (!hasChunks) {
+                        this.vectorStore.saveChunks(chunkTranscript(id, preprocessTranscript(meeting.transcript ?? [])));
+                    }
+                    const summary = buildMeetingSummaryText(meeting);
+                    if (!hasSummary && summary) this.vectorStore.saveSummary(id, summary);
+                }
+                this.embeddingPipeline.queueMeetingReindex(id);
+            }
+        })();
+        await this.embeddingPipeline.processQueue();
     }
 
     /**

@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: index recovery, step K6 (branch `index-recovery`, uncommitted)
+
+- Search index shows distinct failed meetings, the first real error line and pending/processing/completed/failed job counts. User Retry resets only terminal failures and deduplicates historical NULL-keyed summary jobs; startup remains pending-only. Re-index all needs two presses with the full saved-meeting count and coalesces repeated requests, rebuilding missing index text and re-embedding unchanged notes through the existing path.
+- Full rebuilds collect every vector for a meeting before swapping vectors and provider metadata in one transaction. Flush reuses the shared all-dimension native cleanup, including orphan rows, and preserves knowledge documents/vectors. Summary replacement clears the old summary id's vectors; both SQL source paths still work without sqlite-vec.
+- Checks: both typechecks, lint (908 warnings, no errors) and full tap (3832 assertions) exit 0. The 24 new synthetic/windowless cases cover retry/deduplication, atomic replacement and rollback, missing derived text, notes, flush, unloaded sqlite-vec, rendered states/actions and preload forwarding. Red runs exposed the intended missing retry, channel, notes work, UI, cleanup and summary deduplication before their respective fixes.
+- Found, not fixed: transport edits force provider re-initialization but do not rebuild stored vectors under the unchanged id:model identity; the older incompatible-only rebuild still clears first; legacy exhausted-pending rows count as failed but are not terminal failed jobs. Owner: both themes at 560px, long errors, keyboard/focus, real-provider recovery/model switch and restart. No app, real provider/device, Windows or packaged build was run; mutator is unavailable. No schema, setting, identity, ranking, Sources or interview change.
+
 ## 2026-10-28: configured speech only, step S3b (branch `speech-configured`, uncommitted)
 
 - Missing or blank keys now throw a readable service-specific setup error before any speech provider is constructed. Google, explicit or the legacy default, requires the saved service-account path (startup copies it to the environment); there is no credential-free mode. Same-service OpenAI model/WebSocket/REST alternatives are unchanged. Pipeline setup propagates failures to the existing meeting-start catch, which broadcasts once and retains the exact message; the existing overlay status poll displays it without new IPC or renderer error wiring.

@@ -34,6 +34,45 @@ function setup(t: Test, legacy = false, native = false) {
     return { db, manager, orchestrator };
 }
 
+for (const native of [false, true]) {
+    t.test(`${native ? 'native' : 'JS'}: Re-index all re-embeds unchanged notes through the saved-notes path`, async t => {
+        const f = setup(t, false, native);
+        f.orchestrator.setEmbedFn(async () => ({ embedding: [1, 0, 0], provider: 'example:old', dimensions: 3 }));
+        await f.orchestrator.setNotes('Invented amber lantern inventory.');
+        const oldDoc = f.manager.getDocumentByType(DocType.NOTES)!;
+        const calls: string[] = [];
+        f.orchestrator.setEmbedFn(async text => {
+            calls.push(text);
+            return { embedding: [0, 1], provider: 'example:new', dimensions: 2 };
+        });
+        const handlers = new Map<string, () => Promise<unknown>>();
+        const { registerRagHandlers } = mockRequire(path.resolve('electron/ipc/rag.ts'), {
+            [path.resolve('electron/main.ts')]: {},
+            [path.resolve('electron/ipc/safeHandle.ts')]: { safeHandle: (channel: string, handler: () => Promise<unknown>) => handlers.set(channel, handler) },
+        }) as typeof import('../../electron/ipc/rag');
+        let rebuilds = 0;
+        registerRagHandlers({
+            getRAGManager: () => ({ reindexAllMeetings: async () => { rebuilds++; } }),
+            getKnowledgeOrchestrator: () => f.orchestrator,
+        } as unknown as Parameters<typeof registerRagHandlers>[0]);
+        t.same(await Promise.all([handlers.get('rag:reindex-all')!(), handlers.get('rag:reindex-all')!()]), [{ success: true }, { success: true }]);
+        t.equal(rebuilds, 1, 'repeat presses share the operation including notes');
+        t.same(calls, ['Invented amber lantern inventory.']);
+        const doc = f.manager.getDocumentByType(DocType.NOTES)!;
+        t.equal(doc.id, oldDoc.id, 'unchanged notes retain their source id');
+        t.match(doc, { embedding_provider: 'example:new', embedding_dimensions: 2, index_error: null });
+        t.same(f.manager.getChunksForDoc(doc.id).map(chunk => chunk.embedding), [blob([0, 1])]);
+        if (native) {
+            t.same(f.db.prepare('SELECT * FROM vec_knowledge_3').all(), []);
+            t.equal((f.db.prepare('SELECT COUNT(*) AS count FROM vec_knowledge_2').get() as { count: number }).count, 1);
+        }
+        f.orchestrator.setEmbedFn(async () => { throw new Error('Synthetic notes rebuild refused'); });
+        t.same(await handlers.get('rag:reindex-all')!(), { success: false, error: 'Synthetic notes rebuild refused' });
+        t.match(f.manager.getDocumentByType(DocType.NOTES), { embedding_provider: 'example:new', index_error: 'Synthetic notes rebuild refused' });
+        t.same(f.manager.getChunksForDoc(doc.id).map(chunk => chunk.embedding), [blob([0, 1])], 'failed notes rebuild preserves vectors');
+    });
+}
+
 const note = 'Invented amber lantern inventory.\nInvented cobalt lantern inventory.';
 const oldVector = [1, 0, 0];
 const blob = (vector: number[]) => Buffer.from(new Float32Array(vector).buffer);
