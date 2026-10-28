@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: safe summary-only refresh, step K3a (branch `summary-refresh`, uncommitted)
+
+- `RAGManager.refreshMeetingSummary` transactionally removes the old summary BLOB, native vectors across all provisioned dimensions and superseded summary jobs, then stores non-empty text and one pending job; empty text removes only the derived summary. It enqueues without starting the shared runner, so pending chunk work is untouched. No callers are wired (K3b).
+- `EmbeddingPipeline` deduplicates NULL-keyed pending/processing summary jobs in code, rejects stale text/deleted rows after embedding, and commits the vector with provider compatibility checks and its metadata stamp in one transaction. No schema, dependency or existing caller change beyond summary deduplication/embedding guards.
+- Checks: both typechecks, lint (946 warnings, no errors) and full tap (2179 assertions) exit 0. The new fake-provider/temporary-SQLite suite passes 28 native/JS cases (192 assertions), including content/vector/metadata checks, in-flight refresh/removal, retry compatibility, transactional rollback and unchanged record/transcript/chunk data and jobs. The real search worker source ran without a build.
+- Found, not changed: exhausted-provider fallback still clears/re-embeds the whole meeting; native vector-write errors are still swallowed by `VectorStore`. Owner: after K3b, check final/recovered/edited-summary search with a real provider. No app, real provider/device, Windows or packaged build was run.
+
 ## 2026-10-27: Provider list, step S1b (branch `provider-list`)
 
 - Provider setup lists configured built-ins and every custom by id, with interface/host, key state and model-list Test results. One quiet Add opens the Interface-first editor; built-in identity is read-only, custom rename retains id/key, built-in reset removes the key and host override. Custom deletion asks twice and is blocked by named Quick answers, Summaries, Agent, Search index or Translation uses in both UI and IPC. Failed/rejected Save, Delete and Test show the real error and retain the draft; canceled Test callbacks cannot reach another editor.

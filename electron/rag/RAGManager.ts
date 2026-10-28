@@ -133,6 +133,28 @@ export class RAGManager {
     }
 
     /**
+     * Replace only the derived summary index and queue its current text for embedding.
+     * Leave processing to the shared queue runner so a refresh cannot run chunk jobs.
+     */
+    refreshMeetingSummary(meetingId: string, summaryText: string): void {
+        const hasSummary = summaryText.trim().length > 0;
+        this.db.transaction(() => {
+            const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[];
+            for (const { name } of tables) {
+                if (!/^vec_summaries_\d+$/.test(name)) continue;
+                this.db.prepare(`DELETE FROM ${name} WHERE summary_id IN (SELECT id FROM chunk_summaries WHERE meeting_id = ?)`).run(meetingId);
+            }
+            this.db.prepare('DELETE FROM chunk_summaries WHERE meeting_id = ?').run(meetingId);
+            // Cancel in-flight jobs too, so their late completion cannot complete the replacement job.
+            this.db.prepare('DELETE FROM embedding_queue WHERE meeting_id = ? AND chunk_id IS NULL').run(meetingId);
+            if (hasSummary) {
+                this.vectorStore.saveSummary(meetingId, summaryText);
+                this.embeddingPipeline.queueMeetingSummary(meetingId);
+            }
+        })();
+    }
+
+    /**
      * Query meeting with RAG
      * Returns streaming generator for response
      */
