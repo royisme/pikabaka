@@ -8,6 +8,16 @@ What is done, what is broken, what is unverified. `TASKS.md` is what to do next;
 - Tests failed first for missing final refresh, stale edited vectors and blank stop-time index text, then passed. The 23 new synthetic SQLite/fake-provider cases (154 assertions) cover exact text, native vector replacement/removal, both save branches, recovery, failed writes, thrown refreshes, missing RAG/provider and non-blocking/rejected runners. Both typechecks, lint (930 warnings, no errors) and full tap (2564 assertions) exit 0.
 - Owner: real-provider final/recovered/edited-summary search, empty-edit removal and restart. No app, real provider/device, Windows or packaged build was run; mutation tooling is unavailable. No dependency, persisted shape or K3a/V1 primitive changed.
 
+## 2026-10-28: execution order and the private repository (branch `queue-plan`)
+
+- The owner chose to finish and merge every open step, sync `main` to the private repository `royisme/meetingCopa`, and only then remove the interview framing from the public product. `TASKS.md` now holds the wave order, the steps added from this session's findings (B1, the K6 and SEC1 additions) and the open owner decisions.
+- `royisme/meetingCopa` is a private mirror of `main` at `b18ea25` (branches and tags, history preserved); remote `private` exists in the main checkout. It carries the full-feature version after the removal. Not done yet: sync after the last wave, the removal itself.
+- Opus's design for the process-disguise removal and the "Hide from screen share" rename is `docs/design-strip-stealth.md` (five small steps, a merge recipe for the private repository, device checks). Found by it: `scripts/ad-hoc-sign.js` also disguises the helper process names at build time. The AGENTS/RULES stealth rule text changes only with step X0, after the owner approves the contracts in its section 3.
+
+## 2026-10-28: package license aligned with LICENSE (branch `license-field`)
+
+- `package.json` said `ISC` while `LICENSE` and the README say AGPL-3.0. The field is now the SPDX id `AGPL-3.0-only`, which is what "AGPL-3.0" in the README means. Owner decision 2026-10-28. Metadata only; no code or build change.
+
 ## 2026-10-28: vector integrity, step V1 (branch `vector-integrity`)
 
 - `VectorStore` owns all-dimension native cleanup, reused by scoped chunk/summary clears and meeting deletion. The existing delete IPC handler now clears RAG data before the record cascade; short meetings already use that cleanup. Native writes delete then insert and propagate errors through the existing embedding transactions.
