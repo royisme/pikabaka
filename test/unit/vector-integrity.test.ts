@@ -523,3 +523,58 @@ t.test('queue status counts exhausted pending rows as stalled without double-cou
     t.same(f.jobs(), before, 'status reporting does not rewrite jobs');
     Reflect.set(f.pipeline, 'provider', null);
 });
+
+t.test('Re-index all fills only what is missing and never rewrites an existing chunk or summary', async t => {
+    const f = await setup(t, true);
+    f.db.exec(`ALTER TABLE meetings ADD COLUMN summary_json TEXT;
+        INSERT INTO meetings (id, title, is_processed) VALUES ('chunks-only', 'Invented chunks-only meeting', 1), ('summary-only', 'Invented summary-only meeting', 1);
+        INSERT INTO chunks VALUES (3, 'chunks-only', 0, 'Speaker', 1000, 2000, 'Invented existing chunk text.', 3, NULL);
+        INSERT INTO chunk_summaries VALUES (3, 'summary-only', 'Invented existing summary text.', NULL);
+        INSERT INTO transcripts VALUES (1, 'chunks-only', 'Invented transcript that must not replace the chunk.', 'Speaker', 1000),
+            (2, 'summary-only', 'Invented transcript that becomes the missing chunk.', 'Speaker', 1000);`);
+    const keyPoints = JSON.stringify({ detailedSummary: { keyPoints: ['Invented derived key point.'], actionItems: [] } });
+    f.db.prepare('UPDATE meetings SET summary_json = ? WHERE id IN (?, ?)').run(keyPoints, 'chunks-only', 'summary-only');
+    const handlers = await ragHandlers(f.manager);
+    t.same(await handlers.get('rag:reindex-all')!(), { success: true });
+    t.match(f.db.prepare('SELECT cleaned_text FROM chunks WHERE meeting_id = ?').all('chunks-only'), [{ cleaned_text: 'Invented existing chunk text.' }], 'existing chunks stay');
+    t.match(f.db.prepare('SELECT summary_text FROM chunk_summaries WHERE meeting_id = ?').all('chunks-only'), [{ summary_text: /Invented derived key point/ }], 'the missing summary is derived');
+    t.match(f.db.prepare('SELECT cleaned_text FROM chunks WHERE meeting_id = ?').all('summary-only'), [{ cleaned_text: 'Invented transcript that becomes the missing chunk.' }], 'the missing chunk is derived');
+    t.match(f.db.prepare('SELECT summary_text FROM chunk_summaries WHERE meeting_id = ?').all('summary-only'), [{ summary_text: 'Invented existing summary text.' }], 'an existing summary is not replaced');
+});
+
+for (const changed of ['chunk', 'summary'] as const) {
+    t.test(`a meeting whose ${changed} changes while it is being re-embedded is retried, not stored stale`, async t => {
+        const f = await setup(t, true);
+        const embedded: string[] = [];
+        f.p.name = 'active:new-index';
+        f.p.embed = async (text: string) => {
+            embedded.push(text);
+            if (embedded.length === 1) {
+                if (changed === 'chunk') f.db.prepare("UPDATE chunks SET cleaned_text = 'Invented edited chunk text.' WHERE id = 1").run();
+                else f.db.prepare("UPDATE chunk_summaries SET summary_text = 'Invented edited summary text.' WHERE meeting_id = 'meeting-a'").run();
+            }
+            return newVector;
+        };
+        const handlers = await ragHandlers(f.manager);
+        t.same(await handlers.get('rag:reindex-all')!(), { success: true });
+        t.ok(embedded.includes(changed === 'chunk' ? 'Invented edited chunk text.' : 'Invented edited summary text.'), 'the retry embeds the edited text');
+        t.match(f.jobs().filter(job => job.meeting_id === 'meeting-a'), [{ status: 'completed', retry_count: 1 }, { status: 'completed', retry_count: 1 }], 'the first attempt was rejected');
+    });
+}
+
+t.test('the Retry failed and Re-index all handlers return the real failure and share one run', async t => {
+    const retry = await ragHandlers({ retryFailedEmbeddings: async () => { throw new Error('Synthetic retry failure'); } } as unknown as Manager);
+    t.same(await retry.get('rag:retry-embeddings')!(), { success: false, error: 'Synthetic retry failure' });
+
+    let runs = 0;
+    const manager = { reindexAllMeetings: async () => { runs++; await new Promise(resolve => setTimeout(resolve, 10)); } } as unknown as Manager;
+    const withoutIndex = await ragHandlers(manager, { getNotes: () => '', setNotes: async () => {}, getStatus: () => ({}) });
+    const [first, second] = await Promise.all([withoutIndex.get('rag:reindex-all')!(), withoutIndex.get('rag:reindex-all')!()]);
+    t.same([first, second], [{ success: true }, { success: true }], 'a user without a notes index still succeeds');
+    t.equal(runs, 1, 'two presses at once share one run');
+
+    const failing = await ragHandlers(manager, { getNotes: () => 'Invented note.', setNotes: async () => {}, getStatus: () => ({ notesIndex: { error: 'Synthetic notes failure' } }) });
+    t.same(await failing.get('rag:reindex-all')!(), { success: false, error: 'Synthetic notes failure' });
+    const missing = await ragHandlers(undefined as unknown as Manager);
+    t.same(await missing.get('rag:reindex-all')!(), { success: false, error: 'RAGManager not initialized' });
+});
