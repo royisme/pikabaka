@@ -13,6 +13,7 @@ function store(test: typeof t) {
     test.teardown(() => fs.rmSync(directory, { recursive: true, force: true }));
     const file = path.join(directory, 'credentials.json');
     const { CredentialsManager: Manager } = mockRequire(path.resolve('electron/services/CredentialsManager.ts'), {
+        electron: { safeStorage: { isEncryptionAvailable: () => false } },
         [path.resolve('electron/services/configPaths.ts')]: { getCredentialsJsonPath: () => file },
     }) as typeof import('../../electron/services/CredentialsManager');
     const manager = Object.create(Manager.prototype) as CredentialsManager;
