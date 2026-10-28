@@ -4,7 +4,7 @@ What is done, what is broken, what is unverified. `TASKS.md` is what to do next;
 
 ## 2026-10-28: package license aligned with LICENSE (branch `license-field`)
 
-- `package.json` said `ISC` while `LICENSE` and the README say AGPL-3.0. The field is now the SPDX id `AGPL-3.0-only`, which is what "AGPL-3.0" in the README means. Owner decision 2026-10-28. Metadata only; no code or build change. Not checked: the license of the upstream project this repository descends from (the code history suggests an earlier app called Natively); that remains a question for the owner.
+- `package.json` said `ISC` while `LICENSE` and the README say AGPL-3.0. The field is now the SPDX id `AGPL-3.0-only`, which is what "AGPL-3.0" in the README means. Owner decision 2026-10-28. Metadata only; no code or build change.
 
 ## 2026-10-28: vector integrity, step V1 (branch `vector-integrity`)
 
