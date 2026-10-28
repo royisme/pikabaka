@@ -294,6 +294,23 @@ t.test('a search-index cleanup failure does not stop a meeting from being delete
     t.same(f.state(2).meeting?.id, 'meeting-b', 'the other meeting is untouched');
 });
 
+t.test('a failing job backs off 2 s then 4 s and waits no longer once it has failed', async t => {
+    const f = await setup(t, true);
+    const delays: number[] = [];
+    Reflect.set(f.pipeline, 'delay', async (ms: number) => { delays.push(ms); });
+    f.p.embed = async () => { throw new Error('Synthetic provider refusal'); };
+    f.queue('chunk');
+    await f.pipeline.processQueue();
+    t.same(delays, [2000, 4000]);
+});
+
+t.test('an empty queue and a queue with one status report zero for every other count', async t => {
+    const f = await setup(t, true);
+    t.same(f.pipeline.getQueueStatus(), { pending: 0, processing: 0, completed: 0, failed: 0 });
+    f.queue('chunk');
+    t.same(f.pipeline.getQueueStatus(), { pending: 1, processing: 0, completed: 0, failed: 0 });
+});
+
 t.test('queue status counts exhausted pending rows as stalled without double-counting failed jobs', async t => {
     const f = await setup(t, false);
     f.db.exec(`
