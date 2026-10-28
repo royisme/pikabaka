@@ -1,31 +1,23 @@
 import t from 'tap';
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
-import { runInNewContext } from 'node:vm';
-import ts from 'typescript';
+import { speechHost } from '../helpers/speechSettingsHost';
 import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 import type { AppState } from '../../electron/main';
 
-t.test('Soniox field, Save enablement and submit share the typed key', t => {
-    const source = readFileSync('src/components/SettingsOverlay.tsx', 'utf8');
-    const file = ts.createSourceFile('SettingsOverlay.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-    let lookup: ts.Expression | undefined;
-    const visit = (node: ts.Node) => {
-        if (ts.isVariableDeclaration(node) && node.name.getText(file) === 'sttKey') lookup = node.initializer;
-        ts.forEachChild(node, visit);
-    };
-    visit(file);
-    if (!lookup) throw new Error('The shared speech key lookup is missing');
-    const key = runInNewContext(`(${lookup.getText(file)})`, {
-        sttProvider: 'soniox', sttSonioxKey: 'invented-soniox-key',
-        sttGroqKey: '', sttOpenaiKey: '', sttDeepgramKey: '',
-        sttElevenLabsKey: '', sttAzureKey: '', sttIbmKey: '',
+t.test('Soniox field, Save enablement and submit share the typed key', async t => {
+    let submitted = false;
+    const host = speechHost({
+        testSttConnection: async () => ({ success: true }),
+        setSonioxApiKey: async (key: string) => { submitted = key === 'invented-soniox-key'; return { success: true }; },
     });
-    t.equal(key, 'invented-soniox-key');
-    t.match(source, /value=\{sttKey\}/, 'the field displays the shared key');
-    t.match(source, /disabled=\{sttSaving \|\| !sttKey\.trim\(\)\}/, 'Save checks the shared key');
-    t.match(source, /handleSttKeySubmit\(sttProvider, sttKey\)/, 'Save submits the same key');
-    t.end();
+    t.teardown(host.unmount);
+    host.click('Add provider'); host.change('select', 'Service', 'soniox');
+    t.equal(host.control('button', 'Save').props.disabled, true, 'Save checks the empty shared key');
+    host.change('input', 'API key', 'invented-soniox-key');
+    t.ok(host.control('input', 'API key').props.value === 'invented-soniox-key', 'the field displays the shared key');
+    t.equal(host.control('button', 'Save').props.disabled, false, 'Save checks the typed shared key');
+    host.click('Save'); await host.settle();
+    t.ok(submitted, 'Save submits the same key');
 });
 
 t.test('ElevenLabs key test requires a successful response and returns real failures', async t => {
