@@ -36,6 +36,7 @@ import { MicrophoneCapture } from "./audio/MicrophoneCapture"
 import { ThemeManager } from "./helpers/ThemeManager"
 import { RAGManager } from "./rag/RAGManager"
 import { buildEmbeddingConfig } from "./rag/embeddingConfig"
+import { buildMeetingSummaryText } from "./rag/meetingSummaryIndex"
 import { DatabaseManager } from "./db/DatabaseManager"
 import { getMeetingAgent, getGate, refreshGate } from './agent/instance'
 import { type MeetingAgent, reportAgentError } from './agent/MeetingAgent'
@@ -308,7 +309,7 @@ export class AppState {
 
 
     // Initialize IntelligenceManager with LLMHelper
-    this.intelligenceManager = new IntelligenceManager(this.processingHelper.getLLMHelper())
+    this.intelligenceManager = new IntelligenceManager(this.processingHelper.getLLMHelper(), () => this.ragManager)
 
     // Initialize ThemeManager
     this.themeManager = ThemeManager.getInstance()
@@ -930,14 +931,7 @@ export class AppState {
         timestamp: t.timestamp
       }));
 
-      // Generate summary from detailedSummary if available
-      let summary: string | undefined;
-      if (meeting.detailedSummary) {
-        summary = [
-          ...(meeting.detailedSummary.keyPoints || []),
-          ...(meeting.detailedSummary.actionItems || []).map(a => `Action: ${a}`)
-        ].join('. ');
-      }
+      const summary = buildMeetingSummaryText(meeting);
 
       const result = await this.ragManager.processMeeting(meeting.id, segments, summary);
       console.log(`[AppState] RAG processed meeting ${meeting.id}: ${result.chunkCount} chunks`);
