@@ -22,7 +22,10 @@ const SearchIndexSettings: React.FC = () => {
                 setDraft(null);
                 rebuild.reset();
             },
-            onSettled: () => queryClient.invalidateQueries(['embedding-status']),
+            onSettled: () => Promise.all([
+                queryClient.invalidateQueries(['embedding-status']),
+                queryClient.invalidateQueries(['profile', 'status']),
+            ]),
         }
     );
     const rebuild = useMutation(

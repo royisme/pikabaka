@@ -36,6 +36,7 @@ import { MicrophoneCapture } from "./audio/MicrophoneCapture"
 import { ThemeManager } from "./helpers/ThemeManager"
 import { RAGManager } from "./rag/RAGManager"
 import { buildEmbeddingConfig } from "./rag/embeddingConfig"
+import { buildMeetingSummaryText } from "./rag/meetingSummaryIndex"
 import { DatabaseManager } from "./db/DatabaseManager"
 import { getMeetingAgent, getGate, refreshGate } from './agent/instance'
 import { type MeetingAgent, reportAgentError } from './agent/MeetingAgent'
@@ -308,7 +309,7 @@ export class AppState {
 
 
     // Initialize IntelligenceManager with LLMHelper
-    this.intelligenceManager = new IntelligenceManager(this.processingHelper.getLLMHelper())
+    this.intelligenceManager = new IntelligenceManager(this.processingHelper.getLLMHelper(), () => this.ragManager)
 
     // Initialize ThemeManager
     this.themeManager = ThemeManager.getInstance()
@@ -435,18 +436,25 @@ export class AppState {
         // We await waitForReady() so uploads during boot wait for the pipeline
         // instead of immediately throwing 'not ready'.
         const self = this;
+        this.knowledgeOrchestrator.setEmbeddingStatusFn(() => self.ragManager?.getEmbeddingPipeline().getStatus() ?? null);
         this.knowledgeOrchestrator.setEmbedFn(async (text: string) => {
           const pipeline = self.ragManager?.getEmbeddingPipeline();
           if (!pipeline) throw new Error('RAG pipeline not available');
           await pipeline.waitForReady();
-          return await pipeline.getEmbedding(text);
+          const { providerName, dimensions } = pipeline.getStatus();
+          if (!providerName || !dimensions) throw new Error('Embedding provider not initialized');
+          const embedding = await pipeline.getEmbedding(text);
+          return { embedding, provider: providerName, dimensions };
         });
         if (typeof this.knowledgeOrchestrator.setEmbedQueryFn === 'function') {
           this.knowledgeOrchestrator.setEmbedQueryFn(async (text: string) => {
             const pipeline = self.ragManager?.getEmbeddingPipeline();
             if (!pipeline) throw new Error('RAG pipeline not available');
             await pipeline.waitForReady();
-            return await pipeline.getEmbeddingForQuery(text);
+            const { providerName, dimensions } = pipeline.getStatus();
+            if (!providerName || !dimensions) throw new Error('Embedding provider not initialized');
+            const embedding = await pipeline.getEmbeddingForQuery(text);
+            return { embedding, provider: providerName, dimensions };
           });
         }
 
@@ -930,14 +938,7 @@ export class AppState {
         timestamp: t.timestamp
       }));
 
-      // Generate summary from detailedSummary if available
-      let summary: string | undefined;
-      if (meeting.detailedSummary) {
-        summary = [
-          ...(meeting.detailedSummary.keyPoints || []),
-          ...(meeting.detailedSummary.actionItems || []).map(a => `Action: ${a}`)
-        ].join('. ');
-      }
+      const summary = buildMeetingSummaryText(meeting);
 
       const result = await this.ragManager.processMeeting(meeting.id, segments, summary);
       console.log(`[AppState] RAG processed meeting ${meeting.id}: ${result.chunkCount} chunks`);

@@ -9,6 +9,8 @@ import { renameMeetingFolder } from '../agent/workspace';
 import { SessionTracker, TranscriptSegment } from './SessionTracker';
 import { LLMHelper } from './LLMHelper';
 import { DatabaseManager, Meeting } from '../db/DatabaseManager';
+import type { RAGManager } from '../rag/RAGManager';
+import { refreshCommittedMeetingSummary } from '../rag/meetingSummaryIndex';
 const crypto = require('crypto');
 
 function contextFromTranscript(transcript: Array<{ speaker: string; text: string }>): string {
@@ -23,7 +25,7 @@ export class MeetingPersistence {
     private session: SessionTracker;
     private llmHelper: LLMHelper;
 
-    constructor(session: SessionTracker, llmHelper: LLMHelper) {
+    constructor(session: SessionTracker, llmHelper: LLMHelper, private getRAGManager: () => RAGManager | null = () => null) {
         this.session = session;
         this.llmHelper = llmHelper;
         this.session.setUsageRecorder((meetingId, usage) => {
@@ -224,10 +226,11 @@ export class MeetingPersistence {
             };
 
             const db = DatabaseManager.getInstance();
+            let committed = true;
             if (fullSave) {
                 db.saveMeeting(meetingData, data.startTime, data.durationMs);
             } else {
-                db.completeMeeting(meetingId, {
+                committed = db.completeMeeting(meetingId, {
                     title,
                     durationMs: data.durationMs,
                     summaryJson: JSON.stringify({
@@ -237,6 +240,7 @@ export class MeetingPersistence {
                     isProcessed: true
                 });
             }
+            if (committed) refreshCommittedMeetingSummary(this.getRAGManager(), meetingId);
 
             // The meeting folder carries the title from now on (renamed once; a missing folder is fine).
             void renameMeetingFolder(meetingId, title).catch(() => {});

@@ -27,9 +27,10 @@ const { default: SettingsOverlay } = mockRequire(path.resolve('src/components/Se
     [path.resolve('src/utils/platformUtils.ts')]: { isMac: true, isWindows: false },
 }) as typeof import('../../src/components/SettingsOverlay');
 
-function renderSettings(initialTab: string, connections: AiConnectionView[] = []) {
+function renderSettings(initialTab: string, connections: AiConnectionView[] = [], speechCredentials = {}) {
     const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
     client.setQueryData(['ai-connections'], connections);
+    client.setQueryData(['speech-credentials'], speechCredentials);
     const html = renderToStaticMarkup(React.createElement(
         QueryClientProvider,
         { client },
@@ -79,6 +80,20 @@ t.test('Provider setup alone renders the provider list without presets and with 
     t.end();
 });
 
+t.test('Provider setup lists only speech services with a saved key or account below language models', t => {
+    const html = renderSettings('providers', [], { hasSonioxKey: true, hasAzureKey: true, googleServiceAccountPath: '/synthetic/account.json' });
+    const speech = html.slice(html.indexOf('>Speech-to-text providers</h3>'));
+    t.ok(html.indexOf('>Language model providers</h3>') < html.indexOf('>Speech-to-text providers</h3>'));
+    t.match(speech, '>Soniox</span>');
+    t.match(speech, '>Azure Speech</span>');
+    t.match(speech, '>Google Cloud</span>');
+    t.equal((speech.match(/Key saved/g) ?? []).length, 2);
+    t.match(speech, 'File chosen');
+    for (const name of ['Groq Whisper', 'OpenAI', 'Deepgram', 'ElevenLabs Scribe', 'IBM Watson']) t.notMatch(speech, `>${name}</span>`);
+    t.notMatch(speech, '/synthetic/account.json', 'the list does not expose the account path');
+    t.end();
+});
+
 t.test('floating picker repair section opens the named hidden built-in editor', t => {
     const html = renderSettings('providers:openai', [{
         id: 'openai', name: 'OpenAI', type: 'openai', baseUrl: 'https://api.openai.com/v1',
@@ -87,6 +102,70 @@ t.test('floating picker repair section opens the named hidden built-in editor', 
     t.match(html, '>Edit OpenAI</h4>');
     t.match(html, 'No providers yet. Add one to use a model.');
     t.same(sidebarButtons(html).filter(button => button.attributes.includes('bg-bg-item-active text-text-primary')).map(button => button.label), ['Provider setup']);
+    t.end();
+});
+
+t.test('Audio keeps speech selection but replaces account/key fields with a plain Provider setup link', t => {
+    const html = renderSettings('audio');
+    const speech = html.slice(html.indexOf('>Speech recognition</h3>'), html.indexOf('>Translation</h3>'));
+    t.match(speech, 'Speech Provider');
+    t.match(speech, 'Their language');
+    t.match(speech, 'You speak');
+    t.match(speech, 'Save speech settings');
+    t.match(speech, /Keys and accounts are in <button[^>]*type="button"[^>]*>Provider setup<\/button>/);
+    t.notMatch(speech, 'Service Account JSON');
+    t.notMatch(speech, 'Select File');
+    t.notMatch(speech, 'type="password"');
+    t.notMatch(speech, 'Test key');
+    t.end();
+});
+
+t.test('Audio still offers every service, uses saved keys for model Fetch, and its setup link opens Provider setup', t => {
+    const state: unknown[] = [];
+    let index = 0;
+    const client = new QueryClient();
+    t.teardown(() => client.clear());
+    const noop = () => {};
+    const { default: Overlay } = mockRequire(path.resolve('src/components/SettingsOverlay.tsx'), {
+        react: { ...React,
+            useState: (initial: unknown) => {
+                const slot = index++;
+                if (!(slot in state)) state[slot] = typeof initial === 'function' ? initial() : initial;
+                return [state[slot], (next: unknown) => { state[slot] = typeof next === 'function' ? next(state[slot]) : next; }];
+            },
+            useEffect: noop, useRef: (value: unknown) => ({ current: value }), useMemo: (fn: () => unknown) => fn(),
+        },
+        'react-query': { ...ReactQuery, useQueryClient: () => client, useQuery: () => ({}) },
+        'framer-motion': FramerMotion,
+        [path.resolve('src/hooks/useShortcuts.ts')]: { useShortcuts: () => ({ shortcuts: {}, updateShortcut: noop, resetShortcuts: noop }) },
+        [path.resolve('src/hooks/useMainEvent.ts')]: { useMainEvent: noop },
+        [path.resolve('src/hooks/useWindowEvent.ts')]: { useWindowEvent: noop },
+        [path.resolve('src/hooks/useResolvedTheme.ts')]: { useResolvedTheme: () => 'dark' },
+        [path.resolve('src/hooks/useLocalStorageValue.ts')]: { useLocalStorageValue: () => [null, noop] },
+        [path.resolve('src/utils/platformUtils.ts')]: { isMac: true, isWindows: false },
+    }) as typeof import('../../src/components/SettingsOverlay');
+    const draw = () => { index = 0; return Overlay({ isOpen: true, initialTab: 'audio', onClose: noop }); };
+    type Element = React.ReactElement<Record<string, unknown> & { children?: React.ReactNode }>;
+    const elements = (tree: React.ReactNode): Element[] => React.isValidElement<Element['props']>(tree)
+        ? [tree, ...React.Children.toArray(tree.props.children).flatMap(elements)] : [];
+    const speech = () => elements(draw()).find(element => element.type === 'div' && React.Children.toArray(element.props.children).some(child => React.isValidElement<{ children: string }>(child) && child.type === 'h3' && child.props.children === 'Speech recognition'))!;
+    const picker = elements(speech()).find(element => Array.isArray(element.props.options) && element.props.value === 'google')!;
+    const options = picker.props.options as Array<{ id: string }>;
+    t.same(options.map(option => option.id), ['google', 'groq', 'openai', 'deepgram', 'elevenlabs', 'azure', 'ibmwatson', 'soniox']);
+    for (const { id } of options) {
+        (picker.props.onChange as (id: string) => void)(id);
+        const section = speech();
+        const html = renderToStaticMarkup(section);
+        t.notMatch(html, 'type="password"', `${id}: no key field`);
+        t.notMatch(html, 'Service Account JSON', `${id}: no account chooser`);
+        t.match(html, 'Save speech settings');
+        const model = elements(section).find(element => 'apiKey' in element.props);
+        if (model) t.equal(model.props.apiKey, '', `${id}: model Fetch uses the saved key`);
+    }
+    const link = elements(speech()).find(element => element.type === 'button' && element.props.children === 'Provider setup')!;
+    t.equal(link.props.type, 'button');
+    (link.props.onClick as () => void)();
+    t.ok(elements(draw()).some(element => typeof element.type === 'function' && element.type.name === 'ProviderSetupSettings'), 'the link changes the actual Settings page');
     t.end();
 });
 

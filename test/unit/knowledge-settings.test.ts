@@ -3,6 +3,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import KnowledgeSettings from '../../src/components/settings/KnowledgeSettings';
+import type { NotesIndexStatus } from '../../electron/knowledge/types';
 
 function renderSources(client: QueryClient) {
     const html = renderToStaticMarkup(React.createElement(
@@ -12,6 +13,40 @@ function renderSources(client: QueryClient) {
     ));
     client.clear();
     return html;
+}
+
+const indexedAt = '2026-10-27T12:34:56.000Z';
+for (const [status, expected] of [
+    [{ state: 'indexed', provider: 'example:amber', dimensions: 3, indexedAt, error: null }, '✓ Indexed'],
+    [{ state: 'not-indexed', provider: null, dimensions: null, indexedAt: null, error: 'Embedding quota exceeded' }, '✕ Not indexed'],
+    [{ state: 'unknown', provider: null, dimensions: null, indexedAt: null, error: null }, '○ Unknown'],
+    [{ state: 'needs-reindex', provider: 'example:amber', dimensions: 3, indexedAt, error: null }, '▲ Needs re-index'],
+] as Array<[NotesIndexStatus, string]>) {
+    t.test(`Sources renders notes status ${status.state} from the existing electronAPI reply`, async t => {
+        const previous = globalThis.window;
+        globalThis.window = { electronAPI: {
+            profileGetStatus: async () => ({ hasProfile: false, profileMode: false, notesIndex: status }),
+            profileGetNotes: async () => 'Invented lantern inventory.',
+            getRecentMeetings: async () => [],
+        } } as unknown as Window & typeof globalThis;
+        t.teardown(() => { globalThis.window = previous; });
+        const client = sourcesClient();
+        client.removeQueries(['profile', 'status']);
+        await client.fetchQuery(['profile', 'status'], () => window.electronAPI.profileGetStatus());
+        await client.fetchQuery(['profile-notes'], () => window.electronAPI.profileGetNotes());
+        await client.fetchQuery(['recent-meetings'], () => window.electronAPI.getRecentMeetings());
+        const html = renderSources(client);
+        t.match(html, expected);
+        if (status.provider) {
+            t.match(html, 'example:amber');
+            t.match(html, '3 dimensions');
+        }
+        if (status.indexedAt && status.state === 'indexed') t.match(html, new Date(indexedAt).toLocaleString());
+        if (status.error) t.match(html, 'Embedding quota exceeded');
+        if (status.state === 'needs-reindex') t.match(html, 'active embedding model differs');
+        if (status.state !== 'indexed') t.notMatch(html, '✓ Indexed');
+        t.notMatch(html, 'animate-spin');
+    });
 }
 
 function sourcesClient() {

@@ -1,4 +1,5 @@
 import ConnectionsSettings from './ConnectionsSettings';
+import SpeechProvidersSettings from './SpeechProvidersSettings';
 
 const ProviderSetupSettings = ({ onOpenModels }: { onOpenModels: () => void }) => (
     <div className="space-y-5 animated fadeIn pb-10">
@@ -9,6 +10,7 @@ const ProviderSetupSettings = ({ onOpenModels }: { onOpenModels: () => void }) =
             </p>
         </div>
         <ConnectionsSettings />
+        <SpeechProvidersSettings />
     </div>
 );
 
