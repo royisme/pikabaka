@@ -102,6 +102,23 @@ t.test('a failed Save shows the real error and keeps the values on screen', asyn
     t.equal(host.component('ConnectionModelPicker').props.model, 'invented-kept-model');
 });
 
+t.test('a refused translation save shows its disk error, not even a previous Saved mark', async t => {
+    let fail = false;
+    const host = translationHost({
+        setTranscriptTranslationSettings: async () => fail ? { success: false, error: 'ENOSPC: invented disk full' } : { success: true },
+    }, saved);
+    t.teardown(host.unmount);
+    host.click('Save Translation Settings');
+    await host.settle();
+    t.match(host.html(), '✓ Saved');
+    fail = true;
+    host.click('✓ Saved');
+    await host.settle();
+    t.match(host.html(), 'ENOSPC: invented disk full');
+    t.match(host.html(), /role="alert"/);
+    t.notMatch(host.html(), '✓ Saved');
+});
+
 t.test('the translation Test sits collapsed and opens itself when its result arrives', async t => {
     const host = translationTestHost();
     t.teardown(host.unmount);

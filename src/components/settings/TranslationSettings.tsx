@@ -68,8 +68,10 @@ const TranslationSettings = ({ languages }: { languages: Array<{ value: string; 
 
     const save = async () => {
         setSaveError(null);
+        setSavedShown(false);
         try {
-            await window.electronAPI.setTranscriptTranslationSettings(value);
+            const result = await window.electronAPI.setTranscriptTranslationSettings(value);
+            if (!result.success) throw new Error(result.error || 'Could not save the translation settings');
             setSavedShown(true);
             setTimeout(() => setSavedShown(false), 2000);
         } catch (error) {

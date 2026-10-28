@@ -597,6 +597,7 @@ export function registerCoreHandlers(appState: AppState): void {
       const hasKey = (key?: string) => !!(key && key.trim().length > 0);
 
       return {
+        storage: CredentialsManager.getInstance().getStorageStatus(),
         connectionHeaders: Object.fromEntries(CredentialsManager.getInstance().listConnections().filter(c => c.headers).map(c => [c.id, c.headers])),
         hasGeminiKey: hasKey(creds.geminiApiKey),
         hasGroqKey: hasKey(creds.groqApiKey),
@@ -630,7 +631,7 @@ export function registerCoreHandlers(appState: AppState): void {
         claudePreferredModel: creds.claudePreferredModel || undefined,
       };
     } catch (error: any) {
-      return { hasGeminiKey: false, hasGroqKey: false, hasOpenaiKey: false, hasClaudeKey: false, googleServiceAccountPath: null, sttProvider: 'google', groqSttModel: 'whisper-large-v3-turbo', hasSttGroqKey: false, hasSttOpenaiKey: false, hasDeepgramKey: false, hasElevenLabsKey: false, hasAzureKey: false, azureRegion: 'eastus', hasIbmWatsonKey: false, ibmWatsonRegion: 'us-south', hasSonioxKey: false, hasTavilyKey: false, transcriptTranslationEnabled: false, transcriptTranslationProvider: 'ollama', transcriptTranslationModel: '', transcriptTranslationPrompt: '', transcriptTranslationDisplayMode: 'original', transcriptTranslationSourceLanguage: 'auto', transcriptTranslationTargetLanguage: 'chinese' };
+      return { storage: { mode: 'locked', reason: 'Credential storage status could not be read. Restart Pika and try again.' }, hasGeminiKey: false, hasGroqKey: false, hasOpenaiKey: false, hasClaudeKey: false, googleServiceAccountPath: null, sttProvider: 'google', groqSttModel: 'whisper-large-v3-turbo', hasSttGroqKey: false, hasSttOpenaiKey: false, hasDeepgramKey: false, hasElevenLabsKey: false, hasAzureKey: false, azureRegion: 'eastus', hasIbmWatsonKey: false, ibmWatsonRegion: 'us-south', hasSonioxKey: false, hasTavilyKey: false, transcriptTranslationEnabled: false, transcriptTranslationProvider: 'ollama', transcriptTranslationModel: '', transcriptTranslationPrompt: '', transcriptTranslationDisplayMode: 'original', transcriptTranslationSourceLanguage: 'auto', transcriptTranslationTargetLanguage: 'chinese' };
     }
   });
 }
