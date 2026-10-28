@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-27: Provider list, step S1b (branch `provider-list`)
+
+- Provider setup lists configured built-ins and every custom by id, with interface/host, key state and model-list Test results. One quiet Add opens the Interface-first editor; built-in identity is read-only, custom rename retains id/key, built-in reset removes the key and host override. Custom deletion asks twice and is blocked by named Quick answers, Summaries, Agent, Search index or Translation uses in both UI and IPC. Failed/rejected Save, Delete and Test show the real error and retain the draft; canceled Test callbacks cannot reach another editor.
+- All shared job pickers retain their named unconfigured provider and open its editor through local Settings navigation; the floating picker uses the existing section string (`providers:<id>`). No stored shape, connection resolution, STT/translation routing, embedding pipeline or credential write path changed. Eight implementation/test files, plus the task/progress/architecture docs.
+- Checks: both typechecks, lint (949 warnings, no errors) and tap (1605 assertions) exit 0. Browser preview with a mocked `electronAPI` (list with a configured built-in, a hidden unconfigured built-in, two same-named customs and a keyless local one; the add editor), dark and light themes; the key state is a status dot plus words and the quiet buttons have a fill. Tests cover list/editor states, picker filtering/repair, id/key-preserving rename, rejected/failed requests, canceled Tests and the main-process delete guard. S1a preset assertions were updated for the explicitly requested removal.
+- Found, not changed: credential disk-write failures are swallowed below IPC, so these tests cannot prove durable Save/Delete; a blank draft Test URL reuses the saved host; repeated identical cross-window section requests while Settings stays open can be ignored by App's unchanged state handling. Owner: both themes, narrow/long rows, keyboard/focus, real keys, restart and Windows. No app, Vite, provider, device or packaged build was run.
+
 ## 2026-10-27: live indexing uses the recorded meeting id, step K2b (branch `live-meeting-id`)
 
 - Live indexing starts immediately after successful record creation, before deferred audio startup, using the real id. Live queries capture the indexer's id without changing IPC payloads. The redundant `source` INSERT and provisional cleanup are gone; historical provisional rows are untouched. The agent already excludes the real current id; a regression test confirms it.

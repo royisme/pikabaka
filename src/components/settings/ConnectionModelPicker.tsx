@@ -1,7 +1,13 @@
-import React from 'react';
+import React, { createContext, useContext } from 'react';
 import { useQuery } from 'react-query';
 import type { AiConnectionType, AiConnectionView } from '../../types/electron';
 import ModelCombobox from './ModelCombobox';
+
+export const ProviderNavigation = createContext<{ editorId?: string; open: (id?: string) => void } | null>(null);
+export const configuredProvider = (c: AiConnectionView) => !c.builtin || c.hasApiKey || c.customBaseUrl;
+export const interfaceLabel: Record<AiConnectionType, string> = {
+    openai: 'OpenAI compatible', anthropic: 'Anthropic compatible', gemini: 'Gemini compatible',
+};
 
 const field = 'w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors';
 const smallButton = 'h-11 px-3 shrink-0 rounded-lg text-xs font-medium border border-border-subtle text-text-secondary hover:text-text-primary disabled:opacity-40 transition-colors';
@@ -26,7 +32,9 @@ interface ConnectionModelPickerProps {
  * previous one's models, and nothing here needs an effect.
  */
 const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, connectionId, model, emptyLabel, modelPlaceholder = 'Model id', types, onChange, onModelSelect }) => {
-    const { data: connections = [] } = useQuery<AiConnectionView[]>(['ai-connections'], () => window.electronAPI.aiConnectionsList());
+    const navigation = useContext(ProviderNavigation);
+    const { data: connections = [], error: listError } = useQuery<AiConnectionView[]>(['ai-connections'], () => window.electronAPI.aiConnectionsList());
+    const selected = connections.find(c => c.id === connectionId);
 
     // Fetched on demand (the button), never on its own: the host is asked only when the user asks.
     const models = useQuery(
@@ -60,8 +68,9 @@ const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, conne
                         className={field}
                     >
                         {emptyLabel !== undefined && <option value="">{emptyLabel}</option>}
-                        {connections.filter(c => !types || types.includes(c.type)).map((c) => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
+                        {connectionId && !selected && <option value={connectionId}>{connectionId} (unavailable)</option>}
+                        {connections.filter(c => c.id === connectionId || (configuredProvider(c) && (!types || types.includes(c.type)))).map((c) => (
+                            <option key={c.id} value={c.id}>{c.name} · {interfaceLabel[c.type]} · {c.baseUrl.replace(/^https?:\/\//i, '')}</option>
                         ))}
                     </select>
                 </div>
@@ -81,6 +90,16 @@ const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, conne
                     </div>
                 </div>
             </div>
+            {navigation ? (
+                <button type="button" onClick={() => navigation.open(selected?.id)} className="text-xs text-primary hover:underline text-left break-words">
+                    {selected ? `Edit ${selected.name} in Provider setup` : 'Open Provider setup'}
+                </button>
+            ) : (
+                <button type="button" onClick={() => window.electronAPI.openSettingsSection(selected ? `providers:${selected.id}` : 'providers')} className="text-xs text-primary hover:underline text-left break-words">
+                    {selected ? `Edit ${selected.name} in Provider setup` : 'Open Provider setup'}
+                </button>
+            )}
+            {listError ? <p role="alert" className="text-[11px] text-text-primary">✕ {(listError as Error).message}</p> : null}
             {note && <p className={`text-[11px] ${note.tone === 'error' ? 'text-state-danger' : 'text-text-tertiary'}`}>{note.text}</p>}
         </div>
     );
