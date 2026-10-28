@@ -562,7 +562,7 @@ t.test('generateInterviewPrep() uses active JD when no jdId provided', async (t)
   t.end();
 });
 
-t.test('generateInterviewPrep() propagates error gracefully', async (t) => {
+t.test('generateInterviewPrep() returns the real model failure', async (t) => {
   const orch = new KnowledgeOrchestrator(
     createMockDbManager({
       resumeRow: EMPTY_RESUME_ROW,
@@ -572,12 +572,7 @@ t.test('generateInterviewPrep() propagates error gracefully', async (t) => {
   );
   orch.setGenerateContentFn((async () => { throw new Error('LLM exploded'); }) as any);
 
-  const originalError = console.error;
-  console.error = () => {};
-  const result = await orch.generateInterviewPrep();
-  console.error = originalError;
-
-  t.equal(result, null, 'returns null on error (error is caught)');
+  await t.rejects(orch.generateInterviewPrep(), { message: 'LLM exploded' });
   t.end();
 });
 
@@ -589,13 +584,13 @@ t.test('setKnowledgeMode and isKnowledgeMode', (t) => {
   t.equal(orch.isKnowledgeMode(), false, 'false without resume');
 
   const orch2 = new KnowledgeOrchestrator(createMockDbManager({ resumeRow: EMPTY_RESUME_ROW }));
-  t.equal(orch2.isKnowledgeMode(), false, 'false with resume but knowledgeMode off');
-
-  orch2.setKnowledgeMode(true);
-  t.equal(orch2.isKnowledgeMode(), true, 'true after setKnowledgeMode(true)');
+  t.equal(orch2.isKnowledgeMode(), true, 'true with a resume: the mode is on at start');
 
   orch2.setKnowledgeMode(false);
   t.equal(orch2.isKnowledgeMode(), false, 'false after setKnowledgeMode(false)');
+
+  orch2.setKnowledgeMode(true);
+  t.equal(orch2.isKnowledgeMode(), true, 'true after setKnowledgeMode(true)');
 
   t.end();
 });

@@ -157,7 +157,7 @@ const ProactiveHelpSettings = ({ onOpenProviders }: { onOpenProviders: () => voi
                             <p className="text-[11px] text-state-danger">{(test.error as Error).message}</p>
                         ) : test.data?.success ? (
                             <p className="text-xs text-text-primary">
-                                It decided help is {percent(test.data.help)} likely, kind: {test.data.kind?.replace('_', ' ')}, in {test.data.latencyMs} ms.
+                                It decided help is {percent(test.data.help)} likely, kind: {test.data.kind?.replace('_', ' ')}{test.data.latencyMs === undefined ? '.' : `, in ${test.data.latencyMs} ms. Live use allows 2 s: ${test.data.latencyMs > 2000 ? 'this reply would have been too slow live.' : 'this reply is fast enough live.'}`}
                                 {test.data.help !== undefined && ` The help score is ${test.data.help < threshold ? 'below' : 'at or above'} the ${percent(threshold)} threshold.`}
                                 {' Mode, help kind, staleness, cooldown and card drafting also determine whether a card appears.'}
                             </p>

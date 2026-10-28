@@ -7,6 +7,7 @@ import { useKnowledgeMode } from '../../hooks/useKnowledgeMode';
 import { ProfileVisualizer } from '../knowledge/ProfileVisualizer';
 import { JDListManager } from '../knowledge/JDListManager';
 import NotesSettings from './NotesSettings';
+import AnswerSourcesSettings from './AnswerSourcesSettings';
 import SearchIndexSettings from './SearchIndexSettings';
 
 const quietButton = 'px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-component text-xs font-medium text-text-secondary hover:bg-bg-input hover:text-text-primary disabled:opacity-50';
@@ -130,6 +131,7 @@ const KnowledgeSettings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         </div>
                     </div>
                     {editingNotes && <NotesSettings />}
+                    <AnswerSourcesSettings />
                 </section>
             )}
 

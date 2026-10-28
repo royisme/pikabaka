@@ -157,6 +157,8 @@ export class RestSTT extends EventEmitter {
     private provider: RestSttProvider;
     private apiKey: string;
     private region?: string;
+    /** The model the user chose; the provider's default applies when this is empty. */
+    private modelOverride?: string;
     private config: RestSttProviderConfig;
 
     private chunks: Buffer[] = [];
@@ -176,11 +178,16 @@ export class RestSTT extends EventEmitter {
         this.provider = provider;
         this.apiKey = apiKey;
         this.region = region;
-        this.config = PROVIDER_CONFIGS[provider](apiKey, region);
-        if (modelOverride) {
-            this.config.model = modelOverride;
-        }
+        this.modelOverride = modelOverride;
+        this.config = this.configFor();
         console.log(`[RestSTT] Initialized for provider: ${provider}, model: ${this.config.model || '(default)'}`);
+    }
+
+    /** Rebuilds the provider config without losing the chosen model. */
+    private configFor(languageKey?: string): RestSttProviderConfig {
+        const config = PROVIDER_CONFIGS[this.provider](this.apiKey, this.region, languageKey);
+        if (this.modelOverride) config.model = this.modelOverride;
+        return config;
     }
 
     /**
@@ -188,7 +195,7 @@ export class RestSTT extends EventEmitter {
      */
     public setApiKey(apiKey: string): void {
         this.apiKey = apiKey;
-        this.config = PROVIDER_CONFIGS[this.provider](apiKey, this.region);
+        this.config = this.configFor();
         console.log(`[RestSTT] API key updated for ${this.provider}`);
     }
 
@@ -215,7 +222,7 @@ export class RestSTT extends EventEmitter {
      */
     public setRecognitionLanguage(key: string): void {
         console.log(`[RestSTT] Updating recognition language to: ${key}`);
-        this.config = PROVIDER_CONFIGS[this.provider](this.apiKey, this.region, key);
+        this.config = this.configFor(key);
     }
 
     /**

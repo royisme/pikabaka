@@ -33,7 +33,7 @@ export class CompanyResearchEngine {
   }
 
   private async searchTavily(query: string): Promise<TavilySearchResult[]> {
-    if (!this.tavilyApiKey) return [];
+    if (!this.tavilyApiKey) throw new Error('No search key is saved');
     const response = await fetch('https://api.tavily.com/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -62,6 +62,7 @@ export class CompanyResearchEngine {
     }
 
     let searchResults = '';
+    let searchFailure: string | undefined;
     try {
       const queries = [
         `${company} glassdoor reviews interview`,
@@ -75,11 +76,12 @@ export class CompanyResearchEngine {
         .filter(Boolean)
         .join('\n\n');
     } catch (error) {
-      console.error('[CompanyResearch] Tavily search failed:', error);
+      searchFailure = (error as Error).message;
+      console.error('[CompanyResearch] Search failed:', searchFailure);
     }
 
     if (!searchResults) {
-      searchResults = `No live search results available. Use your knowledge about ${company} to generate a dossier. Note that information may not be current.`;
+      throw new Error(`Company research is not available: ${searchFailure ?? 'no search results were found'}.`);
     }
 
     const prompt = buildCompanyResearchPrompt(company, searchResults, jdContext);
@@ -92,57 +94,39 @@ export class CompanyResearchEngine {
   }
 
   private parseResponse(response: string, company: string): CompanyDossier {
-    try {
-      const parsed: any = parseLLMJson(response);
-      return {
-        company: parsed.company || company,
-        overview: parsed.overview || '',
-        products: Array.isArray(parsed.products) ? parsed.products : [],
-        hiring_strategy: parsed.hiring_strategy || undefined,
-        culture_ratings: {
-          overall: typeof parsed.culture_ratings?.overall === 'number' ? parsed.culture_ratings.overall : 3,
-          work_life_balance: typeof parsed.culture_ratings?.work_life_balance === 'number'
-            ? parsed.culture_ratings.work_life_balance
-            : undefined,
-          compensation: typeof parsed.culture_ratings?.compensation === 'number'
-            ? parsed.culture_ratings.compensation
-            : undefined,
-          management: typeof parsed.culture_ratings?.management === 'number'
-            ? parsed.culture_ratings.management
-            : undefined,
-          review_count: parsed.culture_ratings?.review_count || undefined,
-          data_sources: Array.isArray(parsed.culture_ratings?.data_sources)
-            ? parsed.culture_ratings.data_sources
-            : undefined,
-        },
-        interview_focus: parsed.interview_focus || undefined,
-        interview_difficulty: parsed.interview_difficulty || undefined,
-        salary_estimates: Array.isArray(parsed.salary_estimates) ? parsed.salary_estimates : [],
-        employee_reviews: Array.isArray(parsed.employee_reviews) ? parsed.employee_reviews : [],
-        critics: Array.isArray(parsed.critics) ? parsed.critics : [],
-        benefits: Array.isArray(parsed.benefits) ? parsed.benefits : [],
-        core_values: Array.isArray(parsed.core_values) ? parsed.core_values : [],
-        recent_news: Array.isArray(parsed.recent_news) ? parsed.recent_news : [],
-        competitors: Array.isArray(parsed.competitors) ? parsed.competitors : [],
-        sources: Array.isArray(parsed.sources) ? parsed.sources : [],
-        talking_points: Array.isArray(parsed.talking_points) ? parsed.talking_points : [],
-      };
-    } catch {
-      return {
-        company,
-        overview: response.slice(0, 500),
-        products: [],
-        culture_ratings: { overall: 3 },
-        salary_estimates: [],
-        employee_reviews: [],
-        critics: [],
-        benefits: [],
-        core_values: [],
-        competitors: [],
-        sources: [],
-        recent_news: [],
-        talking_points: [],
-      };
-    }
+    const parsed: any = parseLLMJson(response);
+    return {
+      company: parsed.company || company,
+      overview: parsed.overview || '',
+      products: Array.isArray(parsed.products) ? parsed.products : [],
+      hiring_strategy: parsed.hiring_strategy || undefined,
+      culture_ratings: {
+        overall: typeof parsed.culture_ratings?.overall === 'number' ? parsed.culture_ratings.overall : undefined,
+        work_life_balance: typeof parsed.culture_ratings?.work_life_balance === 'number'
+          ? parsed.culture_ratings.work_life_balance
+          : undefined,
+        compensation: typeof parsed.culture_ratings?.compensation === 'number'
+          ? parsed.culture_ratings.compensation
+          : undefined,
+        management: typeof parsed.culture_ratings?.management === 'number'
+          ? parsed.culture_ratings.management
+          : undefined,
+        review_count: parsed.culture_ratings?.review_count || undefined,
+        data_sources: Array.isArray(parsed.culture_ratings?.data_sources)
+          ? parsed.culture_ratings.data_sources
+          : undefined,
+      },
+      interview_focus: parsed.interview_focus || undefined,
+      interview_difficulty: parsed.interview_difficulty || undefined,
+      salary_estimates: Array.isArray(parsed.salary_estimates) ? parsed.salary_estimates : [],
+      employee_reviews: Array.isArray(parsed.employee_reviews) ? parsed.employee_reviews : [],
+      critics: Array.isArray(parsed.critics) ? parsed.critics : [],
+      benefits: Array.isArray(parsed.benefits) ? parsed.benefits : [],
+      core_values: Array.isArray(parsed.core_values) ? parsed.core_values : [],
+      recent_news: Array.isArray(parsed.recent_news) ? parsed.recent_news : [],
+      competitors: Array.isArray(parsed.competitors) ? parsed.competitors : [],
+      sources: Array.isArray(parsed.sources) ? parsed.sources : [],
+      talking_points: Array.isArray(parsed.talking_points) ? parsed.talking_points : [],
+    };
   }
 }
