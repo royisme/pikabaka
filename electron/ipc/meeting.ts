@@ -2,6 +2,7 @@ import { shell } from "electron"
 import { AppState } from "../main"
 import { DatabaseManager } from "../db/DatabaseManager"
 import { safeHandle } from "./safeHandle"
+import { refreshCommittedMeetingSummary } from "../rag/meetingSummaryIndex"
 
 export function registerMeetingHandlers(appState: AppState): void {
   // ==========================================
@@ -43,7 +44,9 @@ export function registerMeetingHandlers(appState: AppState): void {
   });
 
   safeHandle("update-meeting-summary", async (_, { id, updates }: { id: string; updates: any }) => {
-    return DatabaseManager.getInstance().updateMeetingSummary(id, updates);
+    const updated = DatabaseManager.getInstance().updateMeetingSummary(id, updates);
+    if (updated) refreshCommittedMeetingSummary(appState.getRAGManager(), id);
+    return updated;
   });
 
   safeHandle("delete-meeting", async (_, id: string) => {

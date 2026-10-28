@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: committed summary index hooks, step K3b (branch `summary-hooks`)
+
+- One shared builder composes key points and action items for stop-time transcript indexing and summary refreshes; placeholder/blank notes yield no text. Final saves (both writer branches), recovery and successful summary edits refresh from the committed record and start the existing queue runner without awaiting it. An injected getter carries the optional RAG manager through the intelligence facade; refresh/runner failures do not change commit or IPC results.
+- Tests failed first for missing final refresh, stale edited vectors and blank stop-time index text, then passed. The 23 new synthetic SQLite/fake-provider cases (154 assertions) cover exact text, native vector replacement/removal, both save branches, recovery, failed writes, thrown refreshes, missing RAG/provider and non-blocking/rejected runners. Both typechecks, lint (930 warnings, no errors) and full tap (2564 assertions) exit 0.
+- Owner: real-provider final/recovered/edited-summary search, empty-edit removal and restart. No app, real provider/device, Windows or packaged build was run; mutation tooling is unavailable. No dependency, persisted shape or K3a/V1 primitive changed.
+
 ## 2026-10-28: execution order and the private repository (branch `queue-plan`)
 
 - The owner chose to finish and merge every open step, sync `main` to the private repository `royisme/meetingCopa`, and only then remove the interview framing from the public product. `TASKS.md` now holds the wave order, the steps added from this session's findings (B1, the K6 and SEC1 additions) and the open owner decisions.
