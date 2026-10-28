@@ -231,6 +231,13 @@ export interface KnowledgeEmbedding {
 export type EmbedFn = (text: string) => Promise<KnowledgeEmbedding>;
 export type EmbedQueryFn = EmbedFn;
 
+/** A passage of the user's own notes, quoted as data: no candidate framing. */
+export interface MaterialPassage {
+  text: string;
+  source: string;
+  score: number;
+}
+
 // ─── Database Row Types ──────────────────────────────────────
 
 export interface DocumentRow {

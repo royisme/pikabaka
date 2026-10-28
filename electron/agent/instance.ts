@@ -2,7 +2,7 @@ import { app } from 'electron';
 import { readFile } from 'node:fs/promises';
 import { AppState } from '../main';
 import { CredentialsManager } from '../services/CredentialsManager';
-import { getAnswerSources, PAST_MEETING_SEARCH_OFF } from '../services/SettingsManager';
+import { getAnswerSources, MATERIALS_SEARCH_OFF, PAST_MEETING_SEARCH_OFF } from '../services/SettingsManager';
 import { DatabaseManager } from '../db/DatabaseManager';
 import { VectorStore } from '../rag/VectorStore';
 import { MeetingAgent } from './MeetingAgent';
@@ -50,6 +50,13 @@ export function getMeetingAgent(): MeetingAgent {
       return JSON.stringify(chunks.filter(chunk => chunk.meetingId !== state.getCurrentMeetingId() && chunk.meetingId !== 'live-meeting-current').slice(0, 8).map(chunk => ({
         meetingId: chunk.meetingId, text: chunk.text, startMs: chunk.startMs, endMs: chunk.endMs,
       })));
+    },
+    searchMaterials: async query => {
+      if (!getAnswerSources().materials) return MATERIALS_SEARCH_OFF;
+      const knowledge = state.getKnowledgeOrchestrator();
+      if (!knowledge) throw new Error('Materials search unavailable');
+      const passages = await knowledge.searchMaterials(query);
+      return passages.length ? JSON.stringify(passages) : 'No notes match that question.';
     },
     captureScreenshot: async () => ({
       data: (await readFile(await state.takeScreenshot(false))).toString('base64'), mimeType: 'image/png',
