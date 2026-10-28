@@ -418,3 +418,32 @@ t.test('record creation failure does not start live indexing, even after deferre
     t.same(f.db.prepare('SELECT * FROM meetings').all(), []);
     t.same(f.db.prepare('SELECT * FROM chunks').all(), []);
 });
+
+t.test('a deferred audio reconfiguration is dropped when the session ended or was replaced', async t => {
+    const AppState = mainClass(t);
+    const state = Object.create(AppState.prototype) as State;
+    const ids = ['session-a', 'session-b'];
+    const pending: Array<() => void> = [];
+    const setupCalls: string[] = [];
+    Reflect.set(state, 'intelligenceManager', { startMeeting: () => ids.shift() ?? null, setMeetingMetadata: () => {} });
+    Reflect.set(state, 'getMeetingAgent', () => ({ open: async () => {} }));
+    Reflect.set(state, 'getWindowHelper', () => ({ getOverlayWindow: () => undefined, getLauncherWindow: () => undefined }));
+    Reflect.set(state, 'reconfigureAudio', async () => new Promise<void>(resolve => pending.push(resolve)));
+    Reflect.set(state, 'setupSystemAudioPipeline', () => setupCalls.push(state.getCurrentMeetingId() ?? 'none'));
+    for (const name of ['setMicrophoneMuted', 'resetBufferedTranscriptTurns', 'broadcastMeetingState']) Reflect.set(state, name, () => {});
+
+    const tick = async () => { for (let i = 0; i < 50 && pending.length < 2 && setupCalls.length === 0; i++) await new Promise<void>(resolve => setImmediate(resolve)); };
+    await state.startMeeting({ audio: { inputDeviceId: 'invented-input' } });
+    await tick();
+    t.equal(pending.length, 1, 'the first session waits for its audio reconfiguration');
+    await state.startMeeting({ audio: { inputDeviceId: 'invented-input' } });
+    await tick();
+    t.equal(pending.length, 2, 'the next session starts its own reconfiguration');
+
+    pending[0]();
+    await new Promise<void>(resolve => setImmediate(resolve));
+    t.same(setupCalls, [], 'the replaced session never starts the pipeline');
+    pending[1]();
+    await new Promise<void>(resolve => setImmediate(resolve));
+    t.same(setupCalls, ['session-b'], 'only the current session starts the pipeline');
+});

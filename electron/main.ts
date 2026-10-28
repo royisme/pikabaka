@@ -819,6 +819,7 @@ export class AppState {
     // without waiting for SCK/audio initialization (which takes 5-7 seconds).
     // setTimeout(0) ensures setWindowMode IPC is processed first.
     setTimeout(async () => {
+      const sessionMeetingId = this.currentMeetingId;
       // BUG-02 fix: a fast start→stop sequence can call endMeeting() before
       // this callback fires, leaving isMeetingActive=false. If that happened,
       // do NOT boot the audio pipeline — it would run forever with no stop signal.
@@ -830,6 +831,11 @@ export class AppState {
         // Check for audio configuration preference
         if (metadata?.audio) {
           await this.reconfigureAudio(metadata.audio.inputDeviceId, metadata.audio.outputDeviceId);
+          // Another session may have ended or replaced this one while audio was reconfiguring.
+          if (!this.isMeetingActive || this.currentMeetingId !== sessionMeetingId) {
+            console.warn('[Main] Meeting session changed during audio reconfiguration — aborting that start.');
+            return;
+          }
         }
 
         // LAZY INIT: Ensure pipeline is ready (if not reconfigured above)
