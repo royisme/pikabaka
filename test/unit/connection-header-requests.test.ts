@@ -84,7 +84,7 @@ for (const type of ['openai', 'anthropic', 'gemini'] as const) {
         const { models, ref } = await buildAgentModel(c, 'example', false);
         const model = models.getModel(ref.provider, ref.modelId)!;
         const result = await models.complete(model, { messages: [{ role: 'user', content: 'Invented sample.', timestamp: 1 }] });
-        t.equal(result.stopReason, 'stop');
+        t.equal(result.stopReason, 'stop', result.errorMessage);
         t.match(result.content, [{ type: 'text', text: 'ready' }]);
         t.equal(requests.at(-1)?.headers['x-gateway'], 'fake-header-value', 'pi-ai model headers reach the actual request');
         await llm.translateTranscriptText({ provider: 'connection', connection: connection(type, false), model: 'example', prompt: 'Translate.', sourceText: 'Invented sample.' });
