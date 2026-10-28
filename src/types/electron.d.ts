@@ -4,7 +4,9 @@ export interface AgentGateDecision {
 }
 
 export type AiConnectionType = 'openai' | 'anthropic' | 'gemini'
-export interface AiConnectionView { id: string; name: string; type: AiConnectionType; baseUrl: string; customBaseUrl: boolean; hasApiKey: boolean; builtin: boolean }
+export type HeaderEdit = { op: 'keep' | 'remove'; name: string } | { op: 'set'; name: string; value: string }
+export type HeaderState = { name: string; set: true }
+export interface AiConnectionView { id: string; name: string; type: AiConnectionType; baseUrl: string; customBaseUrl: boolean; hasApiKey: boolean; headers?: HeaderState[]; builtin: boolean }
 export interface AgentApprovalRequest { id: string; meetingId: string; tool: 'bash' | 'write' | 'edit' | 'read'; target: string; detail?: string; folder: string; outside?: boolean }
 export type AgentApprovalEvent = { type: 'requested'; request: AgentApprovalRequest } | { type: 'settled'; id: string; allowed: boolean }
 export interface AgentProactiveCard { id: string; meetingId: string; segmentId: string; kind: string; text: string; time: number }
@@ -93,7 +95,7 @@ export interface ElectronAPI {
   toggleAdvancedSettings: () => Promise<void>
   closeAdvancedSettings: () => Promise<void>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
-  getStoredCredentials: () => Promise<{ hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; groqSttModel?: string; sttModels?: Record<string, string>; hasSonioxKey?: boolean; hasTavilyKey?: boolean; transcriptTranslationEnabled?: boolean; transcriptTranslationProvider?: string; transcriptTranslationModel?: string; transcriptTranslationPrompt?: string; transcriptTranslationDisplayMode?: 'original' | 'translated' | 'both'; transcriptTranslationSourceLanguage?: string; transcriptTranslationTargetLanguage?: string; geminiPreferredModel?: string; groqPreferredModel?: string; openaiPreferredModel?: string; claudePreferredModel?: string }>
+  getStoredCredentials: () => Promise<{ connectionHeaders?: Record<string, HeaderState[]>; hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; groqSttModel?: string; sttModels?: Record<string, string>; hasSonioxKey?: boolean; hasTavilyKey?: boolean; transcriptTranslationEnabled?: boolean; transcriptTranslationProvider?: string; transcriptTranslationModel?: string; transcriptTranslationPrompt?: string; transcriptTranslationDisplayMode?: 'original' | 'translated' | 'both'; transcriptTranslationSourceLanguage?: string; transcriptTranslationTargetLanguage?: string; geminiPreferredModel?: string; groqPreferredModel?: string; openaiPreferredModel?: string; claudePreferredModel?: string }>
   testTranscriptTranslation: (draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => Promise<{ success: boolean; sample: string; translatedText?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
   getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both'; sourceLanguage: string; targetLanguage: string }>
   setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both'; sourceLanguage?: string; targetLanguage?: string }) => Promise<{ success: boolean }>
@@ -109,9 +111,9 @@ export interface ElectronAPI {
   agentWorkspacePick: () => Promise<{ canceled: boolean; root?: string; error?: string }>
   agentWorkspaceClear: () => Promise<{ success: boolean }>
   aiConnectionsList: () => Promise<AiConnectionView[]>
-  aiConnectionSave: (input: { id?: string; name?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; id?: string; error?: string }>
+  aiConnectionSave: (input: { id?: string; name?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string; headerEdits?: HeaderEdit[] }) => Promise<{ success: boolean; id?: string; error?: string }>
   aiConnectionDelete: (id: string) => Promise<{ success: boolean; error?: string }>
-  aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
+  aiConnectionModels: (input: { id?: string; type?: AiConnectionType; baseUrl?: string; apiKey?: string; headerEdits?: HeaderEdit[] }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
   agentTest: (draft: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; reply?: string; toolCalls?: boolean | null; totalMs?: number; error?: string }>
   modelTest: (draft: { job: 'chat' | 'summary'; connectionId: string; model: string }) => Promise<{ success: boolean; reply?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
 

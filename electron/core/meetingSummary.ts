@@ -2,6 +2,8 @@
 // characters, so anything said later in a long call never reached it. Here every part is read, each
 // part is turned into notes, and the notes are merged. Nothing here logs transcript text.
 
+import { redactConnectionError, type ConnectionSecrets } from '../services/connectionSecrets';
+
 export interface SummaryData {
     overview?: string;
     keyPoints: string[];
@@ -81,7 +83,7 @@ export function parseSummary(generated: string): SummaryData | null {
  * `single` is the prompt for a transcript that fits in one part. A longer one is read part by part
  * and merged. A part that fails is skipped; if none succeeds the result is null.
  */
-export async function summarizeMeeting(context: string, generate: Generate, single: string): Promise<SummaryData | null> {
+export async function summarizeMeeting(context: string, generate: Generate, single: string, secrets?: ConnectionSecrets): Promise<SummaryData | null> {
     const chunks = splitIntoChunks(context);
     if (chunks.length <= 1) {
         const generated = await generate(single, context);
@@ -95,7 +97,7 @@ export async function summarizeMeeting(context: string, generate: Generate, sing
             if (parsed) notes.push(parsed);
             else console.warn(`[MeetingSummary] Part ${index + 1} of ${chunks.length} gave no usable notes`);
         } catch (error) {
-            console.warn(`[MeetingSummary] Part ${index + 1} of ${chunks.length} failed:`, (error as Error).message);
+            console.warn(`[MeetingSummary] Part ${index + 1} of ${chunks.length} failed:`, redactConnectionError(error, secrets).message);
         }
     }
     if (notes.length === 0) return null;
