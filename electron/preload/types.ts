@@ -4,6 +4,8 @@ import type { KeybindStatus, KeybindResult } from '../services/KeybindManager'
 import type { NotesIndexStatus } from '../knowledge/types'
 
 export interface ElectronAPI {
+  embeddingStatus: () => Promise<{ providerName: string | null; dimensions: number | null; usingSelected: boolean; selectedLabel: string | null; incompatible: number; meetingCount: number; failedMeetings: number; firstError: string | null }>
+  reindexAllMeetings: () => Promise<{ success: boolean; error?: string }>
   aiConnectionsList: () => Promise<ConnectionView[]>
   aiConnectionSave: (input: { id?: string; name?: string; type?: ConnectionType; baseUrl?: string; apiKey?: string; headerEdits?: HeaderEdit[] }) => Promise<{ success: boolean; id?: string; error?: string }>
   aiConnectionModels: (input: { id?: string; type?: ConnectionType; baseUrl?: string; apiKey?: string; headerEdits?: HeaderEdit[] }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
@@ -202,7 +204,7 @@ export interface ElectronAPI {
   ragCancelQuery: (options: { meetingId?: string; global?: boolean }) => Promise<{ success: boolean }>
   ragIsMeetingProcessed: (meetingId: string) => Promise<boolean>
   ragGetQueueStatus: () => Promise<{ pending: number; processing: number; completed: number; failed: number }>
-  ragRetryEmbeddings: () => Promise<{ success: boolean }>
+  ragRetryEmbeddings: () => Promise<{ success: boolean; error?: string }>
   onRAGStreamChunk: (callback: (data: { meetingId?: string; global?: boolean; chunk: string }) => void) => () => void
   onRAGStreamComplete: (callback: (data: { meetingId?: string; global?: boolean }) => void) => () => void
   onRAGStreamError: (callback: (data: { meetingId?: string; global?: boolean; error: string }) => void) => () => void
