@@ -26,6 +26,7 @@ export function getAnswerSources() {
 }
 
 export const PAST_MEETING_SEARCH_OFF = 'Past-meeting search is turned off.';
+export const MATERIALS_SEARCH_OFF = 'Materials are turned off for answering.';
 
 export class SettingsManager {
     private static instance: SettingsManager;
