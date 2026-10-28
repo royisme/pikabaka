@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
 import ConnectionModelPicker from './ConnectionModelPicker';
+import AnswerLanguageSetting from './AnswerLanguageSetting';
+import AnswerStyleSettings from './AnswerStyleSettings';
 
 type ModelUse = { connectionId: string; model: string; supportsImages?: boolean };
 type Job = 'chat' | 'summary' | 'agent';
@@ -46,7 +48,7 @@ const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
     const tested = test.data;
 
     return (
-        <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-3">
+        <div className="min-w-0 bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-3">
             <div>
                 <h4 className="text-sm font-bold text-text-primary mb-1">{labels[job]}</h4>
                 <p className="text-xs text-text-secondary">{descriptions[job]}</p>
@@ -109,6 +111,12 @@ const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
                 )}
             </fieldset>
             {job === 'chat' && (!saved?.connectionId || !saved.model) && <p className="text-xs text-text-secondary">Not chosen: chat answers will say so until you pick a model.</p>}
+            {job === 'chat' && (
+                <>
+                    <AnswerLanguageSetting />
+                    <AnswerStyleSettings />
+                </>
+            )}
         </div>
     );
 };

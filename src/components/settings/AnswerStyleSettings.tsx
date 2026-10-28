@@ -15,6 +15,7 @@ const AnswerStyleSettings: React.FC = () => {
     const queryClient = useQueryClient();
     const { data: saved } = useQuery(['answer-style'], () => window.electronAPI.getAnswerStyle());
     const [draft, setDraft] = useState<string | null>(null);
+    const [expanded, setExpanded] = useState(false);
     const value = draft ?? saved ?? '';
 
     const save = useMutation(
@@ -31,42 +32,51 @@ const AnswerStyleSettings: React.FC = () => {
     );
 
     return (
-        <div className="px-4 py-3 space-y-2">
-            <div>
-                <h3 className="text-sm font-bold text-text-primary">How answers sound</h3>
-                <p className="text-xs text-text-secondary mt-0.5">
+        <div className="min-w-0 space-y-2">
+            <button
+                type="button"
+                aria-expanded={expanded}
+                aria-controls="answer-style-settings"
+                onClick={() => setExpanded(!expanded)}
+                className="bg-bg-component hover:bg-bg-elevated border border-border-subtle rounded-lg px-3 py-1.5 text-xs font-medium text-text-primary"
+            >
+                How answers sound
+            </button>
+            <div id="answer-style-settings" hidden={!expanded} className="space-y-2">
+                <p className="text-xs text-text-secondary">
                     Answers are written to be said out loud: short sentences, and a STAR shape for stories. Describe the voice, or name a person whose manner of speaking to borrow (only the manner, never their words or life). Empty means plain and conversational.
                 </p>
-            </div>
-            <div className="flex items-center gap-2">
-                <input
-                    type="text"
-                    value={value}
-                    maxLength={200}
-                    onChange={(e) => { save.reset(); setDraft(e.target.value); }}
-                    placeholder="Plain, direct and conversational"
-                    className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
-                />
-                <button
-                    onClick={() => save.mutate(value)}
-                    disabled={save.isLoading || draft === null}
-                    className={`shrink-0 h-11 px-4 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${save.isSuccess && draft === null ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
-                >
-                    {save.isLoading ? 'Saving…' : save.isSuccess && draft === null ? 'Saved!' : 'Save'}
-                </button>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-                {PRESETS.map((preset) => (
+                <div className="flex flex-wrap items-center gap-2">
+                    <input
+                        type="text"
+                        aria-label="How answers sound"
+                        value={value}
+                        maxLength={200}
+                        onChange={(e) => { save.reset(); setDraft(e.target.value); }}
+                        placeholder="Plain, direct and conversational"
+                        className="min-w-0 flex-1 basis-48 h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
+                    />
                     <button
-                        key={preset}
-                        onClick={() => { save.reset(); setDraft(preset); }}
-                        className="px-2 py-1 rounded-full border border-border-subtle text-[11px] text-text-secondary hover:text-text-primary transition-colors"
+                        onClick={() => save.mutate(value)}
+                        disabled={save.isLoading || draft === null}
+                        className={`shrink-0 h-11 px-4 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${save.isSuccess && draft === null ? 'bg-state-success-soft text-state-success' : 'bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary'}`}
                     >
-                        {preset}
+                        {save.isLoading ? 'Saving…' : save.isSuccess && draft === null ? 'Saved!' : 'Save'}
                     </button>
-                ))}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                    {PRESETS.map((preset) => (
+                        <button
+                            key={preset}
+                            onClick={() => { save.reset(); setDraft(preset); }}
+                            className="px-2 py-1 rounded-full bg-bg-component border border-border-subtle text-[11px] text-text-secondary hover:text-text-primary transition-colors"
+                        >
+                            {preset}
+                        </button>
+                    ))}
+                </div>
+                {save.error ? <p className="text-[11px] text-state-danger">{(save.error as Error).message}</p> : null}
             </div>
-            {save.error ? <p className="text-[11px] text-state-danger">{(save.error as Error).message}</p> : null}
         </div>
     );
 };
