@@ -2,6 +2,21 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: material import design addendum, step K5b (branch `import-design`, uncommitted)
+
+- The design addendum is written and awaiting the owner's review. It is `docs/design-knowledge.md`, section "K5b: material import". It covers:
+  - a `material` value in the existing `doc_type` column (no migration);
+  - `.txt` and `.md` everywhere and `.docx` on macOS; PDF is not offered, because `pdftotext` is not bundled;
+  - caps of 20 MB, 200,000 characters and 1,000 passages; identical text is refused;
+  - an import dialog that the main process opens itself, with states in words;
+  - four new `knowledge:*` channels;
+  - a Documents block on the Sources page;
+  - documents in `search_materials`, plus a deferrable neutral quick-answer block;
+  - a one-transaction Remove across every vector dimension;
+  - a plan in three PRs (K5b1 to K5b3).
+- Four questions are open for the owner: the unused `pdf-parse` and `mammoth` dependencies; a downgrade to v2.4.0 reading documents (its interceptor has no type filter); deleted text left in free SQLite pages; and the parser-message assertion.
+- Docs only. No code was changed and no check was run. The `textutil -stdout` conversion was tried once on macOS with an invented file.
+
 ## 2026-10-28: custom headers editor, step S5b (branch `headers-editor`, uncommitted)
 
 - The custom provider editor (Add provider and edit) owns **Custom headers (optional)** under the API key: an empty state, Add header, and one row per header with its name plus a `set` mark and the page's dot, a blank value field with "Saved. Type to replace.", and Remove. Saved values never reach the renderer; rows send explicit keep/set/remove edits on Save and on the discovery Test, a new row is sent only once it has a name and a typed value, Remove on a saved row says "Removing on Save." with Keep before it applies, and Cancel makes no request. Built-ins show no section and send no `headerEdits`.
