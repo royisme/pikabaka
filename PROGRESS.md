@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: answer-source enforcement, step K4a (branch `answer-sources`, uncommitted)
+
+- Three approved settings keys are read per call: meetings default on, materials/profile off. Agent past-meeting search and global RAG refuse visibly before retrieval or renderer fallback; live and explicitly viewed-meeting queries are unchanged. Both quick-answer interceptors gate notes versus resume/roles, intro/coaching and profile/no-match fallbacks. Off kinds contribute no placeholder identity; a switched-off kind adds nothing to the answer text (no notice is prepended to answers). Non-streaming chat still ignores the knowledge system prompt, as before (a separate finding, not changed here). The legacy background-mode gate remains; no existing key changes meaning.
+- Twenty new synthetic/fake-model cases (313 assertions) cover defaults/persistence, same-object toggles, tool and global/IPC fallbacks, live/viewed scope, native/JS pre-limit kind filtering, all four source combinations, notes-only users, intro/coaching and failed/no-index/no-match fallbacks. Behavior tests were observed failing for missing reader, disabled retrieval, leaked source content and invented identity before fixes. Existing knowledge tests explicitly opt in without changing assertions. Both typechecks, lint and full tap exit 0.
+- Found, not changed: toggles do not retract source text already in agent/tool/assistant history or user-supplied context; arbitrary non-viewed meeting ids are still accepted by scoped IPC. There is no `queryLive` method or secondary global-search fallback in this checkout (live IPC uses `queryMeeting`; the manager's fallback is its no-context message). Explicit profile extraction, role analysis, interview prep, company research and negotiation-script generation remain ungated. No responsibilities moved, so architecture docs are unchanged.
+- Behaviour change the owner must accept: materials and the interview profile now default to off, so a user who already has a resume or notes gets no personalization in answers until the K4c switches exist; do not release between K4a and K4c.
+- Owner: real-provider toggles, restart and the future K4c controls. No app, real provider/device, Windows or packaged build was run; mutation tooling is unavailable. No UI, dependency, indexing or persisted change beyond the three approved keys. Next: K4b/K4c.
+
 ## 2026-10-28: decision service setup, step S4 (branch `decision-setup`)
 
 - Provider setup owns a separate Decision service section below speech: URL, write-only key, Save, Test, confirmed Remove key, words/marks and real IPC errors. Proactive help keeps behaviour, model Test and log, with a plain setup link. Saves send disjoint partial fields; no IPC, stored shape, provider list, threshold, deadline or dependency changed.

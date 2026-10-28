@@ -194,8 +194,7 @@ export function buildNoMatchPrompt(question: string, identitySummary: string, de
 
 ${depthInstruction}
 
-Candidate identity: ${identitySummary}
-
+${identitySummary ? `Candidate identity: ${identitySummary}\n` : ''}
 Interview question: ${question}
 
 Instructions:
@@ -220,7 +219,7 @@ export function buildContextEnhancementPrompt(
 
 ${depthInstruction}
 
-Candidate identity: ${identitySummary}
+${identitySummary ? `Candidate identity: ${identitySummary}` : ''}
 ${jdSection}
 
 Relevant background:

@@ -3,6 +3,7 @@ import { safeHandle } from "./safeHandle"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { DatabaseManager } from "../db/DatabaseManager"
 import { buildEmbeddingConfig } from "../rag/embeddingConfig"
+import { getAnswerSources, PAST_MEETING_SEARCH_OFF } from "../services/SettingsManager"
 
 // Abort controllers of the RAG answers being streamed; module-level so a Stop from anywhere can end them.
 const activeRAGQueries = new Map<string, AbortController>();
@@ -116,6 +117,12 @@ export function registerRagHandlers(appState: AppState): void {
 
   // Query global (cross-meeting search)
   safeHandle("rag:query-global", async (event, { query }: { query: string }) => {
+    // Refuse before readiness so the renderer cannot fall back to regular chat for an opted-out search.
+    if (!getAnswerSources().meetings) {
+      event.sender.send("rag:stream-chunk", { global: true, chunk: PAST_MEETING_SEARCH_OFF });
+      event.sender.send("rag:stream-complete", { global: true });
+      return { success: true };
+    }
     const ragManager = appState.getRAGManager();
 
     if (!ragManager || !ragManager.isReady()) {

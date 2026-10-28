@@ -70,7 +70,7 @@ export class KnowledgeVectorStore {
     queryEmbedding: number[],
     limit: number,
     providerName: string,
-    docType?: DocType
+    docType?: DocType | DocType[]
   ): ScoredChunk[] {
     if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0 || limit <= 0) {
       return [];
@@ -148,7 +148,7 @@ export class KnowledgeVectorStore {
     queryEmbedding: number[],
     limit: number,
     providerName: string,
-    docType?: DocType
+    docType?: DocType | DocType[]
   ): ScoredChunk[] | null {
     const dim = queryEmbedding.length;
     const queryBlob = this.embeddingToBlob(queryEmbedding);
@@ -181,8 +181,9 @@ export class KnowledgeVectorStore {
       const params: Array<number | string> = [...chunkIds];
 
       if (docType) {
-        query += ' AND doc_type = ?';
-        params.push(docType);
+        const types = Array.isArray(docType) ? docType : [docType];
+        query += ` AND doc_type IN (${types.map(() => '?').join(',')})`;
+        params.push(...types);
       }
 
       const chunkRows = this.db.prepare(query).all(...params) as Array<Pick<ChunkRow, 'id' | 'text' | 'metadata' | 'doc_type'>>;
@@ -221,7 +222,7 @@ export class KnowledgeVectorStore {
     queryEmbedding: number[],
     limit: number,
     providerName: string,
-    docType?: DocType
+    docType?: DocType | DocType[]
   ): ScoredChunk[] {
     const compatible = this.compatibleChunks(providerName, queryEmbedding.length, docType);
     const rows = this.db.prepare(`
@@ -257,14 +258,15 @@ export class KnowledgeVectorStore {
       .slice(0, limit);
   }
 
-  private compatibleChunks(providerName: string, dimensions: number, docType?: DocType) {
+  private compatibleChunks(providerName: string, dimensions: number, docType?: DocType | DocType[]) {
+    const types = docType ? (Array.isArray(docType) ? docType : [docType]) : [];
     return {
       sql: `SELECT c.id FROM knowledge_chunks c JOIN knowledge_documents d ON d.id = c.doc_id
         WHERE length(c.embedding) = ?
           AND (d.embedding_provider IS NULL OR d.embedding_dimensions IS NULL
             OR (d.embedding_provider = ? AND d.embedding_dimensions = ?))
-          ${docType ? 'AND d.doc_type = ?' : ''}`,
-      params: [dimensions * 4, providerName, dimensions, ...(docType ? [docType] : [])],
+          ${docType ? `AND d.doc_type IN (${types.map(() => '?').join(',')})` : ''}`,
+      params: [dimensions * 4, providerName, dimensions, ...types],
     };
   }
 

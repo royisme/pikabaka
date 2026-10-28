@@ -2,6 +2,7 @@ import { app } from 'electron';
 import { readFile } from 'node:fs/promises';
 import { AppState } from '../main';
 import { CredentialsManager } from '../services/CredentialsManager';
+import { getAnswerSources, PAST_MEETING_SEARCH_OFF } from '../services/SettingsManager';
 import { DatabaseManager } from '../db/DatabaseManager';
 import { VectorStore } from '../rag/VectorStore';
 import { MeetingAgent } from './MeetingAgent';
@@ -34,6 +35,7 @@ export function getMeetingAgent(): MeetingAgent {
     recentSegments: (id, sinceMs) => DatabaseManager.getInstance().getRecentSegments(id, sinceMs),
     searchSegments: (id, query, limit) => DatabaseManager.getInstance().searchSegments(id, query, limit),
     searchMeetings: async query => {
+      if (!getAnswerSources().meetings) return PAST_MEETING_SEARCH_OFF;
       const rag = state.getRAGManager();
       if (!rag?.isReady()) throw new Error('Meeting search unavailable');
       const manager = DatabaseManager.getInstance();

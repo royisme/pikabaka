@@ -5,9 +5,14 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { KnowledgeDatabaseManager } from '../../electron/knowledge/KnowledgeDatabaseManager';
-import { KnowledgeOrchestrator } from '../../electron/knowledge/KnowledgeOrchestrator';
+import type { KnowledgeOrchestrator as Orchestrator } from '../../electron/knowledge/KnowledgeOrchestrator';
+import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 import { KnowledgeVectorStore } from '../../electron/knowledge/KnowledgeVectorStore';
 import { DocType } from '../../electron/knowledge/types';
+
+const { KnowledgeOrchestrator } = mockRequire(path.resolve('electron/knowledge/KnowledgeOrchestrator.ts'), {
+    [path.resolve('electron/services/SettingsManager.ts')]: { getAnswerSources: () => ({ meetings: true, materials: true, profile: true }) },
+}) as { KnowledgeOrchestrator: typeof Orchestrator };
 
 function setup(t: Test, legacy = false, native = false) {
     const dir = mkdtempSync(path.join(tmpdir(), 'pika-material-status-'));

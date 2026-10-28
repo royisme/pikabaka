@@ -1,6 +1,12 @@
 import t from 'tap';
-import { KnowledgeOrchestrator } from '../../../electron/knowledge/KnowledgeOrchestrator';
+import path from 'node:path';
+import type { KnowledgeOrchestrator as Orchestrator } from '../../../electron/knowledge/KnowledgeOrchestrator';
+import { mockRequire } from '../../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 import { DocType, ProfileData, JDData, DocumentRow, NegotiationState } from '../../../electron/knowledge/types';
+
+const { KnowledgeOrchestrator } = mockRequire(path.resolve('electron/knowledge/KnowledgeOrchestrator.ts'), {
+  [path.resolve('electron/services/SettingsManager.ts')]: { getAnswerSources: () => ({ meetings: true, materials: true, profile: true }) },
+}) as { KnowledgeOrchestrator: typeof Orchestrator };
 
 // ─── Mock DB Manager ───────────────────────────────────────────────
 
