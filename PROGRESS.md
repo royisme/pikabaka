@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: decision service setup, step S4 (branch `decision-setup`)
+
+- Provider setup owns a separate Decision service section below speech: URL, write-only key, Save, Test, confirmed Remove key, words/marks and real IPC errors. Proactive help keeps behaviour, model Test and log, with a plain setup link. Saves send disjoint partial fields; no IPC, stored shape, provider list, threshold, deadline or dependency changed.
+- Checks: both typechecks, lint (908 warnings, no errors) and full tap (2894 assertions) exit 0. Eight new renderer cases plus extended navigation coverage prove section placement, exact payloads in both stale-page save orders, draft/saved-key Test behaviour, confirmed single removal, and refused/rejected errors with draft retention. Missing section/controls/link and the stale overwrite were observed failing before their fixes.
+- No endpoint-only test exists: setup reuses `agentGateTest` with draft URL/key and the saved decision model, explained in the UI. Existing storage write failures remain swallowed; the gate Test requests 5 seconds but its timeout message says 2 seconds. Both are unchanged. Owner: both themes, 560px/long errors, keyboard/focus, real endpoint and restart persistence. No app, real provider/device, Windows or packaged build was run; mutation tooling is unavailable.
+
 ## 2026-10-28: dormant custom headers, step S5a (branch `headers-backend`)
 
 - Custom providers retain optional headers across unrelated saves; explicit keep/set/remove edits are validated in the main process (32 headers, 8192 total bytes; SDK-owned auth is reserved). List/status payloads expose names and set marks, never values. All three SDK clients, model lists and pi-ai models, both embedding protocols and the translation projection carry headers; selected-embedding transport changes force a rebuild.
