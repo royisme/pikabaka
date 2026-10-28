@@ -463,12 +463,7 @@ export class KnowledgeOrchestrator {
 
     if (!jdData) return null;
 
-    try {
-      return await this.interviewPrepService.generatePrep(profile, jdData);
-    } catch (error: any) {
-      console.error('[KnowledgeOrchestrator] generateInterviewPrep error:', error);
-      return null;
-    }
+    return this.interviewPrepService.generatePrep(profile, jdData);
   }
 
   feedForDepthScoring(message: string): void {

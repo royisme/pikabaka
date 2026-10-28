@@ -562,7 +562,7 @@ t.test('generateInterviewPrep() uses active JD when no jdId provided', async (t)
   t.end();
 });
 
-t.test('generateInterviewPrep() propagates error gracefully', async (t) => {
+t.test('generateInterviewPrep() returns the real model failure', async (t) => {
   const orch = new KnowledgeOrchestrator(
     createMockDbManager({
       resumeRow: EMPTY_RESUME_ROW,
@@ -572,12 +572,7 @@ t.test('generateInterviewPrep() propagates error gracefully', async (t) => {
   );
   orch.setGenerateContentFn((async () => { throw new Error('LLM exploded'); }) as any);
 
-  const originalError = console.error;
-  console.error = () => {};
-  const result = await orch.generateInterviewPrep();
-  console.error = originalError;
-
-  t.equal(result, null, 'returns null on error (error is caught)');
+  await t.rejects(orch.generateInterviewPrep(), { message: 'LLM exploded' });
   t.end();
 });
 

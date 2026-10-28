@@ -34,6 +34,9 @@ t.test('save rebuilds only the selected connection on changed headers or host; d
     registerConnectionHandlers({ getRAGManager: () => ({ initializeEmbeddings: async (config: AppAPIConfig, options: unknown) => { calls.push({ config, options }); } }) } as unknown as AppState);
     const invoke = (name: string, input?: unknown) => handlers.get(name)!(undefined, input);
     const before = structuredClone(cm.getAllCredentials());
+    t.same(await invoke('ai-connection-models', { id: 'gateway', baseUrl: '   ' }), { success: false, error: 'Enter a Base URL' }, 'a blank draft URL is refused');
+    t.same(await invoke('ai-connection-models', { type: 'openai', baseUrl: '' }), { success: false, error: 'Enter a Base URL' }, 'a blank URL on a new draft is refused');
+    t.equal(requests.length, 0, 'a blank URL sends no request');
     t.match(await invoke('ai-connection-models', { id: 'gateway', headerEdits: [{ op: 'set', name: 'X-Draft', value: 'fake-draft-secret' }] }), { success: true });
     t.match(requests[0], { headers: { 'X-Gateway': 'fake-header-secret', 'X-Draft': 'fake-draft-secret' } }, 'model-list projection carries saved and draft headers');
     await invoke('ai-connection-models', { id: 'gateway', headerEdits: [{ op: 'remove', name: 'X-Gateway' }] });

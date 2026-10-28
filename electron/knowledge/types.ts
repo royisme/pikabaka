@@ -121,7 +121,7 @@ export interface CompanyDossier {
   overview: string;
   products: string[];
   culture_ratings: {
-    overall: number;
+    overall?: number;
     work_life_balance?: number;
     compensation?: number;
     management?: number;
