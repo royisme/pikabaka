@@ -325,9 +325,11 @@ Each step is one branch and one PR, after `material-notes` (K4b/K4c) merges. Wav
 - Native and JS search score differently (a K5a finding), so the 0.3 cut-off may let in different passages on the two paths.
 - Text that is not UTF-8 imports with replacement characters.
 
-**Open questions for the owner**
+**Decisions taken to proceed (2026-10-28)**
 
-1. PDF, and DOCX on Windows: turn on the declared but unused `pdf-parse` and `mammoth` in a later step? That is a dependency decision, because it brings `pdfjs-dist` into the main process. Or stay with `.txt`, `.md` and macOS `.docx`?
-2. Downgrading to v2.4.0 sends imported passages into interview answers when knowledge mode is on there. Accept it (auto-update only moves forward, and the release notes can say so), or ask for a design that keeps old versions from reading documents?
-3. Remove leaves deleted text in free database pages until they are reused. Accept that, or turn on `PRAGMA secure_delete` for the shared database? That would also apply to meetings.
-4. May the parser's error messages become neutral (for example "…convert the file to .txt or .md")? That replaces the exact string asserted at `document-parser.test.ts:24`. The same question covers "Save the document again to retry." (`KnowledgeVectorStore.ts:38`, asserted at `material-status.test.ts:108`), which a document row would show as it is. RULES (Tests) does not let an implementer change either assertion alone.
+The owner chose to build K5b before freezing the private repository and did not answer the four questions one by one, so the implementation takes the recommended default for each. Each is reversible without rework.
+
+1. **No new dependency now.** `.txt`, `.md` and macOS `.docx` only. `pdf-parse` and `mammoth` stay declared and unused; turning them on is a later, separate decision.
+2. **Downgrade leakage accepted.** Auto-update only moves forward; the release notes say that an older Pika cannot be trusted with imported documents.
+3. **Deleted text residue accepted.** No `secure_delete`, no VACUUM in this step.
+4. **Neutral error strings allowed.** The parser's unreadable-file message and "Save the document again to retry." become neutral. The two assertions (`document-parser.test.ts:24`, `material-status.test.ts:108`) change together with the strings in the same step, and the PR says so.
