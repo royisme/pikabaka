@@ -15,6 +15,6 @@ export const AIProvidersSettings = ({ onOpenProviders }: { onOpenProviders: () =
             <WorkspaceSettings />
             <p className="text-xs text-text-secondary">The search index is under Knowledge.</p>
         </section>
-        <ProactiveHelpSettings />
+        <ProactiveHelpSettings onOpenProviders={onOpenProviders} />
     </div>
 );

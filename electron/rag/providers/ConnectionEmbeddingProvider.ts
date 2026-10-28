@@ -64,7 +64,7 @@ export class ConnectionEmbeddingProvider implements IEmbeddingProvider {
   }
 
   private async request(url: string, body: object): Promise<{ data: unknown; status: number }> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = { ...this.connection.headers, 'Content-Type': 'application/json' };
     if (this.connection.type === 'gemini') headers['x-goog-api-key'] = this.connection.apiKey;
     else if (this.connection.apiKey) headers.Authorization = `Bearer ${this.connection.apiKey}`;
     let response: Response;

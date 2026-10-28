@@ -40,6 +40,7 @@ export async function buildAgentModel(connection: Connection, modelId: string, s
     id: modelId,
     name: modelId,
     provider: connection.id,
+    headers: connection.headers,
     input,
     reasoning: false,
     // Unknown for a model Pika was not told about: conservative values, so a request is not refused for asking too much.

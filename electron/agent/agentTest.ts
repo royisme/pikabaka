@@ -1,3 +1,4 @@
+import { redactConnectionError } from '../services/connectionSecrets';
 import { classifyTranslationError } from '../transcript/translationError';
 import { buildAgentModel } from './models';
 import { loadAgentRuntime } from './loader';
@@ -16,8 +17,8 @@ export interface AgentTestResult {
 const TEXT_QUESTION = 'Reply with the single word: ready';
 const TOOL_QUESTION = 'Call the echo tool with the word "ping". Do not answer in text.';
 
-function describe(error: unknown, errorMessage?: string): string {
-  const message = (errorMessage ?? (error instanceof Error ? error.message : String(error))).replace(/\s+/g, ' ').slice(0, 300);
+function describe(connection: Connection, error: unknown, errorMessage?: string): string {
+  const message = redactConnectionError(errorMessage ?? error, connection).message.replace(/\s+/g, ' ').slice(0, 300);
   const status = Number((error as { status?: unknown } | null)?.status);
   return `${classifyTranslationError(error ?? errorMessage)}${Number.isFinite(status) ? ` (HTTP ${status})` : ''}: ${message}`;
 }
@@ -25,7 +26,7 @@ function describe(error: unknown, errorMessage?: string): string {
 /**
  * Runs the agent's model the way the agent does (same connection, same registration with pi-ai) on two
  * invented questions: a plain one, then one that offers a tool. The text of the questions is fixed and
- * invented, so the provider's own message is safe to show.
+ * invented; provider messages still need secret redaction.
  */
 export async function testAgentModel(connection: Connection, modelId: string, supportsImages: boolean): Promise<AgentTestResult> {
   const startedAt = Date.now();
@@ -40,7 +41,7 @@ export async function testAgentModel(connection: Connection, modelId: string, su
       messages: [{ role: 'user', content: TEXT_QUESTION, timestamp: Date.now() }],
     });
     if (plain.stopReason === 'error' || plain.stopReason === 'aborted') {
-      return { success: false, totalMs: Date.now() - startedAt, error: describe(undefined, plain.errorMessage ?? `The request ended with ${plain.stopReason}.`) };
+      return { success: false, totalMs: Date.now() - startedAt, error: describe(connection, undefined, plain.errorMessage ?? `The request ended with ${plain.stopReason}.`) };
     }
     const reply = plain.content.flatMap((part) => (part.type === 'text' ? [part.text] : [])).join('').trim();
 
@@ -58,6 +59,6 @@ export async function testAgentModel(connection: Connection, modelId: string, su
     }
     return { success: true, reply: reply || '(no text)', toolCalls, totalMs: Date.now() - startedAt };
   } catch (error: unknown) {
-    return { success: false, totalMs: Date.now() - startedAt, error: describe(error) };
+    return { success: false, totalMs: Date.now() - startedAt, error: describe(connection, error) };
   }
 }

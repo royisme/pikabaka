@@ -3,6 +3,9 @@ import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { CONNECTION_TYPES, isBuiltinConnection, type ConnectionType } from "../services/aiConnections"
+import { editConnectionHeaders, type HeaderEdit } from '../services/connectionHeaders'
+import { redactConnectionError, type ConnectionSecrets } from '../services/connectionSecrets'
+import { buildEmbeddingConfig } from '../rag/embeddingConfig'
 import { fetchConnectionModels } from "../utils/connectionModels"
 
 // Connections (type, host, key) and the agent's own model. The key never leaves the main process:
@@ -10,7 +13,7 @@ import { fetchConnectionModels } from "../utils/connectionModels"
 export function registerConnectionHandlers(appState: AppState): void {
   safeHandle("ai-connections-list", async () => CredentialsManager.getInstance().listConnections())
 
-  safeHandle("ai-connection-save", async (_, input: { id?: string; name?: string; type?: ConnectionType; baseUrl?: string; apiKey?: string }) => {
+  safeHandle("ai-connection-save", async (_, input: { id?: string; name?: string; type?: ConnectionType; baseUrl?: string; apiKey?: string; headerEdits?: HeaderEdit[] }) => {
     if (typeof input !== 'object' || input === null) return { success: false, error: 'Invalid connection' }
     for (const key of ['id', 'name', 'baseUrl', 'apiKey'] as const) {
       const value = input[key]
@@ -18,8 +21,18 @@ export function registerConnectionHandlers(appState: AppState): void {
     }
     if (input.type !== undefined && !CONNECTION_TYPES.includes(input.type)) return { success: false, error: 'Invalid type' }
     const cm = CredentialsManager.getInstance()
+    const previous = input.id ? cm.resolveConnection(input.id) : undefined
     const result = cm.saveConnection(input)
     if ('error' in result) return { success: false, error: result.error }
+    const current = cm.resolveConnection(result.id)
+    if (cm.getEmbeddingUse().connectionId === result.id &&
+        JSON.stringify([previous?.type, previous?.baseUrl, previous?.apiKey, previous?.headers]) !== JSON.stringify([current?.type, current?.baseUrl, current?.apiKey, current?.headers])) {
+      try {
+        await appState.getRAGManager()?.initializeEmbeddings(buildEmbeddingConfig(cm), { force: true })
+      } catch (error) {
+        return { success: false, error: redactConnectionError(error, current).message }
+      }
+    }
     return { success: true, id: result.id }
   })
 
@@ -39,21 +52,31 @@ export function registerConnectionHandlers(appState: AppState): void {
   })
 
   // Fetch the models a connection serves: a saved one by id, or a draft (type, host, key) before saving.
-  safeHandle("ai-connection-models", async (_, input: { id?: string; type?: ConnectionType; baseUrl?: string; apiKey?: string }) => {
+  safeHandle("ai-connection-models", async (_, input: { id?: string; type?: ConnectionType; baseUrl?: string; apiKey?: string; headerEdits?: HeaderEdit[] }) => {
+    let secrets: ConnectionSecrets | undefined
     try {
+      if (typeof input !== 'object' || input === null) return { success: false, error: 'Invalid connection test' }
+      for (const key of ['id', 'baseUrl', 'apiKey'] as const) {
+        if (input[key] !== undefined && (typeof input[key] !== 'string' || input[key].length > 2048)) return { success: false, error: `Invalid ${key}` }
+      }
       const cm = CredentialsManager.getInstance()
       const saved = input?.id ? cm.resolveConnection(input.id) : undefined
       const type = input?.type ?? saved?.type
       if (!type || !CONNECTION_TYPES.includes(type)) return { success: false, error: 'Choose a type' }
-      const models = await fetchConnectionModels({
-        type,
-        baseUrl: input?.baseUrl?.trim() || saved?.baseUrl || '',
-        // A draft without a key tests the saved one.
-        apiKey: input?.apiKey?.trim() || saved?.apiKey || '',
-      })
+      if (saved?.builtin && input?.headerEdits !== undefined) return { success: false, error: 'Custom headers are not supported for built-in connections' }
+      const result = editConnectionHeaders(saved?.headers, input?.headerEdits)
+      if ('error' in result) return { success: false, error: result.error }
+      const baseUrl = input?.baseUrl?.trim() || saved?.baseUrl || ''
+      const apiKey = input?.apiKey?.trim() || saved?.apiKey || ''
+      if (saved && (baseUrl.replace(/\/+$/, '') !== saved.baseUrl || type !== saved.type) &&
+          ((!input?.apiKey?.trim() && saved.apiKey) || Object.keys(result.headers ?? {}).some(name => result.headers?.[name] === saved.headers?.[name]))) {
+        return { success: false, error: 'Save the new host or interface before testing with saved credentials' }
+      }
+      secrets = { apiKey, headers: result.headers }
+      const models = await fetchConnectionModels({ type, baseUrl, apiKey, headers: result.headers })
       return { success: true, models }
     } catch (error) {
-      return { success: false, error: (error as Error).message }
+      return { success: false, error: redactConnectionError(error, secrets).message }
     }
   })
 

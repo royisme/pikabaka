@@ -3,6 +3,8 @@
 // Pika is not tied to any provider: OpenAI, Groq, OpenRouter, a gateway of your own and the like
 // are all the `openai` type with their own host; Claude and compatible services are `anthropic`.
 
+import type { HeaderState } from './connectionHeaders';
+
 export type ConnectionType = 'openai' | 'anthropic' | 'gemini';
 
 export const CONNECTION_TYPES: ConnectionType[] = ['openai', 'anthropic', 'gemini'];
@@ -27,6 +29,7 @@ export interface Connection {
     /** The host in use: the override, or the type's default. */
     baseUrl: string;
     apiKey: string;
+    headers?: Record<string, string>;
     builtin: boolean;
 }
 
@@ -39,6 +42,7 @@ export interface ConnectionView {
     /** True when the host is not the default one. */
     customBaseUrl: boolean;
     hasApiKey: boolean;
+    headers?: HeaderState[];
     builtin: boolean;
 }
 

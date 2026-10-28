@@ -10,6 +10,18 @@ What is done, what is broken, what is unverified. `TASKS.md` is what to do next;
 - Behaviour change the owner must accept: materials and the interview profile now default to off, so a user who already has a resume or notes gets no personalization in answers until the K4c switches exist; do not release between K4a and K4c.
 - Owner: real-provider toggles, restart and the future K4c controls. No app, real provider/device, Windows or packaged build was run; mutation tooling is unavailable. No UI, dependency, indexing or persisted change beyond the three approved keys. Next: K4b/K4c.
 
+## 2026-10-28: decision service setup, step S4 (branch `decision-setup`)
+
+- Provider setup owns a separate Decision service section below speech: URL, write-only key, Save, Test, confirmed Remove key, words/marks and real IPC errors. Proactive help keeps behaviour, model Test and log, with a plain setup link. Saves send disjoint partial fields; no IPC, stored shape, provider list, threshold, deadline or dependency changed.
+- Checks: both typechecks, lint (908 warnings, no errors) and full tap (2894 assertions) exit 0. Eight new renderer cases plus extended navigation coverage prove section placement, exact payloads in both stale-page save orders, draft/saved-key Test behaviour, confirmed single removal, and refused/rejected errors with draft retention. Missing section/controls/link and the stale overwrite were observed failing before their fixes.
+- No endpoint-only test exists: setup reuses `agentGateTest` with draft URL/key and the saved decision model, explained in the UI. Existing storage write failures remain swallowed; the gate Test requests 5 seconds but its timeout message says 2 seconds. Both are unchanged. Owner: both themes, 560px/long errors, keyboard/focus, real endpoint and restart persistence. No app, real provider/device, Windows or packaged build was run; mutation tooling is unavailable.
+
+## 2026-10-28: dormant custom headers, step S5a (branch `headers-backend`)
+
+- Custom providers retain optional headers across unrelated saves; explicit keep/set/remove edits are validated in the main process (32 headers, 8192 total bytes; SDK-owned auth is reserved). List/status payloads expose names and set marks, never values. All three SDK clients, model lists and pi-ai models, both embedding protocols and the translation projection carry headers; selected-embedding transport changes force a rebuild.
+- Shared redaction covers model/Agent/translation Tests, SDK error boundaries and summary logs; corrupt credential JSON logs no content. Failing tests were observed before fixes; synthetic stores, SDK/HTTP loopback requests and fetch stubs verify storage, validation, transport, redaction and real embedding-provider replacement. Both typechecks, lint and full tap pass.
+- No UI, encryption, dependency, channel, speech, decision, Tavily or Automatic embedding change. Owner: real gateways/keys, restart, Windows and packaged app. Mutation check unavailable (`mutator` absent); Node 26 tests shim the removed SlowBuffer API for the installed Google auth dependency. Existing swallowed credential write failures remain SEC1; pi-durable still persists raw model error details internally (not exposed by Pika's classified Agent events).
+
 ## 2026-10-28: material provenance and notes index status, step K5a (branch `material-status`)
 
 - Four owner-approved nullable columns are added with guarded, idempotent ALTERs; old rows remain NULL/Unknown. Knowledge vector writes replace native/BLOB vectors and provenance in one transaction. Failures retain the previous vectors/provenance and store only the first line of the thrown error; background logs carry the document id, not the error body or source text.

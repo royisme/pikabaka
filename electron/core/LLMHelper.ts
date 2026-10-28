@@ -6,6 +6,7 @@ import {
   HARD_SYSTEM_PROMPT, GROQ_SYSTEM_PROMPT, OPENAI_SYSTEM_PROMPT, CLAUDE_SYSTEM_PROMPT
 } from "../llm/prompts"
 import { openAiRoot, type Connection } from '../services/aiConnections';
+import { redactConnectionError } from '../services/connectionSecrets';
 import { CredentialsManager } from '../services/CredentialsManager';
 import { getAnswerSources } from '../services/SettingsManager';
 import { buildTranscriptTranslationPrompt } from '../transcript/translationExecutor';
@@ -52,7 +53,7 @@ export interface TranscriptTranslationRequest {
   /** Per-segment language detected by STT provider (overrides sourceLanguageKey as a hint when present). */
   detectedLanguageKey?: string;
   /** When provider is `connection`: the connection chosen for translation (its type decides how it is called). */
-  connection?: { type: Connection['type']; baseUrl: string; apiKey: string };
+  connection?: Pick<Connection, 'type' | 'baseUrl' | 'apiKey' | 'headers'>;
   /** Previous translated turns, oldest first, for terminology/pronoun consistency. */
   context?: Array<{ source: string; translation: string }>;
 }
@@ -81,11 +82,11 @@ export class LLMHelper {
   private connectionClients(c: NonNullable<TranscriptTranslationRequest['connection']>) {
     const key = c.apiKey.trim();
     return {
-      openai: () => new OpenAI({ apiKey: key || 'none', baseURL: openAiRoot(c.baseUrl) }),
-      anthropic: () => new Anthropic({ apiKey: key, baseURL: c.baseUrl }),
+      openai: () => new OpenAI({ apiKey: key || 'none', baseURL: openAiRoot(c.baseUrl), defaultHeaders: c.headers }),
+      anthropic: () => new Anthropic({ apiKey: key, baseURL: c.baseUrl, defaultHeaders: c.headers }),
       gemini: () => new GoogleGenAI({
         apiKey: key,
-        httpOptions: { apiVersion: "v1alpha", ...(c.baseUrl.includes('generativelanguage.googleapis.com') ? {} : { baseUrl: c.baseUrl }) },
+        httpOptions: { headers: c.headers, apiVersion: "v1alpha", ...(c.baseUrl.includes('generativelanguage.googleapis.com') ? {} : { baseUrl: c.baseUrl }) },
       }),
     };
   }
@@ -133,64 +134,68 @@ export class LLMHelper {
     history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
     signal?: AbortSignal
   ): AsyncGenerator<string, void, unknown> {
-    signal?.throwIfAborted();
-    const images = await Promise.all((imagePaths ?? []).map(async p => (await fs.promises.readFile(p)).toString('base64')));
-    const clients = this.connectionClients(c);
-    if (c.type === 'anthropic') {
-      const stream = await clients.anthropic().messages.stream({
-        model,
-        max_tokens: 8192,
-        system: systemPrompt,
-        messages: [...history, ...(userContent === undefined ? [] : [{
-          role: "user" as const,
-          content: [
-            ...images.map(data => ({ type: "image" as const, source: { type: "base64" as const, media_type: "image/png" as const, data } })),
-            { type: "text" as const, text: userContent },
+    try {
+      signal?.throwIfAborted();
+      const images = await Promise.all((imagePaths ?? []).map(async p => (await fs.promises.readFile(p)).toString('base64')));
+      const clients = this.connectionClients(c);
+      if (c.type === 'anthropic') {
+        const stream = await clients.anthropic().messages.stream({
+          model,
+          max_tokens: 8192,
+          system: systemPrompt,
+          messages: [...history, ...(userContent === undefined ? [] : [{
+            role: "user" as const,
+            content: [
+              ...images.map(data => ({ type: "image" as const, source: { type: "base64" as const, media_type: "image/png" as const, data } })),
+              { type: "text" as const, text: userContent },
+            ],
+          }])],
+        }, { signal });
+        for await (const event of stream) {
+          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') yield event.delta.text;
+        }
+        return;
+      }
+      if (c.type === 'gemini') {
+        const stream = await clients.gemini().models.generateContentStream({
+          model,
+          config: { systemInstruction: systemPrompt, abortSignal: signal },
+          contents: [
+            ...history.map(message => ({ role: message.role === 'assistant' ? 'model' : 'user', parts: [{ text: message.content }] })),
+            ...(userContent === undefined ? [] : [{ role: "user", parts: [{ text: userContent }, ...images.map(data => ({ inlineData: { mimeType: "image/png", data } }))] }]),
           ],
-        }])],
-      }, { signal });
-      for await (const event of stream) {
-        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') yield event.delta.text;
+        });
+        for await (const chunk of stream) {
+          if (chunk.text) yield chunk.text;
+        }
+        return;
       }
-      return;
-    }
-    if (c.type === 'gemini') {
-      const stream = await clients.gemini().models.generateContentStream({
+      const stream = await clients.openai().chat.completions.create({
         model,
-        config: { systemInstruction: systemPrompt, abortSignal: signal },
-        contents: [
-          ...history.map(message => ({ role: message.role === 'assistant' ? 'model' : 'user', parts: [{ text: message.content }] })),
-          ...(userContent === undefined ? [] : [{ role: "user", parts: [{ text: userContent }, ...images.map(data => ({ inlineData: { mimeType: "image/png", data } }))] }]),
+        stream: true,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...history,
+          ...(userContent === undefined ? [] : [{
+            role: "user" as const,
+            content: images.length
+              ? [{ type: "text" as const, text: userContent }, ...images.map(data => ({ type: "image_url" as const, image_url: { url: `data:image/png;base64,${data}` } }))]
+              : userContent,
+          }]),
         ],
-      });
+        ...(c.baseUrl.includes('api.openai.com') ? { max_completion_tokens: 8192 } : { max_tokens: 8192 }),
+      }, { signal });
       for await (const chunk of stream) {
-        if (chunk.text) yield chunk.text;
+        const content = chunk.choices[0]?.delta?.content;
+        if (content) yield content;
       }
-      return;
-    }
-    const stream = await clients.openai().chat.completions.create({
-      model,
-      stream: true,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...history,
-        ...(userContent === undefined ? [] : [{
-          role: "user" as const,
-          content: images.length
-            ? [{ type: "text" as const, text: userContent }, ...images.map(data => ({ type: "image_url" as const, image_url: { url: `data:image/png;base64,${data}` } }))]
-            : userContent,
-        }]),
-      ],
-      ...(c.baseUrl.includes('api.openai.com') ? { max_completion_tokens: 8192 } : { max_tokens: 8192 }),
-    }, { signal });
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) yield content;
+    } catch (error) {
+      throw redactConnectionError(error, c);
     }
   }
 
   public testModel(connection: Connection, model: string): Promise<ModelTestResult> {
-    return runModelTest(this.streamViaConnectionChat(connection, model, 'You are a connection test.', 'Reply with the single word: ready'), connection.apiKey);
+    return runModelTest(this.streamViaConnectionChat(connection, model, 'You are a connection test.', 'Reply with the single word: ready'), connection.apiKey, connection.headers);
   }
 
   private async generateViaConnectionChat({ systemPrompt, userContent, imagePaths }: {
@@ -268,7 +273,7 @@ export class LLMHelper {
       // A 400 while a thinking setting was sent: ask again with the next setting, or none when none is left.
       const status = Number((error as { status?: unknown } | null)?.status);
       const model = request.model?.trim() ?? '';
-      if (status !== 400 || !translationThinking(model)) throw error;
+      if (status !== 400 || !translationThinking(model)) throw redactConnectionError(error, request.connection);
       refusedThinkingSettings.set(model, (refusedThinkingSettings.get(model) ?? 0) + 1);
       console.warn('[LLMHelper] The host rejected a thinking setting; trying the next one');
       return this.translateTranscriptText(request, onProgress);
