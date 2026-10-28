@@ -6,7 +6,7 @@ What is done, what is broken, what is unverified. `TASKS.md` is what to do next;
 
 - The owner chose to finish and merge every open step, sync `main` to the private repository `royisme/meetingCopa`, and only then remove the interview framing from the public product. `TASKS.md` now holds the wave order, the steps added from this session's findings (B1, the K6 and SEC1 additions) and the open owner decisions.
 - `royisme/meetingCopa` is a private mirror of `main` at `b18ea25` (branches and tags, history preserved); remote `private` exists in the main checkout. It carries the full-feature version after the removal. Not done yet: sync after the last wave, the removal itself.
-- Opus is designing the process-disguise removal and the "Hide from screen share" rename; the AGENTS/RULES stealth rule text changes only with that step.
+- Opus's design for the process-disguise removal and the "Hide from screen share" rename is `docs/design-strip-stealth.md` (five small steps, a merge recipe for the private repository, device checks). Found by it: `scripts/ad-hoc-sign.js` also disguises the helper process names at build time. The AGENTS/RULES stealth rule text changes only with step X0, after the owner approves the contracts in its section 3.
 
 ## 2026-10-28: vector integrity, step V1 (branch `vector-integrity`)
 
