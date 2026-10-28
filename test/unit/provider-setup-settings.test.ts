@@ -67,6 +67,20 @@ t.test('Settings preserves the sidebar order and every initialTab id', t => {
     t.end();
 });
 
+t.test('Provider setup shows storage notices with words and marks, only for plaintext or locked', t => {
+    const plaintext = renderSettings('providers', [], { storage: { mode: 'plaintext', reason: 'No keychain on this invented system.' } });
+    t.match(plaintext, '▲ Keys are stored in a plain local file.');
+    t.match(plaintext, 'No keychain on this invented system.');
+    const locked = renderSettings('providers', [], { storage: { mode: 'locked', reason: 'Invented secure storage is locked.' } });
+    t.match(locked, '✕ Stored credentials are locked.');
+    t.match(locked, 'Invented secure storage is locked.');
+    const encrypted = renderSettings('providers', [], { storage: { mode: 'encrypted' } });
+    t.notMatch(encrypted, 'Keys are stored in a plain local file');
+    t.notMatch(encrypted, 'Stored credentials are locked');
+    t.notMatch(renderSettings('ai-providers', [], { storage: { mode: 'plaintext', reason: 'Invented notice reason' } }), 'Invented notice reason', 'notice belongs to Provider setup only');
+    t.end();
+});
+
 t.test('Provider setup alone renders the provider list without presets and with a model-jobs link', t => {
     const html = renderSettings('providers');
     t.match(html, /<h3[^>]*>Provider setup<\/h3>/);
@@ -129,7 +143,7 @@ t.test('Audio keeps speech selection but replaces account/key fields with a plai
     t.end();
 });
 
-t.test('Audio still offers every service, uses saved keys for model Fetch, and its setup link opens Provider setup', t => {
+t.test('Audio offers every configured service, uses saved keys for model Fetch, and its setup link opens Provider setup', t => {
     const state: unknown[] = [];
     let index = 0;
     const client = new QueryClient();
@@ -144,7 +158,10 @@ t.test('Audio still offers every service, uses saved keys for model Fetch, and i
             },
             useEffect: noop, useRef: (value: unknown) => ({ current: value }), useMemo: (fn: () => unknown) => fn(),
         },
-        'react-query': { ...ReactQuery, useQueryClient: () => client, useQuery: () => ({}) },
+        'react-query': { ...ReactQuery, useQueryClient: () => client, useQuery: (key: string[]) => key[0] === 'speech-credentials' ? { data: {
+            googleServiceAccountPath: '/synthetic/account.json', hasSttGroqKey: true, hasSttOpenaiKey: true,
+            hasDeepgramKey: true, hasElevenLabsKey: true, hasAzureKey: true, hasIbmWatsonKey: true, hasSonioxKey: true,
+        } } : {} },
         'framer-motion': FramerMotion,
         [path.resolve('src/hooks/useShortcuts.ts')]: { useShortcuts: () => ({ shortcuts: {}, updateShortcut: noop, resetShortcuts: noop }) },
         [path.resolve('src/hooks/useMainEvent.ts')]: { useMainEvent: noop },

@@ -5,6 +5,7 @@ import { app } from 'electron';
 import fs from 'fs';
 import * as sqliteVec from 'sqlite-vec';
 import * as meetingRecord from './meetingRecord';
+import { VectorStore } from '../rag/VectorStore';
 
 // Interfaces for our data objects
 export interface Meeting {
@@ -847,6 +848,12 @@ export class DatabaseManager {
             // but SQLite handles cascades). Using a transaction ensures we never
             // end up in a half-cleared state if one statement fails.
             this.db.transaction(() => {
+                try {
+                    VectorStore.clearNativeVectors(this.db!);
+                } catch {
+                    // The SQL flush still works when an existing vec0 table cannot be opened.
+                    console.warn('[DatabaseManager] Could not clear native meeting vectors');
+                }
                 this.db!.exec('DELETE FROM embedding_queue');
                 this.db!.exec('DELETE FROM chunk_summaries');
                 this.db!.exec('DELETE FROM chunks');

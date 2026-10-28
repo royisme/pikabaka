@@ -59,7 +59,7 @@ export class NegotiationEngine {
     return [
       `Company: ${dossier.company}`,
       `Overview: ${dossier.overview}`,
-      `Glassdoor: ${dossier.culture_ratings.overall}/5`,
+      typeof dossier.culture_ratings.overall === 'number' ? `Glassdoor: ${dossier.culture_ratings.overall}/5` : '',
       dossier.interview_difficulty ? `Interview difficulty: ${dossier.interview_difficulty}` : '',
     ].filter(Boolean).join('\n');
   }

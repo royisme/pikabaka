@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from 'react-query';
 
 type Credentials = Awaited<ReturnType<typeof window.electronAPI.getStoredCredentials>>;
 type Service = Credentials['sttProvider'];
-const services: Array<{ id: Service; name: string; configured: (credentials: Credentials) => boolean }> = [
+export const speechServices: Array<{ id: Service; name: string; configured: (credentials: Credentials) => boolean }> = [
     { id: 'google', name: 'Google Cloud', configured: c => !!c.googleServiceAccountPath },
     { id: 'groq', name: 'Groq Whisper', configured: c => c.hasSttGroqKey },
     { id: 'openai', name: 'OpenAI', configured: c => c.hasSttOpenaiKey },
@@ -34,7 +34,7 @@ function setSpeechKey(provider: Exclude<Service, 'google'>, key: string) {
 const SpeechProvidersSettings = () => {
     const queryClient = useQueryClient();
     const credentials = useQuery(['speech-credentials'], () => window.electronAPI.getStoredCredentials());
-    const visible = services.filter(service => credentials.data && service.configured(credentials.data));
+    const visible = speechServices.filter(service => credentials.data && service.configured(credentials.data));
     const [editor, setEditor] = useState<Service | 'add' | null>(null);
     const [service, setService] = useState<Service>('google');
     const [sttKey, setSttKey] = useState('');
@@ -42,7 +42,7 @@ const SpeechProvidersSettings = () => {
     const [confirmService, setConfirmService] = useState<Service>();
     const [results, setResults] = useState<Partial<Record<Service, { success: boolean; message: string }>>>({});
     const sttProvider = editor === 'add' ? service : editor ?? 'google';
-    const selected = services.find(s => s.id === sttProvider)!;
+    const selected = speechServices.find(s => s.id === sttProvider)!;
     const configured = !!credentials.data && selected.configured(credentials.data);
     const checkKey = async () => {
         if (sttProvider === 'google') return;
@@ -128,7 +128,7 @@ const SpeechProvidersSettings = () => {
         <fieldset disabled={busy} className="space-y-3 min-w-0">
         <label className="block text-xs text-text-secondary space-y-1">Service{editor === 'add'
             ? <select aria-label="Service" value={service} onChange={e => { setService(e.target.value as Service); setSttKey(''); save.reset(); test.reset(); chooseFile.reset(); }} className={field}>
-                {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {speechServices.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
             : <input readOnly value={selected.name} className={field} />}
         </label>

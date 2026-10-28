@@ -90,7 +90,7 @@ pnpm run dist           # production build via electron-builder
 
 ## Configure Models & Agent
 
-You only need **one** LLM provider and **one** STT provider to get started. All keys are stored in your OS keychain.
+You only need **one** LLM provider and **one** STT provider to get started. Keys are encrypted with the operating system's secure storage when available; otherwise Pika keeps a plain local file and shows a notice in Provider setup.
 
 ### LLM Providers
 
@@ -120,7 +120,7 @@ Three-process Electron app:
 ```
             ┌─────────────────────────────────────┐
             │ Electron Main (Node + native deps)  │
-            │  IPC · keychain · provider routing  │
+            │  IPC · storage · provider routing   │
             └────────────┬────────────────────────┘
               IPC bridge │
             ┌────────────┴───────────┐    ┌──────────────────┐
@@ -129,7 +129,7 @@ Three-process Electron app:
             └────────────────────────┘    └──────────────────┘
 ```
 
-Local data lives in `~/Library/Application Support/Pika` (macOS) or `%APPDATA%\Pika` (Windows). API keys live in the OS keychain. No telemetry runs by default.
+Local data lives in `~/Library/Application Support/Pika` (macOS) or `%APPDATA%\Pika` (Windows). API keys and custom header values use the credential storage described below. No telemetry runs by default.
 
 ## System Requirements
 
@@ -156,7 +156,7 @@ Yes — AGPL-3.0. Free for personal use, study, and open-source projects. Commer
 Only if you choose a cloud STT/LLM provider. Pair Ollama with a local STT engine (or system-only transcription) for a fully offline pipeline.
 
 **Where are my API keys stored?**
-In your OS keychain — Keychain Access on macOS, Credential Manager on Windows. Never in plaintext config files.
+In a local `credentials.enc` file encrypted by Electron's `safeStorage`, using the operating system's secure storage when available (macOS Keychain, Windows DPAPI, Linux libsecret/KWallet). Credentials live under `~/.config/pika/` on macOS/Linux or `%APPDATA%\pika\` on Windows. If secure storage is unavailable, Pika keeps `credentials.json` in plaintext and shows a notice in Settings > Provider setup. On upgrade, existing plaintext is encrypted and verified before it is deleted. A decryption failure locks saves and shows a notice instead of overwriting the file. Custom header values are protected along with API keys.
 
 **How is Pika different from Cluely?**
 Open source under AGPL-3.0, no subscription, you bring your own API key, and you can run completely offline with Ollama. The overlay's global shortcuts and AI providers are configurable.

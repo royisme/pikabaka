@@ -373,10 +373,18 @@ export class VectorStore {
      * Save or update meeting summary
      */
     saveSummary(meetingId: string, summaryText: string): void {
-        this.db.prepare(`
-            INSERT OR REPLACE INTO chunk_summaries (meeting_id, summary_text)
-            VALUES (?, ?)
-        `).run(meetingId, summaryText);
+        this.db.transaction(() => {
+            try {
+                this.clearNativeVectorsForMeeting(meetingId, 'summaries');
+            } catch {
+                // A missing sqlite-vec module must not prevent saving the SQL source.
+                console.warn('[VectorStore] Could not clear native vectors for a replaced summary');
+            }
+            this.db.prepare(`
+                INSERT OR REPLACE INTO chunk_summaries (meeting_id, summary_text)
+                VALUES (?, ?)
+            `).run(meetingId, summaryText);
+        })();
     }
 
     /**
@@ -548,14 +556,19 @@ export class VectorStore {
      * Clear native vectors while their owning rows still exist, regardless of the search mode.
      */
     clearNativeVectorsForMeeting(meetingId: string, kind: 'chunks' | 'summaries' | 'all' = 'all'): void {
-        const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[];
+        VectorStore.clearNativeVectors(this.db, meetingId, kind);
+    }
+
+    static clearNativeVectors(db: Database.Database, meetingId?: string, kind: 'chunks' | 'summaries' | 'all' = 'all'): void {
+        const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[];
         for (const { name } of tables) {
             const match = /^vec_(chunks|summaries)_\d+$/.exec(name);
             if (!match || (kind !== 'all' && match[1] !== kind)) continue;
             const isChunk = match[1] === 'chunks';
             const idColumn = isChunk ? 'chunk_id' : 'summary_id';
             const source = isChunk ? 'chunks' : 'chunk_summaries';
-            this.db.prepare(`DELETE FROM ${name} WHERE ${idColumn} IN (SELECT id FROM ${source} WHERE meeting_id = ?)`).run(meetingId);
+            if (meetingId === undefined) db.prepare(`DELETE FROM ${name}`).run();
+            else db.prepare(`DELETE FROM ${name} WHERE ${idColumn} IN (SELECT id FROM ${source} WHERE meeting_id = ?)`).run(meetingId);
         }
     }
 

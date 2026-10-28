@@ -29,6 +29,7 @@ export class EmbeddingPipeline {
     private db: Database.Database;
     private vectorStore: VectorStore;
     private processingPromise: Promise<void> | null = null;
+    private reindexMeetings = new Set<string>();
     private liveBatches = new Set<Promise<number>>();
     private initPromise: Promise<void> | null = null;
     /** Tracks the config used in the most recent successful initialize() call to enable idempotency. */
@@ -251,6 +252,20 @@ export class EmbeddingPipeline {
         })();
     }
 
+    queueMeetingReindex(meetingId: string): void {
+        this.db.transaction(() => {
+            this.db.prepare('DELETE FROM embedding_queue WHERE meeting_id = ?').run(meetingId);
+            this.db.prepare(`
+                INSERT INTO embedding_queue (meeting_id, chunk_id, status)
+                SELECT meeting_id, id, 'pending' FROM chunks WHERE meeting_id = ?
+            `).run(meetingId);
+            if (this.db.prepare('SELECT 1 FROM chunk_summaries WHERE meeting_id = ?').get(meetingId)) {
+                this.queueMeetingSummary(meetingId);
+            }
+        })();
+        this.reindexMeetings.add(meetingId);
+    }
+
     /**
      * Process pending embeddings from queue, retaining exhausted jobs as failed.
      */
@@ -299,13 +314,21 @@ export class EmbeddingPipeline {
                 break;
             }
 
-            // Mark as processing
+            const reindex = this.reindexMeetings.has(pending.meeting_id);
+            const jobs = reindex ? this.db.prepare(`
+                SELECT id FROM embedding_queue WHERE meeting_id = ? AND status = 'pending'
+            `).all(pending.meeting_id) as { id: number }[] : [{ id: pending.id }];
+            const ids = jobs.map(job => job.id);
+            const placeholders = ids.map(() => '?').join(',');
             this.db.prepare(
-                `UPDATE embedding_queue SET status = 'processing' WHERE id = ?`
-            ).run(pending.id);
+                `UPDATE embedding_queue SET status = 'processing' WHERE id IN (${placeholders})`
+            ).run(...ids);
 
             try {
-                if (pending.chunk_id) {
+                if (reindex) {
+                    await this.embedWholeMeeting(pending.meeting_id, activeProvider);
+                    this.reindexMeetings.delete(pending.meeting_id);
+                } else if (pending.chunk_id) {
                     await this.embedChunk(pending.chunk_id, activeProvider);
                 } else {
                     await this.embedMeetingSummary(pending.meeting_id, activeProvider);
@@ -315,8 +338,8 @@ export class EmbeddingPipeline {
                 this.db.prepare(`
                     UPDATE embedding_queue
                     SET status = 'completed', processed_at = ?
-                    WHERE id = ?
-                `).run(new Date().toISOString(), pending.id);
+                    WHERE id IN (${placeholders})
+                `).run(new Date().toISOString(), ...ids);
 
             } catch (error: any) {
                 const newRetryCount = pending.retry_count + 1;
@@ -330,8 +353,8 @@ export class EmbeddingPipeline {
                 this.db.prepare(`
                     UPDATE embedding_queue
                     SET status = ?, retry_count = ?, error_message = ?
-                    WHERE id = ?
-                `).run(exhausted ? 'failed' : 'pending', newRetryCount, error.message, pending.id);
+                    WHERE id IN (${placeholders})
+                `).run(exhausted ? 'failed' : 'pending', newRetryCount, error.message, ...ids);
 
                 if (!exhausted) {
                     const delay = RETRY_DELAY_BASE_MS * Math.pow(2, pending.retry_count);
@@ -339,6 +362,31 @@ export class EmbeddingPipeline {
                 }
             }
         }
+    }
+
+    async retryFailedEmbeddings(): Promise<void> {
+        if (!this.provider) throw new Error('No active embedding provider available');
+        // A failed rebuild can survive a restart with the old provider still recorded.
+        const incompatible = this.db.prepare(`
+            SELECT DISTINCT q.meeting_id FROM embedding_queue q JOIN meetings m ON m.id = q.meeting_id
+            WHERE q.status = 'failed' AND m.embedding_provider IS NOT NULL
+                AND (m.embedding_provider != ? OR m.embedding_dimensions != ?)
+        `).all(this.provider.name, this.provider.dimensions) as { meeting_id: string }[];
+        for (const row of incompatible) this.reindexMeetings.add(row.meeting_id);
+        this.db.transaction(() => {
+            // NULL chunk ids bypass the unique index, including on older failed summary jobs.
+            this.db.prepare(`
+                DELETE FROM embedding_queue WHERE status = 'failed' AND chunk_id IS NULL AND (
+                    id NOT IN (SELECT MIN(id) FROM embedding_queue WHERE status = 'failed' AND chunk_id IS NULL GROUP BY meeting_id)
+                    OR meeting_id IN (SELECT meeting_id FROM embedding_queue WHERE chunk_id IS NULL AND status IN ('pending', 'processing'))
+                )
+            `).run();
+            this.db.prepare(`
+                UPDATE embedding_queue SET status = 'pending', retry_count = 0, error_message = NULL, processed_at = NULL
+                WHERE status = 'failed'
+            `).run();
+        })();
+        await this.processQueue();
     }
 
     /**
@@ -382,6 +430,32 @@ export class EmbeddingPipeline {
         this.liveBatches.add(batch);
         void batch.finally(() => { this.liveBatches.delete(batch); });
         return batch;
+    }
+
+    private async embedWholeMeeting(meetingId: string, provider: IEmbeddingProvider): Promise<void> {
+        const readChunks = () => this.db.prepare(
+            'SELECT id, cleaned_text FROM chunks WHERE meeting_id = ? ORDER BY id'
+        ).all(meetingId) as { id: number; cleaned_text: string }[];
+        const readSummary = () => this.db.prepare(
+            'SELECT id, summary_text FROM chunk_summaries WHERE meeting_id = ?'
+        ).get(meetingId) as { id: number; summary_text: string } | undefined;
+        const chunks = readChunks();
+        const summary = readSummary();
+        const vectors: { id: number; embedding: number[] }[] = [];
+        for (const chunk of chunks) vectors.push({ id: chunk.id, embedding: await provider.embed(chunk.cleaned_text) });
+        const summaryVector = summary ? await provider.embed(summary.summary_text) : null;
+        this.db.transaction(() => {
+            if (!this.db.prepare('SELECT 1 FROM meetings WHERE id = ?').get(meetingId)) return;
+            if (JSON.stringify(readChunks()) !== JSON.stringify(chunks) || JSON.stringify(readSummary()) !== JSON.stringify(summary)) {
+                throw new Error('Meeting changed while re-indexing; retry required');
+            }
+            // Keep the entire old model until all replacement vectors exist, then swap together.
+            this.vectorStore.clearNativeVectorsForMeeting(meetingId);
+            for (const vector of vectors) this.vectorStore.storeEmbedding(vector.id, vector.embedding);
+            if (summaryVector) this.vectorStore.storeSummaryEmbedding(meetingId, summaryVector);
+            this.db.prepare('UPDATE meetings SET embedding_provider = ?, embedding_dimensions = ? WHERE id = ?')
+                .run(provider.name, provider.dimensions, meetingId);
+        })();
     }
 
     /**

@@ -37,6 +37,10 @@ node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.t
 
 `pnpm run dev` starts Vite only (the renderer in a browser, without `window.electronAPI`). The app is `pnpm start` (`app:dev`).
 
+## Credential storage and downgrades
+
+Pika migrates `credentials.json` to OS-encrypted `credentials.enc` only after a verified round trip. An older Pika cannot read `credentials.enc`: downgrading after migration makes saved credentials and the settings in that file unavailable to the old version. Keep the encrypted file and use the newer version to regain access; do not delete it to fix a locked-store notice. When OS secure storage is unavailable, plaintext remains and Provider setup shows a notice. Tests substitute `safeStorage` and synthetic temporary stores; never exercise the real keychain in tests.
+
 ## Checks
 
 | Check | Command | Notes |

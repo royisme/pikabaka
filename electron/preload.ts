@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron"
 import type { KeybindStatus, KeybindResult } from './services/KeybindManager'
 import type { NotesIndexStatus } from './knowledge/types'
+import type { CredentialStorageStatus } from './services/CredentialsManager'
 
 type PreloadAgentEvent = { meetingId: string } & (
   | { type: 'run_started' | 'run_settled' }
@@ -68,10 +69,10 @@ interface ElectronAPI {
   analyzeImageFile: (path: string) => Promise<void>
   quitApp: () => Promise<void>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
-  getStoredCredentials: () => Promise<{ connectionHeaders?: Record<string, HeaderState[]>; hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: string; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; hasSonioxKey: boolean }>
+  getStoredCredentials: () => Promise<{ storage: CredentialStorageStatus; connectionHeaders?: Record<string, HeaderState[]>; hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: string; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; hasSonioxKey: boolean }>
   testTranscriptTranslation: (draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => Promise<{ success: boolean; sample: string; translatedText?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
   getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both' }>
-  setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) => Promise<{ success: boolean }>
+  setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) => Promise<{ success: boolean; error?: string }>
   agentGateGetSettings: () => Promise<{ mode: 'log' | 'on' | 'off'; model: string; baseUrl: string; hasApiKey: boolean; threshold: number; cooldownSeconds: number }>
   agentGateSetSettings: (settings: { mode?: 'log' | 'on' | 'off'; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }) => Promise<{ success: boolean; error?: string }>
   agentGateStatus: () => Promise<{ mode: 'log' | 'on' | 'off'; configured: boolean; state: 'ok' | 'unavailable' | 'unconfigured'; reason?: string; lastDecision?: AgentGateDecision }>
@@ -92,8 +93,9 @@ interface ElectronAPI {
 
   embeddingUseGet: () => Promise<{ connectionId: string; model: string }>
   embeddingUseSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
-  embeddingStatus: () => Promise<{ providerName: string | null; dimensions: number | null; usingSelected: boolean; selectedLabel: string | null; incompatible: number }>
+  embeddingStatus: () => Promise<{ providerName: string | null; dimensions: number | null; usingSelected: boolean; selectedLabel: string | null; incompatible: number; meetingCount: number; failedMeetings: number; firstError: string | null }>
   reindexIncompatibleMeetings: () => Promise<{ success: boolean; error?: string }>
+  reindexAllMeetings: () => Promise<{ success: boolean; error?: string }>
   agentGateTest: (draft: { model?: string; baseUrl?: string; apiKey?: string }) => Promise<{ success: boolean; help?: number; kind?: string; latencyMs?: number; error?: string }>
   agentModelGet: () => Promise<{ connectionId: string; model: string; supportsImages: boolean }>
   agentModelSet: (use: { connectionId: string; model: string; supportsImages?: boolean }) => Promise<{ success: boolean; error?: string }>
@@ -138,6 +140,8 @@ interface ElectronAPI {
   getSttLanguage: (speaker?: 'interviewer' | 'user') => Promise<string>
   getAiResponseLanguage: () => Promise<string>
   getAnswerStyle: () => Promise<string>
+  getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean; profile: boolean }>
+  setAnswerSources: (sources: { meetings?: boolean; materials?: boolean; profile?: boolean }) => Promise<{ success: boolean; error?: string }>
   profileGetNotes: () => Promise<string>
   profileSetNotes: (text: string) => Promise<{ success: boolean; error?: string }>
   setAnswerStyle: (style: string) => Promise<{ success: boolean; error?: string }>
@@ -263,7 +267,7 @@ interface ElectronAPI {
   ragCancelQuery: (options: { meetingId?: string; global?: boolean }) => Promise<{ success: boolean }>
   ragIsMeetingProcessed: (meetingId: string) => Promise<boolean>
   ragGetQueueStatus: () => Promise<{ pending: number; processing: number; completed: number; failed: number }>
-  ragRetryEmbeddings: () => Promise<{ success: boolean }>
+  ragRetryEmbeddings: () => Promise<{ success: boolean; error?: string }>
   onRAGStreamChunk: (callback: (data: { meetingId?: string; global?: boolean; chunk: string }) => void) => () => void
   onRAGStreamComplete: (callback: (data: { meetingId?: string; global?: boolean }) => void) => () => void
   onRAGStreamError: (callback: (data: { meetingId?: string; global?: boolean; error: string }) => void) => () => void
@@ -683,6 +687,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getSttLanguage: (speaker?: 'interviewer' | 'user') => ipcRenderer.invoke("get-stt-language", speaker),
   getAiResponseLanguage: () => ipcRenderer.invoke("get-ai-response-language"),
   getAnswerStyle: () => ipcRenderer.invoke("get-answer-style"),
+  getAnswerSources: () => ipcRenderer.invoke("answer-sources:get"),
+  setAnswerSources: (sources: { meetings?: boolean; materials?: boolean; profile?: boolean }) => ipcRenderer.invoke("answer-sources:set", sources),
   profileGetNotes: () => ipcRenderer.invoke("profile:get-notes"),
   profileSetNotes: (text: string) => ipcRenderer.invoke("profile:set-notes", text),
   setAnswerStyle: (style: string) => ipcRenderer.invoke("set-answer-style", style),
@@ -1043,6 +1049,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     }
   },
   reindexIncompatibleMeetings: () => ipcRenderer.invoke('rag:reindex-incompatible-meetings'),
+  reindexAllMeetings: () => ipcRenderer.invoke('rag:reindex-all'),
 
   onRAGStreamChunk: (callback: (data: { meetingId?: string; global?: boolean; chunk: string }) => void) => {
     const subscription = (_: any, data: any) => callback(data)
