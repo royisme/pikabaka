@@ -51,6 +51,15 @@ CI runs two workflows on pull requests: `verify.yml` (typecheck, lint, tests) an
 
 Under an agent's shell, run the tools without pnpm when `node_modules` may be out of step (see "pnpm caveat"): `node node_modules/typescript/bin/tsc --noEmit`, `node node_modules/eslint/bin/eslint.js src electron test --no-inline-config --max-warnings 1265`, `node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.ts"`.
 
+### Mutation check
+
+A passing test run does not show that the tests would catch a wrong change. When a change adds or changes tests for production logic (`electron/`, `src/lib/`; not copy, styling, pure moves or docs), run a mutation pass over the production files it changed and read the survivors. It is a review aid on the changed functions, not a CI gate and not a repository-wide score.
+
+- Tool: [unclebob/mutator](https://github.com/unclebob/mutator) (BSD-0, Python, tree-sitter only). It lives outside the repository and is not a dependency in `package.json`. Run it from a scratch worktree (`git worktree add --detach ../pika-wt/<name> main`, `node_modules` symlinked), never from the main checkout: it writes `.metrics/` and `target/`.
+- Command: `mutator --no-coverage --max-workers 4 --test-command "node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx --node-arg=--disable-warning=DEP0205 --disable-coverage test/unit/<the test>.test.ts" electron/<changed file>.ts`. `--no-coverage` is needed because tap with tsx writes no usable line coverage. A file of about 130 sites takes about two minutes.
+- Read only the functions the change touches. Functions that the single test file does not exercise report 0% and mean nothing.
+- A survivor is either a missing assertion (add it) or an equivalent mutant (it changes only a log line or reaches an unreachable branch; say so in the report). Never weaken a test to make a mutant die.
+
 ## UI changes
 
 - There is no UI or end-to-end test suite, and none is required for a UI change. Logic that can be tested without a window (scroll-follow rule, message model, translation modules) gets a unit test in `test/unit/`.
@@ -61,10 +70,11 @@ Under an agent's shell, run the tools without pnpm when `node_modules` may be ou
 
 1. Re-read your diff: no unrelated edits, debug output, screenshots or scratch files.
 2. Run the checks above and read each exit code. Report which ran and which did not.
-3. Update `TASKS.md` (the step leaves the queue, the next is named) and `PROGRESS.md`. Do not touch `CHANGELOG.md`.
-4. Commit on a branch (`type(scope): summary`; no issue number in the title; `Fixes #N` in the body). End the message with the attribution lines the session requires.
-5. Push and open a PR only when the owner asks. The PR template needs a type and a manual-test line naming the OS.
-6. Report: what changed, what was verified and how, what was not run, what the owner must check by hand.
+3. If the change adds or changes tests for production logic, run the mutation check on the changed files and report the survivors ("Mutation check" above).
+4. Update `TASKS.md` (the step leaves the queue, the next is named) and `PROGRESS.md`. Do not touch `CHANGELOG.md`.
+5. Commit on a branch (`type(scope): summary`; no issue number in the title; `Fixes #N` in the body). End the message with the attribution lines the session requires.
+6. Push and open a PR only when the owner asks. The PR template needs a type and a manual-test line naming the OS.
+7. Report: what changed, what was verified and how, what was not run, what the owner must check by hand.
 
 ## Releases
 
