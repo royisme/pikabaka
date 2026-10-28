@@ -9,9 +9,9 @@ import { useWindowEvent } from '../hooks/useWindowEvent';
 import { useMainEvent } from '../hooks/useMainEvent';
 import { useLocalStorageValue } from '../hooks/useLocalStorageValue';
 import {
-    X, Mic, Speaker, Monitor, Keyboard, BookOpen, Upload,
+    X, Mic, Speaker, Monitor, Keyboard, BookOpen,
     RotateCcw, Eye, Layout, MessageSquare,
-    ChevronDown, ChevronRight, Check, Power, Palette, Ghost, Sun, Moon, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink, Trash2,
+    ChevronDown, ChevronRight, Check, Power, Palette, Ghost, Sun, Moon, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink,
     MapPin, PointerOff,
     AlertCircle, Shield
 } from 'lucide-react';
@@ -507,31 +507,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     // STT Provider settings
     const [sttProvider, setSttProvider] = useState<'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'>('google');
     const [transcriptAssemblerProfile, setTranscriptAssemblerProfile] = useState<TranscriptAssemblerProfile>('sentence_bias');
-    const [sttGroqKey, setSttGroqKey] = useState('');
-    const [sttOpenaiKey, setSttOpenaiKey] = useState('');
-    const [sttDeepgramKey, setSttDeepgramKey] = useState('');
-    const [sttElevenLabsKey, setSttElevenLabsKey] = useState('');
-    const [sttAzureKey, setSttAzureKey] = useState('');
-    const [sttAzureRegion, setSttAzureRegion] = useState('eastus');
-    const [sttIbmKey, setSttIbmKey] = useState('');
-    const [sttTestStatus, setSttTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-    const [sttTestError, setSttTestError] = useState('');
-    const [sttSaving, setSttSaving] = useState(false);
-    const [sttSaved, setSttSaved] = useState(false);
-    const [googleServiceAccountPath, setGoogleServiceAccountPath] = useState<string | null>(null);
-    const [hasStoredSttGroqKey, setHasStoredSttGroqKey] = useState(false);
-    const [hasStoredSttOpenaiKey, setHasStoredSttOpenaiKey] = useState(false);
-    const [hasStoredDeepgramKey, setHasStoredDeepgramKey] = useState(false);
-    const [hasStoredElevenLabsKey, setHasStoredElevenLabsKey] = useState(false);
-    const [hasStoredAzureKey, setHasStoredAzureKey] = useState(false);
-    const [hasStoredIbmWatsonKey, setHasStoredIbmWatsonKey] = useState(false);
-    const [sttSonioxKey, setSttSonioxKey] = useState('');
-    const [hasStoredSonioxKey, setHasStoredSonioxKey] = useState(false);
-    const sttKey = {
-        google: '', groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey,
-        elevenlabs: sttElevenLabsKey, azure: sttAzureKey, ibmwatson: sttIbmKey,
-        soniox: sttSonioxKey,
-    }[sttProvider];
+    const { data: speechCredentials } = useQuery(
+        ['speech-credentials'],
+        () => window.electronAPI.getStoredCredentials(),
+        { enabled: isOpen && !!window.electronAPI?.getStoredCredentials }
+    );
     const [isSttDropdownOpen, setIsSttDropdownOpen] = useState(false);
     const sttDropdownRef = React.useRef<HTMLDivElement>(null);
     const [transcriptTranslationEnabled, setTranscriptTranslationEnabled] = useState(false);
@@ -564,15 +544,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 if (creds) {
                     setSttProvider(creds.sttProvider || 'google');
                     setSttModelDraft({ ...(creds.sttModels || {}), groq: creds.groqSttModel || '' });
-                    setGoogleServiceAccountPath(creds.googleServiceAccountPath);
-                    setHasStoredSttGroqKey(creds.hasSttGroqKey);
-                    setHasStoredSttOpenaiKey(creds.hasSttOpenaiKey);
-                    setHasStoredDeepgramKey(creds.hasDeepgramKey);
-                    setHasStoredElevenLabsKey(creds.hasElevenLabsKey);
-                    setHasStoredAzureKey(creds.hasAzureKey);
-                    if (creds.azureRegion) setSttAzureRegion(creds.azureRegion);
-                    setHasStoredIbmWatsonKey(creds.hasIbmWatsonKey);
-                    setHasStoredSonioxKey(creds.hasSonioxKey || false);
                     setTranscriptTranslationEnabled(!!creds.transcriptTranslationEnabled);
                     setTranscriptTranslationProvider(creds.transcriptTranslationProvider || 'ollama');
                     setTranscriptTranslationModel(creds.transcriptTranslationModel || '');
@@ -658,8 +629,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const handleSttProviderChange = async (provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => {
         setSttProvider(provider);
         setIsSttDropdownOpen(false);
-        setSttTestStatus('idle');
-        setSttTestError('');
         setSpeechResult(null);
         // Nothing is sent here: the provider is applied when Save is pressed.
         // If switching to a provider that doesn't support multi-language detection
@@ -680,157 +649,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         } catch (e) {
             console.error('Failed to set transcript segmentation profile:', e);
             setTranscriptAssemblerProfile(previousProfile);
-        }
-    };
-
-    const handleSttKeySubmit = async (provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox', key: string) => {
-        if (!key.trim()) return;
-
-        // Auto-test before saving
-        setSttSaving(true);
-        setSttTestStatus('testing');
-        setSttTestError('');
-
-        try {
-            // @ts-ignore
-            const testResult = await window.electronAPI?.testSttConnection?.(
-                provider,
-                key.trim(),
-                provider === 'azure' ? sttAzureRegion : undefined
-            );
-
-            if (!testResult?.success) {
-                setSttTestStatus('error');
-                setSttTestError(testResult?.error || 'Validation failed. Key not saved.');
-                setSttSaving(false);
-                return; // Stop save
-            }
-
-            // If success, proceed to save
-            setSttTestStatus('success');
-            setTimeout(() => setSttTestStatus('idle'), 3000);
-
-            if (provider === 'groq') {
-                // @ts-ignore
-                await window.electronAPI?.setGroqSttApiKey?.(key.trim());
-            } else if (provider === 'openai') {
-                // @ts-ignore
-                await window.electronAPI?.setOpenAiSttApiKey?.(key.trim());
-            } else if (provider === 'elevenlabs') {
-                // @ts-ignore
-                await window.electronAPI?.setElevenLabsApiKey?.(key.trim());
-            } else if (provider === 'azure') {
-                // @ts-ignore
-                await window.electronAPI?.setAzureApiKey?.(key.trim());
-            } else if (provider === 'ibmwatson') {
-                // @ts-ignore
-                await window.electronAPI?.setIbmWatsonApiKey?.(key.trim());
-            } else if (provider === 'soniox') {
-                // @ts-ignore
-                await window.electronAPI?.setSonioxApiKey?.(key.trim());
-            } else {
-                // @ts-ignore
-                await window.electronAPI?.setDeepgramApiKey?.(key.trim());
-            }
-            if (provider === 'groq') setHasStoredSttGroqKey(true);
-            else if (provider === 'openai') setHasStoredSttOpenaiKey(true);
-            else if (provider === 'elevenlabs') setHasStoredElevenLabsKey(true);
-            else if (provider === 'azure') setHasStoredAzureKey(true);
-            else if (provider === 'ibmwatson') setHasStoredIbmWatsonKey(true);
-            else if (provider === 'soniox') setHasStoredSonioxKey(true);
-            else setHasStoredDeepgramKey(true);
-
-            setSttSaved(true);
-            setTimeout(() => setSttSaved(false), 2000);
-        } catch (e: any) {
-            console.error(`Failed to save ${provider} STT key:`, e);
-            setSttTestStatus('error');
-            setSttTestError(e.message || 'Validation failed');
-        } finally {
-            setSttSaving(false);
-        }
-    };
-
-    const handleRemoveSttKey = async (provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => {
-        if (!confirm(`Are you sure you want to remove the ${provider === 'ibmwatson' ? 'IBM Watson' : provider.charAt(0).toUpperCase() + provider.slice(1)} API key?`)) return;
-
-        try {
-            if (provider === 'groq') {
-                // @ts-ignore
-                await window.electronAPI?.setGroqSttApiKey?.('');
-                setSttGroqKey('');
-                setHasStoredSttGroqKey(false);
-            } else if (provider === 'openai') {
-                // @ts-ignore
-                await window.electronAPI?.setOpenAiSttApiKey?.('');
-                setSttOpenaiKey('');
-                setHasStoredSttOpenaiKey(false);
-            } else if (provider === 'elevenlabs') {
-                // @ts-ignore
-                await window.electronAPI?.setElevenLabsApiKey?.('');
-                setSttElevenLabsKey('');
-                setHasStoredElevenLabsKey(false);
-            } else if (provider === 'azure') {
-                // @ts-ignore
-                await window.electronAPI?.setAzureApiKey?.('');
-                setSttAzureKey('');
-                setHasStoredAzureKey(false);
-            } else if (provider === 'ibmwatson') {
-                // @ts-ignore
-                await window.electronAPI?.setIbmWatsonApiKey?.('');
-                setSttIbmKey('');
-                setHasStoredIbmWatsonKey(false);
-            } else if (provider === 'soniox') {
-                // @ts-ignore
-                await window.electronAPI?.setSonioxApiKey?.('');
-                setSttSonioxKey('');
-                setHasStoredSonioxKey(false);
-            } else {
-                // @ts-ignore
-                await window.electronAPI?.setDeepgramApiKey?.('');
-                setSttDeepgramKey('');
-                setHasStoredDeepgramKey(false);
-            }
-        } catch (e) {
-            console.error(`Failed to remove ${provider} STT key:`, e);
-        }
-    };
-
-
-    const handleTestSttConnection = async () => {
-        if (sttProvider === 'google') return;
-        const hasStoredMap: Record<string, boolean> = {
-            groq: hasStoredSttGroqKey, openai: hasStoredSttOpenaiKey, deepgram: hasStoredDeepgramKey,
-            elevenlabs: hasStoredElevenLabsKey, azure: hasStoredAzureKey, ibmwatson: hasStoredIbmWatsonKey,
-            soniox: hasStoredSonioxKey,
-        };
-        const keyToTest = sttKey;
-        // Allow test with empty local key if a stored key exists (backend will use it)
-        if (!keyToTest.trim() && !hasStoredMap[sttProvider]) {
-            setSttTestStatus('error');
-            setSttTestError('Please enter an API key first');
-            return;
-        }
-
-        setSttTestStatus('testing');
-        setSttTestError('');
-        try {
-            // @ts-ignore
-            const result = await window.electronAPI?.testSttConnection?.(
-                sttProvider,
-                keyToTest.trim(),
-                sttProvider === 'azure' ? sttAzureRegion : undefined
-            );
-            if (result?.success) {
-                setSttTestStatus('success');
-                setTimeout(() => setSttTestStatus('idle'), 3000);
-            } else {
-                setSttTestStatus('error');
-                setSttTestError(result?.error || 'Connection failed');
-            }
-        } catch (e: any) {
-            setSttTestStatus('error');
-            setSttTestError(e.message || 'Test failed');
         }
     };
 
@@ -1535,14 +1353,14 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         value={sttProvider}
                                                         onChange={(val) => handleSttProviderChange(val as any)}
                                                         options={[
-                                                            { id: 'google', label: 'Google Cloud', badge: googleServiceAccountPath ? 'Saved' : null, recommended: true, desc: 'gRPC streaming via Service Account', icon: <Mic size={14} /> },
-                                                            { id: 'groq', label: 'Groq Whisper', badge: hasStoredSttGroqKey ? 'Saved' : null, recommended: true, desc: 'Ultra-fast REST transcription', icon: <Mic size={14} /> },
-                                                            { id: 'openai', label: 'OpenAI', badge: hasStoredSttOpenaiKey ? 'Saved' : null, desc: 'Streaming transcription with REST fallback', icon: <Mic size={14} /> },
-                                                            { id: 'deepgram', label: 'Deepgram', badge: hasStoredDeepgramKey ? 'Saved' : null, recommended: true, desc: 'Streaming transcription with a configurable model', icon: <Mic size={14} /> },
-                                                            { id: 'elevenlabs', label: 'ElevenLabs Scribe', badge: hasStoredElevenLabsKey ? 'Saved' : null, desc: 'Scribe v2 Realtime API', icon: <Mic size={14} /> },
-                                                            { id: 'azure', label: 'Azure Speech', badge: hasStoredAzureKey ? 'Saved' : null, desc: 'Microsoft Cognitive Services STT', icon: <Mic size={14} /> },
-                                                            { id: 'ibmwatson', label: 'IBM Watson', badge: hasStoredIbmWatsonKey ? 'Saved' : null, desc: 'IBM Watson cloud STT service', icon: <Mic size={14} /> },
-                                                            { id: 'soniox', label: 'Soniox', badge: hasStoredSonioxKey ? 'Saved' : null, recommended: true, desc: '60+ languages, multilingual, domain context', icon: <Mic size={14} /> },
+                                                            { id: 'google', label: 'Google Cloud', badge: speechCredentials?.googleServiceAccountPath ? 'Saved' : null, recommended: true, desc: 'gRPC streaming via Service Account', icon: <Mic size={14} /> },
+                                                            { id: 'groq', label: 'Groq Whisper', badge: speechCredentials?.hasSttGroqKey ? 'Saved' : null, recommended: true, desc: 'Ultra-fast REST transcription', icon: <Mic size={14} /> },
+                                                            { id: 'openai', label: 'OpenAI', badge: speechCredentials?.hasSttOpenaiKey ? 'Saved' : null, desc: 'Streaming transcription with REST fallback', icon: <Mic size={14} /> },
+                                                            { id: 'deepgram', label: 'Deepgram', badge: speechCredentials?.hasDeepgramKey ? 'Saved' : null, recommended: true, desc: 'Streaming transcription with a configurable model', icon: <Mic size={14} /> },
+                                                            { id: 'elevenlabs', label: 'ElevenLabs Scribe', badge: speechCredentials?.hasElevenLabsKey ? 'Saved' : null, desc: 'Scribe v2 Realtime API', icon: <Mic size={14} /> },
+                                                            { id: 'azure', label: 'Azure Speech', badge: speechCredentials?.hasAzureKey ? 'Saved' : null, desc: 'Microsoft Cognitive Services STT', icon: <Mic size={14} /> },
+                                                            { id: 'ibmwatson', label: 'IBM Watson', badge: speechCredentials?.hasIbmWatsonKey ? 'Saved' : null, desc: 'IBM Watson cloud STT service', icon: <Mic size={14} /> },
+                                                            { id: 'soniox', label: 'Soniox', badge: speechCredentials?.hasSonioxKey ? 'Saved' : null, recommended: true, desc: '60+ languages, multilingual, domain context', icon: <Mic size={14} /> },
                                                         ]}
                                                     />
                                                 </div>
@@ -1555,188 +1373,16 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     <SttModelPicker
                                                         provider={sttProvider}
                                                         model={sttModelDraft[sttProvider] ?? ''}
-                                                        apiKey={sttKey}
+                                                        apiKey=""
                                                         onChange={(model) => { setSttModelDraft({ ...sttModelDraft, [sttProvider]: model }); setSpeechResult(null); }}
                                                     />
-                                                    <p className="text-[11px] text-text-tertiary">Leave empty for the default. The API key below is used to fetch the list; a saved key works too.</p>
+                                                    <p className="text-[11px] text-text-tertiary">Leave empty for the default. The saved speech key is used to fetch the list.</p>
                                                 </div>
                                             )}
 
-                                            {/* Google Cloud Service Account */}
-                                            {sttProvider === 'google' && (
-                                                <div className="bg-bg-card rounded-xl border border-border-subtle p-4">
-                                                    <label className="text-xs font-medium text-text-secondary mb-2 block">Service Account JSON</label>
-                                                    <div className="flex gap-2">
-                                                        <div className="flex-1 bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-xs text-text-secondary font-mono truncate">
-                                                            {googleServiceAccountPath
-                                                                ? <span className="text-text-primary">{googleServiceAccountPath.split('/').pop()}</span>
-                                                                : <span className="text-text-tertiary italic">No file selected</span>}
-                                                        </div>
-                                                        <button
-                                                            onClick={async () => {
-                                                                // @ts-ignore
-                                                                const result = await window.electronAPI?.selectServiceAccount?.();
-                                                                if (result?.success && result.path) {
-                                                                    setGoogleServiceAccountPath(result.path);
-                                                                }
-                                                            }}
-                                                            className="px-3 py-2 bg-bg-input hover:bg-bg-elevated border border-border-subtle rounded-lg text-xs font-medium text-text-primary transition-colors flex items-center gap-2"
-                                                        >
-                                                            <Upload size={14} /> Select File
-                                                        </button>
-                                                    </div>
-                                                    <p className="text-[11px] text-text-tertiary mt-2">
-                                                        Required for Google Cloud Speech-to-Text.
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            {/* API Key Input (non-Google providers) */}
-                                            {sttProvider !== 'google' && (
-                                                <div className="bg-bg-card rounded-xl border border-border-subtle p-4 space-y-3">
-                                                    <label className="text-xs font-medium text-text-secondary block">
-                                                        {sttProvider === 'groq' ? 'Groq' : sttProvider === 'openai' ? 'OpenAI STT' : sttProvider === 'elevenlabs' ? 'ElevenLabs' : sttProvider === 'azure' ? 'Azure' : sttProvider === 'ibmwatson' ? 'IBM Watson' : sttProvider === 'soniox' ? 'Soniox' : 'Deepgram'} API Key
-                                                    </label>
-                                                    {sttProvider === 'openai' && (
-                                                        <p className="text-[11px] text-text-tertiary mb-1.5">
-                                                            This key is separate from the OpenAI connection key in Provider setup.
-                                                        </p>
-                                                    )}
-                                                    <div className="flex gap-2">
-                                                        <input
-                                                            type="password"
-                                                            value={sttKey}
-                                                            onChange={(e) => {
-                                                                if (sttProvider === 'groq') setSttGroqKey(e.target.value);
-                                                                else if (sttProvider === 'openai') setSttOpenaiKey(e.target.value);
-                                                                else if (sttProvider === 'elevenlabs') setSttElevenLabsKey(e.target.value);
-                                                                else if (sttProvider === 'azure') setSttAzureKey(e.target.value);
-                                                                else if (sttProvider === 'ibmwatson') setSttIbmKey(e.target.value);
-                                                                else if (sttProvider === 'soniox') setSttSonioxKey(e.target.value);
-                                                                else setSttDeepgramKey(e.target.value);
-                                                            }}
-                                                            placeholder={
-                                                                sttProvider === 'groq'
-                                                                    ? (hasStoredSttGroqKey ? '••••••••••••' : 'Enter Groq API key')
-                                                                    : sttProvider === 'openai'
-                                                                        ? (hasStoredSttOpenaiKey ? '••••••••••••' : 'Enter OpenAI STT API key')
-                                                                        : sttProvider === 'elevenlabs'
-                                                                            ? (hasStoredElevenLabsKey ? '••••••••••••' : 'Enter ElevenLabs API key')
-                                                                            : sttProvider === 'azure'
-                                                                                ? (hasStoredAzureKey ? '••••••••••••' : 'Enter Azure API key')
-                                                                                : sttProvider === 'ibmwatson'
-                                                                                    ? (hasStoredIbmWatsonKey ? '••••••••••••' : 'Enter IBM Watson API key')
-                                                                                    : sttProvider === 'soniox'
-                                                                                        ? (hasStoredSonioxKey ? '••••••••••••' : 'Enter Soniox API key')
-                                                                                        : (hasStoredDeepgramKey ? '••••••••••••' : 'Enter Deepgram API key')
-                                                            }
-                                                            className="flex-1 bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
-                                                        />
-                                                        <button
-                                                            onClick={() => handleSttKeySubmit(sttProvider, sttKey)}
-                                                            disabled={sttSaving || !sttKey.trim()}
-                                                            className={`px-5 py-2.5 rounded-lg text-xs font-medium transition-colors ${sttSaved
-                                                                ? 'bg-state-success-soft text-state-success'
-                                                                : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-50'
-                                                                }`}
-                                                        >
-                                                            {sttSaving ? '● Saving...' : sttSaved ? '✓ Saved' : 'Save'}
-                                                        </button>
-                                                        {(() => {
-                                                            const hasKeyMap: Record<string, boolean> = {
-                                                                groq: hasStoredSttGroqKey,
-                                                                openai: hasStoredSttOpenaiKey,
-                                                                deepgram: hasStoredDeepgramKey,
-                                                                elevenlabs: hasStoredElevenLabsKey,
-                                                                azure: hasStoredAzureKey,
-                                                                ibmwatson: hasStoredIbmWatsonKey,
-                                                                soniox: hasStoredSonioxKey,
-                                                            };
-                                                            return hasKeyMap[sttProvider] ? (
-                                                                <button
-                                                                    onClick={() => handleRemoveSttKey(sttProvider as any)}
-                                                                    className="px-2.5 py-2.5 rounded-lg text-xs font-medium text-text-tertiary hover:text-state-danger hover:bg-state-danger-soft transition-all"
-                                                                    title="Remove API Key"
-                                                                >
-                                                                    <Trash2 size={16} strokeWidth={1.5} />
-                                                                </button>
-                                                            ) : null;
-                                                        })()}
-                                                    </div>
-
-                                                    <div className="flex flex-wrap items-center gap-3">
-                                                        <button
-                                                            onClick={handleTestSttConnection}
-                                                            disabled={sttTestStatus === 'testing'}
-                                                            className="text-xs bg-bg-input hover:bg-bg-elevated text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-2 disabled:opacity-50"
-                                                        >
-                                                            {sttTestStatus === 'testing' ? (
-                                                                <><span aria-hidden="true">●</span> Checking key...</>
-                                                            ) : sttTestStatus === 'success' ? (
-                                                                <><Check size={12} className="text-state-success" /> The key is accepted</>
-                                                            ) : (
-                                                                <>Test key</>
-                                                            )}
-                                                        </button>
-                                                        {sttProvider !== 'soniox' && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    const urls: Record<string, string> = {
-                                                                        groq: 'https://console.groq.com/keys',
-                                                                        openai: 'https://platform.openai.com/api-keys',
-                                                                        deepgram: 'https://console.deepgram.com',
-                                                                        elevenlabs: 'https://elevenlabs.io/app/settings/api-keys',
-                                                                        azure: 'https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeech',
-                                                                        ibmwatson: 'https://cloud.ibm.com/catalog/services/speech-to-text'
-                                                                    };
-                                                                    if (urls[sttProvider]) {
-                                                                        // @ts-ignore
-                                                                        window.electronAPI?.openExternal(urls[sttProvider]);
-                                                                    }
-                                                                }}
-                                                                className="text-xs text-text-tertiary hover:text-text-primary flex items-center gap-1 transition-colors ml-1"
-                                                                title="Get API Key"
-                                                            >
-                                                                <ExternalLink size={12} />
-                                                            </button>
-                                                        )}
-                                                        {sttTestStatus === 'error' && (
-                                                            <span className="text-xs text-text-primary">✕ {sttTestError}</span>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-[11px] text-text-tertiary">Checks the key, not the selected model or languages.</p>
-
-                                                    {/* Azure Region Input */}
-                                                    {sttProvider === 'azure' && (
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-xs font-medium text-text-secondary block">Region</label>
-                                                            <div className="flex gap-2">
-                                                                <input
-                                                                    type="text"
-                                                                    value={sttAzureRegion}
-                                                                    onChange={(e) => setSttAzureRegion(e.target.value)}
-                                                                    placeholder="e.g. eastus"
-                                                                    className="flex-1 bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
-                                                                />
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        if (!sttAzureRegion.trim()) return;
-                                                                        // @ts-ignore
-                                                                        await window.electronAPI?.setAzureRegion?.(sttAzureRegion.trim());
-                                                                        setSttSaved(true);
-                                                                        setTimeout(() => setSttSaved(false), 2000);
-                                                                    }}
-                                                                    disabled={!sttAzureRegion.trim()}
-                                                                    className="px-5 py-2.5 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-50 transition-colors"
-                                                                >
-                                                                    Save
-                                                                </button>
-                                                            </div>
-                                                            <p className="text-[11px] text-text-tertiary">e.g. eastus, westeurope, westus2</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
+                                            <p className="text-xs text-text-secondary">
+                                                Keys and accounts are in <button type="button" onClick={() => { setProviderEditorId(undefined); setActiveTab('providers'); }} className="text-primary hover:underline">Provider setup</button>.
+                                            </p>
 
                                             {/* Recognition Language Family */}
                                             <CustomSelect

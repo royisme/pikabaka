@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: speech provider list, step S3a (branch `speech-list`)
+
+- Provider setup now owns the configured speech-provider list and a service-first editor, separate from the service that transcribes. Seven key services reuse their existing validation/Test/setter calls; removal needs two presses. State uses words and a mark; refused/rejected Save, Test, Remove and file selection show the real error. Audio keeps all eight choices, model/language drafts and Save behaviour; keys/accounts are replaced by a plain setup link, and saved-key badges share the refreshed credentials query.
+- Checks: both typechecks, lint and full tap exit 0. Eleven new renderer cases cover configured-only rows and saved states, service-specific fields, every key setter and removal payload, validation ordering, real failures/draft retention, Google selection/cancellation, region-only Save, all Audio choices and working setup navigation. The existing four-assertion Soniox regression now exercises the moved editor instead of inspecting obsolete Audio source. New behaviour tests were observed failing first for the missing UI/control before implementation.
+- Existing-IPC limits prevent full preview parity: Google selection saves immediately and has no Test/removal IPC; Watson has no region-save IPC, so its stored region is read-only. No fake Test or removal was added. `CredentialsManager` still swallows disk-write errors, so a successful IPC cannot prove durable Save/Remove. No IPC, persisted shape, pipeline, language-model list or dependency changed.
+- Owner: accept the existing-IPC limits, check both themes, 560px wrapping/long errors, keyboard/focus, real credentials and restart persistence. No app, Vite, real provider/device, Windows or packaged build was run. Next: S3b; configured-only Audio selection and routing remain untouched.
+
 ## 2026-10-28: committed summary index hooks, step K3b (branch `summary-hooks`)
 
 - One shared builder composes key points and action items for stop-time transcript indexing and summary refreshes; placeholder/blank notes yield no text. Final saves (both writer branches), recovery and successful summary edits refresh from the committed record and start the existing queue runner without awaiting it. An injected getter carries the optional RAG manager through the intelligence facade; refresh/runner failures do not change commit or IPC results.
