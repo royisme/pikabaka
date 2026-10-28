@@ -290,3 +290,36 @@ t.test('existing credentials status reply exposes storage state without credenti
     t.match(result, { storage: { mode: 'locked', reason: /cannot be decrypted/i }, hasDeepgramKey: false });
     t.notOk(containsSecret(JSON.stringify(result)));
 });
+
+t.test('Linux with a real secret-store backend counts as encrypted storage', t => {
+    const f = fixture(t);
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    Object.defineProperty(process, 'platform', { value: 'linux' });
+    t.teardown(() => Object.defineProperty(process, 'platform', platform));
+    const manager = f.start();
+    t.same(manager.getStorageStatus(), { mode: 'encrypted' });
+    t.ok(fs.existsSync(f.enc));
+    t.notOk(fs.existsSync(f.json));
+    t.end();
+});
+
+for (const content of [[], null, 'text', 5]) {
+    t.test(`a credential file that holds ${JSON.stringify(content)} instead of an object is reported and left untouched`, t => {
+        const f = fixture(t, content);
+        const manager = f.start();
+        t.same(manager.getStorageStatus(), { mode: 'plaintext', reason: 'The credential file must contain an object.' });
+        t.equal(fs.readFileSync(f.json, 'utf8'), JSON.stringify(content), 'the file is not rewritten or deleted');
+        t.notOk(fs.existsSync(f.enc));
+        t.same(manager.getAllCredentials(), {});
+        t.end();
+    });
+}
+
+t.test('a stored file whose values are all empty does not block saving an empty store', t => {
+    const f = fixture(t, { openaiApiKey: '' });
+    const manager = f.start();
+    t.ok(fs.existsSync(f.enc), 'the empty-valued file was migrated');
+    Reflect.set(manager, 'credentials', {});
+    t.doesNotThrow(() => (Reflect.get(manager, 'saveCredentials') as () => void).call(manager));
+    t.end();
+});
