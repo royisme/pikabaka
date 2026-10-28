@@ -90,6 +90,32 @@ t.test('floating picker repair section opens the named hidden built-in editor', 
     t.end();
 });
 
+t.test('General no longer renders answer controls and keeps its other settings', t => {
+    const html = renderSettings('general');
+    t.notMatch(html, 'AI Response Language');
+    t.notMatch(html, 'ai-response-language');
+    t.notMatch(html, 'How answers sound');
+    t.notMatch(html, 'answer-style-settings');
+    for (const label of ['General settings', 'Theme', 'Live transcript', 'Overlay opacity', 'Process Disguise']) {
+        t.match(html, label);
+    }
+    t.end();
+});
+
+t.test('answer language and collapsed style belong only to the Quick answers row', t => {
+    const html = renderSettings('ai-providers');
+    const quickAnswers = html.slice(html.indexOf('>Quick answers</h4>'), html.indexOf('>Summaries</h4>'));
+    const laterRows = html.slice(html.indexOf('>Summaries</h4>'));
+    t.match(quickAnswers, 'Answers in the overlay. The top-bar model selector switches this model.');
+    t.match(quickAnswers, 'AI Response Language');
+    t.match(quickAnswers, /aria-expanded="false" aria-controls="answer-style-settings"/);
+    t.match(quickAnswers, '>How answers sound</button>');
+    t.match(quickAnswers, /id="answer-style-settings" hidden=""/);
+    t.notMatch(laterRows, 'AI Response Language');
+    t.notMatch(laterRows, 'How answers sound');
+    t.end();
+});
+
 t.test('Models & Agent renders its job rows and a real Provider setup button, not Connections', t => {
     const html = renderSettings('ai-providers');
     t.notMatch(html, /<h3[^>]*>Connections<\/h3>/);

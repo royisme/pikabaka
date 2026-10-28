@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: Answer controls beside Quick answers, step S2 (branch `answer-style`, uncommitted)
+
+- Answer language and How answers sound moved from General into the Quick answers row. `AnswerLanguageSetting` owns the existing language IPC queries/save, English-first ordering, unchanged labels/codes and optimistic selection with rollback; failures now show the real message. The native select is keyboard-accessible. Style has a plain, initially collapsed disclosure with `aria-expanded`; its draft survives closing it. General keeps theme, transcript, permissions, opacity and the other non-answer settings; no empty section remains.
+- Checks: both typechecks, lint (947 warnings, no errors) and tap (2030 assertions, 43 new) exit 0. Five new renderer tests cover saved language/one save, failed/rejected saves and rollback, style disclosure/draft retention, General without either control and Quick answers-only placement. Mocked browser preview at 560px in both themes: no horizontal overflow, wrapped controls, Space opens style; General retains opacity and neither answer control. No app, real provider/device or packaged build was run.
+- Found, not changed: this checkout still labels the page Models & Agent and Quick answers has only its existing short description, not the full job list stated in the brief (the design queues those lines for S6). Owner: visual acceptance in the running app, keyboard/focus, real persistence after restart and Windows. No IPC, setting key, prompt, stored shape or dependency changed.
+
 ## 2026-10-28: safe summary-only refresh, step K3a (branch `summary-refresh`, uncommitted)
 
 - `RAGManager.refreshMeetingSummary` transactionally removes the old summary BLOB, native vectors across all provisioned dimensions and superseded summary jobs, then stores non-empty text and one pending job; empty text removes only the derived summary. It enqueues without starting the shared runner, so pending chunk work is untouched. No callers are wired (K3b).

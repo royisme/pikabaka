@@ -1,7 +1,6 @@
 import SttModelPicker, { STT_MODEL_DEFAULTS } from './settings/SttModelPicker';
 import ConnectionModelPicker, { ProviderNavigation } from './settings/ConnectionModelPicker';
 import TranslationTest from './settings/TranslationTest';
-import AnswerStyleSettings from './settings/AnswerStyleSettings';
 import KnowledgeSettings from './settings/KnowledgeSettings';
 import ProviderSetupSettings from './settings/ProviderSetupSettings';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -297,18 +296,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     );
 
     const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
-    const [isAiLangDropdownOpen, setIsAiLangDropdownOpen] = useState(false);
     const themeDropdownRef = useRef<HTMLDivElement>(null);
-    const aiLangDropdownRef = useRef<HTMLDivElement>(null);
 
     useWindowEvent(
         'mousedown',
         (event) => {
             if (isThemeDropdownOpen && themeDropdownRef.current && !themeDropdownRef.current.contains(event.target as Node)) {
                 setIsThemeDropdownOpen(false);
-            }
-            if (isAiLangDropdownOpen && aiLangDropdownRef.current && !aiLangDropdownRef.current.contains(event.target as Node)) {
-                setIsAiLangDropdownOpen(false);
             }
         },
         'document'
@@ -322,10 +316,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [userRecognitionLanguage, setUserRecognitionLanguage] = useState('');
     const [selectedSttGroup, setSelectedSttGroup] = useState('');
     const [availableLanguages, setAvailableLanguages] = useState<Record<string, any>>({});
-
-    // AI Response Language
-    const [aiResponseLanguage, setAiResponseLanguage] = useState('English');
-    const [availableAiLanguages, setAvailableAiLanguages] = useState<any[]>([]);
 
     // Overlay Opacity state
     const [overlayOpacity, setOverlayOpacity] = useState<number>(() => {
@@ -405,20 +395,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                     setUserRecognitionLanguage(storedUserStt || currentLangKey || 'english-us');
                 }
             }
-
-            if (window.electronAPI?.getAiResponseLanguages) {
-                const aiLangs = await window.electronAPI.getAiResponseLanguages();
-                // Sort: English first, then alphabetical
-                const sortedAiLangs = [...aiLangs].sort((a, b) => {
-                    if (a.label === 'English') return -1;
-                    if (b.label === 'English') return 1;
-                    return a.label.localeCompare(b.label);
-                });
-                setAvailableAiLanguages(sortedAiLangs);
-
-                const storedAi = await window.electronAPI.getAiResponseLanguage();
-                setAiResponseLanguage(storedAi || 'English');
-            }
         };
         loadLanguages();
     }, []);
@@ -479,27 +455,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             groupId: '',
             toJSON: () => ({})
         }));
-
-    const handleAiLanguageChange = async (key: string) => {
-        if (!key) return;
-        const previous = aiResponseLanguage;
-        setAiResponseLanguage(key); // Optimistic update
-        try {
-            if (window.electronAPI?.setAiResponseLanguage) {
-                const result = await window.electronAPI.setAiResponseLanguage(key);
-                if (result && !result.success) {
-                    // Rollback on explicit failure
-                    setAiResponseLanguage(previous);
-                    console.error('[Settings] Failed to set AI response language:', result.error);
-                }
-            }
-        } catch (err) {
-            // Rollback on exception
-            setAiResponseLanguage(previous);
-            console.error('[Settings] Exception setting AI response language:', err);
-        }
-    };
-
 
     // Theme Handlers
     const handleSetTheme = async (mode: 'system' | 'light' | 'dark') => {
@@ -1277,51 +1232,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         )}
                                                     </div>
                                                 </div>
-
-                                                {/* AI Response Language */}
-                                                <div className="flex items-center justify-between px-4 py-3">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 bg-bg-item-surface rounded-lg border border-border-subtle flex items-center justify-center text-text-tertiary">
-                                                            <Globe size={20} />
-                                                        </div>
-                                                        <div>
-                                                            <h3 className="text-sm font-bold text-text-primary">AI Response Language</h3>
-                                                            <p className="text-xs text-text-secondary mt-0.5">Reading language for quick answers and proactive cards; adds a translation when it differs from your speaking-language setting.</p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="relative" ref={aiLangDropdownRef}>
-                                                        <button
-                                                            onClick={() => setIsAiLangDropdownOpen(!isAiLangDropdownOpen)}
-                                                            className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary pl-4 pr-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 min-w-[110px] justify-between"
-                                                        >
-                                                            <span className="capitalize text-ellipsis overflow-hidden whitespace-nowrap">
-                                                                {aiResponseLanguage}
-                                                            </span>
-                                                            <ChevronDown size={12} className={`shrink-0 transition-transform ${isAiLangDropdownOpen ? 'rotate-180' : ''}`} />
-                                                        </button>
-
-                                                        {/* Dropdown Menu */}
-                                                        {isAiLangDropdownOpen && (
-                                                            <div className="absolute right-0 top-full mt-1 min-w-full w-max bg-bg-elevated border border-border-subtle rounded-lg shadow-xl overflow-hidden z-20 p-1 animated fadeIn select-none max-h-60 overflow-y-auto custom-scrollbar">
-                                                                {availableAiLanguages.map((option) => (
-                                                                    <button
-                                                                        key={option.code}
-                                                                        onClick={() => {
-                                                                            handleAiLanguageChange(option.code);
-                                                                            setIsAiLangDropdownOpen(false);
-                                                                        }}
-                                                                        className={`w-full text-left px-2 py-1.5 rounded-md text-xs flex items-center gap-2 transition-colors ${aiResponseLanguage === option.code ? 'text-text-primary bg-bg-item-active/50' : 'text-text-secondary hover:bg-bg-input hover:text-text-primary'}`}
-                                                                    >
-                                                                        <span className="font-medium">{option.label}</span>
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <AnswerStyleSettings />
 
                                             </div>
                                             </div>
