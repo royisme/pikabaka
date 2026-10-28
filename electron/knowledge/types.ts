@@ -185,7 +185,16 @@ export interface NegotiationState {
 
 // ─── Knowledge Engine Types ──────────────────────────────────
 
+export interface NotesIndexStatus {
+  state: 'indexed' | 'not-indexed' | 'unknown' | 'needs-reindex';
+  provider: string | null;
+  dimensions: number | null;
+  indexedAt: string | null;
+  error: string | null;
+}
+
 export interface KnowledgeStatus {
+  notesIndex?: NotesIndexStatus | null;
   hasResume: boolean;
   activeMode: boolean;
   jdCount: number;
@@ -213,8 +222,14 @@ export interface KnowledgeResult {
 // ─── Function Types (injected from main.ts) ──────────────────
 
 export type GenerateContentFn = (contents: Array<{ text: string }>) => Promise<string>;
-export type EmbedFn = (text: string) => Promise<number[]>;
-export type EmbedQueryFn = (text: string) => Promise<number[]>;
+export interface KnowledgeEmbedding {
+  embedding: number[];
+  provider: string;
+  dimensions: number;
+}
+
+export type EmbedFn = (text: string) => Promise<KnowledgeEmbedding>;
+export type EmbedQueryFn = EmbedFn;
 
 // ─── Database Row Types ──────────────────────────────────────
 
@@ -228,6 +243,10 @@ export interface DocumentRow {
   updated_at: string;
   is_active?: number;  // 0 or 1
   label?: string;
+  embedding_provider?: string | null;
+  embedding_dimensions?: number | null;
+  indexed_at?: string | null;
+  index_error?: string | null;
 }
 
 export interface ChunkRow {

@@ -1,3 +1,5 @@
+import type { NotesIndexStatus } from '../../electron/knowledge/types'
+
 export interface AgentGateDecision {
   time: number; meetingId: string; segmentId: string; revision: number; model: string; threshold: number; cooldownSeconds: number
   help?: number; kind?: string; kindProbability?: number; latencyMs?: number; outcome: string
@@ -311,7 +313,7 @@ export interface ElectronAPI {
 
   // Profile Engine API
   profileUploadResume: (filePath: string) => Promise<{ success: boolean; error?: string }>
-  profileGetStatus: () => Promise<{ hasProfile: boolean; profileMode: boolean; name?: string; role?: string; totalExperienceYears?: number }>
+  profileGetStatus: () => Promise<{ hasProfile: boolean; profileMode: boolean; name?: string; role?: string; totalExperienceYears?: number; notesIndex?: NotesIndexStatus | null }>
   profileSetMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>
   profileDelete: () => Promise<{ success: boolean; error?: string }>
   profileGetProfile: () => Promise<any>

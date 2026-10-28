@@ -27,7 +27,7 @@ function orchestrator(options: { scores: number[]; notes?: string }) {
   };
   const o: any = new KnowledgeOrchestrator(db);
   o.setKnowledgeMode(true);
-  o.setEmbedQueryFn(async () => [1, 0, 0]);
+  o.setEmbedQueryFn(async () => ({ embedding: [1, 0, 0], provider: 'example:index', dimensions: 3 }));
   o.vectorStore = {
     hasEmbeddings: () => true,
     searchSimilar: () => options.scores.map((score, i) => ({ id: i, text: `passage ${i}`, score, metadata: {}, docType: 'resume' })),
@@ -57,9 +57,9 @@ t.test('a passage that matches is used as background and is not a miss', async (
 t.test('notes make the knowledge mode work without a resume, and saving empty notes removes them', async (t) => {
   const o = orchestrator({ scores: [] });
   t.equal(o.getNotes(), '');
-  o.setNotes('Led the billing migration: 40 services, no downtime.\n\nCut the close from 5 days to 2.');
+  await o.setNotes('Led the billing migration: 40 services, no downtime.\n\nCut the close from 5 days to 2.');
   t.match(o.getNotes(), /billing migration/);
   t.equal(o.isKnowledgeMode(), true);
-  o.setNotes('   ');
+  await o.setNotes('   ');
   t.equal(o.getNotes(), '');
 });

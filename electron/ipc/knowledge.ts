@@ -33,7 +33,7 @@ export function registerKnowledgeHandlers(appState: AppState): void {
     const orchestrator = appState.getKnowledgeOrchestrator();
     if (!orchestrator) return { success: false, error: 'Knowledge engine not initialized. Please ensure API keys are configured.' };
     if (typeof text !== 'string' || text.length > 40_000) return { success: false, error: 'The notes are too long.' };
-    orchestrator.setNotes(text);
+    await orchestrator.setNotes(text);
     return { success: true };
   });
 
@@ -50,7 +50,8 @@ export function registerKnowledgeHandlers(appState: AppState): void {
         profileMode: status.activeMode,
         name: status.resumeSummary?.name,
         role: status.resumeSummary?.role,
-        totalExperienceYears: status.resumeSummary?.totalExperienceYears
+        totalExperienceYears: status.resumeSummary?.totalExperienceYears,
+        notesIndex: status.notesIndex,
       };
     } catch (error: any) {
       return { hasProfile: false, profileMode: false };
