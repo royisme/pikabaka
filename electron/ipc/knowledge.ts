@@ -4,8 +4,33 @@ import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
 import { DocType } from "../knowledge/types"
 import { CredentialsManager } from "../services/CredentialsManager"
+import { getAnswerSources, SettingsManager } from "../services/SettingsManager"
+
+/** The three source switches the Sources page reads and writes, by the settings key each one owns. */
+const ANSWER_SOURCE_KEYS = {
+  meetings: 'answerUsesMeetings',
+  materials: 'answerUsesMaterials',
+  profile: 'answerUsesProfile',
+} as const
 
 export function registerKnowledgeHandlers(appState: AppState): void {
+  safeHandle("answer-sources:get", async () => getAnswerSources());
+
+  // A partial payload is enough: the page sends only the switch the user moved. Every key is checked before any write.
+  safeHandle("answer-sources:set", async (_, sources: unknown) => {
+    if (typeof sources !== 'object' || sources === null || Array.isArray(sources)) {
+      return { success: false, error: 'Invalid answer sources' };
+    }
+    const entries = Object.entries(sources);
+    for (const [key, value] of entries) {
+      if (!(key in ANSWER_SOURCE_KEYS)) return { success: false, error: `Unknown setting: ${key}` };
+      if (typeof value !== 'boolean') return { success: false, error: `${key} must be true or false` };
+    }
+    const manager = SettingsManager.getInstance();
+    for (const [key, value] of entries) manager.set(ANSWER_SOURCE_KEYS[key as keyof typeof ANSWER_SOURCE_KEYS], value as boolean);
+    return { success: true };
+  });
+
   // ==========================================
   // Profile Engine IPC Handlers
   // ==========================================

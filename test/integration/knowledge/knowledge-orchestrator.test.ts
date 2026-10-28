@@ -584,13 +584,13 @@ t.test('setKnowledgeMode and isKnowledgeMode', (t) => {
   t.equal(orch.isKnowledgeMode(), false, 'false without resume');
 
   const orch2 = new KnowledgeOrchestrator(createMockDbManager({ resumeRow: EMPTY_RESUME_ROW }));
-  t.equal(orch2.isKnowledgeMode(), false, 'false with resume but knowledgeMode off');
-
-  orch2.setKnowledgeMode(true);
-  t.equal(orch2.isKnowledgeMode(), true, 'true after setKnowledgeMode(true)');
+  t.equal(orch2.isKnowledgeMode(), true, 'true with a resume: the mode is on at start');
 
   orch2.setKnowledgeMode(false);
   t.equal(orch2.isKnowledgeMode(), false, 'false after setKnowledgeMode(false)');
+
+  orch2.setKnowledgeMode(true);
+  t.equal(orch2.isKnowledgeMode(), true, 'true after setKnowledgeMode(true)');
 
   t.end();
 });

@@ -22,11 +22,15 @@ import {
   NegotiationState,
   JDListItem,
   InterviewPrepData,
+  MaterialPassage,
 } from './types';
 import { buildContextEnhancementPrompt, buildIntroResponsePrompt, buildNoMatchPrompt } from './prompts';
 
 /** The least cosine similarity at which a passage of the user's materials counts as about the question. */
 const MIN_MATCH_SCORE = 0.3;
+/** The neutral notes lookup: at most this many passages, each at most this many characters. */
+const MATERIALS_LIMIT = 5;
+const MATERIALS_MAX_CHARS = 400;
 /** The notes the user writes about themselves: at most this many characters. */
 const NOTES_MAX_LENGTH = 20_000;
 
@@ -42,7 +46,8 @@ export class KnowledgeOrchestrator {
   private embedFn: EmbedFn | null = null;
   private embedQueryFn: EmbedQueryFn | null = null;
   private embeddingStatusFn: (() => { providerName: string | null; dimensions: number | null } | null) | null = null;
-  private knowledgeMode: boolean = false;
+  // On at start: what answers may use is decided by the saved Use when answering switches; turning this off in a session only mutes the background for that session.
+  private knowledgeMode: boolean = true;
 
   private cachedProfileData: ProfileData | null = null;
   private cachedNegotiationScript: NegotiationScript | null = null;
@@ -243,6 +248,28 @@ export class KnowledgeOrchestrator {
       this.cachedNegotiationScript = null;
       this.db.clearNegotiationState();
     }
+  }
+
+  /**
+   * The best passages of the user's notes for a question, quoted as data: no resume, no roles and no
+   * candidate framing. Uses the same provider/dimension guard and score cut as the answer interceptor.
+   */
+  async searchMaterials(query: string): Promise<MaterialPassage[]> {
+    if (!this.embedQueryFn || !this.vectorStore.hasEmbeddings()) return [];
+    const source = this.db.getDocumentByType(DocType.NOTES);
+    if (!source) return [];
+    const { embedding, provider, dimensions } = await this.embedQueryFn(query);
+    const active = this.embeddingStatusFn?.();
+    // The model changed while this query was being embedded: the vectors belong to another model.
+    if (active && (active.providerName !== provider || active.dimensions !== dimensions)) return [];
+    const sources = this.db.getChunkSources(DocType.NOTES);
+    return this.vectorStore.searchSimilar(embedding, MATERIALS_LIMIT, provider, DocType.NOTES)
+      .filter((result) => result.score >= MIN_MATCH_SCORE)
+      .map((result) => ({
+        text: result.text.slice(0, MATERIALS_MAX_CHARS),
+        source: sources.get(result.id) ?? source.file_name,
+        score: result.score,
+      }));
   }
 
   getProfileData(): ProfileData | null {
