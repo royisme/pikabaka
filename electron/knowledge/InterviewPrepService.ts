@@ -2,7 +2,6 @@ import {
   ProfileData,
   JDData,
   InterviewPrepData,
-  InterviewPrepQuestion,
   GenerateContentFn,
 } from './types';
 
@@ -32,7 +31,7 @@ export class InterviewPrepService {
       const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       prepData = JSON.parse(cleaned);
     } catch {
-      prepData = this.buildFallbackPrep(profile, jd, matchAnalysis);
+      throw new Error('The model did not return valid interview prep JSON.');
     }
 
     prepData.matchScore = matchAnalysis.matchScore;
@@ -165,56 +164,4 @@ Generate 8-12 likely questions across categories. Focus on questions that test t
 Return ONLY the JSON, no markdown fences.`;
   }
 
-  private buildFallbackPrep(
-    profile: ProfileData,
-    jd: JDData,
-    matchAnalysis: { matched: string[]; weak: string[]; missing: string[]; matchScore: number },
-  ): InterviewPrepData {
-    const questions: InterviewPrepQuestion[] = [
-      {
-        question: 'Tell me about yourself and why you\'re interested in this role.',
-        category: 'intro',
-        difficulty: 1,
-        relatedJDRequirement: jd.title,
-        suggestedAnswer: {
-          opening: `I'm ${profile.identity?.name}, a ${profile.experience?.[0]?.role || 'professional'} with ${profile.totalExperienceYears} years of experience.`,
-          keyPoints: ['Highlight relevant experience', 'Connect skills to role requirements', 'Express genuine interest in the company'],
-        },
-      },
-      {
-        question: 'What is your greatest technical strength?',
-        category: 'behavioral',
-        difficulty: 1,
-        suggestedAnswer: {
-          opening: `My strongest technical area is ${profile.skills?.[0] || 'problem solving'}.`,
-          keyPoints: profile.skills?.slice(0, 3).map(s => `Demonstrate depth in ${s}`) || [],
-        },
-      },
-    ];
-
-    for (const req of (jd.requirements || []).slice(0, 5)) {
-      questions.push({
-        question: `Can you describe your experience with ${req}?`,
-        category: 'technical',
-        difficulty: 2,
-        relatedJDRequirement: req,
-        suggestedAnswer: {
-          opening: `Yes, I have experience with ${req} from my work at ${profile.experience?.[0]?.company || 'my previous role'}.`,
-          keyPoints: [`Reference specific project using ${req}`, 'Quantify impact if possible', 'Connect to business outcomes'],
-        },
-      });
-    }
-
-    return {
-      likelyQuestions: questions,
-      matchScore: matchAnalysis.matchScore,
-      knowledgeGaps: matchAnalysis.missing.map((skill: string) => ({
-        skill,
-        importance: 'nice_to_have' as const,
-        suggestion: 'Frame as eager to learn; mention adjacent experience',
-      })),
-      mustMentionKeywords: jd.keywords || jd.technologies?.slice(0, 10) || [],
-      openingPitch: `I'm ${profile.identity?.name}, a ${profile.experience?.[0]?.role || 'professional'} with ${profile.totalExperienceYears} years of experience, particularly in ${profile.skills?.slice(0, 3).join(', ')}. I'm excited about this ${jd.title} role at ${jd.company}.`,
-    };
-  }
 }

@@ -83,8 +83,13 @@ for (const type of ['openai', 'anthropic', 'gemini'] as const) {
         t.equal(requests.at(-1)?.headers['x-gateway'], 'fake-header-value', 'model-list HTTP request');
         const { models, ref } = await buildAgentModel(c, 'example', false);
         const model = models.getModel(ref.provider, ref.modelId)!;
-        const result = await models.complete(model, { messages: [{ role: 'user', content: 'Invented sample.', timestamp: 1 }] });
-        t.equal(result.stopReason, 'stop');
+        const ask = () => models.complete(model, { messages: [{ role: 'user', content: 'Invented sample.', timestamp: 1 }] });
+        let result = await ask();
+        // On a slow CI runner the first call loads the provider module and has failed with pi-ai's own "Connection error."
+        // after 13-17 s, although the request itself reached the gateway. That environment error is not what this test is about;
+        // any other failure still fails it.
+        if (result.stopReason === 'error' && result.errorMessage === 'Connection error.') result = await ask();
+        t.equal(result.stopReason, 'stop', result.errorMessage);
         t.match(result.content, [{ type: 'text', text: 'ready' }]);
         t.equal(requests.at(-1)?.headers['x-gateway'], 'fake-header-value', 'pi-ai model headers reach the actual request');
         await llm.translateTranscriptText({ provider: 'connection', connection: connection(type, false), model: 'example', prompt: 'Translate.', sourceText: 'Invented sample.' });

@@ -83,19 +83,11 @@ t.test('InterviewPrepService parses valid JSON and caches by profile + JD', asyn
   t.same(second, first, 'returns cached prep payload');
 });
 
-t.test('InterviewPrepService falls back when model output is invalid', async (t) => {
+t.test('InterviewPrepService reports invalid model output instead of template questions', async (t) => {
   const service = new InterviewPrepService(async () => 'not valid json');
-  const prep = await service.generatePrep(buildProfile(), buildJD());
-
-  t.ok(prep.likelyQuestions.length >= 2, 'creates fallback questions');
-  t.equal(prep.likelyQuestions[0].category, 'intro', 'starts with intro fallback question');
-  t.ok(prep.likelyQuestions.some((question) => question.category === 'technical'), 'adds technical questions from JD requirements');
-  t.same(
-    prep.knowledgeGaps.map((gap) => gap.skill),
-    ['leadership'],
-    'only fully missing skills become knowledge gaps',
-  );
-  t.same(prep.mustMentionKeywords, ['customer empathy', 'cross-functional leadership']);
+  await t.rejects(service.generatePrep(buildProfile(), buildJD()), {
+    message: 'The model did not return valid interview prep JSON.',
+  });
 });
 
 t.test('InterviewPrepService buildPrepPrompt includes profile, JD, and match sections', async (t) => {
@@ -105,7 +97,7 @@ t.test('InterviewPrepService buildPrepPrompt includes profile, JD, and match sec
     return 'not valid json';
   });
 
-  await service.generatePrep(buildProfile(), buildJD());
+  await t.rejects(service.generatePrep(buildProfile(), buildJD()));
 
   t.match(capturedPrompt, /## Candidate Profile/);
   t.match(capturedPrompt, /Avery Stone/);

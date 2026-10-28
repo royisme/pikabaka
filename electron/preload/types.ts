@@ -88,6 +88,8 @@ export interface ElectronAPI {
   setAiResponseLanguage: (language: string) => Promise<{ success: boolean; error?: string }>
   getSttLanguage: () => Promise<string>
   getAiResponseLanguage: () => Promise<string>
+  getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean; profile: boolean }>
+  setAnswerSources: (sources: { meetings?: boolean; materials?: boolean; profile?: boolean }) => Promise<{ success: boolean; error?: string }>
   getNativeAudioStatus: () => Promise<{
     connected: boolean;
     meetingActive: boolean;

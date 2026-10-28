@@ -121,7 +121,7 @@ export interface CompanyDossier {
   overview: string;
   products: string[];
   culture_ratings: {
-    overall: number;
+    overall?: number;
     work_life_balance?: number;
     compensation?: number;
     management?: number;
@@ -230,6 +230,13 @@ export interface KnowledgeEmbedding {
 
 export type EmbedFn = (text: string) => Promise<KnowledgeEmbedding>;
 export type EmbedQueryFn = EmbedFn;
+
+/** A passage of the user's own notes, quoted as data: no candidate framing. */
+export interface MaterialPassage {
+  text: string;
+  source: string;
+  score: number;
+}
 
 // ─── Database Row Types ──────────────────────────────────────
 

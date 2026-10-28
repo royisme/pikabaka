@@ -61,7 +61,7 @@ const DecisionServiceSettings = () => {
             </div>
             <p className="text-[11px] text-text-tertiary">Uses the saved decision model from Proactive help and an invented question, not an endpoint-only check.</p>
             <div aria-live="polite" className="text-xs text-text-primary break-words [overflow-wrap:anywhere]">
-                {test.isSuccess && <p>● Test passed{test.data.latencyMs !== undefined ? ` in ${test.data.latencyMs} ms` : ''}</p>}
+                {test.isSuccess && <p>● Test passed{test.data.latencyMs === undefined ? '' : ` in ${test.data.latencyMs} ms. Live use allows 2 s: ${test.data.latencyMs > 2000 ? 'this reply would have been too slow live.' : 'this reply is fast enough live.'}`}</p>}
                 {test.isError && <p role="alert">✕ Test failed: {(test.error as Error).message}</p>}
             </div>
             {settings.isError && <p role="alert" className="text-xs text-text-primary break-words [overflow-wrap:anywhere]">✕ {(settings.error as Error).message}</p>}

@@ -139,6 +139,8 @@ interface ElectronAPI {
   getSttLanguage: (speaker?: 'interviewer' | 'user') => Promise<string>
   getAiResponseLanguage: () => Promise<string>
   getAnswerStyle: () => Promise<string>
+  getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean; profile: boolean }>
+  setAnswerSources: (sources: { meetings?: boolean; materials?: boolean; profile?: boolean }) => Promise<{ success: boolean; error?: string }>
   profileGetNotes: () => Promise<string>
   profileSetNotes: (text: string) => Promise<{ success: boolean; error?: string }>
   setAnswerStyle: (style: string) => Promise<{ success: boolean; error?: string }>
@@ -684,6 +686,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getSttLanguage: (speaker?: 'interviewer' | 'user') => ipcRenderer.invoke("get-stt-language", speaker),
   getAiResponseLanguage: () => ipcRenderer.invoke("get-ai-response-language"),
   getAnswerStyle: () => ipcRenderer.invoke("get-answer-style"),
+  getAnswerSources: () => ipcRenderer.invoke("answer-sources:get"),
+  setAnswerSources: (sources: { meetings?: boolean; materials?: boolean; profile?: boolean }) => ipcRenderer.invoke("answer-sources:set", sources),
   profileGetNotes: () => ipcRenderer.invoke("profile:get-notes"),
   profileSetNotes: (text: string) => ipcRenderer.invoke("profile:set-notes", text),
   setAnswerStyle: (style: string) => ipcRenderer.invoke("set-answer-style", style),

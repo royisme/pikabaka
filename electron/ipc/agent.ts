@@ -19,13 +19,15 @@ export function registerAgentHandlers(appState: AppState): void {
   // Runs the agent's model on two invented questions, for the settings as shown (saved or not).
   safeHandle('agent-test', async (_event, draft: { connectionId: string; model: string; supportsImages?: boolean }) => {
     const cm = CredentialsManager.getInstance();
-    const chosen = typeof draft?.connectionId === 'string' && draft.connectionId && typeof draft.model === 'string' && draft.model.trim()
-      ? { connection: cm.resolveConnection(draft.connectionId), model: draft.model.trim() }
-      : (() => { const resolved = cm.resolveModelUse('agent'); return 'error' in resolved ? { error: resolved.error } : resolved; })();
-    if ('error' in chosen) return { success: false, error: chosen.error };
-    if (!chosen.connection) return { success: false, error: 'That connection does not exist.' };
-    if (!chosen.connection.apiKey && !cm.isConnectionReady(chosen.connection.id)) return { success: false, error: `No API key is saved for ${chosen.connection.name}.` };
-    return testAgentModel(chosen.connection, chosen.model, draft?.supportsImages === true);
+    const connectionId = typeof draft?.connectionId === 'string' ? draft.connectionId.trim() : '';
+    const model = typeof draft?.model === 'string' ? draft.model.trim() : '';
+    if (!connectionId && !model) return { success: false, error: 'Choose a connection and enter a model before testing.' };
+    if (!connectionId) return { success: false, error: 'Choose a connection before testing.' };
+    if (!model) return { success: false, error: 'Enter a model before testing.' };
+    const connection = cm.resolveConnection(connectionId);
+    if (!connection) return { success: false, error: 'That connection does not exist.' };
+    if (!connection.apiKey && !cm.isConnectionReady(connection.id)) return { success: false, error: `No API key is saved for ${connection.name}.` };
+    return testAgentModel(connection, model, draft?.supportsImages === true);
   });
 
   safeHandle('agent-status', async () => {

@@ -1,6 +1,7 @@
 import SttModelPicker, { STT_MODEL_DEFAULTS } from './settings/SttModelPicker';
-import ConnectionModelPicker, { ProviderNavigation } from './settings/ConnectionModelPicker';
-import TranslationTest from './settings/TranslationTest';
+import { speechServices } from './settings/SpeechProvidersSettings';
+import { ProviderNavigation } from './settings/ConnectionModelPicker';
+import TranslationSettings from './settings/TranslationSettings';
 import KnowledgeSettings from './settings/KnowledgeSettings';
 import ProviderSetupSettings from './settings/ProviderSetupSettings';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -27,17 +28,6 @@ import {
 } from '../lib/overlayAppearance';
 import { KeyRecorder } from './ui/KeyRecorder';
 import { isMac } from '../utils/platformUtils';
-
-const DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT =
-    'You are a realtime subtitle translator. Preserve meaning, tone, technical terms, product names, numbers, and code tokens exactly when appropriate. Do not summarize, do not add explanations, and do not omit information. Return only the translated sentence(s), with no prefix/suffix and no markdown.';
-
-type TranscriptAssemblerProfile = 'sentence_bias' | 'low_latency' | 'coherent';
-
-const TRANSCRIPT_ASSEMBLER_PROFILE_OPTIONS: Array<{ value: TranscriptAssemblerProfile; label: string; desc: string }> = [
-    { value: 'sentence_bias', label: 'Sentence-biased', desc: 'Balanced sentence completeness with moderate delay.' },
-    { value: 'low_latency', label: 'Low-latency', desc: 'Fastest transcript updates, but long sentences may split earlier.' },
-    { value: 'coherent', label: 'Coherent', desc: 'Most complete segments for translation; final subtitles may arrive 5-30s later.' },
-];
 
 interface CustomSelectProps {
     label: string;
@@ -506,23 +496,16 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
     // STT Provider settings
     const [sttProvider, setSttProvider] = useState<'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'>('google');
-    const [transcriptAssemblerProfile, setTranscriptAssemblerProfile] = useState<TranscriptAssemblerProfile>('sentence_bias');
-    const { data: speechCredentials } = useQuery(
+    const { data: speechCredentials, error: speechCredentialsError } = useQuery(
         ['speech-credentials'],
         () => window.electronAPI.getStoredCredentials(),
         { enabled: isOpen && !!window.electronAPI?.getStoredCredentials }
     );
+    const configuredSpeechServices = speechServices.filter(service => speechCredentials && service.configured(speechCredentials));
+    const speechServiceConfigured = configuredSpeechServices.some(service => service.id === sttProvider);
+    const selectedSpeechService = speechServices.find(service => service.id === sttProvider);
     const [isSttDropdownOpen, setIsSttDropdownOpen] = useState(false);
     const sttDropdownRef = React.useRef<HTMLDivElement>(null);
-    const [transcriptTranslationEnabled, setTranscriptTranslationEnabled] = useState(false);
-    const [transcriptTranslationProvider, setTranscriptTranslationProvider] = useState('ollama');
-    const [transcriptTranslationModel, setTranscriptTranslationModel] = useState('');
-    const [transcriptTranslationPrompt, setTranscriptTranslationPrompt] = useState(DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT);
-    const [transcriptTranslationDisplayMode, setTranscriptTranslationDisplayMode] = useState<'original' | 'translated' | 'both'>('original');
-    const [transcriptTranslationSourceLanguage, setTranscriptTranslationSourceLanguage] = useState('auto');
-    const [transcriptTranslationTargetLanguage, setTranscriptTranslationTargetLanguage] = useState('chinese');
-    const [translationSettingsSaved, setTranslationSettingsSaved] = useState(false);
-    const [showTranslationAdvanced, setShowTranslationAdvanced] = useState(false);
 
     // Close STT dropdown when clicking outside
     useWindowEvent(
@@ -544,29 +527,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 if (creds) {
                     setSttProvider(creds.sttProvider || 'google');
                     setSttModelDraft({ ...(creds.sttModels || {}), groq: creds.groqSttModel || '' });
-                    setTranscriptTranslationEnabled(!!creds.transcriptTranslationEnabled);
-                    setTranscriptTranslationProvider(creds.transcriptTranslationProvider || 'ollama');
-                    setTranscriptTranslationModel(creds.transcriptTranslationModel || '');
-                    if (typeof creds.transcriptTranslationPrompt === 'string' && creds.transcriptTranslationPrompt.length > 0) {
-                        setTranscriptTranslationPrompt(creds.transcriptTranslationPrompt);
-                    } else {
-                        setTranscriptTranslationPrompt(DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT);
-                    }
-                    setTranscriptTranslationDisplayMode(creds.transcriptTranslationDisplayMode || 'original');
-                    setTranscriptTranslationSourceLanguage(
-                        typeof creds.transcriptTranslationSourceLanguage === 'string'
-                            ? creds.transcriptTranslationSourceLanguage
-                            : 'auto'
-                    );
-                    setTranscriptTranslationTargetLanguage(
-                        typeof creds.transcriptTranslationTargetLanguage === 'string'
-                            ? creds.transcriptTranslationTargetLanguage
-                            : 'chinese'
-                    );
-                }
-                const assemblerProfile = await window.electronAPI?.getTranscriptAssemblerProfile?.();
-                if (assemblerProfile) {
-                    setTranscriptAssemblerProfile(assemblerProfile);
                 }
             } catch (e) {
                 console.error('Failed to load STT settings:', e);
@@ -586,14 +546,15 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         setSpeechSaving(true);
         setSpeechResult(null);
         try {
+            // Switch first: saving a model rebuilds the pipeline, and the old service may have no key.
+            // @ts-ignore
+            const providerResult = await api.setSttProvider?.(sttProvider);
+            if (providerResult && !providerResult.success) throw new Error(providerResult.error || 'The service was not saved');
             const wantModel = (sttModelDraft[sttProvider] ?? '').trim();
             if (sttProvider in STT_MODEL_DEFAULTS) {
                 const modelResult = await api.setSttModel(sttProvider, wantModel);
                 if (!modelResult.success) throw new Error(modelResult.error || 'The model was not saved');
             }
-            // @ts-ignore
-            const providerResult = await api.setSttProvider?.(sttProvider);
-            if (providerResult && !providerResult.success) throw new Error(providerResult.error || 'The service was not saved');
             await api.setRecognitionLanguage(recognitionLanguage, 'interviewer');
             await api.setRecognitionLanguage(userRecognitionLanguage || recognitionLanguage, 'user');
 
@@ -637,43 +598,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             await handleLanguageChange('english-us');
         }
     };
-
-    const handleTranscriptAssemblerProfileChange = async (profile: TranscriptAssemblerProfile) => {
-        const previousProfile = transcriptAssemblerProfile;
-        setTranscriptAssemblerProfile(profile);
-        try {
-            const result = await window.electronAPI?.setTranscriptAssemblerProfile?.(profile);
-            if (result && !result.success) {
-                setTranscriptAssemblerProfile(previousProfile);
-            }
-        } catch (e) {
-            console.error('Failed to set transcript segmentation profile:', e);
-            setTranscriptAssemblerProfile(previousProfile);
-        }
-    };
-
-    const handleSaveTranscriptTranslationSettings = async () => {
-        try {
-            await window.electronAPI?.setTranscriptTranslationSettings?.({
-                enabled: transcriptTranslationEnabled,
-                provider: transcriptTranslationProvider,
-                model: transcriptTranslationModel,
-                prompt: transcriptTranslationPrompt,
-                displayMode: transcriptTranslationDisplayMode,
-                sourceLanguage: transcriptTranslationSourceLanguage,
-                targetLanguage: transcriptTranslationTargetLanguage,
-            });
-            setTranslationSettingsSaved(true);
-            setTimeout(() => setTranslationSettingsSaved(false), 2000);
-        } catch (e) {
-            console.error('Failed to save transcript translation settings:', e);
-        }
-    };
-
-    const handleResetTranscriptTranslationPrompt = () => {
-        setTranscriptTranslationPrompt(DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT);
-    };
-
 
     // Load stored credentials on mount
 
@@ -1349,7 +1273,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             <div className="bg-bg-card rounded-xl border border-border-subtle p-4 space-y-3">
                                                 <label className="text-xs font-medium text-text-secondary block">Speech Provider</label>
                                                 <div className="relative">
-                                                    <ProviderSelect
+                                                    {configuredSpeechServices.length > 0 && <ProviderSelect
                                                         value={sttProvider}
                                                         onChange={(val) => handleSttProviderChange(val as any)}
                                                         options={[
@@ -1361,13 +1285,19 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             { id: 'azure', label: 'Azure Speech', badge: speechCredentials?.hasAzureKey ? 'Saved' : null, desc: 'Microsoft Cognitive Services STT', icon: <Mic size={14} /> },
                                                             { id: 'ibmwatson', label: 'IBM Watson', badge: speechCredentials?.hasIbmWatsonKey ? 'Saved' : null, desc: 'IBM Watson cloud STT service', icon: <Mic size={14} /> },
                                                             { id: 'soniox', label: 'Soniox', badge: speechCredentials?.hasSonioxKey ? 'Saved' : null, recommended: true, desc: '60+ languages, multilingual, domain context', icon: <Mic size={14} /> },
-                                                        ]}
-                                                    />
+                                                        ].filter(option => configuredSpeechServices.some(service => service.id === option.id))}
+                                                    />}
+                                                    {!!speechCredentialsError ? <p role="alert" className="text-xs text-text-primary break-words">✕ {(speechCredentialsError as Error).message}</p>
+                                                        : !speechCredentials ? <p className="text-xs text-text-secondary">Loading speech providers…</p>
+                                                        : <>
+                                                            {!speechServiceConfigured && <p className="text-xs text-text-primary">✕ {selectedSpeechService?.name}: not configured</p>}
+                                                            {!configuredSpeechServices.length && <p className="text-xs text-text-secondary">No speech services configured.</p>}
+                                                        </>}
                                                 </div>
                                             </div>
 
                                             {/* Model (services that let you choose one) */}
-                                            {sttProvider in STT_MODEL_DEFAULTS && (
+                                            {speechServiceConfigured && sttProvider in STT_MODEL_DEFAULTS && (
                                                 <div className="bg-bg-card rounded-xl border border-border-subtle p-4 space-y-2">
                                                     <label className="text-xs font-medium text-text-secondary block">Model</label>
                                                     <SttModelPicker
@@ -1445,7 +1375,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex flex-wrap items-center gap-3">
                                                     <button
                                                         onClick={handleSaveSpeechSettings}
-                                                        disabled={speechSaving}
+                                                        disabled={speechSaving || !speechServiceConfigured}
                                                         className="px-5 py-2.5 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-50 transition-colors"
                                                     >
                                                         {speechSaving ? '● Saving...' : 'Save speech settings'}
@@ -1459,165 +1389,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                         </div>
                                     </div>
 
-                                    <div className="bg-bg-card rounded-xl border border-border-subtle p-4">
-                                        <h3 className="text-lg font-bold text-text-primary mb-1">Translation</h3>
-                                        <p className="text-xs text-text-secondary mb-5">STT is realtime. Translation is applied asynchronously to final interviewer segments.</p>
-
-                                        <div className="space-y-4">
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <label className="text-xs font-medium text-text-secondary block">Enable Translation</label>
-                                                    <p className="text-[11px] text-text-tertiary mt-1">Choose a connection and model below.</p>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    aria-label="Enable translation"
-                                                    aria-pressed={transcriptTranslationEnabled}
-                                                    onClick={() => setTranscriptTranslationEnabled((v) => !v)}
-                                                    className="text-xs bg-bg-input hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-md shrink-0"
-                                                >
-                                                    {transcriptTranslationEnabled ? '● On' : '○ Off'}
-                                                </button>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                <div className="space-y-1.5">
-                                                    <label className="text-xs font-medium text-text-secondary block">Display Mode</label>
-                                                    <select
-                                                        value={transcriptTranslationDisplayMode}
-                                                        onChange={(e) => setTranscriptTranslationDisplayMode(e.target.value as any)}
-                                                        className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-                                                    >
-                                                        <option value="original">Original Only</option>
-                                                        <option value="translated">Translation Only</option>
-                                                        <option value="both">Original + Translation</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                <div className="space-y-1.5">
-                                                    <label className="text-xs font-medium text-text-secondary block">Source language hint</label>
-                                                    <select
-                                                        value={transcriptTranslationSourceLanguage}
-                                                        onChange={(e) => setTranscriptTranslationSourceLanguage(e.target.value)}
-                                                        className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-                                                    >
-                                                        <option value="auto">Auto-detect (recommended)</option>
-                                                        {translationLanguageOptions.map((o) => (
-                                                            <option key={o.value} value={o.value}>
-                                                                {o.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    <p className="text-[11px] text-text-tertiary leading-snug">
-                                                        Guides the translation model. When no language is detected, this is also used to skip translation if it matches the target language.
-                                                    </p>
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <label className="text-xs font-medium text-text-secondary block">Target language</label>
-                                                    <select
-                                                        value={transcriptTranslationTargetLanguage}
-                                                        onChange={(e) => setTranscriptTranslationTargetLanguage(e.target.value)}
-                                                        className="w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
-                                                    >
-                                                        {translationLanguageOptions.map((o) => (
-                                                            <option key={o.value} value={o.value}>
-                                                                {o.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-1.5">
-                                                <label className="text-xs font-medium text-text-secondary block">Translation model</label>
-                                                <ConnectionModelPicker
-                                                    id="translation"
-                                                    connectionId={transcriptTranslationProvider}
-                                                    model={transcriptTranslationModel}
-                                                    onChange={(next) => { setTranscriptTranslationProvider(next.connectionId); setTranscriptTranslationModel(next.model); }}
-                                                />
-                                                <p className="text-[11px] text-text-tertiary">
-                                                    Add connections and their API keys in Provider setup.
-                                                </p>
-                                                <TranslationTest
-                                                    provider={transcriptTranslationProvider}
-                                                    model={transcriptTranslationModel}
-                                                    prompt={transcriptTranslationPrompt}
-                                                    targetLanguage={transcriptTranslationTargetLanguage}
-                                                />
-                                            </div>
-
-                                            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                                <button
-                                                    onClick={handleSaveTranscriptTranslationSettings}
-                                                    className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${translationSettingsSaved ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
-                                                >
-                                                    {translationSettingsSaved ? '✓ Saved' : 'Save Translation Settings'}
-                                                </button>
-                                                <p className="text-[11px] text-text-tertiary sm:pl-1">Only final interviewer transcript segments are translated.</p>
-                                            </div>
-
-                                            <button
-                                                type="button"
-                                                aria-expanded={showTranslationAdvanced}
-                                                aria-controls="translation-advanced"
-                                                onClick={() => setShowTranslationAdvanced(!showTranslationAdvanced)}
-                                                className="w-full flex items-center gap-2 text-left text-sm text-text-secondary hover:text-text-primary transition-colors"
-                                            >
-                                                <ChevronRight size={15} className={showTranslationAdvanced ? 'rotate-90' : ''} />
-                                                Advanced
-                                            </button>
-                                            <div id="translation-advanced" hidden={!showTranslationAdvanced} className="space-y-4">
-                                                <div className="space-y-1.5">
-                                                    <div className="flex items-center justify-between">
-                                                        <label className="text-xs font-medium text-text-secondary block">Translation Prompt</label>
-                                                        <button
-                                                            onClick={handleResetTranscriptTranslationPrompt}
-                                                            className="text-[11px] text-text-tertiary hover:text-text-primary transition-colors"
-                                                        >
-                                                            Reset to Default
-                                                        </button>
-                                                    </div>
-                                                    <textarea
-                                                        value={transcriptTranslationPrompt}
-                                                        onChange={(e) => setTranscriptTranslationPrompt(e.target.value)}
-                                                        rows={4}
-                                                        className="w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors resize-y"
-                                                    />
-                                                </div>
-
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-text-primary mb-1">Transcript Segmentation</h4>
-                                                    <p className="text-xs text-text-secondary mb-3">Choose how patiently Pika buffers final speech segments before translation.</p>
-                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                                        {TRANSCRIPT_ASSEMBLER_PROFILE_OPTIONS.map((option) => {
-                                                            const selected = transcriptAssemblerProfile === option.value;
-                                                            return (
-                                                                <button
-                                                                    key={option.value}
-                                                                    type="button"
-                                                                    aria-pressed={selected}
-                                                                    onClick={() => handleTranscriptAssemblerProfileChange(option.value)}
-                                                                    className={`rounded-xl border p-4 text-left transition-colors ${selected
-                                                                        ? 'bg-bg-input border-accent-primary text-text-primary'
-                                                                        : 'bg-bg-card border-border-subtle text-text-secondary hover:bg-bg-elevated hover:text-text-primary'
-                                                                        }`}
-                                                                >
-                                                                    <div className="flex items-center justify-between gap-3 mb-2">
-                                                                        <span className="text-sm font-semibold">{option.label}</span>
-                                                                        {selected && <Check size={15} className="text-accent-primary" />}
-                                                                    </div>
-                                                                    <p className="text-xs leading-relaxed text-text-tertiary">{option.desc}</p>
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <TranslationSettings languages={translationLanguageOptions} />
 
                                 </div>
                             )}

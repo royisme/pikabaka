@@ -48,11 +48,13 @@ export class RAGManager {
         this.retriever = new RAGRetriever(this.vectorStore, this.embeddingPipeline);
         this.liveIndexer = new LiveRAGIndexer(this.vectorStore, this.embeddingPipeline);
 
-        this.embeddingPipeline.initialize({
+        void this.embeddingPipeline.initialize({
             openaiKey: config.openaiKey,
             geminiKey: config.geminiKey,
             ollamaUrl: config.ollamaUrl,
             selected: config.selected
+        }).catch(() => {
+            console.warn('[RAGManager] Embedding initialization failed; the pipeline stays not ready');
         });
     }
 

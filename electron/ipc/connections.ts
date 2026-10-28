@@ -59,6 +59,7 @@ export function registerConnectionHandlers(appState: AppState): void {
       for (const key of ['id', 'baseUrl', 'apiKey'] as const) {
         if (input[key] !== undefined && (typeof input[key] !== 'string' || input[key].length > 2048)) return { success: false, error: `Invalid ${key}` }
       }
+      if (typeof input.baseUrl === 'string' && !input.baseUrl.trim()) return { success: false, error: 'Enter a Base URL' }
       const cm = CredentialsManager.getInstance()
       const saved = input?.id ? cm.resolveConnection(input.id) : undefined
       const type = input?.type ?? saved?.type

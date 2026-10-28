@@ -101,3 +101,24 @@ t.test('Sources shows real query errors instead of invented empty counts', t => 
     t.notMatch(html, 'Write a note');
     t.end();
 });
+
+t.test('Sources shows one Use when answering row per kind, with the reply state and what it controls', t => {
+    const client = sourcesClient();
+    client.setQueryData(['recent-meetings'], []);
+    client.setQueryData(['profile-notes'], '');
+    client.setQueryData(['answer-sources'], { meetings: true, materials: false, profile: false });
+    const html = renderSources(client);
+    t.match(html, 'Use when answering');
+    t.equal((html.match(/role="switch"/g) ?? []).length, 3);
+    t.match(html, 'Past meetings');
+    t.match(html, 'Materials (notes)');
+    t.match(html, 'Interview profile');
+    t.match(html, 'Pika may search your recorded meetings when you ask a question.');
+    t.match(html, 'Pika may search your notes when you ask a question. Off until you turn it on.');
+    t.match(html, 'Interview practice answers may use your resume and target roles. Off until you turn it on.');
+    t.match(html, '● On');
+    t.match(html, '○ Off');
+    t.match(html, 'bg-bg-component');
+    t.notMatch(html, 'animate-spin');
+    t.end();
+});

@@ -138,7 +138,7 @@ const GATE_KINDS: GateKind[] = ['answer_question', 'explain_term', 'check_fact',
 export interface GateTestResult { success: boolean; help?: number; kind?: GateKind; latencyMs?: number; error?: string }
 
 const GATE_TEST_ERROR: Record<GateErrorClass, string> = {
-  timeout: 'The decision model did not answer within 2 seconds.',
+  timeout: 'The decision model did not answer within 5 seconds. Live use allows 2 seconds.',
   auth: 'The decision model refused the key (401 or 403).',
   network: 'The decision model could not be reached (connection refused, DNS, or a server error).',
   bad_response: 'The host answered, but not in the format this model expects: requests go to the base URL followed by /systemone and need an answer of that kind.',
