@@ -181,13 +181,10 @@ export class VectorStore {
             const dim = embedding.length;
             // Lazily provision the table if it's a novel dimension (e.g., a new provider)
             DatabaseManager.getInstance().ensureVecTableForDim(dim);
-            try {
-                this.db.prepare(
-                    `INSERT OR REPLACE INTO vec_chunks_${dim}(chunk_id, embedding) VALUES (?, ?)`
-                ).run(BigInt(chunkId), blob);
-            } catch (e) {
-                console.warn(`[VectorStore] Failed to insert into vec_chunks_${dim}:`, e);
-            }
+            this.db.prepare(`DELETE FROM vec_chunks_${dim} WHERE chunk_id = ?`).run(chunkId);
+            this.db.prepare(
+                `INSERT INTO vec_chunks_${dim}(chunk_id, embedding) VALUES (?, ?)`
+            ).run(BigInt(chunkId), blob);
         }
     }
 
@@ -347,33 +344,13 @@ export class VectorStore {
     }
 
     /**
-     * Delete all chunks for a meeting (removes from all tracked dimension tables)
+     * Delete all chunks for a meeting, including native vectors in every dimension.
      */
     deleteChunksForMeeting(meetingId: string): void {
-        if (this.useNativeVec) {
-            try {
-                const ids = this.db.prepare(
-                    'SELECT id FROM chunks WHERE meeting_id = ?'
-                ).all(meetingId) as any[];
-
-                if (ids.length > 0) {
-                    const placeholders = ids.map(() => '?').join(',');
-                    const idList = ids.map(r => r.id);
-                    // Delete from all known dimension-specific vec0 tables
-                    for (const dim of DatabaseManager.KNOWN_DIMS) {
-                        try {
-                            this.db.prepare(
-                                `DELETE FROM vec_chunks_${dim} WHERE chunk_id IN (${placeholders})`
-                            ).run(...idList);
-                        } catch (_) { /* dim table may not exist */ }
-                    }
-                }
-            } catch (e) {
-                console.warn('[VectorStore] Failed to delete from vec_chunks dimension tables:', e);
-            }
-        }
-
-        this.db.prepare('DELETE FROM chunks WHERE meeting_id = ?').run(meetingId);
+        this.db.transaction(() => {
+            this.clearNativeVectorsForMeeting(meetingId, 'chunks');
+            this.db.prepare('DELETE FROM chunks WHERE meeting_id = ?').run(meetingId);
+        })();
     }
 
     /**
@@ -410,20 +387,17 @@ export class VectorStore {
         this.db.prepare('UPDATE chunk_summaries SET embedding = ? WHERE meeting_id = ?').run(blob, meetingId);
 
         if (this.useNativeVec) {
-            try {
-                const row = this.db.prepare(
-                    'SELECT id FROM chunk_summaries WHERE meeting_id = ?'
-                ).get(meetingId) as any;
+            const row = this.db.prepare(
+                'SELECT id FROM chunk_summaries WHERE meeting_id = ?'
+            ).get(meetingId) as { id: number } | undefined;
 
-                if (row) {
-                    const dim = embedding.length;
-                    DatabaseManager.getInstance().ensureVecTableForDim(dim);
-                    this.db.prepare(
-                        `INSERT OR REPLACE INTO vec_summaries_${dim}(summary_id, embedding) VALUES (?, ?)`
-                    ).run(BigInt(row.id), blob);
-                }
-            } catch (e) {
-                console.warn('[VectorStore] Failed to insert into vec_summaries dim table:', e);
+            if (row) {
+                const dim = embedding.length;
+                DatabaseManager.getInstance().ensureVecTableForDim(dim);
+                this.db.prepare(`DELETE FROM vec_summaries_${dim} WHERE summary_id = ?`).run(row.id);
+                this.db.prepare(
+                    `INSERT INTO vec_summaries_${dim}(summary_id, embedding) VALUES (?, ?)`
+                ).run(BigInt(row.id), blob);
             }
         }
     }
@@ -564,84 +538,39 @@ export class VectorStore {
         if (meetingIds.length === 0) return [];
 
         for (const id of meetingIds) {
-            // Nullify embeddings
-            this.db.prepare('UPDATE chunks SET embedding = NULL WHERE meeting_id = ?').run(id);
-            this.db.prepare('UPDATE chunk_summaries SET embedding = NULL WHERE meeting_id = ?').run(id);
-            this.db.prepare('UPDATE meetings SET embedding_provider = NULL, embedding_dimensions = NULL WHERE id = ?').run(id);
-
-            // Delete from per-dimension vec0 tables
-            if (this.useNativeVec) {
-                try {
-                    const cIds = this.db.prepare('SELECT id FROM chunks WHERE meeting_id = ?').all(id) as any[];
-                    if (cIds.length > 0) {
-                        const placeholders = cIds.map(() => '?').join(',');
-                        const idList = cIds.map(r => r.id);
-                        for (const dim of DatabaseManager.KNOWN_DIMS) {
-                            try {
-                                this.db.prepare(`DELETE FROM vec_chunks_${dim} WHERE chunk_id IN (${placeholders})`).run(...idList);
-                            } catch (_) { /* dim table may not exist */ }
-                        }
-                    }
-
-                    const sIds = this.db.prepare('SELECT id FROM chunk_summaries WHERE meeting_id = ?').get(id) as any;
-                    if (sIds) {
-                        for (const dim of DatabaseManager.KNOWN_DIMS) {
-                            try {
-                                this.db.prepare(`DELETE FROM vec_summaries_${dim} WHERE summary_id = ?`).run(sIds.id);
-                            } catch (_) { /* dim table may not exist */ }
-                        }
-                    }
-                } catch (e) {}
-            }
+            this.clearEmbeddingsForMeeting(id);
         }
         return meetingIds;
     }
 
 
     /**
-     * Clear embeddings for a single meeting without deleting chunks.
-     * Used when falling back to a different provider mid-stream — the chunks
-     * are kept but their embedding BLOBs, vec0 rows, and provider metadata
-     * are wiped so the new provider can embed them cleanly.
+     * Clear native vectors while their owning rows still exist, regardless of the search mode.
+     */
+    clearNativeVectorsForMeeting(meetingId: string, kind: 'chunks' | 'summaries' | 'all' = 'all'): void {
+        const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[];
+        for (const { name } of tables) {
+            const match = /^vec_(chunks|summaries)_\d+$/.exec(name);
+            if (!match || (kind !== 'all' && match[1] !== kind)) continue;
+            const isChunk = match[1] === 'chunks';
+            const idColumn = isChunk ? 'chunk_id' : 'summary_id';
+            const source = isChunk ? 'chunks' : 'chunk_summaries';
+            this.db.prepare(`DELETE FROM ${name} WHERE ${idColumn} IN (SELECT id FROM ${source} WHERE meeting_id = ?)`).run(meetingId);
+        }
+    }
+
+    /**
+     * Clear embeddings and provider metadata without deleting the indexed text.
      */
     clearEmbeddingsForMeeting(meetingId: string): void {
-        // Wipe embedding blobs from chunks and summaries
-        this.db.prepare('UPDATE chunks SET embedding = NULL WHERE meeting_id = ?').run(meetingId);
-        this.db.prepare('UPDATE chunk_summaries SET embedding = NULL WHERE meeting_id = ?').run(meetingId);
-
-        // Reset provider metadata so it gets re-assigned by the fallback provider
-        this.db.prepare(
-            'UPDATE meetings SET embedding_provider = NULL, embedding_dimensions = NULL WHERE id = ?'
-        ).run(meetingId);
-
-        // Delete rows from all per-dimension vec0 tables
-        if (this.useNativeVec) {
-            try {
-                const cIds = this.db.prepare('SELECT id FROM chunks WHERE meeting_id = ?').all(meetingId) as any[];
-                if (cIds.length > 0) {
-                    const placeholders = cIds.map(() => '?').join(',');
-                    const idList = cIds.map(r => r.id);
-                    for (const dim of DatabaseManager.KNOWN_DIMS) {
-                        try {
-                            this.db.prepare(
-                                `DELETE FROM vec_chunks_${dim} WHERE chunk_id IN (${placeholders})`
-                            ).run(...idList);
-                        } catch (_) { /* dim table may not exist */ }
-                    }
-                }
-
-                const sRow = this.db.prepare('SELECT id FROM chunk_summaries WHERE meeting_id = ?').get(meetingId) as any;
-                if (sRow) {
-                    for (const dim of DatabaseManager.KNOWN_DIMS) {
-                        try {
-                            this.db.prepare(`DELETE FROM vec_summaries_${dim} WHERE summary_id = ?`).run(sRow.id);
-                        } catch (_) { /* dim table may not exist */ }
-                    }
-                }
-            } catch (e) {
-                console.warn('[VectorStore] clearEmbeddingsForMeeting: error deleting from vec0 tables:', e);
-            }
-        }
+        this.db.transaction(() => {
+            this.clearNativeVectorsForMeeting(meetingId);
+            this.db.prepare('UPDATE chunks SET embedding = NULL WHERE meeting_id = ?').run(meetingId);
+            this.db.prepare('UPDATE chunk_summaries SET embedding = NULL WHERE meeting_id = ?').run(meetingId);
+            this.db.prepare(
+                'UPDATE meetings SET embedding_provider = NULL, embedding_dimensions = NULL WHERE id = ?'
+            ).run(meetingId);
+        })();
 
         console.log(`[VectorStore] Cleared embeddings for meeting ${meetingId} (chunks preserved for re-embedding)`);
     }

@@ -97,7 +97,7 @@ export class RAGManager {
         const chunks = chunkTranscript(meetingId, cleaned);
         console.log(`[RAGManager] Created ${chunks.length} chunks`);
 
-        // Finish queued writes before replacing their rows (including any fallback reset).
+        // Finish queued writes before replacing their rows.
         await this.embeddingPipeline.processQueue();
         if (!this.db.prepare('SELECT 1 FROM meetings WHERE id = ?').get(meetingId)) return { chunkCount: 0 };
         this.db.transaction(() => {
@@ -139,11 +139,7 @@ export class RAGManager {
     refreshMeetingSummary(meetingId: string, summaryText: string): void {
         const hasSummary = summaryText.trim().length > 0;
         this.db.transaction(() => {
-            const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[];
-            for (const { name } of tables) {
-                if (!/^vec_summaries_\d+$/.test(name)) continue;
-                this.db.prepare(`DELETE FROM ${name} WHERE summary_id IN (SELECT id FROM chunk_summaries WHERE meeting_id = ?)`).run(meetingId);
-            }
+            this.vectorStore.clearNativeVectorsForMeeting(meetingId, 'summaries');
             this.db.prepare('DELETE FROM chunk_summaries WHERE meeting_id = ?').run(meetingId);
             // Cancel in-flight jobs too, so their late completion cannot complete the replacement job.
             this.db.prepare('DELETE FROM embedding_queue WHERE meeting_id = ? AND chunk_id IS NULL').run(meetingId);
@@ -326,18 +322,15 @@ export class RAGManager {
      */
     deleteMeetingData(meetingId: string): void {
         this.db.transaction(() => {
-            this.deleteMeetingChunks(meetingId);
+            this.vectorStore.clearNativeVectorsForMeeting(meetingId);
+            this.db.prepare('DELETE FROM chunks WHERE meeting_id = ?').run(meetingId);
+            this.db.prepare('DELETE FROM chunk_summaries WHERE meeting_id = ?').run(meetingId);
             this.db.prepare('DELETE FROM embedding_queue WHERE meeting_id = ?').run(meetingId);
         })();
     }
 
     private deleteMeetingChunks(meetingId: string): void {
-        // Include dynamically provisioned dimensions, not just the built-in tiers.
-        const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[];
-        for (const { name } of tables) {
-            if (!/^vec_chunks_\d+$/.test(name)) continue;
-            this.db.prepare(`DELETE FROM ${name} WHERE chunk_id IN (SELECT id FROM chunks WHERE meeting_id = ?)`).run(meetingId);
-        }
+        this.vectorStore.clearNativeVectorsForMeeting(meetingId, 'chunks');
         this.db.prepare('DELETE FROM embedding_queue WHERE meeting_id = ? AND chunk_id IS NOT NULL').run(meetingId);
         this.db.prepare('DELETE FROM chunks WHERE meeting_id = ?').run(meetingId);
     }

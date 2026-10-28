@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: vector integrity, step V1 (branch `vector-integrity`)
+
+- `VectorStore` owns all-dimension native cleanup, reused by scoped chunk/summary clears and meeting deletion. The existing delete IPC handler now clears RAG data before the record cascade; short meetings already use that cleanup. Native writes delete then insert and propagate errors through the existing embedding transactions.
+- Exhausted jobs stay `failed` with their real error; whole-meeting fallback, its sentinel and event sender are removed. Local-provider initialization fallback remains. This checkout has no fallback-event preload/type declaration or renderer listener, so none was added or changed.
+- Checks: both typechecks, lint (930 warnings, no errors) and full tap (2404 assertions) exit 0. The 27 new synthetic cases cover native/JS replacement/search, all clear paths including 1024 dimensions and IPC deletion, native-error rollback/retries, failed-job preservation and queue counts; K3a still passes.
+- Found, not changed: bulk `clearAllData` still leaves native vectors; `saveSummary` outside the refresh primitive can replace a summary id without clearing its old native row. Owner: real-provider failure/status, meeting deletion and restart; no app, real provider/device, Windows or packaged build was run. No schema, dependency or historical-orphan sweep.
+- Review fix: the `delete-meeting` handler catches a search-index cleanup failure (for example sqlite-vec not loaded, where `DELETE` on an existing `vec0` table throws) and logs it, so the record is still deleted; a test covers it.
+
 ## 2026-10-28: mutation check added to the finishing checklist (branch `mutation-check`)
 
 - `docs/development.md` gains a "Mutation check" section and a step in "Finishing a change": when a change adds or changes tests for production logic, run `mutator` on the changed files from a scratch worktree and report the survivors. A review aid on the changed functions, not a CI gate or a repository score; the tool stays outside the repository and `package.json`.

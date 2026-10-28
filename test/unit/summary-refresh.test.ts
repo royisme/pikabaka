@@ -304,8 +304,8 @@ for (const native of [true, false]) {
             Reflect.set(f.pipeline, 'delay', async () => {});
             f.db.prepare("INSERT INTO embedding_queue (meeting_id, chunk_id, status) VALUES ('meeting-a', NULL, 'pending')").run();
             await f.pipeline.processQueue();
-            t.match(f.jobs(), [{ status: 'completed' }, { status: 'pending', retry_count: 3, error_message: 'Meeting embeddings use a different provider; rebuild required' }]);
-            t.same({ summary: f.summary(), vectors: f.vectors(), metadata: f.metadata() }, before, 'queue retries also preserve the old index when no fallback is available');
+            t.match(f.jobs(), [{ status: 'completed' }, { status: 'failed', retry_count: 3, error_message: 'Meeting embeddings use a different provider; rebuild required' }]);
+            t.same({ summary: f.summary(), vectors: f.vectors(), metadata: f.metadata() }, before, 'exhausted queue jobs preserve the old index');
             f.assertUnchanged();
         });
     }
