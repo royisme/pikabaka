@@ -154,6 +154,16 @@ async function setup(t: Test) {
     };
 }
 
+t.test('the indexed summary text is empty for a meeting without a summary and drops blank entries', async t => {
+    const { buildMeetingSummaryText } = mockRequire(file('rag/meetingSummaryIndex'), {
+        [file('db/DatabaseManager')]: { DatabaseManager: {} },
+    }) as typeof import('../../electron/rag/meetingSummaryIndex');
+    t.equal(buildMeetingSummaryText({}), '');
+    t.equal(buildMeetingSummaryText({ detailedSummary: { keyPoints: [], actionItems: [] } }), '');
+    t.equal(buildMeetingSummaryText({ detailedSummary: { keyPoints: ['  ', 'Lamps are approved'], actionItems: ['', 'Order the shelf'] } }),
+        'Lamps are approved. Action: Order the shelf');
+});
+
 t.test('final commit refreshes the recorded summary and starts embedding without blocking stop', async t => {
     const f = await setup(t);
     const embedded = deferred<number[]>();
