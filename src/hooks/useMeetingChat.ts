@@ -52,6 +52,8 @@ function toolWorkingMessage(toolName: string): string {
       return 'Reading the latest lines…';
     case 'search_meetings':
       return 'Searching past meetings…';
+    case 'search_materials':
+      return 'Searching your notes…';
     case 'screenshot':
       return 'Looking at the screen…';
     default:
