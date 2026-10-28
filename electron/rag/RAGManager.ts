@@ -3,6 +3,7 @@
 // Coordinates preprocessing, chunking, embedding, and retrieval
 
 import Database from 'better-sqlite3';
+import { getAnswerSources, PAST_MEETING_SEARCH_OFF } from '../services/SettingsManager';
 import { LLMHelper } from '../core/LLMHelper';
 import { preprocessTranscript, RawSegment } from './TranscriptPreprocessor';
 import { chunkTranscript } from './SemanticChunker';
@@ -206,6 +207,10 @@ export class RAGManager {
         query: string,
         abortSignal?: AbortSignal
     ): AsyncGenerator<string, void, unknown> {
+        if (!getAnswerSources().meetings) {
+            yield PAST_MEETING_SEARCH_OFF;
+            return;
+        }
         if (!this.llmHelper) {
             throw new Error('LLM helper not initialized');
         }

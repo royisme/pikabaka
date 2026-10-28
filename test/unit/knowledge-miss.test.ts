@@ -1,6 +1,12 @@
 import t from 'tap';
-import { KnowledgeOrchestrator } from '../../electron/knowledge/KnowledgeOrchestrator';
+import path from 'node:path';
+import type { KnowledgeOrchestrator as Orchestrator } from '../../electron/knowledge/KnowledgeOrchestrator';
+import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 import { DocType, type DocumentRow } from '../../electron/knowledge/types';
+
+const { KnowledgeOrchestrator } = mockRequire(path.resolve('electron/knowledge/KnowledgeOrchestrator.ts'), {
+  [path.resolve('electron/services/SettingsManager.ts')]: { getAnswerSources: () => ({ meetings: true, materials: true, profile: true }) },
+}) as { KnowledgeOrchestrator: typeof Orchestrator };
 
 const resume: DocumentRow = {
   id: 1, doc_type: DocType.RESUME, file_name: 'resume.pdf', raw_text: 'raw', created_at: '', updated_at: '', is_active: 0, label: null,
@@ -34,7 +40,7 @@ function orchestrator(options: { scores: number[]; notes?: string }) {
     clearEmbeddings: () => {},
     storeEmbeddings: async () => {},
   };
-  return o as KnowledgeOrchestrator;
+  return o as Orchestrator;
 }
 
 t.test('passages that are not about the question are dropped, and nothing is invented in their place', async (t) => {

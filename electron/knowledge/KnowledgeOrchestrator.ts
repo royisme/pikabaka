@@ -1,4 +1,5 @@
 import path from 'path';
+import { getAnswerSources } from '../services/SettingsManager';
 
 import { KnowledgeDatabaseManager } from './KnowledgeDatabaseManager';
 import { DocumentParser } from './DocumentParser';
@@ -194,7 +195,9 @@ export class KnowledgeOrchestrator {
   }
 
   isKnowledgeMode(): boolean {
-    return this.knowledgeMode && (this.db.getDocumentByType(DocType.RESUME) !== null || this.getNotes() !== '');
+    const sources = getAnswerSources();
+    return this.knowledgeMode && ((sources.profile && this.db.getDocumentByType(DocType.RESUME) !== null)
+      || (sources.materials && this.getNotes() !== ''));
   }
 
   /** What the user wrote about themselves, one fact per line; empty when nothing is saved. */
@@ -492,8 +495,9 @@ export class KnowledgeOrchestrator {
       return null;
     }
 
+    const sources = getAnswerSources();
     try {
-      if (this.isIntroQuestion(message)) {
+      if (sources.profile && this.isIntroQuestion(message)) {
         const profile = this.getProfileData();
         if (profile && this.generateContentFn) {
           const prompt = buildIntroResponsePrompt(profile);
@@ -502,7 +506,7 @@ export class KnowledgeOrchestrator {
         }
       }
 
-      if (this.negotiationTracker?.isActive?.()) {
+      if (sources.profile && this.negotiationTracker?.isActive?.()) {
         const coaching = this.negotiationTracker.getCoachingResponse?.(message);
         if (coaching) {
           return { liveNegotiationResponse: coaching };
@@ -515,15 +519,16 @@ export class KnowledgeOrchestrator {
         const active = this.embeddingStatusFn?.();
         const modelChanged = active && (active.providerName !== provider || active.dimensions !== dimensions);
         // Below this similarity a passage is not about the question: it is dropped, not sent as "background".
-        const results = modelChanged ? [] : this.vectorStore.searchSimilar(queryEmbedding, 5, provider).filter((result) => result.score >= MIN_MATCH_SCORE);
+        const docTypes = sources.materials && sources.profile ? undefined
+          : sources.materials ? DocType.NOTES : [DocType.RESUME, DocType.JD];
+        const results = modelChanged ? [] : this.vectorStore.searchSimilar(queryEmbedding, 5, provider, docTypes).filter((result) => result.score >= MIN_MATCH_SCORE);
         searchedWithoutMatch = results.length === 0;
 
         if (results.length > 0) {
-          const profile = this.getProfileData();
-          const identityName = profile?.identity?.name || 'the candidate';
-          const latestRole = profile?.experience?.[0]?.role || '';
-          const totalExperienceYears = profile?.totalExperienceYears || 0;
-          const identitySummary = `${identityName}, ${latestRole} with ${totalExperienceYears} years of experience`;
+          const profile = sources.profile ? this.getProfileData() : null;
+          const identitySummary = profile
+            ? `${profile.identity?.name || 'the candidate'}, ${profile.experience?.[0]?.role || ''} with ${profile.totalExperienceYears || 0} years of experience`
+            : '';
           const depthInstruction = this.depthScorer.getDepthInstruction();
           const contextChunks = results.map((result) => result.text);
           const jdContext = profile?.activeJD ? {
@@ -548,11 +553,11 @@ export class KnowledgeOrchestrator {
         }
       }
 
-      const profile = this.getProfileData();
+      const profile = sources.profile ? this.getProfileData() : null;
       if (searchedWithoutMatch) {
         const identitySummary = profile
           ? `${profile.identity.name}, ${profile.experience?.[0]?.role || ''} with ${profile.totalExperienceYears} years of experience`
-          : 'the candidate';
+          : '';
         return {
           knowledgeMiss: true,
           systemPromptInjection: buildNoMatchPrompt(message, identitySummary, this.depthScorer.getDepthInstruction()),

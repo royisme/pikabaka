@@ -11,7 +11,21 @@ export interface AppSettings {
     actionButtonMode?: 'recap' | 'brainstorm';
     autoCheckUpdates?: boolean;
     transcriptAssemblerProfile?: 'sentence_bias' | 'low_latency' | 'coherent';
+    answerUsesMeetings?: boolean;
+    answerUsesMaterials?: boolean;
+    answerUsesProfile?: boolean;
 }
+
+export function getAnswerSources() {
+    const settings = SettingsManager.getInstance();
+    return {
+        meetings: settings.get('answerUsesMeetings') ?? true,
+        materials: settings.get('answerUsesMaterials') ?? false,
+        profile: settings.get('answerUsesProfile') ?? false,
+    };
+}
+
+export const PAST_MEETING_SEARCH_OFF = 'Past-meeting search is turned off.';
 
 export class SettingsManager {
     private static instance: SettingsManager;

@@ -7,6 +7,7 @@ import {
 } from "../llm/prompts"
 import { openAiRoot, type Connection } from '../services/aiConnections';
 import { CredentialsManager } from '../services/CredentialsManager';
+import { getAnswerSources } from '../services/SettingsManager';
 import { buildTranscriptTranslationPrompt } from '../transcript/translationExecutor';
 import { classifyTranslationError } from '../transcript/translationError';
 import { answerLanguageInstruction } from '../llm/answerLanguage';
@@ -565,6 +566,7 @@ ANSWER DIRECTLY:`;
   }
 
   public async chatWithGemini(message: string, imagePaths?: string[], context?: string, skipSystemPrompt: boolean = false, alternateGroqMessage?: string): Promise<string> {
+    const sources = getAnswerSources();
     try {
       console.log('[LLMHelper] chatWithGemini called')
 
@@ -573,7 +575,7 @@ ANSWER DIRECTLY:`;
       // If knowledge mode is active, check for intro questions and
       // inject system prompt + relevant context
       // ============================================================
-      if (this.knowledgeOrchestrator?.isKnowledgeMode()) {
+      if ((sources.materials || sources.profile) && this.knowledgeOrchestrator?.isKnowledgeMode()) {
         try {
           // Feed only to the depth scorer — NOT feedInterviewerUtterance, which also routes to the
           // negotiation tracker and would misclassify the user's typed question as a recruiter utterance.
@@ -659,7 +661,8 @@ ANSWER DIRECTLY:`;
     // ============================================================
     // KNOWLEDGE MODE INTERCEPT (Streaming)
     // ============================================================
-    if (!options?.verbatimPrompt && this.knowledgeOrchestrator?.isKnowledgeMode()) {
+    const sources = getAnswerSources();
+    if (!options?.verbatimPrompt && (sources.materials || sources.profile) && this.knowledgeOrchestrator?.isKnowledgeMode()) {
       try {
         // Feed to depth scorer only (not negotiation tracker) — mirrors non-streaming path fix.
         this.knowledgeOrchestrator.feedForDepthScoring(message);
