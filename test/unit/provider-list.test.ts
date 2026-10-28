@@ -101,7 +101,7 @@ t.test('add editor starts with Interface, real default URL and blank name; no de
     t.match(html, 'Ollama and LM Studio speak this interface.');
     t.match(html, 'Asks the host for its model list. It does not check a model, images or tools.');
     t.notMatch(html, '>Delete</button>');
-    t.notMatch(html, 'Custom headers');
+    t.match(html, 'Custom headers (optional)');
     t.end();
 });
 

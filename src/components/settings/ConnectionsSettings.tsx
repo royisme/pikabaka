@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
-import type { AiConnectionType, AiConnectionView } from '../../types/electron';
+import type { AiConnectionType, AiConnectionView, HeaderEdit } from '../../types/electron';
 import { connectionNeedsKey } from '../../../electron/services/aiConnections';
 import { configuredProvider, interfaceLabel, ProviderNavigation } from './ConnectionModelPicker';
 
@@ -18,6 +18,33 @@ const field = 'w-full h-11 bg-bg-input border border-border-subtle rounded-lg px
 const smallButton = 'min-h-9 px-3 py-2 rounded-lg text-xs font-medium border border-border-subtle bg-bg-component text-text-secondary hover:text-text-primary disabled:opacity-50';
 type TestResult = { success: boolean; message: string };
 type Uses = Array<{ name: string; connectionId: string }>;
+// One row of the custom-header draft: a saved row keeps its name and only sends a value the user typed.
+type HeaderRow = { name: string; value: string; saved: boolean; removed: boolean };
+
+const HTTP_TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+
+/** Only the rules the user can fix here and the backend also enforces; reserved names, limits and
+ * control characters stay with the backend, whose real message is shown. */
+function headerRowError(rows: HeaderRow[], index: number): string | undefined {
+    const row = rows[index];
+    if (!row.saved) {
+        if (!row.name) return 'Give the header a name.';
+        if (!HTTP_TOKEN.test(row.name)) return "A header name uses letters, digits and !#$%&'*+-.^_`|~ only.";
+        if (!row.value.trim()) return 'A new header needs a value.';
+    }
+    return rows.some((other, i) => i !== index && other.name.toLowerCase() === row.name.toLowerCase())
+        ? 'Two headers cannot share a name; header names ignore case.' : undefined;
+}
+
+function headerEditsOf(rows: HeaderRow[]): HeaderEdit[] {
+    return rows.flatMap((row): HeaderEdit[] => {
+        if (row.saved) {
+            if (row.removed) return [{ op: 'remove', name: row.name }];
+            return [row.value.trim() ? { op: 'set', name: row.name, value: row.value } : { op: 'keep', name: row.name }];
+        }
+        return row.name && row.value.trim() ? [{ op: 'set', name: row.name, value: row.value }] : [];
+    });
+}
 
 export function ProviderList({ connections, uses, results, busyId, confirmId, canDelete = true, onEdit, onRemove, onConfirm }: {
     connections: AiConnectionView[]; uses: Uses; results: Record<string, TestResult>;
@@ -60,17 +87,22 @@ export function ProviderEditor({ connection, onClose, onSaved, onTest, onBusy, d
         id: connection?.id, type: connection?.type ?? 'openai' as AiConnectionType,
         name: connection?.name ?? '', baseUrl: connection?.baseUrl ?? DEFAULT_HOST.openai, apiKey: '',
     });
+    const [headers, setHeaders] = useState<HeaderRow[]>((connection?.headers ?? []).map(header => ({ name: header.name, value: '', saved: true, removed: false })));
+    const headerErrors = headers.map((_, index) => headerRowError(headers, index));
+    const headerEdits = headerEditsOf(headers);
     const save = useMutation(async () => {
-        const result = await window.electronAPI.aiConnectionSave({ ...draft, apiKey: draft.apiKey || undefined });
+        const result = await window.electronAPI.aiConnectionSave({ ...draft, apiKey: draft.apiKey || undefined, ...(headerEdits.length ? { headerEdits } : {}) });
         if (!result.success) throw new Error(result.error || 'Could not save provider');
     });
     const test = useMutation(async () => {
-        const result = await window.electronAPI.aiConnectionModels({ id: draft.id, type: draft.type, baseUrl: draft.baseUrl, apiKey: draft.apiKey || undefined });
+        const result = await window.electronAPI.aiConnectionModels({ id: draft.id, type: draft.type, baseUrl: draft.baseUrl, apiKey: draft.apiKey || undefined, ...(headerEdits.length ? { headerEdits } : {}) });
         if (!result.success) throw new Error(result.error || 'Could not fetch models');
         return `The host lists ${result.models?.length ?? 0} models.`;
     });
     const busy = disabled || save.isLoading || test.isLoading;
     const change = (next: Partial<typeof draft>) => { setDraft({ ...draft, ...next }); save.reset(); test.reset(); };
+    const changeHeaders = (next: HeaderRow[]) => { setHeaders(next); save.reset(); test.reset(); };
+    const changeHeader = (index: number, next: Partial<HeaderRow>) => changeHeaders(headers.map((row, i) => i === index ? { ...row, ...next } : row));
     return <section className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-3">
         <h4 className="text-sm font-bold text-text-primary">{connection ? `Edit ${connection.name}` : 'Add provider'}</h4>
         <fieldset disabled={busy} className="space-y-3 min-w-0">
@@ -84,14 +116,43 @@ export function ProviderEditor({ connection, onClose, onSaved, onTest, onBusy, d
             <label className="block text-xs text-text-secondary space-y-1">Name<input value={draft.name} readOnly={connection?.builtin} onChange={e => change({ name: e.target.value })} className={field} /></label>
             <label className="block text-xs text-text-secondary space-y-1">Base URL<input value={draft.baseUrl} onChange={e => change({ baseUrl: e.target.value })} className={field} /></label>
             <label className="block text-xs text-text-secondary space-y-1">API key<input type="password" autoComplete="off" value={draft.apiKey} onChange={e => change({ apiKey: e.target.value })} placeholder={connection?.hasApiKey ? 'Saved. Leave empty to keep it.' : 'Optional for a local address'} className={field} /></label>
+            {!connection?.builtin && <div className="space-y-2 min-w-0">
+                <p className="text-xs text-text-secondary">Custom headers (optional)</p>
+                {!headers.length && <p className="text-xs text-text-secondary">No custom headers.</p>}
+                {headers.map((row, index) => <div key={index} className="space-y-1 min-w-0">
+                    <div className="flex flex-wrap items-end gap-2 min-w-0">
+                        {row.saved
+                            ? <div className="min-w-0 flex-1 basis-full min-[560px]:basis-0 space-y-1">
+                                <p className="text-xs text-text-secondary">Name</p>
+                                <p className="flex h-11 min-w-0 items-center gap-1.5 text-sm text-text-primary">
+                                    <span className="min-w-0 break-words [overflow-wrap:anywhere]">{row.name}</span>
+                                    {!row.removed && <><span aria-hidden="true" className="inline-block w-2 h-2 shrink-0 rounded-full bg-state-success" /><span className="text-[11px] text-text-secondary">set</span></>}
+                                </p>
+                            </div>
+                            : <label className="min-w-0 flex-1 basis-full min-[560px]:basis-0 block text-xs text-text-secondary space-y-1">Name
+                                <input aria-label={`Header ${index + 1} name`} value={row.name} onChange={e => changeHeader(index, { name: e.target.value })} className={field} />
+                            </label>}
+                        {row.removed
+                            ? <p className="min-w-0 flex-1 basis-full min-[560px]:basis-0 text-xs text-text-primary">Removing on Save.</p>
+                            : <label className="min-w-0 flex-1 basis-full min-[560px]:basis-0 block text-xs text-text-secondary space-y-1">Value
+                                <input type="password" aria-label={`Header ${index + 1} value`} autoComplete="off" value={row.value} onChange={e => changeHeader(index, { value: e.target.value })} placeholder={row.saved ? 'Saved. Type to replace.' : undefined} className={field} />
+                            </label>}
+                        {row.removed
+                            ? <button type="button" aria-label={`Keep ${row.name}`} onClick={() => changeHeader(index, { removed: false })} className={smallButton}>Keep</button>
+                            : <button type="button" aria-label={row.saved ? `Remove ${row.name}` : 'Remove header'} onClick={() => row.saved ? changeHeader(index, { removed: true, value: '' }) : changeHeaders(headers.filter((_, i) => i !== index))} className={smallButton}>Remove</button>}
+                    </div>
+                    {headerErrors[index] && <p className="text-[11px] text-state-danger">{headerErrors[index]}</p>}
+                </div>)}
+                <button type="button" onClick={() => changeHeaders([...headers, { name: '', value: '', saved: false, removed: false }])} className={smallButton}>Add header</button>
+            </div>}
         </fieldset>
         <p className="text-[11px] text-text-secondary">Asks the host for its model list. It does not check a model, images or tools.</p>
         <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy} className={smallButton} onClick={() => test.mutate(undefined, {
+            <button type="button" disabled={busy || headerErrors.some(Boolean)} className={smallButton} onClick={() => test.mutate(undefined, {
                 onSuccess: message => onTest({ success: true, message }),
                 onError: error => onTest({ success: false, message: (error as Error).message }),
             })}>{test.isLoading ? 'Testing…' : 'Test'}</button>
-            <button type="button" disabled={busy} className="min-h-9 px-4 py-2 rounded-lg text-xs bg-primary text-on-primary disabled:opacity-50" onClick={() => {
+            <button type="button" disabled={busy || headerErrors.some(Boolean)} className="min-h-9 px-4 py-2 rounded-lg text-xs bg-primary text-on-primary disabled:opacity-50" onClick={() => {
                 onBusy(true);
                 save.mutate(undefined, { onSuccess: onSaved, onSettled: () => onBusy(false) });
             }}>{save.isLoading ? 'Saving…' : 'Save'}</button>
