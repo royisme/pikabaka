@@ -1,6 +1,12 @@
+import type { ConnectionType, ConnectionView } from '../services/aiConnections'
+import type { HeaderEdit, HeaderState } from '../services/connectionHeaders'
 import type { KeybindStatus, KeybindResult } from '../services/KeybindManager'
+import type { NotesIndexStatus } from '../knowledge/types'
 
 export interface ElectronAPI {
+  aiConnectionsList: () => Promise<ConnectionView[]>
+  aiConnectionSave: (input: { id?: string; name?: string; type?: ConnectionType; baseUrl?: string; apiKey?: string; headerEdits?: HeaderEdit[] }) => Promise<{ success: boolean; id?: string; error?: string }>
+  aiConnectionModels: (input: { id?: string; type?: ConnectionType; baseUrl?: string; apiKey?: string; headerEdits?: HeaderEdit[] }) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
   updateContentDimensions: (dimensions: {
     width: number
     height: number
@@ -45,7 +51,7 @@ export interface ElectronAPI {
   analyzeImageFile: (path: string) => Promise<void>
   quitApp: () => Promise<void>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
-  getStoredCredentials: () => Promise<{ hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: string; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; hasSonioxKey: boolean }>
+  getStoredCredentials: () => Promise<{ connectionHeaders?: Record<string, HeaderState[]>; hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: string; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; hasSonioxKey: boolean }>
   getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both' }>
   setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) => Promise<{ success: boolean }>
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string; translatedText?: string }>
@@ -217,7 +223,7 @@ export interface ElectronAPI {
 
   // Profile Engine API
   profileUploadResume: (filePath: string) => Promise<{ success: boolean; error?: string }>;
-  profileGetStatus: () => Promise<{ hasProfile: boolean; profileMode: boolean; name?: string; role?: string; totalExperienceYears?: number }>;
+  profileGetStatus: () => Promise<{ hasProfile: boolean; profileMode: boolean; name?: string; role?: string; totalExperienceYears?: number; notesIndex?: NotesIndexStatus | null }>;
   profileSetMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
   profileDelete: () => Promise<{ success: boolean; error?: string }>;
   profileGetProfile: () => Promise<any>;

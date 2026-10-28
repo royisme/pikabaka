@@ -69,6 +69,12 @@ export class KnowledgeDatabaseManager {
       this.db.exec(`ALTER TABLE knowledge_documents ADD COLUMN label TEXT`);
     } catch { /* column already exists */ }
 
+    for (const column of ['embedding_provider TEXT', 'embedding_dimensions INTEGER', 'indexed_at TEXT', 'index_error TEXT']) {
+      try {
+        this.db.exec(`ALTER TABLE knowledge_documents ADD COLUMN ${column}`);
+      } catch { /* column already exists */ }
+    }
+
     // Interview sessions table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS interview_sessions (

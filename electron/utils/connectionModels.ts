@@ -9,26 +9,26 @@ export interface ConnectionModel { id: string; label: string }
 
 const TIMEOUT_MS = 15_000;
 
-export async function fetchConnectionModels(input: { type: ConnectionType; baseUrl: string; apiKey: string }): Promise<ConnectionModel[]> {
+export async function fetchConnectionModels(input: { type: ConnectionType; baseUrl: string; apiKey: string; headers?: Record<string, string> }): Promise<ConnectionModel[]> {
     const base = normalizeBaseUrl(input.baseUrl);
     if (!base) throw new Error('The host is not a valid http or https address');
     const key = input.apiKey.trim();
     try {
         let ids: string[];
         if (input.type === 'openai') {
-            const response = await axios.get(`${openAiRoot(base)}/models`, { headers: key ? { Authorization: `Bearer ${key}` } : {}, timeout: TIMEOUT_MS });
+            const response = await axios.get(`${openAiRoot(base)}/models`, { headers: { ...input.headers, ...(key ? { Authorization: `Bearer ${key}` } : {}) }, timeout: TIMEOUT_MS });
             ids = (response.data?.data ?? []).map((m: { id?: string }) => m.id);
         } else if (input.type === 'anthropic') {
             const root = base.endsWith('/v1') ? base : `${base}/v1`;
             const response = await axios.get(`${root}/models`, {
                 params: { limit: 1000 },
-                headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+                headers: { ...input.headers, 'x-api-key': key, 'anthropic-version': '2023-06-01' },
                 timeout: TIMEOUT_MS,
             });
             ids = (response.data?.data ?? []).map((m: { id?: string }) => m.id);
         } else {
             const root = /\/v1(beta|alpha)?$/.test(base) ? base : `${base}/v1beta`;
-            const response = await axios.get(`${root}/models`, { params: { pageSize: 1000 }, headers: { 'x-goog-api-key': key }, timeout: TIMEOUT_MS });
+            const response = await axios.get(`${root}/models`, { params: { pageSize: 1000 }, headers: { ...input.headers, 'x-goog-api-key': key }, timeout: TIMEOUT_MS });
             ids = (response.data?.models ?? []).map((m: { name?: string }) => (m.name ?? '').replace(/^models\//, ''));
         }
         return [...new Set(ids.filter((id): id is string => typeof id === 'string' && id !== ''))].sort().map(id => ({ id, label: id }));

@@ -436,18 +436,25 @@ export class AppState {
         // We await waitForReady() so uploads during boot wait for the pipeline
         // instead of immediately throwing 'not ready'.
         const self = this;
+        this.knowledgeOrchestrator.setEmbeddingStatusFn(() => self.ragManager?.getEmbeddingPipeline().getStatus() ?? null);
         this.knowledgeOrchestrator.setEmbedFn(async (text: string) => {
           const pipeline = self.ragManager?.getEmbeddingPipeline();
           if (!pipeline) throw new Error('RAG pipeline not available');
           await pipeline.waitForReady();
-          return await pipeline.getEmbedding(text);
+          const { providerName, dimensions } = pipeline.getStatus();
+          if (!providerName || !dimensions) throw new Error('Embedding provider not initialized');
+          const embedding = await pipeline.getEmbedding(text);
+          return { embedding, provider: providerName, dimensions };
         });
         if (typeof this.knowledgeOrchestrator.setEmbedQueryFn === 'function') {
           this.knowledgeOrchestrator.setEmbedQueryFn(async (text: string) => {
             const pipeline = self.ragManager?.getEmbeddingPipeline();
             if (!pipeline) throw new Error('RAG pipeline not available');
             await pipeline.waitForReady();
-            return await pipeline.getEmbeddingForQuery(text);
+            const { providerName, dimensions } = pipeline.getStatus();
+            if (!providerName || !dimensions) throw new Error('Embedding provider not initialized');
+            const embedding = await pipeline.getEmbeddingForQuery(text);
+            return { embedding, provider: providerName, dimensions };
           });
         }
 

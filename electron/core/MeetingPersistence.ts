@@ -2,6 +2,8 @@
 // Handles meeting lifecycle: stop, save, and recovery.
 // Extracted from IntelligenceManager to decouple DB operations from LLM orchestration.
 
+import { CredentialsManager } from '../services/CredentialsManager';
+import { redactConnectionError } from '../services/connectionSecrets';
 import { summarizeMeeting } from './meetingSummary';
 import { renameMeetingFolder } from '../agent/workspace';
 import { SessionTracker, TranscriptSegment } from './SessionTracker';
@@ -147,6 +149,8 @@ export class MeetingPersistence {
         let summaryData: { actionItems: string[], keyPoints: string[] } = { actionItems: [], keyPoints: [] };
 
         if (metadata?.title) title = metadata.title;
+        const summaryUse = CredentialsManager.getInstance().resolveModelUse('summary');
+        const secrets = 'connection' in summaryUse ? summaryUse.connection : undefined;
 
         // The summary reads the whole record in pika.db; the live session's context is compacted and lossy.
         let context = data.context;
@@ -194,14 +198,14 @@ export class MeetingPersistence {
     }`;
 
                 const generate = (prompt: string, context: string) => this.llmHelper.generateMeetingSummary(prompt, context);
-                const summary = await summarizeMeeting(context, generate, summaryPrompt);
+                const summary = await summarizeMeeting(context, generate, summaryPrompt, secrets);
                 if (summary) summaryData = summary;
                 else console.error('Failed to produce a meeting summary');
             } else {
                 console.log("Transcript too short for summary generation.");
             }
         } catch (e) {
-            console.error('Error generating meeting metadata', (e as Error).message);
+            console.error('Error generating meeting metadata', redactConnectionError(e, secrets).message);
         }
 
         try {

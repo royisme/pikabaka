@@ -590,13 +590,14 @@ export function registerCoreHandlers(appState: AppState): void {
   // Get stored API keys (masked for UI display)
   safeHandle("get-stored-credentials", async () => {
     try {
-      const { CredentialsManager } = require('../services/CredentialsManager');
+      const { CredentialsManager } = require('../services/CredentialsManager') as typeof import('../services/CredentialsManager');
       const creds = CredentialsManager.getInstance().getAllCredentials();
 
       // Return masked versions for security (just indicate if set)
       const hasKey = (key?: string) => !!(key && key.trim().length > 0);
 
       return {
+        connectionHeaders: Object.fromEntries(CredentialsManager.getInstance().listConnections().filter(c => c.headers).map(c => [c.id, c.headers])),
         hasGeminiKey: hasKey(creds.geminiApiKey),
         hasGroqKey: hasKey(creds.groqApiKey),
         hasOpenaiKey: hasKey(creds.openaiApiKey),

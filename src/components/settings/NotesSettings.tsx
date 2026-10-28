@@ -19,7 +19,10 @@ const NotesSettings: React.FC = () => {
         },
         {
             onSuccess: async () => {
-                await queryClient.invalidateQueries(['profile-notes']);
+                await Promise.all([
+                    queryClient.invalidateQueries(['profile-notes']),
+                    queryClient.invalidateQueries(['profile', 'status']),
+                ]);
                 setDraft(null);
             },
         }
