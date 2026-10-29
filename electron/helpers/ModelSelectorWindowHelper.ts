@@ -20,13 +20,8 @@ export class ModelSelectorWindowHelper {
 
     // Store offsets relative to main window if needed, but absolute positioning is simpler for dropdowns
     private lastBlurTime: number = 0
-    private ignoreBlur: boolean = false;
 
     constructor() { }
-
-    public setIgnoreBlur(ignore: boolean): void {
-        this.ignoreBlur = ignore;
-    }
 
     private windowHelper: WindowHelper | null = null;
 
@@ -181,7 +176,6 @@ export class ModelSelectorWindowHelper {
 
         // Close on blur (click outside)
         this.window.on('blur', () => {
-            if (this.ignoreBlur) return;
             this.lastBlurTime = Date.now();
             this.hideWindow();
         })
