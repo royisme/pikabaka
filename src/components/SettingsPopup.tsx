@@ -91,24 +91,29 @@ const SettingsPopup = () => {
                 <div className="flex-1 overflow-y-auto scrollbar-hide flex flex-col min-h-0">
 
                 {/* Undetectability */}
-                <div className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors duration-200 group cursor-default ${itemHoverClass}`}>
-                    <div className="flex items-center gap-3">
+                <div className={`flex items-center justify-between gap-1 px-1 py-2 rounded-lg transition-colors duration-200 group cursor-default ${itemHoverClass}`}>
+                    <div className="flex min-w-0 items-center gap-1">
                         <CustomGhost
-                            className={`w-4 h-4 transition-colors ${isUndetectable ? (isLightTheme ? 'text-slate-900' : 'text-white') : iconInactiveClass}`}
+                            className={`w-4 h-4 shrink-0 transition-colors ${isUndetectable ? (isLightTheme ? 'text-slate-900' : 'text-white') : iconInactiveClass}`}
                             fill={isUndetectable ? "currentColor" : "none"}
                             stroke={isUndetectable ? "none" : "currentColor"}
                             eyeColor={isUndetectable ? (isLightTheme ? "white" : "black") : (isLightTheme ? "#334155" : "white")}
                         />
-                        <span className={`text-[12px] font-medium transition-colors ${isUndetectable ? (isLightTheme ? 'text-slate-950' : 'text-white') : labelInactiveClass}`}>{isUndetectable ? 'Undetectable' : 'Detectable'}</span>
+                        <span className={`whitespace-nowrap text-[11px] font-medium transition-colors ${isUndetectable ? (isLightTheme ? 'text-slate-950' : 'text-white') : labelInactiveClass}`}>Hide from screen share</span>
                     </div>
                     <button
+                        type="button"
+                        role="switch"
+                        aria-label="Hide from screen share"
+                        aria-pressed={isUndetectable}
+                        aria-checked={isUndetectable}
                         onClick={() => {
                             const newState = !isUndetectable;
                             queryClient.setQueryData(['undetectable'], newState);
                             localStorage.setItem('pika_undetectable', String(newState));
                             window.electronAPI?.setUndetectable(newState);
                         }}
-                        className={`w-[30px] h-[18px] rounded-full p-[1.5px] transition-all duration-300 ease-spring active:scale-[0.92] ${isUndetectable
+                        className={`w-[30px] h-[18px] shrink-0 rounded-full p-[1.5px] transition-all duration-300 ease-spring active:scale-[0.92] ${isUndetectable
                             ? (isLightTheme ? 'bg-slate-900 shadow-[0_2px_8px_rgba(15,23,42,0.18)]' : 'bg-white shadow-[0_2px_8px_rgba(255,255,255,0.2)]')
                             : defaultToggleTrackClass}`}
                     >

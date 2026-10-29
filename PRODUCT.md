@@ -8,7 +8,7 @@ Pika is a desktop overlay that transcribes a call, translates the other party, a
 
 **Interview practice and prep**: A job candidate rehearsing technical or conversational interview questions before a real interview [README.md]. The documentation designates practice and rehearsal as the legitimate use case, respecting external assistance policies [README.md].
 
-**Sales and customer success calls**: A representative in live customer discussions who needs real-time objection handling, pricing references, and product facts [README.md]. Stealth mode keeps private notes hidden during screen shares [README.md].
+**Sales and customer success calls**: A representative in live customer discussions who needs real-time objection handling, pricing references, and product facts [README.md]. Hide from screen share keeps private notes off a shared screen on macOS and Windows. [README.md]
 
 **Customer support**: A support specialist looking up relevant context from past tickets via on-device vector search during active customer conversations [README.md].
 
@@ -17,7 +17,7 @@ Pika is a desktop overlay that transcribes a call, translates the other party, a
 **Accessibility**: A hearing-impaired individual who needs live speech-to-text captions across meetings [README.md].
 
 ## 3. How it is used
-The overlay is designed for quick glance reading lasting one to three seconds mid-call [DESIGN.md, docs/conventions.md]. It presents as a small, translucent, always-on-top window positioned over call software [DESIGN.md, RULES.md]. Window width defaults to 600px with a 380px minimum; height defaults to 420px with a 360px minimum [docs/conventions.md, DESIGN.md, docs/design-overlay-v2.md, PROGRESS.md]. Global keyboard shortcuts operate primary actions, translation toggles, and scrolling without stealing focus from the call [docs/conventions.md, docs/design-live-translation-ui.md, PROGRESS.md]. Operating system window capture exclusion ensures stealth by hiding the window from screen-sharing software during meetings [README.md, RULES.md].
+The overlay is designed for quick glance reading lasting one to three seconds mid-call [DESIGN.md, docs/conventions.md]. It presents as a small, translucent, always-on-top window positioned over call software [DESIGN.md, RULES.md]. Window width defaults to 600px with a 380px minimum; height defaults to 420px with a 360px minimum [docs/conventions.md, DESIGN.md, docs/design-overlay-v2.md, PROGRESS.md]. Global keyboard shortcuts operate primary actions, translation toggles, and scrolling without stealing focus from the call [docs/conventions.md, docs/design-live-translation-ui.md, PROGRESS.md]. Hide from screen share asks the operating system to keep the window out of screen sharing during meetings; macOS recorders that use ScreenCaptureKit can still capture it, and Linux is not supported [README.md, RULES.md].
 
 ## 4. Principles
 - **Glance-first**: Mid-call reading lasts one to three seconds, requiring minimal chrome and quiet secondary controls [DESIGN.md, docs/conventions.md].
@@ -37,7 +37,7 @@ The overlay is designed for quick glance reading lasting one to three seconds mi
 - **Provider speed and suitability assertions** (e.g. Groq "sub-second inference", Claude "best for coding interviews", Gemini "recommended default"): `not evidenced in the repo`. No comparative evaluation data or latency benchmarks exist in the repository [PROGRESS.md, docs/architecture.md].
 - **Open-source AGPL-3.0 licensing**: `evidenced`. Verified by the project license file [LICENSE].
 - **Bring-your-own-key architecture**: `evidenced`. Supported by `CredentialsManager` and client-side provider routing [docs/architecture.md, docs/conventions.md].
-- **Stealth overlay hidden from screen sharing**: `evidenced`. Verified by window capture exclusion configuration in window helpers [RULES.md, docs/architecture.md].
+- **Hide from screen share**: `evidenced` in code (`setContentProtection` in the window helpers); real-device behaviour is the owner's check. [RULES.md, docs/architecture.md]
 - **Custom global keyboard shortcuts**: `evidenced`. Verified by `KeybindManager` and settings store [docs/architecture.md, PROGRESS.md].
 - **Local RAG memory with sqlite-vec**: `evidenced`. Verified by `electron/rag/` and `electron/db/` [docs/architecture.md].
 - **Dual-channel audio capture (system audio and mic)**: `evidenced`. Verified by native Rust audio capture module implementation [docs/architecture.md].
@@ -49,7 +49,7 @@ The overlay is designed for quick glance reading lasting one to three seconds mi
 - **Translating before a turn flushes**: a design note recommends measuring first, then translating at the provider's own boundary; the stable-prefix design is not recommended [docs/design-early-translation.md].
 - **Translating own speech ("Me")**: excluded; own lines stay untranslated source text [docs/design-live-translation-ui.md].
 - **Linux support and Wayland capture**: open roadmap item [README.md].
-- **Native OS vibrancy blur**: deferred pending a stealth and content-protection review [docs/design-overlay-v2.md].
+- **Native OS vibrancy blur**: deferred pending a content-protection review [docs/design-overlay-v2.md].
 - **Real-provider verification**: nothing built in the last weeks (streaming translation, Stop and Retry, the audio status, the top bar) has been exercised against a real STT or LLM provider or on Windows [PROGRESS.md].
 
 ## 7. Questions for the owner

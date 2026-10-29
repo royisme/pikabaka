@@ -34,7 +34,7 @@ Full demo video: [`demo/out/pika-demo.mp4`](demo/out/pika-demo.mp4) · Built wit
 | Bring your own API key                |    ✓     |   —    |    —    |   —   |
 | 100% offline option (Ollama)          |    ✓     |   —    |    —    |   —   |
 | Real-time AI answer suggestions       |    ✓     |   ✓    |    —    |   —   |
-| Stealth overlay (hidden in screen-share) |  ✓     |   ✓    |    —    |   —   |
+| Hide from screen share (macOS, Windows) | ✓ | ✓ | — | — |
 | Local RAG memory across past meetings |    ✓     |   —    |    —    |   —   |
 | Custom global keyboard shortcuts      |    ✓     |   ✓    | partial |   —   |
 | Audio never leaves your device        |    ✓\*   |   —    |    —    |   —   |
@@ -60,7 +60,7 @@ Full demo video: [`demo/out/pika-demo.mp4`](demo/out/pika-demo.mp4) · Built wit
 - **Mute your microphone** — one button stops your own voice from being transcribed when the call plays through speakers.
 - **Local RAG memory** — past meetings indexed with `sqlite-vec`; search and recall without sending data anywhere.
 - **Screenshot reasoning** — capture full screen or a region, pipe it to a vision model, get an answer in seconds.
-- **Stealth overlay** — hide the window from screen-sharing.
+- **Hide from screen share** — asks macOS and Windows to keep Pika's windows out of screen sharing; macOS recorders that use ScreenCaptureKit can still capture them.
 - **Configurable controls** — customize the overlay's global shortcuts and choose your AI providers.
 - **Cross-platform** — macOS (Apple Silicon + Intel) and Windows 10/11.
 
@@ -161,8 +161,8 @@ In a local `credentials.enc` file encrypted by Electron's `safeStorage`, using t
 **How is Pika different from Cluely?**
 Open source under AGPL-3.0, no subscription, you bring your own API key, and you can run completely offline with Ollama. The overlay's global shortcuts and AI providers are configurable.
 
-**Why "stealth mode"?**
-The overlay can be hidden from screen-sharing tools so private notes during a sales demo don't show on the customer's screen. It's a privacy feature, not a permission to break rules — please use Pika ethically and respect any policies that apply to your conversations.
+**Why "Hide from screen share"?**
+So private notes don't appear on a screen you share. It is not a guarantee (ScreenCaptureKit recorders on macOS; no Linux support). Use Pika ethically and respect the rules of your conversations.
 
 **Can I use Pika during a coding interview?**
 Use it for **prep and rehearsal** before the interview — that's the legitimate use case. Real interviews almost always have explicit rules about external assistance; respect them.
