@@ -574,6 +574,7 @@ ANSWER DIRECTLY:`;
     const sources = getAnswerSources();
     try {
       console.log('[LLMHelper] chatWithGemini called')
+      const documents = sources.materials ? this.knowledgeOrchestrator?.prepareDocumentContext(message) : null;
 
       // ============================================================
       // KNOWLEDGE MODE INTERCEPT
@@ -587,7 +588,7 @@ ANSWER DIRECTLY:`;
           // Recruiter utterances reach the tracker exclusively via the STT path in main.ts.
           this.knowledgeOrchestrator.feedForDepthScoring(message);
 
-          const knowledgeResult = await this.knowledgeOrchestrator.processQuestion(message);
+          const knowledgeResult = await this.knowledgeOrchestrator.processQuestion(message, documents?.queryEmbedding);
           this.emitKnowledgeContextUpdate(knowledgeResult);
           if (knowledgeResult) {
             // Fix 1: short-circuit for live negotiation coaching — bypass second LLM call
@@ -614,6 +615,9 @@ ANSWER DIRECTLY:`;
           console.warn('[LLMHelper] Knowledge mode processing failed, falling back to normal:', classifyTranslationError(knowledgeError));
         }
       }
+
+      const documentContext = await documents?.contextBlock;
+      if (documentContext) context = context ? `${documentContext}\n\n${context}` : documentContext;
 
       const use = CredentialsManager.getInstance().resolveModelUse('chat');
       if ('error' in use) throw new Error(use.error);
@@ -667,12 +671,13 @@ ANSWER DIRECTLY:`;
     // KNOWLEDGE MODE INTERCEPT (Streaming)
     // ============================================================
     const sources = getAnswerSources();
+    const documents = !options?.verbatimPrompt && sources.materials ? this.knowledgeOrchestrator?.prepareDocumentContext(message) : null;
     if (!options?.verbatimPrompt && (sources.materials || sources.profile) && this.knowledgeOrchestrator?.isKnowledgeMode()) {
       try {
         // Feed to depth scorer only (not negotiation tracker) — mirrors non-streaming path fix.
         this.knowledgeOrchestrator.feedForDepthScoring(message);
 
-        const knowledgeResult = await this.knowledgeOrchestrator.processQuestion(message);
+        const knowledgeResult = await this.knowledgeOrchestrator.processQuestion(message, documents?.queryEmbedding);
         if (knowledgeResult) {
           // Fix 1: short-circuit for live negotiation coaching — bypass second LLM call
           if (knowledgeResult.liveNegotiationResponse) {
@@ -700,6 +705,9 @@ ANSWER DIRECTLY:`;
         console.warn('[LLMHelper] Knowledge mode (stream) processing failed, falling back:', classifyTranslationError(knowledgeError));
       }
     }
+
+    const documentContext = await documents?.contextBlock;
+    if (documentContext) context = context ? `${documentContext}\n\n${context}` : documentContext;
 
     // Helper to build combined user message
     const userContent = context

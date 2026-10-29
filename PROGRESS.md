@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: neutral document quick answers, step K5b3 (branch `document-answers`, uncommitted)
+
+- Both quick-answer paths prepend the document-only quoted-data block outside the candidate-mode gate. Materials off and verbatim streaming add nothing; lookup failures leave the answer working. The existing neutral lookup supplies file names, provider/dimension/score checks and the five-passage/400-character caps. A per-call embedding promise is shared with candidate retrieval; notes, interview prompts and shortcuts are unchanged.
+- Thirty new native/JS cases use synthetic SQLite/settings and fake model/embedding boundaries. The document-only tracer failed first for the missing block and embedding; the complete pre-change run failed 56 assertions for the missing document behavior before final implementation. All four checks exit 0: both typechecks, lint (904 warnings, no errors), full tap (4886 assertions). Existing answer-source/material suites also pass. No mutation run: `mutator` is unavailable.
+- The addendum wins over the prompt's broader wording: notes are not duplicated in the new block, and existing base system prompts (which already mention candidates) stay unchanged. `chatWithGemini` has no `verbatimPrompt` option; both existing verbatim entry points are tested without inventing one. Found, not changed: intro/coaching shortcuts return before document context assembly. Owner: a real document quick answer and first-token latency with/without documents. No app, real provider/device, Windows or packaged build ran; K5b2, dependencies and persisted contracts are untouched.
+
 ## 2026-10-28: material import backend, step K5b1 (branch `material-import`, uncommitted)
 
 - Material imports coexist without an LLM or migration. Async parsing supports text/Markdown and macOS DOCX through stdout; material imports refuse PDF. Limits and identical-text refusals store nothing. Main-process list/status, atomic all-dimension Remove and stored-passage Re-index are implemented; no IPC, preload, UI or settings change.
