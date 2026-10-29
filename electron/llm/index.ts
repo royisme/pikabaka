@@ -32,6 +32,6 @@ export type { ConversationIntent, IntentResult } from "./IntentClassifier";
 export { MODE_CONFIGS } from "./types";
 export type { GenerationConfig, GeminiContent } from "./types";
 export {
-    SYSTEM_PROMPT,
+    systemPrompt,
     buildCodeHintMessage
 } from "./prompts";

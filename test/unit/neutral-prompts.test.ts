@@ -11,7 +11,7 @@ import {
     FOLLOW_UP_TASK,
     RECAP_TASK,
     ROLE_PROMPT,
-    SYSTEM_PROMPT,
+    systemPrompt,
     WHAT_TO_ANSWER_TASK,
     buildCodeHintMessage,
     taskPrompt,
@@ -54,7 +54,7 @@ t.test('no text the app can send still talks about the interview', (t) => {
     const texts: Record<string, string> = {
         ROLE_PROMPT,
         CORE_RULES,
-        SYSTEM_PROMPT,
+        systemPrompt: systemPrompt(),
         ANSWER_TASK,
         WHAT_TO_ANSWER_TASK,
         RECAP_TASK,
@@ -91,7 +91,7 @@ t.test('every task prompt is the role, then its task text, then the core rules',
         t.ok(prompt.includes(TASK_TEXT[task]), `${task} contains its task text`);
         t.ok(prompt.endsWith(CORE_RULES), `${task} ends with the core rules`);
     }
-    t.equal(SYSTEM_PROMPT, taskPrompt('chat'), 'the chat system prompt is the chat task prompt');
+    t.equal(systemPrompt(), taskPrompt('chat'), 'the chat system prompt is the chat task prompt');
     t.end();
 });
 

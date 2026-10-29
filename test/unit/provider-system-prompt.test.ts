@@ -4,7 +4,7 @@ import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-requir
 import type { LLMHelper as Helper } from '../../electron/core/LLMHelper';
 import type { Connection } from '../../electron/services/aiConnections';
 import { CredentialsManager } from '../../electron/services/CredentialsManager';
-import { SYSTEM_PROMPT, taskPrompt } from '../../electron/llm/prompts';
+import { CORE_RULES, setPromptOverridesSource, systemPrompt, taskPrompt } from '../../electron/llm/prompts';
 
 // Provider SDKs are mocked; Google's auth dependency cannot load on Node 26 (removed SlowBuffer).
 const originalGetInstance = CredentialsManager.getInstance;
@@ -14,6 +14,8 @@ const LLM_HELPER = path.resolve('electron/core/LLMHelper.ts');
 const { LLMHelper } = mockRequire(LLM_HELPER, {
     '@google/genai': { GoogleGenAI: class {}, ThinkingLevel: { LOW: 'LOW', MINIMAL: 'MINIMAL' } },
     [path.resolve('electron/services/CredentialsManager.ts')]: { CredentialsManager },
+    // The real prompt module, so an override set here is the one the loaded helper reads.
+    [path.resolve('electron/llm/prompts.ts')]: { CORE_RULES, setPromptOverridesSource, systemPrompt, taskPrompt },
 }) as { LLMHelper: typeof Helper };
 
 function helper(): Helper {
@@ -59,7 +61,29 @@ t.test('every provider and every entry point receives the same chat system promp
     t.same(received.map(([id]) => id), CONNECTIONS.flatMap(connection => [connection.id, connection.id, connection.id]), 'three entry points per provider');
     const prompts = new Set(received.map(([, prompt]) => prompt));
     t.equal(prompts.size, 1, 'one system prompt for every provider path');
-    t.ok(received.every(([, prompt]) => prompt.includes(SYSTEM_PROMPT)), 'the system prompt is the chat task prompt');
+    t.ok(received.every(([, prompt]) => prompt.includes(systemPrompt())), 'the system prompt is the chat task prompt');
+    t.end();
+});
+
+t.test('an edited chat text is the system prompt every provider type receives, without a restart', async (t) => {
+    const overrides = { role: 'Invented role line.', tasks: { chat: 'Invented chat text.' } };
+    setPromptOverridesSource(() => overrides);
+    t.teardown(() => setPromptOverridesSource(() => ({})));
+    const received: Array<[string, string]> = [];
+    for (const connection of CONNECTIONS) {
+        managerReturning(connection);
+        const llm = helper();
+        Reflect.set(llm, 'streamViaConnectionChat', async function* (...args: unknown[]) {
+            received.push([connection.id, String(args[2])]);
+            yield 'Invented reply';
+        });
+        await llm.chatWithGemini('Invented question');
+        await collect(llm.streamChat('Invented question'));
+        await collect(llm.streamChatWithGemini('Invented question'));
+    }
+    const expected = `Invented role line.\n\nInvented chat text.\n\n${CORE_RULES}`;
+    t.equal(new Set(received.map(([, prompt]) => prompt)).size, 1, 'one system prompt for every provider path');
+    t.ok(received.every(([, prompt]) => prompt.includes(expected)), 'the edited role and chat text are used, with the fixed rules last');
     t.end();
 });
 

@@ -3,6 +3,7 @@ import type { HeaderEdit, HeaderState } from '../services/connectionHeaders'
 import type { KeybindStatus, KeybindResult } from '../services/KeybindManager'
 import type { ImportedDocument, NotesIndexStatus } from '../knowledge/types'
 import type { CredentialStorageStatus } from '../services/CredentialsManager'
+import type { PromptsEdit, PromptsReply } from '../llm/prompts'
 
 export interface ElectronAPI {
   embeddingStatus: () => Promise<{ providerName: string | null; dimensions: number | null; usingSelected: boolean; selectedLabel: string | null; incompatible: number; meetingCount: number; failedMeetings: number; firstError: string | null }>
@@ -89,6 +90,8 @@ export interface ElectronAPI {
   setAiResponseLanguage: (language: string) => Promise<{ success: boolean; error?: string }>
   getSttLanguage: () => Promise<string>
   getAiResponseLanguage: () => Promise<string>
+  getPrompts: () => Promise<PromptsReply>
+  setPrompts: (edit: PromptsEdit) => Promise<{ success: boolean; error?: string }>
   getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean; profile: boolean }>
   setAnswerSources: (sources: { meetings?: boolean; materials?: boolean; profile?: boolean }) => Promise<{ success: boolean; error?: string }>
   getNativeAudioStatus: () => Promise<{

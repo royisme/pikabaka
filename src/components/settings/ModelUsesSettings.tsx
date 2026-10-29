@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from 'react-query';
 import ConnectionModelPicker from './ConnectionModelPicker';
 import AnswerLanguageSetting from './AnswerLanguageSetting';
 import AnswerStyleSettings from './AnswerStyleSettings';
+import PromptsSettings from './PromptsSettings';
 
 type ModelUse = { connectionId: string; model: string; supportsImages?: boolean };
 type Job = 'chat' | 'summary' | 'agent';
@@ -146,6 +147,7 @@ const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
                 <>
                     <AnswerLanguageSetting />
                     <AnswerStyleSettings />
+                    <PromptsSettings />
                 </>
             )}
         </div>
