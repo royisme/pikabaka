@@ -47,7 +47,6 @@
   "build": {
     "generateUpdatesFilesForAllChannels": true,
     "appId": "com.royisme.pika",
-    "afterPack": "./scripts/ad-hoc-sign.js",
     "productName": "Pika",
     "files": [
       "dist",
