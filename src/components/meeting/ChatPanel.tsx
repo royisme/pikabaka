@@ -425,7 +425,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             `}>
               {msg.role === 'them' && (
                 <div className="flex items-center gap-1.5 mb-1 text-[11px] font-medium tracking-[0.08em] overlay-text-muted">
-                  Interviewer
+                  Them
                   {msg.isStreaming && <span className="w-1 h-1 bg-state-success rounded-full animate-pulse" />}
                 </div>
               )}

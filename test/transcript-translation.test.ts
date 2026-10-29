@@ -46,7 +46,7 @@ t.test('upsertTranscriptSegment defaults the other-party label when speaker is t
     segmentId: 'seg_int',
     speaker: 'them',
   });
-  t.equal(rows[0].speakerLabel, 'Interviewer');
+  t.equal(rows[0].speakerLabel, 'Them');
   t.end();
 });
 

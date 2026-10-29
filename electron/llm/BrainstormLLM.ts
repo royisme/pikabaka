@@ -1,5 +1,5 @@
 import { LLMHelper } from "../core/LLMHelper";
-import { BRAINSTORM_MODE_PROMPT } from "./prompts";
+import { taskPrompt } from "./prompts";
 
 export class BrainstormLLM {
     private llmHelper: LLMHelper;
@@ -15,7 +15,7 @@ export class BrainstormLLM {
     async *generateStream(context: string, imagePaths?: string[]): AsyncGenerator<string> {
         if (!context.trim() && !imagePaths?.length) return;
         try {
-            yield* this.llmHelper.streamChat(context, imagePaths, undefined, BRAINSTORM_MODE_PROMPT);
+            yield* this.llmHelper.streamChat(context, imagePaths, undefined, taskPrompt('brainstorm'));
         } catch (error) {
             console.error("[BrainstormLLM] Stream failed:", error);
             yield "I couldn't generate brainstorm approaches. Make sure your question is visible and try again.";

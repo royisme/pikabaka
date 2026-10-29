@@ -141,7 +141,7 @@ function formatTranscript(items: ContextItem[]): string {
     return items.map(item => {
         if (item.role === 'them') {
             // Weight the other party's turns more strongly - they define intent
-            return `[INTERVIEWER – IMPORTANT]: ${item.text}`;
+            return `[THEM – IMPORTANT]: ${item.text}`;
         } else if (item.role === 'user') {
             return `[ME]: ${item.text}`;
         } else {
@@ -202,7 +202,7 @@ export function formatTemporalContextForPrompt(ctx: TemporalContext): string {
     // Add role context
     if (ctx.roleContext !== 'general') {
         const roleDesc = ctx.roleContext === 'responding_to_them'
-            ? 'You are responding to the interviewer\'s question.'
+            ? 'You are responding to the other party\'s question.'
             : 'You are helping the user formulate their response.';
         parts.push(`<role_context>${roleDesc}</role_context>`);
     }

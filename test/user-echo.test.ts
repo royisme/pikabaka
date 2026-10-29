@@ -22,7 +22,7 @@ t.test('a typed prompt with a screenshot keeps both', async (t) => {
 
 t.test('a quick action without a screenshot adds no user turn', async (t) => {
   t.equal(
-    userEchoMessage({ id: '3', promptText: 'What should I say in response to the latest interviewer context?', echoPrompt: false, attachments: [] }),
+    userEchoMessage({ id: '3', promptText: "What should I say in response to the other party's latest message?", echoPrompt: false, attachments: [] }),
     null
   );
 });

@@ -1,6 +1,6 @@
 // electron/llm/transcriptCleaner.ts
 // Deterministic transcript cleaner - NO LLM calls
-// Fast string-based processing for interview copilot
+// Fast string-based processing for live answers
 
 export interface TranscriptTurn {
     role: 'them' | 'user' | 'assistant';
@@ -137,7 +137,7 @@ export function sparsifyTranscript(
  */
 export function formatTranscriptForLLM(turns: TranscriptTurn[]): string {
     return turns.map(turn => {
-        const label = turn.role === 'them' ? 'INTERVIEWER' :
+        const label = turn.role === 'them' ? 'THEM' :
             turn.role === 'user' ? 'ME' : 'ASSISTANT';
         return `[${label}]: ${turn.text}`;
     }).join('\n');

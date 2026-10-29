@@ -183,7 +183,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   const conversationContext = useMemo(() => {
     return allMessagesForContext
       .filter((m) => m.role !== 'user' || !m.hasScreenshot)
-      .map((m) => `${m.role === 'them' ? 'Interviewer' : m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
+      .map((m) => `${m.role === 'them' ? 'Them' : m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
       .slice(-20)
       .join('\n');
   }, [allMessagesForContext]);
@@ -692,7 +692,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     await submitPrompt({
       userText: attachedContext.length > 0
         ? 'What should I say about this?'
-        : 'What should I say in response to the latest interviewer context?',
+        : "What should I say in response to the other party's latest message?",
       placeholderIntent: 'what_to_answer',
       echoPrompt: false,
     });

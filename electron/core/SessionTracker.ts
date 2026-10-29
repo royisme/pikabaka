@@ -378,7 +378,7 @@ export class SessionTracker {
     getFormattedContext(lastSeconds: number = 120): string {
         const items = this.getContext(lastSeconds);
         return items.map(item => {
-            const label = item.role === 'them' ? 'INTERVIEWER' :
+            const label = item.role === 'them' ? 'THEM' :
                 item.role === 'user' ? 'ME' :
                     'ASSISTANT (PREVIOUS SUGGESTION)';
             return `[${label}]: ${item.text}`;
@@ -403,7 +403,7 @@ export class SessionTracker {
     getFullSessionContext(): string {
         const recentTranscript = this.fullTranscript.map(segment => {
             const role = this.mapSpeakerToRole(segment.speaker);
-            const label = role === 'them' ? 'INTERVIEWER' :
+            const label = role === 'them' ? 'THEM' :
                 role === 'user' ? 'ME' :
                     'ASSISTANT';
             return `[${label}]: ${segment.text}`;
@@ -551,7 +551,7 @@ export class SessionTracker {
             const oldEntries = this.fullTranscript.slice(0, summarizeCount);
             const summaryInput = oldEntries.map(seg => {
                 const role = this.mapSpeakerToRole(seg.speaker);
-                const label = role === 'them' ? 'INTERVIEWER' :
+                const label = role === 'them' ? 'THEM' :
                     role === 'user' ? 'ME' : 'ASSISTANT';
                 return `[${label}]: ${seg.text}`;
             }).join('\n');
