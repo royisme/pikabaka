@@ -36,13 +36,8 @@ export class SettingsWindowHelper {
     private offsetY: number = 0
 
     private lastBlurTime: number = 0
-    private ignoreBlur: boolean = false;
 
     constructor() { }
-
-    public setIgnoreBlur(ignore: boolean): void {
-        this.ignoreBlur = ignore;
-    }
 
     /**
      * Pre-create the settings window in the background (hidden) for faster first open
@@ -205,7 +200,6 @@ export class SettingsWindowHelper {
         // Let's keep it simple: clicks outside close it if we want "popover" behavior.
         // For now, let it stay open until toggled or ESC.
         this.settingsWindow.on('blur', () => {
-            if (this.ignoreBlur) return;
             this.lastBlurTime = Date.now();
             this.closeWindow();
         })

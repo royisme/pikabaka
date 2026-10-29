@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: dock/tray hiding removed, step X3 (branch `stop-dock-hiding`)
+
+- Removed dock/tray hiding, debounce and focus/blur juggling; startup always shows the tray and sets the Pika name, and activation only restores windows. Protection, persisted/IPC names, UI wording and overlay policies are unchanged. Searches confirmed no remaining callers before deleting the blur APIs and tray-hide wrappers.
+- Tests failed first for delayed dock/tray/focus/blur changes and guarded startup/name/activate behaviour. Four new mocked cases cover protection/persistence/deduplicated broadcasts/repeat no-ops and startup/activation on macOS, Windows and Linux; X1's temporary guarded-name assertion now requires Pika unconditionally. Both typechecks, lint (899 warnings, no errors) and full tap (5123 assertions) exit 0. Mutation tool unavailable; no app, real OS window behaviour, provider or packaged build ran.
+- Owner B1: first-start dock/tray after auto-update and fresh install with protection already on; B2: toggles never hide either; B3: protected overlay/cropper/settings/model selector absent from Zoom/Meet shares and macOS screenshots; B4: Settings stays open when toggled; B5: always-on-top, click-through, Cmd+B and full-screen Spaces unchanged. Found, not changed: unused `_dockReassertTimers` remains outside the explicit deletion list. `AGENTS.md` was absent here; the main checkout's copy was read. Next: X4 `screen-share-label`.
+
 ## 2026-10-28: process disguise removed, step X1 (branch `remove-disguise`, uncommitted)
 
 - Removed runtime disguise functions/timers, state, IPC/preload/types, General card/query, six fake icons and demo cycling; README feature text now only says to hide the window from screen-sharing. Lifecycle owns the guarded Pika name and default Windows AUMID. Stored `disguiseMode` and unknown settings survive unrelated saves; protection and all later-step behavior stay unchanged.

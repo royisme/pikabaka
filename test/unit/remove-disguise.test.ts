@@ -140,7 +140,7 @@ for (const platform of ['darwin', 'win32'] as const) for (const protectedStartup
         }) as typeof import('../../electron/lib/lifecycle');
         await initializeApp();
         t.equal(created, 1, 'startup actually creates the launcher');
-        t.same(names, protectedStartup ? [] : ['Pika'], 'only Pika is set, once; protection retains the Step 1 guard');
+        t.same(names, ['Pika'], 'only Pika is set, once, regardless of protection');
         t.same(titles, [], 'startup never assigns process.title');
         t.same(aumids, platform === 'win32' ? ['com.pika.assistant.none'] : [], 'Windows keeps default pin grouping');
         t.notOk(reads.includes('disguiseMode'), 'the dormant key is not read by AppState');

@@ -118,12 +118,3 @@ export function updateTrayMenu(appState: AppState) {
 
   state.tray.setContextMenu(contextMenu)
 }
-
-export function hideTray(appState: AppState): void {
-  const state = appState as any;
-
-  if (state.tray) {
-    state.tray.destroy();
-    state.tray = null;
-  }
-}

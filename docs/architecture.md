@@ -8,7 +8,7 @@ Stack, folders and the pipelines that matter for the conversation UI and live tr
 2. **React renderer** (`src/`): Vite, React, TypeScript, Tailwind. React Query and local `useState`; no Redux or Zustand. Entry `src/main.tsx`; `src/App.tsx` switches on window mode (main, settings, cropper).
 3. **Rust native module** (`native-module/`, crate `natively-audio`): low-latency audio capture with cpal, WebRTC VAD, rubato resampling and silence suppression. Speaker capture is CoreAudio/ScreenCaptureKit on macOS and WASAPI on Windows. Built by `scripts/build-native.js`.
 
-`electron/lib/lifecycle.ts` owns startup identity: the Pika app name (still guarded while Undetectable is on) and the default Windows AUMID `com.pika.assistant.none`. `stealth.ts` no longer manages process identity; dormant `disguiseMode` values remain in `settings.json`, preserved with other unknown keys by `SettingsManager`.
+`electron/lib/lifecycle.ts` owns startup identity: the unconditional Pika app name and the default Windows AUMID `com.pika.assistant.none`, plus unconditional startup tray visibility. `stealth.ts` no longer manages process identity or dock/tray visibility; `setUndetectable` keeps window content protection, persistence and broadcasts without changing focus. Dormant `disguiseMode` values remain in `settings.json`, preserved with other unknown keys by `SettingsManager`.
 
 ## Native echo cancellation
 

@@ -1,8 +1,6 @@
-import { app } from "electron"
 import { SettingsManager } from "../services/SettingsManager"
 import { setVerboseLoggingFlag } from "../lib/verboseLog"
 import type { AppState } from "../main"
-import { hideTray, showTray } from "../lib/tray-menu"
 
 export function setHasDebugged(appState: AppState, value: boolean): void {
   (appState as any).hasDebugged = value
@@ -32,79 +30,6 @@ export function setUndetectable(appState: AppState, state: boolean): void {
 
   // Broadcast state change to all relevant windows
   _broadcastToAllWindows(appState, 'undetectable-changed', state);
-
-  // --- STEALTH MODE LOGIC ---
-  // The dock hide/show is debounced: rapid toggles update isUndetectable immediately
-  // (so content protection, IPC broadcasts and the guard above are always current),
-  // but the actual macOS dock/tray/focus operation only fires once the user stops
-  // toggling. This eliminates the race where dock.show() + NSApp.activate() lingers
-  // after a subsequent dock.hide() call.
-  if (process.platform === 'darwin') {
-    if (appStateInternal._dockDebounceTimer) {
-      clearTimeout(appStateInternal._dockDebounceTimer);
-      appStateInternal._dockDebounceTimer = null;
-    }
-
-    appStateInternal._dockDebounceTimer = setTimeout(() => {
-      appStateInternal._dockDebounceTimer = null;
-
-      // Read the settled state — may differ from the `state` captured above
-      // if the user toggled again before the timer fired.
-      const settled = appStateInternal.isUndetectable;
-
-      const activeWindow = appState.windowHelper.getMainWindow();
-      const settingsWindow = appState.settingsWindowHelper.getSettingsWindow();
-      let targetFocusWindow = activeWindow;
-      if (settingsWindow && !settingsWindow.isDestroyed() && settingsWindow.isVisible()) {
-        targetFocusWindow = settingsWindow;
-      }
-
-      const modelSelectorWindow = appState.modelSelectorWindowHelper.getWindow();
-      const isModelSelectorVisible = modelSelectorWindow && !modelSelectorWindow.isDestroyed() && modelSelectorWindow.isVisible();
-
-      if (targetFocusWindow && targetFocusWindow === settingsWindow) {
-        appState.settingsWindowHelper.setIgnoreBlur(true);
-      }
-      if (isModelSelectorVisible) {
-        appState.modelSelectorWindowHelper.setIgnoreBlur(true);
-      }
-
-      if (settled) {
-        // Capture whether Pika is currently the frontmost app BEFORE
-        // dock.hide() — that call triggers an implicit macOS app-deactivation
-        // which shifts keyboard focus to the next frontmost app (Chrome, etc.).
-        const pikaWasFocused =
-          targetFocusWindow != null &&
-          !targetFocusWindow.isDestroyed() &&
-          targetFocusWindow.isFocused();
-
-        console.log('[Stealth] Calling app.dock.hide()');
-        app.dock.hide();
-        hideTray(appState);
-
-        // If Pika was the focused window when the user toggled stealth,
-        // restore focus to our window after dock.hide() so macOS does not
-        // hand control to Chrome / whatever is behind us.
-        // We use win.focus() (not app.focus()) to avoid the heavy-handed
-        // [NSApp activateIgnoringOtherApps:YES] side-effect.
-        if (pikaWasFocused && targetFocusWindow && !targetFocusWindow.isDestroyed()) {
-          targetFocusWindow.focus();
-        }
-      } else {
-        console.log('[Stealth] Calling app.dock.show()');
-        app.dock.show();
-        showTray(appState);
-        // Do NOT call focus() — let the user's current app retain focus
-      }
-
-      if (targetFocusWindow && targetFocusWindow === settingsWindow) {
-        setTimeout(() => { appState.settingsWindowHelper.setIgnoreBlur(false); }, 500);
-      }
-      if (isModelSelectorVisible) {
-        setTimeout(() => { appState.modelSelectorWindowHelper.setIgnoreBlur(false); }, 500);
-      }
-    }, 150);
-  }
 }
 
 export function getUndetectable(appState: AppState): boolean {
