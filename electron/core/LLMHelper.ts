@@ -547,27 +547,6 @@ ANSWER DIRECTLY:`;
     return `${language?.header ?? ''}${style.header}${systemPrompt}${style.footer}${language?.footer ?? ''}`;
   }
 
-  private emitKnowledgeContextUpdate(knowledgeResult: any): void {
-    if (!knowledgeResult?.matchedJDSignals && !knowledgeResult?.resumeEvidence && !knowledgeResult?.mustHitKeywords) {
-      return;
-    }
-
-    try {
-      const { BrowserWindow } = require('electron');
-      const windows = BrowserWindow.getAllWindows();
-      for (const win of windows) {
-        win.webContents.send('knowledge:context-update', {
-          matchedJDSignals: knowledgeResult.matchedJDSignals || [],
-          resumeEvidence: knowledgeResult.resumeEvidence || [],
-          mustHitKeywords: knowledgeResult.mustHitKeywords || [],
-          questionCategory: knowledgeResult.questionCategory || 'technical',
-        });
-      }
-    } catch (e) {
-      console.warn('[LLMHelper] emitKnowledgeContextUpdate failed:', e);
-    }
-  }
-
   public async chatWithGemini(message: string, imagePaths?: string[], context?: string, skipSystemPrompt: boolean = false): Promise<string> {
     const sources = getAnswerSources();
     try {
@@ -575,29 +554,13 @@ ANSWER DIRECTLY:`;
       const documents = sources.materials ? this.knowledgeOrchestrator?.prepareDocumentContext(message) : null;
 
       // ============================================================
-      // KNOWLEDGE MODE INTERCEPT
-      // If knowledge mode is active, check for intro questions and
-      // inject system prompt + relevant context
+      // MATERIALS INTERCEPT
+      // With the materials switch on, saved notes can sharpen the answer.
       // ============================================================
-      if ((sources.materials || sources.profile) && this.knowledgeOrchestrator?.isKnowledgeMode()) {
+      if (sources.materials && this.knowledgeOrchestrator) {
         try {
-          // Feed only to the depth scorer — NOT feedThemUtterance, which also routes to the
-          // negotiation tracker and would misclassify the user's typed question as a recruiter utterance.
-          // Recruiter utterances reach the tracker exclusively via the STT path in main.ts.
-          this.knowledgeOrchestrator.feedForDepthScoring(message);
-
           const knowledgeResult = await this.knowledgeOrchestrator.processQuestion(message, documents?.queryEmbedding);
-          this.emitKnowledgeContextUpdate(knowledgeResult);
           if (knowledgeResult) {
-            // Fix 1: short-circuit for live negotiation coaching — bypass second LLM call
-            if (knowledgeResult.liveNegotiationResponse) {
-              return JSON.stringify({ __negotiationCoaching: knowledgeResult.liveNegotiationResponse });
-            }
-            // Intro question shortcut — return generated response directly
-            if (knowledgeResult.isIntroQuestion && knowledgeResult.introResponse) {
-              console.log('[LLMHelper] Knowledge mode: returning generated intro response');
-              return knowledgeResult.introResponse;
-            }
             // Inject knowledge system prompt and context
             if (!skipSystemPrompt && knowledgeResult.systemPromptInjection) {
               skipSystemPrompt = false; // ensure we use the knowledge prompt
@@ -610,7 +573,7 @@ ANSWER DIRECTLY:`;
             }
           }
         } catch (knowledgeError: any) {
-          console.warn('[LLMHelper] Knowledge mode processing failed, falling back to normal:', classifyTranslationError(knowledgeError));
+          console.warn('[LLMHelper] Materials intercept failed, falling back to normal:', classifyTranslationError(knowledgeError));
         }
       }
 
@@ -629,7 +592,7 @@ ANSWER DIRECTLY:`;
     }
   }
 
-  /** Structured JSON tasks (resume/JD/company research) use the Quick answers model. */
+  /** Structured JSON tasks use the Quick answers model. */
   public async generateContentStructured(message: string): Promise<string> {
     return this.generateViaConnectionChat({ systemPrompt: '', userContent: message });
   }
@@ -663,28 +626,14 @@ ANSWER DIRECTLY:`;
   ): AsyncGenerator<string, void, unknown> {
 
     // ============================================================
-    // KNOWLEDGE MODE INTERCEPT (Streaming)
+    // MATERIALS INTERCEPT (Streaming)
     // ============================================================
     const sources = getAnswerSources();
     const documents = !options?.verbatimPrompt && sources.materials ? this.knowledgeOrchestrator?.prepareDocumentContext(message) : null;
-    if (!options?.verbatimPrompt && (sources.materials || sources.profile) && this.knowledgeOrchestrator?.isKnowledgeMode()) {
+    if (!options?.verbatimPrompt && sources.materials && this.knowledgeOrchestrator) {
       try {
-        // Feed to depth scorer only (not negotiation tracker) — mirrors non-streaming path fix.
-        this.knowledgeOrchestrator.feedForDepthScoring(message);
-
         const knowledgeResult = await this.knowledgeOrchestrator.processQuestion(message, documents?.queryEmbedding);
         if (knowledgeResult) {
-          // Fix 1: short-circuit for live negotiation coaching — bypass second LLM call
-          if (knowledgeResult.liveNegotiationResponse) {
-            yield JSON.stringify({ __negotiationCoaching: knowledgeResult.liveNegotiationResponse });
-            return;
-          }
-          // Intro question shortcut — yield generated response directly
-          if (knowledgeResult.isIntroQuestion && knowledgeResult.introResponse) {
-            console.log('[LLMHelper] Knowledge mode (stream): returning generated intro response');
-            yield knowledgeResult.introResponse;
-            return;
-          }
           // Inject knowledge system prompt
           if (knowledgeResult.systemPromptInjection) {
             systemPromptOverride = knowledgeResult.systemPromptInjection;
@@ -697,7 +646,7 @@ ANSWER DIRECTLY:`;
           }
         }
       } catch (knowledgeError: any) {
-        console.warn('[LLMHelper] Knowledge mode (stream) processing failed, falling back:', classifyTranslationError(knowledgeError));
+        console.warn('[LLMHelper] Materials intercept (stream) failed, falling back:', classifyTranslationError(knowledgeError));
       }
     }
 

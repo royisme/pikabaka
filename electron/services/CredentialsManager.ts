@@ -216,10 +216,6 @@ export class CredentialsManager {
         return this.credentials.sonioxApiKey;
     }
 
-    public getTavilyApiKey(): string | undefined {
-        return this.credentials.tavilyApiKey;
-    }
-
     // The language of the other party's audio. Before per-speaker languages this was the only one.
     public getSttLanguage(): string {
         return this.credentials.sttLanguage || 'english-us';
@@ -414,13 +410,6 @@ export class CredentialsManager {
         this.credentials.sonioxApiKey = key;
         this.saveCredentials();
         console.log('[CredentialsManager] Soniox API Key updated');
-    }
-
-    public setTavilyApiKey(key: string): void {
-        // Store undefined (not empty string) when removing, so hasKey() checks stay consistent
-        this.credentials.tavilyApiKey = key.trim() || undefined;
-        this.saveCredentials();
-        console.log('[CredentialsManager] Tavily API Key updated');
     }
 
     public setSttLanguage(language: string): void {

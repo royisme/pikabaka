@@ -31,16 +31,6 @@ export type Message = {
   screenshotPreview?: string;
   isCode?: boolean;
   intent?: string;
-  isNegotiationCoaching?: boolean;
-  negotiationCoachingData?: {
-    tacticalNote: string;
-    exactScript: string;
-    showSilenceTimer: boolean;
-    phase: string;
-    theirOffer: number | null;
-    yourTarget: number | null;
-    currency: string;
-  };
   isWorkingState?: boolean;
 };
 
@@ -61,18 +51,10 @@ function toolWorkingMessage(toolName: string): string {
   }
 }
 
-type KnowledgeContext = {
-  matchedJDSignals: Array<{ requirement: string; relevance: number }>;
-  resumeEvidence: Array<{ source: string; text: string }>;
-  mustHitKeywords: string[];
-  questionCategory: string;
-};
-
 type AttachedContext = Array<{ path: string; preview: string }>;
 
 export function useMeetingChat(options: { getReplyContext?: () => string | undefined } = {}) {
   const queryClient = useQueryClient();
-  const [knowledgeContext, setKnowledgeContext] = useState<KnowledgeContext | null>(null);
   const [attachedContext, setAttachedContext] = useState<AttachedContext>([]);
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -118,7 +100,6 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     }
   });
 
-  const knowledgeContextTimeoutRef = useRef<number | null>(null);
   const conversationContextRef = useRef('');
 
   const { messages: chatMessages, sendMessage, status, stop } = useChat({
@@ -143,29 +124,6 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   useMainEvent(window.electronAPI?.onActionButtonModeChanged, (mode: 'recap' | 'brainstorm') => {
     queryClient.setQueryData(['action-button-mode'], mode);
   });
-
-  useEffect(() => {
-    if (!window.electronAPI?.onKnowledgeContextUpdate) return;
-
-    const unsubscribe = window.electronAPI.onKnowledgeContextUpdate((data) => {
-      setKnowledgeContext(data);
-      if (knowledgeContextTimeoutRef.current) {
-        window.clearTimeout(knowledgeContextTimeoutRef.current);
-      }
-      knowledgeContextTimeoutRef.current = window.setTimeout(() => {
-        setKnowledgeContext(null);
-        knowledgeContextTimeoutRef.current = null;
-      }, 30000);
-    });
-
-    return () => {
-      unsubscribe();
-      if (knowledgeContextTimeoutRef.current) {
-        window.clearTimeout(knowledgeContextTimeoutRef.current);
-        knowledgeContextTimeoutRef.current = null;
-      }
-    };
-  }, []);
 
   // Build conversationContext from all messages (chat + system) for IPC quick actions
   const allMessagesForContext = useMemo(() => {
@@ -1014,7 +972,6 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     stopGeneration,
     retryLast,
     canRetry,
-    knowledgeContext,
     attachedContext,
     setAttachedContext,
     actionButtonMode,

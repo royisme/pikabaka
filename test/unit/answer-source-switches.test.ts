@@ -9,7 +9,7 @@ import type * as Settings from '../../electron/services/SettingsManager';
 
 const file = (name: string) => path.resolve(`electron/${name}.ts`);
 
-type AnswerSources = { meetings: boolean; materials: boolean; profile: boolean };
+type AnswerSources = { meetings: boolean; materials: boolean };
 
 function handlers(t: Test) {
     const dir = mkdtempSync(path.join(tmpdir(), 'pika-answer-source-switches-'));
@@ -37,23 +37,24 @@ function handlers(t: Test) {
     };
 }
 
-t.test('the answer-source IPC pair reads the approved defaults and round-trips only the three booleans', async t => {
+t.test('the answer-source IPC pair reads the approved defaults and round-trips only the two booleans', async t => {
     const f = handlers(t);
-    t.same(await f.invoke('answer-sources:get'), { meetings: true, materials: false, profile: false });
+    t.same(await f.invoke('answer-sources:get'), { meetings: true, materials: false }, 'the profile source is gone from the reply');
     t.same(await f.invoke('answer-sources:set', { materials: true }), { success: true });
-    t.same(await f.invoke('answer-sources:get'), { meetings: true, materials: true, profile: false });
+    t.same(await f.invoke('answer-sources:get'), { meetings: true, materials: true });
     t.same(JSON.parse(readFileSync(f.settingsPath, 'utf8')), { answerUsesMaterials: true });
-    t.same(await f.invoke('answer-sources:set', { meetings: false, materials: false, profile: true }), { success: true });
-    t.same(await f.invoke('answer-sources:get'), { meetings: false, materials: false, profile: true });
+    t.same(await f.invoke('answer-sources:set', { meetings: false, materials: false }), { success: true });
+    t.same(await f.invoke('answer-sources:get'), { meetings: false, materials: false });
     t.end();
 });
 
 t.test('the setter rejects a non-boolean, an unknown key and a non-object payload without writing anything', async t => {
     const f = handlers(t);
-    t.same(await f.invoke('answer-sources:set', { profile: true }), { success: true });
+    t.same(await f.invoke('answer-sources:set', { profile: true }), { success: false, error: 'Unknown setting: profile' }, 'the removed profile source is an unknown setting now');
     for (const payload of [
         { profile: 'yes' },
         { profile: false, everything: true },
+        { everything: true },
         'meetings',
         null,
         [],
@@ -62,7 +63,7 @@ t.test('the setter rejects a non-boolean, an unknown key and a non-object payloa
         const reply = await f.invoke('answer-sources:set', payload) as { success: boolean; error?: string };
         t.equal(reply.success, false, `${JSON.stringify(payload)} is rejected`);
         t.ok(reply.error, 'the real reason is returned');
-        t.same(await f.invoke('answer-sources:get'), { meetings: true, materials: false, profile: true }, 'a rejected payload changes nothing');
+        t.same(await f.invoke('answer-sources:get'), { meetings: true, materials: false }, 'a rejected payload changes nothing');
     }
     t.end();
 });
@@ -116,34 +117,34 @@ function host(t: Test, electronAPI: Record<string, unknown>) {
 t.test('the Sources rows show the backend reply, not hard-coded defaults', t => {
     const sent: unknown[] = [];
     const f = host(t, {
-        getAnswerSources: async () => ({ meetings: true, materials: false, profile: false }),
+        getAnswerSources: async () => ({ meetings: true, materials: false }),
         setAnswerSources: async (input: unknown) => { sent.push(input); return { success: true }; },
     });
-    f.loaded({ meetings: false, materials: true, profile: true });
+    f.loaded({ meetings: false, materials: true });
     const switches = f.switches();
-    t.equal(switches.length, 3);
+    t.equal(switches.length, 2, 'meetings and materials only');
     t.same(switches.map(element => element.props['aria-label']), [
-        'Use Past meetings when answering', 'Use Materials (notes and documents) when answering', 'Use Interview profile when answering',
+        'Use Past meetings when answering', 'Use Materials (notes and documents) when answering',
     ]);
-    t.same(switches.map(element => element.props['aria-checked']), [false, true, true]);
+    t.same(switches.map(element => element.props['aria-checked']), [false, true]);
     const html = f.html();
     for (const words of [
-        'Use when answering', 'Past meetings', 'Materials (notes and documents)', 'Interview profile',
+        'Use when answering', 'Past meetings', 'Materials (notes and documents)',
         'Pika may search your recorded meetings when you ask a question.',
         'Pika may search your notes and imported documents when you ask a question. Off until you turn it on.',
-        'Interview practice answers may use your resume and target roles. Off until you turn it on.',
     ]) t.match(html, words);
+    t.notMatch(html, /interview profile/i);
     t.same(sent, [], 'rendering sends nothing');
     t.end();
 });
 
 t.test('no switch reads On before the reply arrives', t => {
     const f = host(t, {
-        getAnswerSources: async () => ({ meetings: true, materials: false, profile: false }),
+        getAnswerSources: async () => ({ meetings: true, materials: false }),
         setAnswerSources: async () => ({ success: true }),
     });
     const switches = f.switches();
-    t.equal(switches.length, 3);
+    t.equal(switches.length, 2);
     for (const element of switches) {
         t.equal(element.props['aria-checked'], false);
         t.notMatch(String(element.props.children), /On/);
@@ -156,10 +157,10 @@ t.test('no switch reads On before the reply arrives', t => {
 t.test('toggling sends exactly the changed key and shows the new state after the reply', async t => {
     const sent: unknown[] = [];
     const f = host(t, {
-        getAnswerSources: async () => ({ meetings: true, materials: false, profile: false }),
+        getAnswerSources: async () => ({ meetings: true, materials: false }),
         setAnswerSources: async (input: unknown) => { sent.push(input); return { success: true }; },
     });
-    f.loaded({ meetings: true, materials: false, profile: false });
+    f.loaded({ meetings: true, materials: false });
     t.equal(String(f.toggle('Use Materials (notes and documents) when answering').props.children), '○ Off');
     f.click('Use Materials (notes and documents) when answering');
     await f.settle();
@@ -170,14 +171,14 @@ t.test('toggling sends exactly the changed key and shows the new state after the
 
 t.test('a failed save shows the real error and leaves the switch in its previous state', async t => {
     const f = host(t, {
-        getAnswerSources: async () => ({ meetings: true, materials: false, profile: false }),
+        getAnswerSources: async () => ({ meetings: true, materials: false }),
         setAnswerSources: async () => ({ success: false, error: 'The settings file is read-only.' }),
     });
-    f.loaded({ meetings: true, materials: false, profile: false });
-    f.click('Use Interview profile when answering');
+    f.loaded({ meetings: true, materials: false });
+    f.click('Use Materials (notes and documents) when answering');
     await f.settle();
     t.match(f.html(), 'The settings file is read-only.');
-    t.equal(f.toggle('Use Interview profile when answering').props['aria-checked'], false);
-    t.equal(String(f.toggle('Use Interview profile when answering').props.children), '○ Off');
+    t.equal(f.toggle('Use Materials (notes and documents) when answering').props['aria-checked'], false);
+    t.equal(String(f.toggle('Use Materials (notes and documents) when answering').props.children), '○ Off');
     t.end();
 });

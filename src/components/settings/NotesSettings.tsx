@@ -2,9 +2,8 @@ import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
 
 /**
- * Facts about the user that a resume does not hold: one per line. They are searched like the resume
- * when a question is about the user; a question they do not cover is answered with brackets to fill in,
- * never with invented experience.
+ * Facts about the user or their work, one per line. They are searched like an imported document when a
+ * question relates to them; a question they do not cover is answered without inventing a past.
  */
 const NotesSettings: React.FC = () => {
     const queryClient = useQueryClient();
@@ -33,7 +32,7 @@ const NotesSettings: React.FC = () => {
             <div>
                 <h4 className="text-sm font-bold text-text-primary mb-1">Notes about you</h4>
                 <p className="text-xs text-text-secondary">
-                    Optional. Facts your resume does not say, one per line: a project and what you did, a number, a decision, why you left a job. When a question is about you, these are searched like your resume and used in the answer. When nothing matches, the answer is given the way an expert in the field would answer, without inventing your past.
+                    Optional. Facts about you or your work, one per line: a project and what you did, a number, a decision, why you moved on. When a question relates to them, they are searched and used in the answer. When nothing matches, the answer is given the way an expert in the field would answer, without inventing your past.
                 </p>
             </div>
             <textarea

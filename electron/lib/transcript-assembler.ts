@@ -163,9 +163,6 @@ export function sealFlushedTranscriptTurn(appState: AppState, speaker: Transcrip
         timestamp: flushed.startedAt,
       }]);
     }
-    if (speaker === 'them') {
-      state.knowledgeOrchestrator?.feedThemUtterance?.(flushed.text);
-    }
   }
   state.lastFlushedTranscriptTurns[speaker] = null;
 }
@@ -414,9 +411,6 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
         text,
         timestamp,
       }]);
-    }
-    if (speaker === 'them') {
-      state.knowledgeOrchestrator?.feedThemUtterance?.(text);
     }
     state.lastFlushedTranscriptTurns[speaker] = null;
   } else {

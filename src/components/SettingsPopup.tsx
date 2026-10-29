@@ -1,22 +1,15 @@
-import React, { useState, useLayoutEffect, useRef } from 'react';
-import { MessageSquare, Link, Camera, Heart, User } from 'lucide-react';
+import React, { useLayoutEffect, useRef } from 'react';
+import { MessageSquare, Link, Camera, Heart } from 'lucide-react';
 import { useQuery, useQueryClient } from 'react-query';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { useMainEvent } from '../hooks/useMainEvent';
 import { useLocalStorageValue } from '../hooks/useLocalStorageValue';
-import { useProfileStatus } from '../hooks/useProfileStatus';
 
 const SettingsPopup = () => {
     const queryClient = useQueryClient();
     const { shortcuts } = useShortcuts();
     const isLightTheme = useResolvedTheme() === 'light';
-
-    // Profile status query
-    const { data: profileStatus } = useProfileStatus();
-    const hasProfile = profileStatus?.hasProfile ?? false;
-    const [draftProfileMode, setDraftProfileMode] = useState<boolean | null>(null);
-    const profileMode = draftProfileMode ?? profileStatus?.profileMode ?? false;
 
     // Undetectable state: read via query, stream via useMainEvent
     const { data: undetectableData } = useQuery<boolean>(
@@ -144,7 +137,7 @@ const SettingsPopup = () => {
                     </button>
                 </div>
 
-                {/* Interview Mode (Brainstorm) Toggle */}
+                {/* Brainstorm Toggle */}
                 <div className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors duration-200 group cursor-default ${itemHoverClass}`}>
                     <div className="flex items-center gap-3">
                         <svg
@@ -162,7 +155,7 @@ const SettingsPopup = () => {
                             <circle cx="6" cy="18" r="3" />
                             <path d="M18 9a9 9 0 0 1-9 9" />
                         </svg>
-                        <span className={`text-[12px] font-medium transition-colors ${actionButtonMode === 'brainstorm' ? (isLightTheme ? 'text-slate-950' : 'text-white') : labelInactiveClass}`}>Interview mode</span>
+                        <span className={`text-[12px] font-medium transition-colors ${actionButtonMode === 'brainstorm' ? (isLightTheme ? 'text-slate-950' : 'text-white') : labelInactiveClass}`}>Brainstorm</span>
                     </div>
                     <button
                         onClick={async () => {
@@ -177,36 +170,6 @@ const SettingsPopup = () => {
                         <div className={`w-[15px] h-[15px] rounded-full transition-transform duration-300 ease-spring ${toggleKnobClass} ${actionButtonMode === 'brainstorm' ? 'translate-x-[12px]' : 'translate-x-0'}`} />
                     </button>
                 </div>
-
-                {/* Profile Mode Toggle */}
-                {hasProfile && (
-                    <div className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors duration-200 group ${itemHoverClass} cursor-default`}>
-                        <div className="flex items-center gap-3">
-                            <User
-                                className={`w-3.5 h-3.5 transition-colors ${profileMode ? 'text-accent-primary' : iconInactiveClass}`}
-                                fill={profileMode ? "currentColor" : "none"}
-                            />
-                            <span className={`text-[12px] font-medium transition-colors ${profileMode ? (isLightTheme ? 'text-slate-950' : 'text-white') : labelInactiveClass}`}>Profile Mode</span>
-                        </div>
-                        <button
-                            onClick={async () => {
-                                const newState = !profileMode;
-                                setDraftProfileMode(newState);
-                                try {
-                                    await window.electronAPI?.profileSetMode?.(newState);
-                                    await queryClient.invalidateQueries(['profile', 'status']);
-                                } catch (e) {
-                                    console.error(e);
-                                } finally {
-                                    setDraftProfileMode(null);
-                                }
-                            }}
-                            className={`w-[30px] h-[18px] rounded-full p-[1.5px] transition-all duration-300 ease-spring active:scale-[0.92] ${profileMode ? 'bg-accent-primary shadow-[0_2px_10px_rgba(var(--color-accent-primary),0.3)]' : defaultToggleTrackClass}`}
-                        >
-                            <div className={`w-[15px] h-[15px] rounded-full transition-transform duration-300 ease-spring ${toggleKnobClass} ${profileMode ? 'translate-x-[12px]' : 'translate-x-0'}`} />
-                        </button>
-                    </div>
-                )}
 
                 <div className={`h-px my-0.5 mx-2 ${dividerClass}`} />
 

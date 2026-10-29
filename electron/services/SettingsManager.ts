@@ -22,12 +22,12 @@ export function getPromptOverrides(): PromptOverrides {
     return SettingsManager.getInstance().get('prompts') ?? {};
 }
 
+// The stored answerUsesProfile value is left in settings.json and deliberately not read: the interview profile is gone.
 export function getAnswerSources() {
     const settings = SettingsManager.getInstance();
     return {
         meetings: settings.get('answerUsesMeetings') ?? true,
         materials: settings.get('answerUsesMaterials') ?? false,
-        profile: settings.get('answerUsesProfile') ?? false,
     };
 }
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
-import { AlertCircle, Briefcase, CheckCircle, DownloadCloud, Ghost, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle, DownloadCloud, Ghost, RefreshCw } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import MeetingDetails from './MeetingDetails';
 import GlobalChatOverlay from './GlobalChatOverlay';
@@ -8,7 +8,6 @@ import LauncherHeader from './launcher/LauncherHeader';
 import MeetingHistorySection from './launcher/MeetingHistorySection';
 import { generateMeetingPDF } from '../utils/pdfGenerator';
 import { useShortcuts } from '../hooks/useShortcuts';
-import { useProfileData } from '../hooks/useProfileData';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { useMainEvent } from '../hooks/useMainEvent';
 import { useWindowEvent } from '../hooks/useWindowEvent';
@@ -59,7 +58,6 @@ const Launcher: React.FC<LauncherProps> = ({
     const [isGlobalChatOpen, setIsGlobalChatOpen] = useState(false);
     const [submittedGlobalQuery, setSubmittedGlobalQuery] = useState('');
     const { isShortcutPressed } = useShortcuts();
-    const { data: profileData } = useProfileData();
     const isLight = useResolvedTheme() === 'light';
 
     const updateSelectedMeeting = (meeting: Meeting | null) => {
@@ -253,14 +251,6 @@ const Launcher: React.FC<LauncherProps> = ({
                                     </div>
                                 </div>
                             </section>
-                            {profileData?.hasActiveJD && profileData.activeJD && (
-                                <div className="border-t border-border-subtle bg-bg-primary/50 px-8 py-3">
-                                    <div className="mx-auto flex max-w-4xl items-center justify-between">
-                                        <div className="flex items-center gap-3"><div className="flex h-7 w-7 items-center justify-center rounded-lg border border-accent-primary/20 bg-accent-primary/10"><Briefcase size={13} className="text-accent-primary" /></div><div><div className="flex items-center gap-2"><span className="text-xs font-semibold text-text-primary">{profileData.activeJD.title}</span><span className="rounded border border-accent-primary/20 bg-accent-primary/10 px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-accent-primary">Active</span></div><span className="text-xs text-text-secondary">{profileData.activeJD.company}</span></div></div>
-                                        <button onClick={() => onOpenSettings?.('profile')} className="rounded-full px-2.5 py-1 text-xs font-medium text-text-tertiary transition-colors hover:bg-bg-input hover:text-text-primary">Change</button>
-                                    </div>
-                                </div>
-                            )}
                             <main className="custom-scrollbar flex-1 overflow-y-auto bg-bg-primary">
                                 <section className="min-h-full px-8 py-8">
                                     <MeetingHistorySection meetings={meetings} onOpenMeeting={handleOpenMeeting} onExportMeeting={handleExportMeeting} onDeleteMeeting={handleDeleteMeeting} onStartMeeting={onStartMeeting} activeMenuId={activeMenuId} onMenuToggle={handleMenuToggle} menuEntered={menuEntered} onMenuEnteredChange={setMenuEntered} />

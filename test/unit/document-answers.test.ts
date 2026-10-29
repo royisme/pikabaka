@@ -65,9 +65,7 @@ function setup(t: Test, stream: boolean, native: boolean) {
         ? collect(helper.streamChat(question, undefined, context ?? undefined))
         : helper.chatWithGemini(question, undefined, context ?? undefined);
     const add = async (type: DocType, name: string, texts: string[], embedding = vector, indexed = true) => {
-        const id = manager.insertDocument(type, name, texts.join('\n'), type === DocType.RESUME ? {
-            identity: { name: 'Invented Candidate Cedar' }, skills: [], experience: [], projects: [], education: [], totalExperienceYears: 3,
-        } : null);
+        const id = manager.insertDocument(type, name, texts.join('\n'), null);
         const ids = manager.saveChunks(id, texts.map(text => ({ text })));
         if (indexed) await store.storeEmbeddings(id, ids.map((id, index) => ({ id, text: texts[index] })), async () => embedding);
         return id;
@@ -78,12 +76,11 @@ function setup(t: Test, stream: boolean, native: boolean) {
 for (const native of [false, true]) {
     for (const stream of [false, true]) {
         const mode = `${native ? 'native' : 'JS'} ${stream ? 'streaming' : 'non-streaming'}`;
-        t.test(`${mode}: Materials on and a matching document: the context has the block with the file name and no candidate wording, including for a user with no notes and no resume`, async t => {
+        t.test(`${mode}: Materials on and a matching document: the context has the block with the file name and no candidate wording, including for a user with no notes`, async t => {
             const f = setup(t, stream, native);
             const baseline = await f.ask();
             const system = f.requests[0].system;
             await f.add(DocType.MATERIAL, 'inventory.md', [documentText]);
-            t.equal(f.orchestrator.isKnowledgeMode(), false, 'documents do not enable the candidate interceptor');
             f.requests.length = 0;
             t.equal(await f.ask(), baseline, 'the model answer is delivered, not replaced by the block');
             t.equal(f.requests.length, 1);
@@ -91,9 +88,8 @@ for (const native of [false, true]) {
             t.equal(f.requests[0].user, `CONTEXT:\n${header}\n[inventory.md] ${documentText}\n\n${liveContext}\n\nUSER QUESTION:\n${question}`);
             t.notMatch(f.requests[0].user, /candidate|Relevant background|interview question/i, 'no candidate wording is added to the context');
             t.same(f.embedded, [question], 'one embedding request per question');
-            f.orchestrator.setKnowledgeMode(false);
             t.equal(await f.ask(null), reply);
-            t.equal(f.requests[1].user, `CONTEXT:\n${header}\n[inventory.md] ${documentText}\n\nUSER QUESTION:\n${question}`, 'the document gate does not need background mode or pre-existing context');
+            t.equal(f.requests[1].user, `CONTEXT:\n${header}\n[inventory.md] ${documentText}\n\nUSER QUESTION:\n${question}`, 'the document gate does not need pre-existing context');
         });
 
         t.test(`${mode}: Materials off: nothing is added`, async t => {
@@ -104,7 +100,7 @@ for (const native of [false, true]) {
             await f.add(DocType.MATERIAL, 'inventory.md', [documentText]);
             f.switches.set('answerUsesProfile', true);
             t.equal(await f.ask(), reply);
-            t.same(f.requests[1], baseline, 'the profile switch cannot enable documents');
+            t.same(f.requests[1], baseline, 'the dormant profile setting cannot enable documents');
             t.same(f.embedded, [], 'off does not embed or search documents');
             f.switches.set('answerUsesMaterials', true);
             t.equal(await f.ask(), reply);
@@ -126,7 +122,7 @@ for (const native of [false, true]) {
             t.equal(await f.ask(), reply);
             const baseline = f.requests[0];
             t.match(baseline.user, note);
-            if (stream) t.match(baseline.system, /Answer in first person as the candidate/);
+            if (stream) t.match(baseline.system, /Answer in first person, as the user/);
             await f.add(DocType.MATERIAL, 'inventory.md', [documentText]);
             f.embedded.length = 0;
             t.equal(await f.ask(), reply);
@@ -136,26 +132,6 @@ for (const native of [false, true]) {
             t.notMatch(f.requests[1].system, documentText, 'documents are not candidate background');
             t.equal(await f.ask(), reply);
             t.same(f.embedded, [question, question], 'the same question on a later call embeds afresh, not from a global cache');
-        });
-
-        t.test(`${mode}: both switches on keeps documents out of the candidate prompt`, async t => {
-            const f = setup(t, stream, native);
-            f.switches.set('answerUsesProfile', true);
-            const resume = 'Invented copper resume evidence.';
-            await f.add(DocType.RESUME, 'resume.txt', [resume]);
-            await f.ask();
-            await f.ask();
-            f.requests.length = 0;
-            t.equal(await f.ask(), reply);
-            const baseline = f.requests[0];
-            t.match(baseline.user, resume);
-            await f.add(DocType.MATERIAL, 'inventory.md', [documentText]);
-            f.embedded.length = 0;
-            t.equal(await f.ask(), reply);
-            t.equal(f.requests[1].system, baseline.system);
-            t.notMatch(f.requests[1].system, documentText);
-            t.equal(f.requests[1].user, baseline.user.replace('CONTEXT:\n', `CONTEXT:\n${header}\n[inventory.md] ${documentText}\n\n`));
-            t.same(f.embedded, [question], 'profile and documents also share one query embedding');
         });
 
         t.test(`${mode}: a failing lookup never breaks the answer`, async t => {
@@ -174,7 +150,6 @@ for (const native of [false, true]) {
             t.notMatch(f.requests[1].user, /Synthetic query unavailable|unavailable_label/);
             t.same(f.embedded, [question, question], 'a failed document lookup does not trigger a second embedding');
             f.db.exec('DROP TABLE knowledge_chunks');
-            f.orchestrator.setKnowledgeMode(false);
             t.equal(await f.ask(), reply, 'a synchronous lookup failure also leaves the answer working');
             t.notMatch(f.requests[2].user, header);
         });
@@ -212,16 +187,14 @@ for (const native of [false, true]) {
 
     t.test(`${native ? 'native' : 'JS'}: a verbatimPrompt call gets no block`, async t => {
         const f = setup(t, true, native);
-        f.switches.set('answerUsesProfile', true);
         await f.add(DocType.NOTES, 'notes.txt', ['Invented violet note.']);
-        await f.add(DocType.RESUME, 'resume.txt', ['Invented copper resume.']);
         await f.add(DocType.MATERIAL, 'inventory.md', [documentText]);
         t.equal(await collect(f.helper.streamChat(question, undefined, liveContext, 'Invented exact system.', { verbatimPrompt: true })), reply);
         t.same(f.requests[0], { system: 'Invented exact system.', user: `CONTEXT:\n${liveContext}\n\nUSER QUESTION:\n${question}` });
         t.same(f.embedded, [], 'verbatim skips both lookups');
         t.equal(await collect(f.helper.streamChatWithGemini(question, undefined, liveContext)), reply, 'the legacy RAG entry point is also verbatim');
         t.equal(f.requests[1].user, `CONTEXT:\n${liveContext}\n\nUSER QUESTION:\n${question}`);
-        t.notMatch(f.requests[1].system, /Invented violet note|Invented copper resume|inventory\.md/);
+        t.notMatch(f.requests[1].system, /Invented violet note|inventory\.md/);
         t.same(f.embedded, []);
     });
 }

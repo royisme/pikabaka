@@ -175,7 +175,7 @@ t.test('write and encryption errors reach setters with no secrets; empty-store a
     t.match(message, /Invented encryption failure/);
     t.notOk(containsSecret(message), 'error redacts keys and header values');
     Reflect.set(manager, 'credentials', {});
-    t.throws(() => manager.setTavilyApiKey(''), /Refusing to overwrite/);
+    t.throws(() => manager.setSonioxApiKey(''), /Refusing to overwrite/);
     manager.scrubMemory();
     t.throws(() => manager.setDeepgramApiKey(invented.deepgramApiKey), /scrubbed/);
     t.ok(isDeepStrictEqual(manager.getAllCredentials(), {}), 'a failed quit-time save cannot restore scrubbed credentials');
@@ -214,12 +214,11 @@ function ipc(f: ReturnType<typeof fixture>, manager: ReturnType<ReturnType<typeo
     return (name: string, ...args: unknown[]) => handlers.get(name)!(null, ...args);
 }
 
-t.test('real IPC handlers return disk errors for speech, provider, Tavily and translation saves', async t => {
+t.test('real IPC handlers return disk errors for speech, provider and translation saves', async t => {
     const f = fixture(t);
     const manager = f.start();
     const stt = ipc(f, manager, 'stt', 'registerSttHandlers');
     const connections = ipc(f, manager, 'connections', 'registerConnectionHandlers');
-    const knowledge = ipc(f, manager, 'knowledge', 'registerKnowledgeHandlers');
     const translation = ipc(f, manager, 'translation', 'registerTranslationHandlers');
     f.faults.write = true;
     for (const call of [
@@ -227,7 +226,6 @@ t.test('real IPC handlers return disk errors for speech, provider, Tavily and tr
         () => stt('set-stt-model', 'deepgram', 'invented-model'),
         () => connections('ai-connection-save', { id: 'openai', apiKey: invented.openaiApiKey }),
         () => connections('chat-model-set', { connectionId: 'openai', model: 'invented-model' }),
-        () => knowledge('set-tavily-api-key', invented.tavilyApiKey),
         () => translation('set-transcript-translation-settings', { enabled: true }),
     ]) {
         const result = await call();
