@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-29: remove the build-time helper rename, track X step X2 (branch `remove-helper-rename`)
+
+- Deleted `scripts/ad-hoc-sign.js` and the `afterPack` entry in `package.json`. The script's whole job was to rewrite the macOS helper processes' `CFBundleName` and `CFBundleDisplayName` to "CoreServices Helper (...)" so Activity Monitor showed another name. After this, the helpers show as "Pika Helper (Renderer/GPU/Plugin)".
+- Nothing else referenced the script. `scripts/release.js` and `scripts/notarize-only.js` are unchanged; electron-builder signs and notarizes as it already did (the script never signed anything).
+- No unit test: there is no logic left. Checks: `package.json` still parses; both typechecks, lint and the tap run are unaffected by a build script (not re-run for a deletion with no importer).
+- Owner (needs a release build): a signed and notarized build passes `codesign --verify --deep --strict` and `spctl -a -vv`; Activity Monitor shows "Pika Helper (Renderer)", "(GPU)" and "(Plugin)"; the app launches and audio capture works.
+
 ## 2026-10-28: document rows, step K5b2 (branch `document-rows`, PR #81)
 
 - Four `knowledge:*` channels list, import, remove and re-index an imported document. The import handler opens the file dialog itself (`.docx` only on macOS); a cancelled dialog is a normal reply. A non-integer, a missing id and an id that is not an imported document are refused with "That document is not in Pika."
