@@ -6,7 +6,6 @@ export interface AppSettings {
     // In the future, other non-secret data like 'language' or 'theme'
     // can be moved here from CredentialsManager to allow early boot access.
     isUndetectable?: boolean;
-    disguiseMode?: 'terminal' | 'settings' | 'activity' | 'none';
     verboseLogging?: boolean;
     actionButtonMode?: 'recap' | 'brainstorm';
     autoCheckUpdates?: boolean;

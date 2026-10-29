@@ -523,11 +523,6 @@ export function registerCoreHandlers(appState: AppState): void {
     return { success: true }
   })
 
-  safeHandle("set-disguise", async (_, mode: 'terminal' | 'settings' | 'activity' | 'none') => {
-    appState.setDisguise(mode)
-    return { success: true }
-  })
-
   safeHandle("get-undetectable", async () => {
     return appState.getUndetectable()
   })
@@ -545,10 +540,6 @@ export function registerCoreHandlers(appState: AppState): void {
 
   safeHandle("get-overlay-mouse-passthrough", async () => {
     return appState.getOverlayMousePassthrough()
-  })
-
-  safeHandle("get-disguise", async () => {
-    return appState.getDisguise()
   })
 
   safeHandle("set-open-at-login", async (_, openAtLogin: boolean) => {

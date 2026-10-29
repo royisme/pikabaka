@@ -210,8 +210,11 @@ t.test('General no longer renders answer controls and keeps its other settings',
     t.notMatch(html, 'ai-response-language');
     t.notMatch(html, 'How answers sound');
     t.notMatch(html, 'answer-style-settings');
-    for (const label of ['General settings', 'Theme', 'Live transcript', 'Overlay opacity', 'Process Disguise']) {
+    for (const label of ['General settings', 'Theme', 'Live transcript', 'Overlay opacity']) {
         t.match(html, label);
+    }
+    for (const label of ['Process Disguise', 'Activity Monitor', 'System Settings']) {
+        t.notMatch(html, label);
     }
     t.end();
 });

@@ -57,8 +57,8 @@ export async function initializeApp() {
   // Initialize IPC handlers before window creation
   initializeIpcHandlers(appState)
 
-  // Apply the full disguise payload (names, dock icon, AUMID) early
-  appState.applyInitialDisguise();
+  if (!appState.getUndetectable()) app.setName("Pika");
+  if (process.platform === 'win32') app.setAppUserModelId("com.pika.assistant.none");
 
   // Start the Ollama lifecycle manager
   OllamaManager.getInstance().init().catch(console.error);

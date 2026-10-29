@@ -585,16 +585,9 @@ const ScreenshotAnalysis: React.FC = () => {
   );
 };
 
-// ─── Scene 5: Stealth Mode ──────────────────────────────────────────
+// ─── Scene 5: Hide from Screen Share ────────────────────────────────
 
-const disguises = [
-  { name: "Pika", icon: "⚡", color: COLORS.accent },
-  { name: "Terminal", icon: "⬛", color: "#64748b" },
-  { name: "Activity Monitor", icon: "📊", color: "#22c55e" },
-  { name: "Settings", icon: "⚙️", color: "#94a3b8" },
-];
-
-const StealthMode: React.FC = () => {
+const ScreenSharePrivacy: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -606,15 +599,6 @@ const StealthMode: React.FC = () => {
     [30, 50, 60, 80],
     [1, 0.15, 0.15, 0.8],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-  );
-
-  // Disguise cycling
-  const disguiseIndex = Math.min(
-    Math.floor(interpolate(frame, [100, 200], [0, disguises.length - 0.01], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    })),
-    disguises.length - 1
   );
 
   const badgeOpacity = interpolate(frame, [210, 230], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
@@ -630,7 +614,7 @@ const StealthMode: React.FC = () => {
       }}
     >
       <div style={{ fontSize: 42, fontWeight: 700, color: COLORS.text, marginBottom: 50, opacity: titleOpacity, fontFamily: "SF Pro Display, sans-serif" }}>
-        Stealth Mode
+        Hide from Screen Share
       </div>
 
       {/* Window mockup */}
@@ -661,36 +645,12 @@ const StealthMode: React.FC = () => {
           <div style={{ width: 12, height: 12, borderRadius: 6, background: "#febc2e" }} />
           <div style={{ width: 12, height: 12, borderRadius: 6, background: "#28c840" }} />
           <span style={{ color: COLORS.textMuted, fontSize: 13, marginLeft: 12, fontFamily: "SF Mono, monospace" }}>
-            {disguises[disguiseIndex].icon} {disguises[disguiseIndex].name}
+            ⚡ Pika
           </span>
         </div>
         <div style={{ padding: 30, display: "flex", justifyContent: "center", alignItems: "center", height: "calc(100% - 36px)" }}>
-          <span style={{ fontSize: 64 }}>{disguises[disguiseIndex].icon}</span>
+          <span style={{ fontSize: 64 }}>⚡</span>
         </div>
-      </div>
-
-      {/* Disguise selector */}
-      <div style={{ display: "flex", gap: 20, marginTop: 40 }}>
-        {disguises.map((d, i) => (
-          <div
-            key={d.name}
-            style={{
-              padding: "12px 24px",
-              borderRadius: 12,
-              background: i === disguiseIndex ? `${d.color}22` : COLORS.panel,
-              border: `2px solid ${i === disguiseIndex ? d.color : COLORS.panelBorder}`,
-              color: i === disguiseIndex ? d.color : COLORS.textMuted,
-              fontSize: 15,
-              fontWeight: i === disguiseIndex ? 700 : 400,
-              fontFamily: "SF Mono, monospace",
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-            }}
-          >
-            <span>{d.icon}</span> {d.name}
-          </div>
-        ))}
       </div>
 
       {/* Invisible badge */}
@@ -866,9 +826,9 @@ export const PikaDemo: React.FC = () => {
         <FadeTransition durationInFrames={15} />
       </Sequence>
 
-      {/* Scene 5: Stealth Mode (960-1200) */}
+      {/* Scene 5: Hide from Screen Share (960-1200) */}
       <Sequence from={960} durationInFrames={255}>
-        <StealthMode />
+        <ScreenSharePrivacy />
       </Sequence>
       <Sequence from={1200} durationInFrames={15}>
         <FadeTransition durationInFrames={15} />

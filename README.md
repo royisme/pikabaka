@@ -60,7 +60,7 @@ Full demo video: [`demo/out/pika-demo.mp4`](demo/out/pika-demo.mp4) · Built wit
 - **Mute your microphone** — one button stops your own voice from being transcribed when the call plays through speakers.
 - **Local RAG memory** — past meetings indexed with `sqlite-vec`; search and recall without sending data anywhere.
 - **Screenshot reasoning** — capture full screen or a region, pipe it to a vision model, get an answer in seconds.
-- **Stealth overlay** — disguise the process name and hide the window from screen-sharing.
+- **Stealth overlay** — hide the window from screen-sharing.
 - **Configurable controls** — customize the overlay's global shortcuts and choose your AI providers.
 - **Cross-platform** — macOS (Apple Silicon + Intel) and Windows 10/11.
 

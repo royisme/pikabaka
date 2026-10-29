@@ -31,15 +31,6 @@ export function settingsChannels() {
         ipcRenderer.removeListener('global-shortcut', subscription)
       }
     },
-    setDisguise: (mode: 'terminal' | 'settings' | 'activity' | 'none') => ipcRenderer.invoke("set-disguise", mode),
-    getDisguise: () => ipcRenderer.invoke("get-disguise"),
-    onDisguiseChanged: (callback: (mode: 'terminal' | 'settings' | 'activity' | 'none') => void) => {
-      const subscription = (_: any, mode: any) => callback(mode)
-      ipcRenderer.on('disguise-changed', subscription)
-      return () => {
-        ipcRenderer.removeListener('disguise-changed', subscription)
-      }
-    },
     getUpdateState: () => ipcRenderer.invoke("get-update-state"),
     setAutoCheckUpdates: (enabled: boolean) => ipcRenderer.invoke("set-auto-check-updates", enabled),
     checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),

@@ -1,6 +1,4 @@
-import { app, nativeImage } from "electron"
-import path from "path"
-import fs from "fs"
+import { app } from "electron"
 import { SettingsManager } from "../services/SettingsManager"
 import { setVerboseLoggingFlag } from "../lib/verboseLog"
 import type { AppState } from "../main"
@@ -31,15 +29,6 @@ export function setUndetectable(appState: AppState, state: boolean): void {
 
   // Persist state via SettingsManager
   SettingsManager.getInstance().set('isUndetectable', state);
-
-  // Cancel all pending disguise timers to prevent their app.setName() calls
-  // from re-registering the dock icon after we hide it
-  if (state) {
-    for (const timer of appStateInternal._disguiseTimers) {
-      clearTimeout(timer);
-    }
-    appStateInternal._disguiseTimers = [];
-  }
 
   // Broadcast state change to all relevant windows
   _broadcastToAllWindows(appState, 'undetectable-changed', state);
@@ -155,167 +144,6 @@ export function setVerboseLogging(appState: AppState, enabled: boolean): void {
   console.log(`[AppState] verboseLogging set to ${enabled}`);
 }
 
-export function setDisguise(appState: AppState, mode: 'terminal' | 'settings' | 'activity' | 'none'): void {
-  (appState as any).disguiseMode = mode;
-  SettingsManager.getInstance().set('disguiseMode', mode);
-
-  // Apply the disguise regardless of undetectable state
-  // (disguise affects Activity Monitor name via process.title,
-  //  dock icon only updates when NOT in stealth)
-  _applyDisguise(appState, mode);
-}
-
-export function applyInitialDisguise(appState: AppState): void {
-  _applyDisguise(appState, (appState as any).disguiseMode);
-}
-
-export function _applyDisguise(appState: AppState, mode: 'terminal' | 'settings' | 'activity' | 'none'): void {
-  const appStateInternal = appState as any;
-
-  let appName = "Pika";
-  let iconPath = "";
-
-  const isWin = process.platform === 'win32';
-  const isMac = process.platform === 'darwin';
-
-  switch (mode) {
-    case 'terminal':
-      appName = isWin ? "Command Prompt " : "Terminal ";
-      if (isWin) {
-        iconPath = app.isPackaged
-          ? path.join(process.resourcesPath, "assets/fakeicon/win/terminal.png")
-          : path.join(app.getAppPath(), "assets/fakeicon/win/terminal.png");
-      } else {
-        iconPath = app.isPackaged
-          ? path.join(process.resourcesPath, "assets/fakeicon/mac/terminal.png")
-          : path.join(app.getAppPath(), "assets/fakeicon/mac/terminal.png");
-      }
-      break;
-    case 'settings':
-      appName = isWin ? "Settings " : "System Settings ";
-      if (isWin) {
-        iconPath = app.isPackaged
-          ? path.join(process.resourcesPath, "assets/fakeicon/win/settings.png")
-          : path.join(app.getAppPath(), "assets/fakeicon/win/settings.png");
-      } else {
-        iconPath = app.isPackaged
-          ? path.join(process.resourcesPath, "assets/fakeicon/mac/settings.png")
-          : path.join(app.getAppPath(), "assets/fakeicon/mac/settings.png");
-      }
-      break;
-    case 'activity':
-      appName = isWin ? "Task Manager " : "Activity Monitor ";
-      if (isWin) {
-        iconPath = app.isPackaged
-          ? path.join(process.resourcesPath, "assets/fakeicon/win/activity.png")
-          : path.join(app.getAppPath(), "assets/fakeicon/win/activity.png");
-      } else {
-        iconPath = app.isPackaged
-          ? path.join(process.resourcesPath, "assets/fakeicon/mac/activity.png")
-          : path.join(app.getAppPath(), "assets/fakeicon/mac/activity.png");
-      }
-      break;
-    case 'none':
-      appName = "Pika";
-      if (isMac) {
-        iconPath = app.isPackaged
-          ? path.join(process.resourcesPath, "assets", "icon.png")
-          : path.join(app.getAppPath(), "assets/icon.png");
-      } else if (isWin) {
-        iconPath = app.isPackaged
-          ? path.join(process.resourcesPath, "assets/icons/win/icon.ico")
-          : path.join(app.getAppPath(), "assets/icons/win/icon.ico");
-      } else {
-        iconPath = app.isPackaged
-          ? path.join(process.resourcesPath, "icon.png")
-          : path.join(app.getAppPath(), "assets/icon.png");
-      }
-      break;
-  }
-
-  console.log(`[AppState] Applying disguise: ${mode} (${appName}) on ${process.platform}`);
-
-  // 1. Update process title (affects Activity Monitor / Task Manager)
-  process.title = appName;
-
-  // 2. Update app name (affects macOS Menu / Dock)
-  // Skip when undetectable — app.setName() causes macOS to re-register
-  // the app and re-show the dock icon even after dock.hide()
-  if (!appStateInternal.isUndetectable) {
-    app.setName(appName);
-  }
-
-  if (isMac) {
-    process.env.CFBundleName = appName.trim();
-  }
-
-  // 3. Update App User Model ID (Windows Taskbar grouping)
-  if (isWin) {
-    // Use unique AUMID per disguise to avoid grouping with the real app
-    app.setAppUserModelId(`com.pika.assistant.${mode}`);
-  }
-
-  // 4. Update Icons
-  if (fs.existsSync(iconPath)) {
-    const image = nativeImage.createFromPath(iconPath);
-
-    if (isMac) {
-      // Skip dock icon update when dock is hidden to avoid potential flicker
-      if (!appStateInternal.isUndetectable) {
-        app.dock.setIcon(image);
-      }
-    } else {
-      // Windows/Linux: Update all window icons
-      appState.windowHelper.getLauncherWindow()?.setIcon(image);
-      appState.windowHelper.getOverlayWindow()?.setIcon(image);
-      appState.settingsWindowHelper.getSettingsWindow()?.setIcon(image);
-    }
-  } else {
-    console.warn(`[AppState] Disguise icon not found: ${iconPath}`);
-  }
-
-  // 5. Update Window Titles
-  const launcher = appState.windowHelper.getLauncherWindow();
-  if (launcher && !launcher.isDestroyed()) {
-    launcher.setTitle(appName.trim());
-    launcher.webContents.send('disguise-changed', mode);
-  }
-
-  const overlay = appState.windowHelper.getOverlayWindow();
-  if (overlay && !overlay.isDestroyed()) {
-    overlay.setTitle(appName.trim());
-    overlay.webContents.send('disguise-changed', mode);
-  }
-
-  const settingsWin = appState.settingsWindowHelper.getSettingsWindow();
-  if (settingsWin && !settingsWin.isDestroyed()) {
-    settingsWin.setTitle(appName.trim());
-    settingsWin.webContents.send('disguise-changed', mode);
-  }
-
-  // Cancel any stale forceUpdate timeouts from previous disguise changes
-  for (const timer of appStateInternal._disguiseTimers) {
-    clearTimeout(timer);
-  }
-  appStateInternal._disguiseTimers = [];
-
-  // Periodically re-assert process.title only — it can drift on some systems.
-  // NOTE: We intentionally do NOT call app.setName() here — it was already called
-  // synchronously above, and repeated calls on macOS cause the system to briefly
-  // show a second dock tile while re-registering the app identity.
-  const scheduleUpdate = (ms: number) => {
-    const ts = setTimeout(() => {
-      process.title = appName;
-      appStateInternal._disguiseTimers = appStateInternal._disguiseTimers.filter((t: NodeJS.Timeout) => t !== ts);
-    }, ms);
-    appStateInternal._disguiseTimers.push(ts);
-  };
-
-  scheduleUpdate(200);
-  scheduleUpdate(1000);
-  scheduleUpdate(5000);
-}
-
 export function _broadcastToAllWindows(appState: AppState, channel: string, ...args: any[]): void {
   const windows = [
     appState.windowHelper.getMainWindow(),
@@ -331,8 +159,4 @@ export function _broadcastToAllWindows(appState: AppState, channel: string, ...a
       win.webContents.send(channel, ...args);
     }
   }
-}
-
-export function getDisguise(appState: AppState): string {
-  return (appState as any).disguiseMode;
 }

@@ -146,33 +146,19 @@ export class WindowHelper {
       icon: (() => {
         const isMac = process.platform === "darwin";
         const isWin = process.platform === "win32";
-        const mode = this.appState.getDisguise();
-
-        if (mode === 'none') {
-          if (isMac) {
-            return app.isPackaged
-              ? path.join(process.resourcesPath, "assets", "icon.png")
-              : path.resolve(app.getAppPath(), "assets/icon.png");
-          } else if (isWin) {
-            return app.isPackaged
-              ? path.join(process.resourcesPath, "assets/icons/win/icon.ico")
-              : path.resolve(app.getAppPath(), "assets/icons/win/icon.ico");
-          } else {
-            return app.isPackaged
-              ? path.join(process.resourcesPath, "icon.png")
-              : path.resolve(app.getAppPath(), "assets/icon.png");
-          }
+        if (isMac) {
+          return app.isPackaged
+            ? path.join(process.resourcesPath, "assets", "icon.png")
+            : path.resolve(app.getAppPath(), "assets/icon.png");
+        } else if (isWin) {
+          return app.isPackaged
+            ? path.join(process.resourcesPath, "assets/icons/win/icon.ico")
+            : path.resolve(app.getAppPath(), "assets/icons/win/icon.ico");
+        } else {
+          return app.isPackaged
+            ? path.join(process.resourcesPath, "icon.png")
+            : path.resolve(app.getAppPath(), "assets/icon.png");
         }
-
-        // Disguise mode icons
-        let iconName = "terminal.png";
-        if (mode === 'settings') iconName = "settings.png";
-        if (mode === 'activity') iconName = "activity.png";
-
-        const platformDir = isWin ? "win" : "mac";
-        return app.isPackaged
-          ? path.join(process.resourcesPath, `assets/fakeicon/${platformDir}/${iconName}`)
-          : path.resolve(app.getAppPath(), `assets/fakeicon/${platformDir}/${iconName}`);
       })()
     }
 

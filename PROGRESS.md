@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: process disguise removed, step X1 (branch `remove-disguise`, uncommitted)
+
+- Removed runtime disguise functions/timers, state, IPC/preload/types, General card/query, six fake icons and demo cycling; README feature text now only says to hide the window from screen-sharing. Lifecycle owns the guarded Pika name and default Windows AUMID. Stored `disguiseMode` and unknown settings survive unrelated saves; protection and all later-step behavior stay unchanged.
+- Tests failed first for remaining exports, Terminal startup identity/title/key reads, terminal AUMID and the three General labels; the unknown-key round trip already passed. Final checks: both typechecks, lint (900 warnings, no errors) and full tap (5017 assertions) exit 0. Mutation tool unavailable; no app, provider, packaged build, Windows or demo command ran.
+- Owner: A1 update an old Terminal profile and check dock/menu/Cmd-Tab/Activity Monitor/window identity; A2 dock icon; A3 meetings/settings/keys/overlay size/agent files; A4 General; Windows name/icon/pin grouping if available. Demo outputs and README media links are unchanged pending the owner's unlink-or-accept-stale choice. `AGENTS.md` was absent here, so the main checkout's copy was read. Found, not changed: SettingsManager now uses `configPaths`, not the design's assumed `userData`. Next: X2 `remove-helper-rename`.
+
 ## 2026-10-28: document rows, step K5b2 (branch `document-rows`, PR #81)
 
 - Four `knowledge:*` channels list, import, remove and re-index an imported document. The import handler opens the file dialog itself (`.docx` only on macOS); a cancelled dialog is a normal reply. A non-integer, a missing id and an id that is not an imported document are refused with "That document is not in Pika."
