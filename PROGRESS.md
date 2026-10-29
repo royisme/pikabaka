@@ -2,6 +2,23 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: material import design addendum, step K5b (branch `import-design`, uncommitted)
+
+- The design addendum is written and awaiting the owner's review. It is `docs/design-knowledge.md`, section "K5b: material import". It covers:
+  - a `material` value in the existing `doc_type` column (no migration);
+  - `.txt` and `.md` everywhere and `.docx` on macOS; PDF is not offered, because `pdftotext` is not bundled;
+  - caps of 20 MB, 200,000 characters and 1,000 passages; identical text is refused;
+  - an import dialog that the main process opens itself, with states in words;
+  - four new `knowledge:*` channels;
+  - a Documents block on the Sources page;
+  - documents in `search_materials`, plus a deferrable neutral quick-answer block;
+  - a one-transaction Remove across every vector dimension;
+  - a plan in three PRs (K5b1 to K5b3).
+- Four questions are open for the owner: the unused `pdf-parse` and `mammoth` dependencies; a downgrade to v2.4.0 reading documents (its interceptor has no type filter); deleted text left in free SQLite pages; and the parser-message assertion.
+- Docs only. No code was changed and no check was run. The `textutil -stdout` conversion was tried once on macOS with an invented file.
+
+## 2026-10-28: custom headers editor, step S5b (branch `headers-editor`, uncommitted)
+
 ## 2026-10-28: owner acceptance checklist before track X
 
 Everything below is merged (PRs #56 to #77) except K5b. None of it was run in the real app by the agent; automated checks (tsc, eslint, tap, a mutation pass on changed logic) are green on `main`. The checks need real accounts, devices and eyes, so they are yours.
