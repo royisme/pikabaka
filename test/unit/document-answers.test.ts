@@ -225,3 +225,20 @@ for (const native of [false, true]) {
         t.same(f.embedded, []);
     });
 }
+
+t.test('the document block is prepared only with a question, the Materials switch, an embedder and document vectors', async t => {
+    const f = setup(t, false, false);
+    t.equal(f.orchestrator.prepareDocumentContext(question), null, 'no document vectors yet');
+    await f.add(DocType.NOTES, 'notes.txt', ['Invented note about the blue cabinet inventory.']);
+    t.equal(f.orchestrator.prepareDocumentContext(question), null, 'note vectors alone are not document vectors');
+    await f.add(DocType.MATERIAL, 'inventory.md', [documentText]);
+    const ready = f.orchestrator.prepareDocumentContext(question);
+    t.ok(ready, 'a question, the switch, an embedder and document vectors give a block');
+    t.match(await ready!.contextBlock, header);
+    t.equal(f.orchestrator.prepareDocumentContext(''), null, 'an empty question');
+    f.switches.set('answerUsesMaterials', false);
+    t.equal(f.orchestrator.prepareDocumentContext(question), null, 'the Materials switch off');
+    f.switches.set('answerUsesMaterials', true);
+    Reflect.set(f.orchestrator, 'embedQueryFn', null);
+    t.equal(f.orchestrator.prepareDocumentContext(question), null, 'no embedder');
+});
