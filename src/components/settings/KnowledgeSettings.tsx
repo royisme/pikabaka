@@ -7,6 +7,7 @@ import { useKnowledgeMode } from '../../hooks/useKnowledgeMode';
 import { ProfileVisualizer } from '../knowledge/ProfileVisualizer';
 import { JDListManager } from '../knowledge/JDListManager';
 import NotesSettings from './NotesSettings';
+import ImportedDocuments from './ImportedDocuments';
 import AnswerSourcesSettings from './AnswerSourcesSettings';
 import SearchIndexSettings from './SearchIndexSettings';
 
@@ -128,6 +129,7 @@ const KnowledgeSettings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                 </div>
                             )}
                             {removeNotes.error ? <p role="alert" className="text-xs text-text-primary">✕ {String(removeNotes.error instanceof Error ? removeNotes.error.message : removeNotes.error)}</p> : null}
+                            <ImportedDocuments />
                         </div>
                     </div>
                     {editingNotes && <NotesSettings />}

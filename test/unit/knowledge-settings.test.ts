@@ -1,9 +1,18 @@
 import t from 'tap';
+import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { QueryClient, QueryClientProvider } from 'react-query';
+import { MutationObserver, QueryClient, QueryClientProvider, QueryObserver, setLogger } from 'react-query';
+import * as ReactQuery from 'react-query';
+import type { UseMutationOptions } from 'react-query';
+import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 import KnowledgeSettings from '../../src/components/settings/KnowledgeSettings';
-import type { NotesIndexStatus } from '../../electron/knowledge/types';
+import ImportedDocuments from '../../src/components/settings/ImportedDocuments';
+import type { ImportedDocument, NotesIndexStatus } from '../../electron/knowledge/types';
+
+const noop = () => {};
+setLogger({ log: noop, warn: noop, error: noop });
+t.teardown(() => setLogger(console));
 
 function renderSources(client: QueryClient) {
     const html = renderToStaticMarkup(React.createElement(
@@ -111,14 +120,337 @@ t.test('Sources shows one Use when answering row per kind, with the reply state 
     t.match(html, 'Use when answering');
     t.equal((html.match(/role="switch"/g) ?? []).length, 3);
     t.match(html, 'Past meetings');
-    t.match(html, 'Materials (notes)');
+    t.match(html, 'Materials (notes and documents)');
     t.match(html, 'Interview profile');
     t.match(html, 'Pika may search your recorded meetings when you ask a question.');
-    t.match(html, 'Pika may search your notes when you ask a question. Off until you turn it on.');
+    t.match(html, 'Pika may search your notes and imported documents when you ask a question. Off until you turn it on.');
     t.match(html, 'Interview practice answers may use your resume and target roles. Off until you turn it on.');
     t.match(html, '● On');
     t.match(html, '○ Off');
     t.match(html, 'bg-bg-component');
     t.notMatch(html, 'animate-spin');
     t.end();
+});
+
+const documentImportedAt = '2026-10-28T09:15:00.000Z';
+const documentIndexedAt = '2026-10-28T14:02:00.000Z';
+const importedDate = new Date(documentImportedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+function importedDocument(overrides: Partial<ImportedDocument> = {}): ImportedDocument {
+    return {
+        id: 4,
+        name: 'quarterly-planning.md',
+        kind: 'md',
+        importedAt: documentImportedAt,
+        passages: 42,
+        state: 'indexed',
+        provider: 'example:amber',
+        dimensions: 3,
+        indexedAt: documentIndexedAt,
+        error: null,
+        ...overrides,
+    };
+}
+
+function documentsClient(documents: ImportedDocument[], materials = false) {
+    const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
+    client.setQueryData(['knowledge-documents'], documents);
+    client.setQueryData(['answer-sources'], { meetings: true, materials, profile: false });
+    return client;
+}
+
+function renderDocuments(client: QueryClient, platform: NodeJS.Platform = 'darwin') {
+    const previous = globalThis.window;
+    const sharedWindow = (globalThis.window ?? {}) as { electronAPI?: { platform: NodeJS.Platform } };
+    const previousApi = sharedWindow.electronAPI;
+    sharedWindow.electronAPI = { platform };
+    globalThis.window = sharedWindow as unknown as Window & typeof globalThis;
+    try {
+        return renderToStaticMarkup(React.createElement(
+            QueryClientProvider,
+            { client },
+            React.createElement(ImportedDocuments)
+        ));
+    } finally {
+        sharedWindow.electronAPI = previousApi;
+        globalThis.window = previous;
+        client.clear();
+    }
+}
+
+t.test('an indexed document row shows the name, kind, imported date, passages and the state in words plus a mark', t => {
+    const html = renderDocuments(documentsClient([importedDocument()], true));
+    t.match(html, 'quarterly-planning.md');
+    t.match(html, `Markdown · ${importedDate} · 42 passages`);
+    t.match(html, '✓ Indexed');
+    t.match(html, 'example:amber');
+    t.match(html, '3 dimensions');
+    t.match(html, new Date(documentIndexedAt).toLocaleString());
+    t.match(html, '>Remove</button>');
+    t.notMatch(html, '>Re-index</button>', 'an indexed row has nothing to re-index');
+    t.notMatch(html, 'Not used when answering', 'the Materials switch is off only when the reply says so');
+    t.notMatch(html, 'animate-spin');
+    t.end();
+});
+
+t.test('a needs-re-index row says what changed and offers Re-index', t => {
+    const html = renderDocuments(documentsClient([importedDocument({ state: 'needs-reindex' })]));
+    t.match(html, '▲ Needs re-index: the search model changed. Not searched until re-indexed.');
+    t.match(html, '>Re-index</button>');
+    t.match(html, '>Remove</button>');
+    t.notMatch(html, '✓ Indexed');
+    t.end();
+});
+
+t.test('a failed re-index says the earlier index is still searched, with its time', t => {
+    const html = renderDocuments(documentsClient([importedDocument({ state: 'failed', error: 'Synthetic quota refused' })]));
+    t.match(html, `▲ Re-index failed: Synthetic quota refused. Still searched with the index from ${new Date(documentIndexedAt).toLocaleString()}.`);
+    t.match(html, '>Re-index</button>');
+    t.end();
+});
+
+t.test('a failed first index shows the first line of the real error and offers Re-index', t => {
+    const html = renderDocuments(documentsClient([importedDocument({
+        name: 'vendor-contract-summary.docx',
+        kind: 'docx',
+        state: 'failed',
+        provider: null,
+        dimensions: null,
+        indexedAt: null,
+        error: 'Embedding provider not initialized\nat synthetic stack line',
+    })]));
+    t.match(html, 'vendor-contract-summary.docx');
+    t.match(html, `Word document · ${importedDate} · 42 passages`);
+    t.match(html, '✕ Not indexed: Embedding provider not initialized');
+    t.notMatch(html, 'synthetic stack line', 'only the first line of the error is shown');
+    t.match(html, '>Re-index</button>');
+    t.end();
+});
+
+t.test('a stopped index reads Not indexed and a running one reads Indexing with its passage count', t => {
+    const stopped = renderDocuments(documentsClient([importedDocument({ state: 'not-indexed', provider: null, dimensions: null, indexedAt: null })]));
+    t.match(stopped, '○ Not indexed: indexing stopped before it finished.');
+    t.match(stopped, '>Re-index</button>');
+
+    const running = renderDocuments(documentsClient([importedDocument({ kind: 'txt', name: 'meeting-agenda.txt', state: 'indexing', provider: null, dimensions: null, indexedAt: null, passages: 120 })]));
+    t.match(running, `Text · ${importedDate} · 120 passages`);
+    t.match(running, '● Indexing 120 passages');
+    t.notMatch(running, '>Re-index</button>', 'a running index cannot be started again');
+    t.match(running, '>Remove</button>');
+    t.end();
+});
+
+t.test('the empty line names only the formats this platform can read', t => {
+    const mac = renderDocuments(documentsClient([]), 'darwin');
+    t.match(mac, 'No documents yet. Import a .txt, .md or .docx file for Pika to search.');
+    const windows = renderDocuments(documentsClient([]), 'win32');
+    t.match(windows, 'No documents yet. Import a .txt or .md file for Pika to search.');
+    t.notMatch(windows, '.docx');
+    t.end();
+});
+
+t.test('the Materials-off line appears only when documents exist and the switch is off', t => {
+    const off = renderDocuments(documentsClient([importedDocument()], false));
+    t.match(off, 'Not used when answering: Materials is off under Use when answering.');
+    const on = renderDocuments(documentsClient([importedDocument()], true));
+    t.notMatch(on, 'Not used when answering');
+    const empty = renderDocuments(documentsClient([], false));
+    t.match(empty, 'No documents yet.');
+    t.notMatch(empty, 'Not used when answering', 'nothing is claimed off for an empty list');
+    t.end();
+});
+
+t.test('a failed list shows its real error instead of the empty line', t => {
+    const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
+    client.setQueryData(['answer-sources'], { meetings: true, materials: true, profile: false });
+    client.getQueryCache().build(client, { queryKey: ['knowledge-documents'] }).setState({
+        status: 'error', error: new Error('Synthetic document listing unavailable'),
+    });
+    const html = renderDocuments(client);
+    t.match(html, '✕ Synthetic document listing unavailable');
+    t.notMatch(html, 'No documents yet.');
+    t.end();
+});
+
+function documentsHost(api: Record<string, unknown>) {
+    const previous = globalThis.window;
+    const previousConfirm = globalThis.confirm;
+    const confirmed: string[] = [];
+    globalThis.confirm = (message?: string) => { confirmed.push(String(message)); return confirmed.length % 2 === 0; };
+    // mockRequire evaluates the component against the window object that already exists, so later tests reuse it.
+    const sharedWindow = (globalThis.window ?? {}) as { electronAPI?: unknown; platform?: string };
+    sharedWindow.electronAPI = api;
+    sharedWindow.platform = 'darwin';
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: sharedWindow });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, cacheTime: Infinity } } });
+    const states: unknown[] = [];
+    const queries: QueryObserver<unknown, Error>[] = [];
+    const mutations: MutationObserver<unknown, Error, unknown>[] = [];
+    const unsubscribes: Array<() => void> = [];
+    const options = new Map<string, Record<string, unknown>>();
+    let stateIndex = 0, queryIndex = 0, mutationIndex = 0;
+    const { default: Component } = mockRequire(path.resolve('src/components/settings/ImportedDocuments.tsx') + '?' + Math.random(), {
+        react: { ...React, useState: (initial: unknown) => {
+            const index = stateIndex++;
+            if (!(index in states)) states[index] = initial;
+            return [states[index], (next: unknown) => { states[index] = typeof next === 'function' ? (next as (current: unknown) => unknown)(states[index]) : next; }];
+        } },
+        'react-query': {
+            ...ReactQuery, useQueryClient: () => client,
+            useQuery: (queryKey: string[], queryFn: () => Promise<unknown>, queryOptions: Record<string, unknown> = {}) => {
+                const index = queryIndex++;
+                if (!queries[index]) {
+                    queries[index] = new QueryObserver(client, { queryKey, queryFn });
+                    unsubscribes.push(queries[index].subscribe(noop));
+                } else queries[index].setOptions({ queryKey, queryFn });
+                options.set(JSON.stringify(queryKey), queryOptions);
+                return queries[index].getCurrentResult();
+            },
+            useMutation: (mutationFn: (value: unknown) => Promise<unknown>, mutationOptions: UseMutationOptions<unknown, Error, unknown> = {}) => {
+                const index = mutationIndex++;
+                const fresh = { ...mutationOptions, mutationFn };
+                if (!mutations[index]) {
+                    mutations[index] = new MutationObserver(client, fresh);
+                    unsubscribes.push(mutations[index].subscribe(noop));
+                } else mutations[index].setOptions(fresh);
+                const observer = mutations[index];
+                return { ...observer.getCurrentResult(), reset: () => observer.reset(), mutate: (value: unknown) => { void observer.mutate(value).catch(noop); } };
+            },
+        },
+    }) as { default: () => React.ReactNode };
+    const draw = () => { stateIndex = 0; queryIndex = 0; mutationIndex = 0; return Component(); };
+    const buttons = (tree: React.ReactNode): React.ReactElement<Record<string, unknown>>[] => {
+        if (!React.isValidElement<{ children?: React.ReactNode }>(tree)) return [];
+        return [...(tree.type === 'button' ? [tree as React.ReactElement<Record<string, unknown>>] : []),
+            ...React.Children.toArray(tree.props.children).flatMap(buttons)];
+    };
+    return {
+        draw, html: () => renderToStaticMarkup(draw()),
+        button: (label: string) => buttons(draw()).find(button => button.props.children === label),
+        buttons: (label: string) => buttons(draw()).filter(button => button.props.children === label),
+        click: (label: string) => {
+            const button = buttons(draw()).find(candidate => candidate.props.children === label);
+            if (!button) throw new Error(`Missing button: ${label}`);
+            (button.props.onClick as () => void)();
+        },
+        queryOptions: (key: string[]) => options.get(JSON.stringify(key)) ?? {},
+        confirmed,
+        settle: async () => { for (let i = 0; i < 4; i++) await new Promise(resolve => setImmediate(resolve)); },
+        close: () => {
+            unsubscribes.forEach(unsubscribe => unsubscribe()); queries.forEach(query => query.destroy());
+            client.clear();
+            globalThis.confirm = previousConfirm;
+            Object.defineProperty(globalThis, 'window', { configurable: true, value: previous });
+        },
+    };
+}
+
+t.test('Remove asks first and sends nothing when the user cancels, then refetches the list once confirmed', async t => {
+    const calls = { list: 0, remove: [] as number[] };
+    const page = documentsHost({
+        knowledgeListDocuments: async () => { calls.list++; return { success: true, documents: [importedDocument()] }; },
+        getAnswerSources: async () => ({ meetings: true, materials: true, profile: false }),
+        knowledgeRemoveDocument: async (id: number) => { calls.remove.push(id); return { success: true }; },
+    });
+    t.teardown(page.close);
+    page.draw(); await page.settle();
+    t.equal(calls.list, 1);
+
+    page.click('Remove'); await page.settle();
+    t.same(page.confirmed, ['Remove quarterly-planning.md?']);
+    t.same(calls.remove, [], 'a cancelled confirmation sends nothing');
+    t.equal(calls.list, 1);
+
+    page.click('Remove'); await page.settle();
+    t.same(calls.remove, [4]);
+    t.equal(calls.list, 2, 'the list refetches after Remove');
+});
+
+t.test('a failed import shows the real message and leaves the list unchanged', async t => {
+    const calls = { list: 0, import: 0 };
+    const page = documentsHost({
+        knowledgeListDocuments: async () => { calls.list++; return { success: true, documents: [importedDocument()] }; },
+        getAnswerSources: async () => ({ meetings: true, materials: true, profile: false }),
+        knowledgeImportDocument: async () => { calls.import++; return { success: false, error: 'This document has no text Pika can read.' }; },
+    });
+    t.teardown(page.close);
+    page.draw(); await page.settle();
+    const button = page.button('Import a document');
+    t.comment(`import button disabled=${String(button?.props.disabled)} loading=${String(button === undefined)}`);
+    page.click('Import a document'); await page.settle();
+    t.comment(`import calls=${calls.import} list calls=${calls.list}`);
+    t.equal(calls.import, 1);
+    t.match(page.html(), '✕ This document has no text Pika can read.');
+    t.equal(calls.list, 1, 'a refused import does not refetch an unchanged list');
+    t.match(page.html(), 'quarterly-planning.md');
+});
+
+t.test('a cancelled import is not an error and a successful one refetches the list', async t => {
+    let list = 0;
+    let next: { cancelled: true } | { success: true; document: ImportedDocument } = { cancelled: true };
+    const page = documentsHost({
+        knowledgeListDocuments: async () => { list++; return { success: true, documents: [] }; },
+        getAnswerSources: async () => ({ meetings: true, materials: true, profile: false }),
+        knowledgeImportDocument: async () => next,
+    });
+    t.teardown(page.close);
+    page.draw(); await page.settle();
+    page.click('Import a document'); await page.settle();
+    t.match(page.html(), 'No documents yet.');
+    t.notMatch(page.html(), '✕');
+
+    next = { success: true, document: importedDocument() };
+    page.click('Import a document'); await page.settle();
+    t.equal(list, 2, 'the list refetches after a successful import');
+});
+
+t.test('Re-index sends the row id and refetches, and only the listed states offer it', async t => {
+    const reindexed: number[] = [];
+    const page = documentsHost({
+        knowledgeListDocuments: async () => ({ success: true, documents: [
+            importedDocument({ id: 7, name: 'agenda.txt', kind: 'txt', state: 'not-indexed', provider: null, dimensions: null, indexedAt: null }),
+            importedDocument({ id: 8, name: 'planning.md' }),
+        ] }),
+        getAnswerSources: async () => ({ meetings: true, materials: true, profile: false }),
+        knowledgeReindexDocument: async (id: number) => { reindexed.push(id); return { success: true }; },
+    });
+    t.teardown(page.close);
+    page.draw(); await page.settle();
+    t.equal(page.buttons('Re-index').length, 1, 'only the not-indexed row offers Re-index');
+    page.click('Re-index'); await page.settle();
+    t.same(reindexed, [7]);
+});
+
+t.test('the list polls every two seconds only while a document is indexing', async t => {
+    const page = documentsHost({
+        knowledgeListDocuments: async () => ({ success: true, documents: [importedDocument({ state: 'indexing', provider: null, dimensions: null, indexedAt: null })] }),
+        getAnswerSources: async () => ({ meetings: true, materials: true, profile: false }),
+    });
+    t.teardown(page.close);
+    page.draw(); await page.settle();
+    const interval = page.queryOptions(['knowledge-documents']).refetchInterval as (data?: ImportedDocument[]) => number | false;
+    t.equal(typeof interval, 'function', 'the polling rule is given to react-query');
+    t.equal(interval([importedDocument({ state: 'indexing', provider: null, dimensions: null, indexedAt: null })]), 2000);
+    t.equal(interval([importedDocument({ state: 'indexed' }), importedDocument({ id: 5, state: 'failed', error: 'Synthetic quota refused' })]), false, 'polling stops when nothing is indexing');
+});
+
+t.test('preload forwards the four document channels and their ids', async t => {
+    let api!: Pick<Window['electronAPI'], 'knowledgeListDocuments' | 'knowledgeImportDocument' | 'knowledgeRemoveDocument' | 'knowledgeReindexDocument'>;
+    const calls: unknown[][] = [];
+    mockRequire(path.resolve('electron/preload.ts'), {
+        electron: {
+            contextBridge: { exposeInMainWorld: (_name: string, exposed: typeof api) => { api = exposed; } },
+            ipcRenderer: { invoke: async (...args: unknown[]) => { calls.push(args); return { success: true, documents: [] }; } },
+        },
+    });
+    await api.knowledgeListDocuments();
+    await api.knowledgeImportDocument();
+    await api.knowledgeRemoveDocument(11);
+    await api.knowledgeReindexDocument(12);
+    t.same(calls, [
+        ['knowledge:list-documents'],
+        ['knowledge:import-document'],
+        ['knowledge:remove-document', 11],
+        ['knowledge:reindex-document', 12],
+    ]);
 });

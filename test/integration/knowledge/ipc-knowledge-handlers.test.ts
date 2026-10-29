@@ -267,3 +267,109 @@ t.test('profile:research-company uses credentials and active JD context from the
     false,
   ]);
 });
+
+// An invented material row; every field is synthetic and no file or store is read.
+const importedDocument = {
+  id: 4,
+  name: 'quarterly-planning.md',
+  kind: 'md' as const,
+  importedAt: '2026-10-28T09:15:00.000Z',
+  passages: 42,
+  state: 'indexed' as const,
+  provider: 'example:amber',
+  dimensions: 3,
+  indexedAt: '2026-10-28T09:16:00.000Z',
+  error: null,
+};
+
+t.test('knowledge:list-documents returns the material rows with ISO dates, or the real error', async t => {
+  const harness = loadRegisterKnowledgeHandlers({ orchestrator: { listDocuments: () => [importedDocument] } });
+  const result = await harness.invoke('knowledge:list-documents');
+  t.same(result, { success: true, documents: [importedDocument] });
+  t.equal(new Date(result.documents[0].importedAt).toISOString(), importedDocument.importedAt, 'the imported date is an ISO 8601 instant');
+  t.equal(new Date(result.documents[0].indexedAt).toISOString(), importedDocument.indexedAt, 'the indexed date is an ISO 8601 instant');
+
+  const failing = loadRegisterKnowledgeHandlers({ orchestrator: { listDocuments: () => { throw new Error('Synthetic document listing unavailable'); } } });
+  t.same(await failing.invoke('knowledge:list-documents'), { success: false, error: 'Synthetic document listing unavailable' });
+
+  const missing = loadRegisterKnowledgeHandlers({ orchestrator: null });
+  const reply = await missing.invoke('knowledge:list-documents');
+  t.equal(reply.success, false, 'a missing engine is a failure, never an empty list');
+  t.match(reply.error, /Knowledge engine not initialized/);
+});
+
+t.test('knowledge:import-document opens the dialog itself, ignores any renderer path, and answers cancel, success and failure', async t => {
+  const opened: Array<Record<string, any>> = [];
+  const imported: string[] = [];
+  const harness = loadRegisterKnowledgeHandlers({
+    showOpenDialog: async (options: any) => {
+      opened.push(options);
+      return { canceled: false, filePaths: ['/tmp/invented-materials/quarterly-planning.md'] };
+    },
+    orchestrator: { importDocument: async (filePath: string) => { imported.push(filePath); return importedDocument; } },
+  });
+
+  t.same(await harness.invoke('knowledge:import-document', '/etc/hosts'), { success: true, document: importedDocument });
+  t.same(imported, ['/tmp/invented-materials/quarterly-planning.md'], 'the renderer path is never read');
+  t.same(opened[0].properties, ['openFile'], 'one file, no folder and no multi-selection');
+  t.ok(opened[0].filters[0].extensions.includes('txt'));
+  t.ok(opened[0].filters[0].extensions.includes('md'));
+
+  let attempted = 0;
+  const cancelled = loadRegisterKnowledgeHandlers({
+    showOpenDialog: async () => ({ canceled: true, filePaths: [] }),
+    orchestrator: { importDocument: async () => { attempted++; return importedDocument; } },
+  });
+  t.same(await cancelled.invoke('knowledge:import-document'), { cancelled: true }, 'a cancelled dialog is a normal reply');
+  t.equal(attempted, 0);
+
+  const refused = loadRegisterKnowledgeHandlers({
+    showOpenDialog: async () => ({ canceled: false, filePaths: ['/tmp/invented-materials/scan.pdf'] }),
+    orchestrator: { importDocument: async () => { throw new Error('This document has no text Pika can read.'); } },
+  });
+  t.same(await refused.invoke('knowledge:import-document'), { success: false, error: 'This document has no text Pika can read.' });
+});
+
+t.test('remove and re-index refuse a non-integer, a missing id and a non-material id, and carry the real failure', async t => {
+  const removed: number[] = [];
+  const reindexed: number[] = [];
+  const orchestrator = {
+    listDocuments: () => [importedDocument],
+    removeDocument: (docId: number) => {
+      if (docId === 4) throw new Error('Synthetic removal refused');
+      removed.push(docId);
+    },
+    reindexDocument: (docId: number) => {
+      if (docId === 4) throw new Error('That document is already indexing.');
+      reindexed.push(docId);
+    },
+  } as Partial<KnowledgeOrchestrator>;
+
+  const harness = loadRegisterKnowledgeHandlers({ orchestrator });
+  for (const bad of ['4', 4.5, NaN, null, undefined]) {
+    t.same(await harness.invoke('knowledge:remove-document', bad), { success: false, error: 'That document is not in Pika.' }, `${String(bad)} is refused`);
+    t.same(await harness.invoke('knowledge:reindex-document', bad), { success: false, error: 'That document is not in Pika.' }, `${String(bad)} is refused`);
+  }
+  t.same(await harness.invoke('knowledge:remove-document', 99), { success: false, error: 'That document is not in Pika.' }, 'an id that is not an imported document, such as a JD, is refused');
+  t.same(await harness.invoke('knowledge:reindex-document', 99), { success: false, error: 'That document is not in Pika.' });
+  t.same(removed, []);
+  t.same(reindexed, []);
+
+  t.same(await harness.invoke('knowledge:remove-document', 4), { success: false, error: 'Synthetic removal refused' });
+  t.same(await harness.invoke('knowledge:reindex-document', 4), { success: false, error: 'That document is already indexing.' });
+});
+
+t.test('remove and re-index forward a valid imported-document id', async t => {
+  const removed: number[] = [];
+  const reindexed: number[] = [];
+  const harness = loadRegisterKnowledgeHandlers({ orchestrator: {
+    listDocuments: () => [importedDocument],
+    removeDocument: (docId: number) => { removed.push(docId); },
+    reindexDocument: (docId: number) => { reindexed.push(docId); },
+  } });
+
+  t.same(await harness.invoke('knowledge:remove-document', 4), { success: true });
+  t.same(await harness.invoke('knowledge:reindex-document', 4), { success: true });
+  t.same(removed, [4]);
+  t.same(reindexed, [4]);
+});

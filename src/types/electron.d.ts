@@ -1,4 +1,4 @@
-import type { NotesIndexStatus } from '../../electron/knowledge/types'
+import type { ImportedDocument, NotesIndexStatus } from '../../electron/knowledge/types'
 import type { CredentialStorageStatus } from '../../electron/services/CredentialsManager'
 
 export interface AgentGateDecision {
@@ -340,6 +340,10 @@ export interface ElectronAPI {
   knowledgeUploadJD: (filePath: string) => Promise<{ success: boolean; error?: string }>
   knowledgeUpdateProfile: (updates: any) => Promise<{ success: boolean; error?: string }>
   knowledgeGeneratePrep: (jdId?: number) => Promise<{ success: boolean; data?: any; error?: string }>
+  knowledgeListDocuments: () => Promise<{ success: true; documents: ImportedDocument[] } | { success: false; error: string }>
+  knowledgeImportDocument: () => Promise<{ cancelled: true } | { success: true; document: ImportedDocument } | { success: false; error: string }>
+  knowledgeRemoveDocument: (id: number) => Promise<{ success: boolean; error?: string }>
+  knowledgeReindexDocument: (id: number) => Promise<{ success: boolean; error?: string }>
 
   // Tavily Search API
   setTavilyApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
