@@ -1,7 +1,7 @@
 import type { ConnectionType, ConnectionView } from '../services/aiConnections'
 import type { HeaderEdit, HeaderState } from '../services/connectionHeaders'
 import type { KeybindStatus, KeybindResult } from '../services/KeybindManager'
-import type { NotesIndexStatus } from '../knowledge/types'
+import type { ImportedDocument, NotesIndexStatus } from '../knowledge/types'
 import type { CredentialStorageStatus } from '../services/CredentialsManager'
 
 export interface ElectronAPI {
@@ -241,6 +241,10 @@ export interface ElectronAPI {
   profileGenerateNegotiation: (force?: boolean) => Promise<{ success: boolean; script?: any; error?: string }>;
   profileGetNegotiationState: () => Promise<{ success: boolean; state?: any; isActive?: boolean; error?: string }>;
   profileResetNegotiation: () => Promise<{ success: boolean; error?: string }>;
+  knowledgeListDocuments: () => Promise<{ success: true; documents: ImportedDocument[] } | { success: false; error: string }>;
+  knowledgeImportDocument: () => Promise<{ cancelled: true } | { success: true; document: ImportedDocument } | { success: false; error: string }>;
+  knowledgeRemoveDocument: (id: number) => Promise<{ success: boolean; error?: string }>;
+  knowledgeReindexDocument: (id: number) => Promise<{ success: boolean; error?: string }>;
 
   // Tavily Search API
   setTavilyApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>;

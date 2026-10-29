@@ -123,14 +123,14 @@ t.test('the Sources rows show the backend reply, not hard-coded defaults', t => 
     const switches = f.switches();
     t.equal(switches.length, 3);
     t.same(switches.map(element => element.props['aria-label']), [
-        'Use Past meetings when answering', 'Use Materials (notes) when answering', 'Use Interview profile when answering',
+        'Use Past meetings when answering', 'Use Materials (notes and documents) when answering', 'Use Interview profile when answering',
     ]);
     t.same(switches.map(element => element.props['aria-checked']), [false, true, true]);
     const html = f.html();
     for (const words of [
-        'Use when answering', 'Past meetings', 'Materials (notes)', 'Interview profile',
+        'Use when answering', 'Past meetings', 'Materials (notes and documents)', 'Interview profile',
         'Pika may search your recorded meetings when you ask a question.',
-        'Pika may search your notes when you ask a question. Off until you turn it on.',
+        'Pika may search your notes and imported documents when you ask a question. Off until you turn it on.',
         'Interview practice answers may use your resume and target roles. Off until you turn it on.',
     ]) t.match(html, words);
     t.same(sent, [], 'rendering sends nothing');
@@ -160,8 +160,8 @@ t.test('toggling sends exactly the changed key and shows the new state after the
         setAnswerSources: async (input: unknown) => { sent.push(input); return { success: true }; },
     });
     f.loaded({ meetings: true, materials: false, profile: false });
-    t.equal(String(f.toggle('Use Materials (notes) when answering').props.children), '○ Off');
-    f.click('Use Materials (notes) when answering');
+    t.equal(String(f.toggle('Use Materials (notes and documents) when answering').props.children), '○ Off');
+    f.click('Use Materials (notes and documents) when answering');
     await f.settle();
     t.same(sent, [{ materials: true }]);
     t.notMatch(f.html(), 'Could not save');

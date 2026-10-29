@@ -7,7 +7,7 @@ type AnswerSources = { meetings: boolean; materials: boolean; profile: boolean }
 
 const ROWS: Array<{ key: keyof AnswerSources; label: string; sentence: string }> = [
     { key: 'meetings', label: 'Past meetings', sentence: 'Pika may search your recorded meetings when you ask a question.' },
-    { key: 'materials', label: 'Materials (notes)', sentence: 'Pika may search your notes when you ask a question. Off until you turn it on.' },
+    { key: 'materials', label: 'Materials (notes and documents)', sentence: 'Pika may search your notes and imported documents when you ask a question. Off until you turn it on.' },
     { key: 'profile', label: 'Interview profile', sentence: 'Interview practice answers may use your resume and target roles. Off until you turn it on.' },
 ];
 

@@ -2,7 +2,7 @@ import { dialog } from "electron"
 
 import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
-import { DocType } from "../knowledge/types"
+import { DocType, ImportedDocument } from "../knowledge/types"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { getAnswerSources, SettingsManager } from "../services/SettingsManager"
 
@@ -358,6 +358,71 @@ export function registerKnowledgeHandlers(appState: AppState): void {
       return { success: true, data: prepData };
     } catch (error: any) {
       console.error('[IPC] knowledge:generate-prep error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // ==========================================
+  // Imported documents
+  // ==========================================
+
+  const documents = () => {
+    const orchestrator = appState.getKnowledgeOrchestrator();
+    if (!orchestrator) throw new Error('Knowledge engine not initialized. Please ensure API keys are configured.');
+    return orchestrator;
+  };
+
+  // A material id is an integer whose row the list reports. The orchestrator repeats the check against the stored type.
+  const materialId = (id: unknown): number | null => {
+    const orchestrator = appState.getKnowledgeOrchestrator();
+    if (typeof id !== 'number' || !Number.isInteger(id) || !orchestrator?.listDocuments().some((doc: ImportedDocument) => doc.id === id)) return null;
+    return id;
+  };
+
+  safeHandle("knowledge:list-documents", async () => {
+    try {
+      return { success: true, documents: documents().listDocuments() };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // The dialog opens here so the renderer never sends a path. A cancelled dialog is a normal reply, not an error.
+  safeHandle("knowledge:import-document", async () => {
+    try {
+      const orchestrator = documents();
+      const result = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        filters: [{
+          name: 'Documents',
+          extensions: process.platform === 'darwin' ? ['txt', 'md', 'docx'] : ['txt', 'md'],
+        }],
+      });
+      if (result.canceled || result.filePaths.length === 0) return { cancelled: true };
+      return { success: true, document: await orchestrator.importDocument(result.filePaths[0]) };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  safeHandle("knowledge:remove-document", async (_, id: unknown) => {
+    try {
+      const docId = materialId(id);
+      if (docId === null) return { success: false, error: 'That document is not in Pika.' };
+      documents().removeDocument(docId);
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  safeHandle("knowledge:reindex-document", async (_, id: unknown) => {
+    try {
+      const docId = materialId(id);
+      if (docId === null) return { success: false, error: 'That document is not in Pika.' };
+      documents().reindexDocument(docId);
+      return { success: true };
+    } catch (error: any) {
       return { success: false, error: error.message };
     }
   });

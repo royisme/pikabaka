@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: document rows, step K5b2 (branch `document-rows`, uncommitted)
+
+- Four `knowledge:*` channels list, import, remove and re-index an imported document. The import handler opens the file dialog itself (`.docx` only on macOS); a cancelled dialog is a normal reply. A non-integer, a missing id and an id that is not an imported document are refused with "That document is not in Pika."
+- Sources shows a Documents block under Notes: name, kind, date, passages, and each state in words plus a mark. Re-index is only on needs-re-index, failed and not-indexed rows. Remove asks first. The list refetches every 2 s while a row is indexing, and a model save refreshes it. The Materials switch and the Search index sentence now name imported documents.
+- Tests failed first because the channels and `ImportedDocuments` did not exist. Handler fakes and a fake `window.electronAPI` cover the reply shapes, a refused import, confirmation, and polling. Both typechecks, lint and the full tap run are recorded in the step report. Owner: both themes, 560px with a long name and a long error, keyboard and focus, a real import, Remove and Re-index, a model switch then Re-index, a restart during indexing, and a Windows dialog that does not offer `.docx`. No app, real provider or Windows ran. Next: K5b3.
+
 ## 2026-10-28: material import backend, step K5b1 (branch `material-import`, uncommitted)
 
 - Material imports coexist without an LLM or migration. Async parsing supports text/Markdown and macOS DOCX through stdout; material imports refuse PDF. Limits and identical-text refusals store nothing. Main-process list/status, atomic all-dimension Remove and stored-passage Re-index are implemented; no IPC, preload, UI or settings change.
