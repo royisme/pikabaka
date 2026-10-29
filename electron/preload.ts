@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron"
 import type { KeybindStatus, KeybindResult } from './services/KeybindManager'
 import type { ImportedDocument, NotesIndexStatus } from './knowledge/types'
 import type { CredentialStorageStatus } from './services/CredentialsManager'
+import type { PromptsEdit, PromptsReply } from './llm/prompts'
 
 type PreloadAgentEvent = { meetingId: string } & (
   | { type: 'run_started' | 'run_settled' }
@@ -140,6 +141,8 @@ interface ElectronAPI {
   getSttLanguage: (speaker?: 'them' | 'user') => Promise<string>
   getAiResponseLanguage: () => Promise<string>
   getAnswerStyle: () => Promise<string>
+  getPrompts: () => Promise<PromptsReply>
+  setPrompts: (edit: PromptsEdit) => Promise<{ success: boolean; error?: string }>
   getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean; profile: boolean }>
   setAnswerSources: (sources: { meetings?: boolean; materials?: boolean; profile?: boolean }) => Promise<{ success: boolean; error?: string }>
   profileGetNotes: () => Promise<string>
@@ -682,6 +685,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getSttLanguage: (speaker?: 'them' | 'user') => ipcRenderer.invoke("get-stt-language", speaker),
   getAiResponseLanguage: () => ipcRenderer.invoke("get-ai-response-language"),
   getAnswerStyle: () => ipcRenderer.invoke("get-answer-style"),
+  getPrompts: () => ipcRenderer.invoke("prompts:get"),
+  setPrompts: (edit: PromptsEdit) => ipcRenderer.invoke("prompts:set", edit),
   getAnswerSources: () => ipcRenderer.invoke("answer-sources:get"),
   setAnswerSources: (sources: { meetings?: boolean; materials?: boolean; profile?: boolean }) => ipcRenderer.invoke("answer-sources:set", sources),
   profileGetNotes: () => ipcRenderer.invoke("profile:get-notes"),

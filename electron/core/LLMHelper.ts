@@ -2,7 +2,7 @@ import { GoogleGenAI, ThinkingLevel } from "@google/genai"
 import OpenAI from "openai"
 import Anthropic from "@anthropic-ai/sdk"
 import fs from "fs"
-import { SYSTEM_PROMPT, taskPrompt } from "../llm/prompts"
+import { systemPrompt, taskPrompt } from "../llm/prompts"
 import { openAiRoot, type Connection } from '../services/aiConnections';
 import { redactConnectionError } from '../services/connectionSecrets';
 import { CredentialsManager } from '../services/CredentialsManager';
@@ -619,7 +619,7 @@ ANSWER DIRECTLY:`;
 
       const use = CredentialsManager.getInstance().resolveModelUse('chat');
       if ('error' in use) throw new Error(use.error);
-      const prompt = this.injectLanguageInstruction(SYSTEM_PROMPT);
+      const prompt = this.injectLanguageInstruction(systemPrompt());
       const userContent = context
         ? `CONTEXT:\n${context}\n\nUSER QUESTION:\n${message}`
         : message;
@@ -648,7 +648,7 @@ ANSWER DIRECTLY:`;
       : message;
     const use = CredentialsManager.getInstance().resolveModelUse('chat');
     if ('error' in use) throw new Error(use.error);
-    yield* this.streamChat(userContent, imagePaths, undefined, skipSystemPrompt ? '' : this.injectLanguageInstruction(SYSTEM_PROMPT), { signal, verbatimPrompt: true });
+    yield* this.streamChat(userContent, imagePaths, undefined, skipSystemPrompt ? '' : this.injectLanguageInstruction(systemPrompt()), { signal, verbatimPrompt: true });
   }
 
   /**
@@ -658,7 +658,7 @@ ANSWER DIRECTLY:`;
     message: string | undefined,
     imagePaths?: string[],
     context?: string,
-    systemPromptOverride?: string, // Optional override (defaults to SYSTEM_PROMPT)
+    systemPromptOverride?: string, // Optional override (defaults to the chat system prompt)
     options?: { history?: Array<{ role: 'user' | 'assistant'; content: string }>; signal?: AbortSignal; verbatimPrompt?: boolean }
   ): AsyncGenerator<string, void, unknown> {
 
@@ -712,7 +712,7 @@ ANSWER DIRECTLY:`;
     // The connection and model chosen for quick answers (Settings, Models & Agent): any host, any model id.
     const chatUse = CredentialsManager.getInstance().resolveModelUse('chat');
     if ('connection' in chatUse) {
-      yield* this.streamViaConnectionChat(chatUse.connection, chatUse.model, options?.verbatimPrompt ? systemPromptOverride ?? '' : this.injectLanguageInstruction(systemPromptOverride || SYSTEM_PROMPT), userContent, imagePaths, options?.history, options?.signal);
+      yield* this.streamViaConnectionChat(chatUse.connection, chatUse.model, options?.verbatimPrompt ? systemPromptOverride ?? '' : this.injectLanguageInstruction(systemPromptOverride || systemPrompt()), userContent, imagePaths, options?.history, options?.signal);
       return;
     }
 

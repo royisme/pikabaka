@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { getSettingsJsonPath } from './configPaths';
+import type { PromptOverrides } from '../llm/prompts';
 
 export interface AppSettings {
     // Only boot-critical or non-encrypted settings should live here.
@@ -13,6 +14,12 @@ export interface AppSettings {
     answerUsesMeetings?: boolean;
     answerUsesMaterials?: boolean;
     answerUsesProfile?: boolean;
+    /** The prompt text written in Settings; a missing key or field means the built-in text. */
+    prompts?: PromptOverrides;
+}
+
+export function getPromptOverrides(): PromptOverrides {
+    return SettingsManager.getInstance().get('prompts') ?? {};
 }
 
 export function getAnswerSources() {

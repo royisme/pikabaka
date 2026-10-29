@@ -344,7 +344,7 @@ export type TaskName =
     | 'brainstorm'
     | 'chat';
 
-const TASK_TEXT: Record<TaskName, string> = {
+export const TASK_TEXT: Record<TaskName, string> = {
     answer: ANSWER_TASK,
     whatToAnswer: WHAT_TO_ANSWER_TASK,
     recap: RECAP_TASK,
@@ -357,10 +357,68 @@ const TASK_TEXT: Record<TaskName, string> = {
     chat: CHAT_TASK,
 };
 
-/** The whole system prompt for a task: role, then the task text, then the fixed rules. */
-export function taskPrompt(task: TaskName): string {
-    return `${ROLE_PROMPT}\n\n${TASK_TEXT[task]}\n\n${CORE_RULES}`;
+/** The ten tasks, in the order the Settings list shows them. */
+export const TASK_NAMES = Object.keys(TASK_TEXT) as TaskName[];
+
+/** The most text one prompt can hold (Settings, and the IPC boundary). */
+export const PROMPT_MAX_LENGTH = 8_000;
+
+/** What the user wrote in Settings: a missing field means the built-in text. */
+export interface PromptOverrides {
+    role?: string;
+    tasks?: Partial<Record<TaskName, string>>;
 }
 
-/** The chat system prompt every provider receives. */
-export const SYSTEM_PROMPT = taskPrompt('chat');
+/** One prompt as Settings shows it: the text in force, its built-in text, and whether it is the user's. */
+export interface PromptPart {
+    text: string;
+    defaultText: string;
+    edited: boolean;
+}
+
+/** The `prompts:get` reply. `rules` and `maxLength` are the same facts the Settings screen shows. */
+export interface PromptsReply {
+    role: PromptPart;
+    tasks: Record<TaskName, PromptPart>;
+    rules: string;
+    maxLength: number;
+}
+
+/** The `prompts:set` payload: a text sets it, `null` goes back to the built-in text. */
+export interface PromptsEdit {
+    role?: string | null;
+    tasks?: Partial<Record<TaskName, string | null>>;
+}
+
+// The saved overrides are read through this one getter, so this module stays free of Electron and the
+// filesystem: the app points it at SettingsManager once at startup, tests pass overrides directly.
+let readOverrides: () => PromptOverrides = () => ({});
+
+export function setPromptOverridesSource(read: () => PromptOverrides): void {
+    readOverrides = read;
+}
+
+/** Empty and whitespace-only text is no override: it goes back to the built-in text. */
+function overrideText(text: string | undefined): string | undefined {
+    return text && text.trim() ? text : undefined;
+}
+
+/** The role text in force. */
+export function rolePrompt(overrides: PromptOverrides = readOverrides()): string {
+    return overrideText(overrides.role) ?? ROLE_PROMPT;
+}
+
+/** The text in force for one task, without the role and the rules. */
+export function taskText(task: TaskName, overrides: PromptOverrides = readOverrides()): string {
+    return overrideText(overrides.tasks?.[task]) ?? TASK_TEXT[task];
+}
+
+/** The whole system prompt for a task: role, then the task text, then the fixed rules. */
+export function taskPrompt(task: TaskName, overrides: PromptOverrides = readOverrides()): string {
+    return `${rolePrompt(overrides)}\n\n${taskText(task, overrides)}\n\n${CORE_RULES}`;
+}
+
+/** The chat system prompt every provider receives, read at each request. */
+export function systemPrompt(overrides?: PromptOverrides): string {
+    return taskPrompt('chat', overrides);
+}
