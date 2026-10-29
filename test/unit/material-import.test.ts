@@ -398,3 +398,27 @@ t.test('captured success, read-refusal and indexing-failure logs contain no sour
     for (const privateValue of [f.dir, source, name, 'missing-private.txt', text]) t.notMatch(logs, privateValue);
     t.match(f.orchestrator.listDocuments()[0].error, text, 'the real error is returned, not logged');
 });
+
+t.test('the list names the kind and reads provenance exactly: either half of a mismatch, partial provenance, a stray time', async t => {
+    const f = setup(t, true);
+    const kinds = new Map<string, string>();
+    for (const name of ['plain.txt', 'notes.md']) {
+        const doc = await f.orchestrator.importDocument(f.file(name, `${text} ${name}`));
+        kinds.set(name, doc.kind);
+    }
+    await f.idle();
+    t.same([...kinds.values()], ['txt', 'md'], 'the kind is the extension without its dot');
+    t.match(f.orchestrator.listDocuments(), [{ state: 'indexed' }, { state: 'indexed' }]);
+
+    f.orchestrator.setEmbeddingStatusFn(() => ({ providerName: 'example:other', dimensions: vector.dimensions }));
+    t.match(f.orchestrator.listDocuments().map(doc => doc.state), ['needs-reindex', 'needs-reindex'], 'another provider with the same dimensions');
+    f.orchestrator.setEmbeddingStatusFn(() => ({ providerName: vector.provider, dimensions: 4 }));
+    t.match(f.orchestrator.listDocuments().map(doc => doc.state), ['needs-reindex', 'needs-reindex'], 'the same provider with other dimensions');
+    f.orchestrator.setEmbeddingStatusFn(() => ({ providerName: vector.provider, dimensions: vector.dimensions }));
+
+    const [first] = f.orchestrator.listDocuments();
+    f.db.prepare('UPDATE knowledge_documents SET embedding_dimensions = NULL WHERE id = ?').run(first.id);
+    t.match(f.orchestrator.listDocuments().find(doc => doc.id === first.id), { state: 'not-indexed' }, 'a provider without dimensions is not a known index');
+    f.db.prepare('UPDATE knowledge_documents SET embedding_provider = NULL, embedding_dimensions = NULL, indexed_at = ? WHERE id = ?').run('2026-01-01T00:00:00.000Z', first.id);
+    t.match(f.orchestrator.listDocuments().find(doc => doc.id === first.id), { state: 'not-indexed' }, 'a time without provenance is not an index either');
+});
