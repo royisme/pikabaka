@@ -6,8 +6,6 @@ Pika is a desktop overlay that transcribes a call, translates the other party, a
 ## 2. Who uses it and when
 **Live phone and video calls**: A participant on a phone or video call who needs to follow what the other party is saying in another language [docs/design-live-translation-ui.md]. The overlay acts as a quiet subtitle strip delivering translations of the other speaker in under two seconds [docs/design-live-translation-ui.md].
 
-**Interview practice and prep**: A job candidate rehearsing technical or conversational interview questions before a real interview [README.md]. The documentation designates practice and rehearsal as the legitimate use case, respecting external assistance policies [README.md].
-
 **Sales and customer success calls**: A representative in live customer discussions who needs real-time objection handling, pricing references, and product facts [README.md]. Hide from screen share keeps private notes off a shared screen on macOS and Windows. [README.md]
 
 **Customer support**: A support specialist looking up relevant context from past tickets via on-device vector search during active customer conversations [README.md].
@@ -34,7 +32,7 @@ The overlay is designed for quick glance reading lasting one to three seconds mi
 - **"No telemetry runs by default" (README line 126)**: `evidenced` since 2026-10-26. The Google Analytics code (`initAnalytics()` and the tracking calls) and the one-time install ping to a third-party worker (`InstallPingManager`) were removed, because the product has neither feature. The only network traffic left is to the providers the user configures. This was checked by searching the code, not by observing traffic.
 - **Feature comparison table cells regarding Cluely, Granola, and Otter**: `not evidenced in the repo`. The repository contains no empirical tests, benchmarks, or documentation concerning competitor features or limitations [RULES.md].
 - **Hardware requirement numbers** ("4 GB RAM minimum, 8 GB recommended", "16 GB+ for Ollama"): `not evidenced in the repo`. No memory profiling or benchmark evidence exists in the codebase [PROGRESS.md].
-- **Provider speed and suitability assertions** (e.g. Groq "sub-second inference", Claude "best for coding interviews", Gemini "recommended default"): `not evidenced in the repo`. No comparative evaluation data or latency benchmarks exist in the repository [PROGRESS.md, docs/architecture.md].
+- **Provider speed and suitability assertions** (e.g. Groq "sub-second inference", Claude "best for code and long reasoning", Gemini "recommended default"): `not evidenced in the repo`. No comparative evaluation data or latency benchmarks exist in the repository [PROGRESS.md, docs/architecture.md].
 - **Open-source AGPL-3.0 licensing**: `evidenced`. Verified by the project license file [LICENSE].
 - **Bring-your-own-key architecture**: `evidenced`. Supported by `CredentialsManager` and client-side provider routing [docs/architecture.md, docs/conventions.md].
 - **Hide from screen share**: `evidenced` in code (`setContentProtection` in the window helpers); real-device behaviour is the owner's check. [RULES.md, docs/architecture.md]
@@ -53,9 +51,9 @@ The overlay is designed for quick glance reading lasting one to three seconds mi
 - **Real-provider verification**: nothing built in the last weeks (streaming translation, Stop and Retry, the audio status, the top bar) has been exercised against a real STT or LLM provider or on Windows [PROGRESS.md].
 
 ## 7. Questions for the owner
-1. Who is the primary target user and what is the primary workflow (live call translation, meeting copilot, or interview rehearsal)?
-2. Should interview prep and assistance remain a headline use case in README.md, given strict interview assistance policies and recent focus on live call translation?
+1. Who is the primary target user and what is the primary workflow (live call translation or meeting copilot)?
+2. ~~Should interview prep remain a headline use case?~~ Decided 2026-10-29: no. The interview feature, the resume and the profile were removed (`docs/design-interview-removal.md`); the README leads with live translation and meetings.
 3. How should the privacy claims in README.md be amended: "audio never leaves your device", "100% offline", and "no telemetry runs by default" (both the analytics script and the install ping were removed on 2026-10-26; the README sentence now matches the code)?
 4. Should the Windows platform badge and Windows 10/11 support claims be marked experimental or removed until issue #15 is resolved and a Windows installer is released?
 5. Should the "100% offline option" claim be removed or qualified until a local STT engine is integrated alongside Ollama?
-6. ~~Which speaker vocabulary...~~ Decided 2026-10-26: "Interviewer" for the other party and "Me" for the user, in the live overlay and in the post-meeting view.
+6. ~~Which speaker vocabulary...~~ Decided 2026-10-26: "Interviewer" for the other party and "Me" for the user. Superseded 2026-10-29: the other party is "Them" (stored value `them`) and the user is "Me".
