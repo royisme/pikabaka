@@ -15,8 +15,11 @@ What an agent (or a person) must never do in this repository, and the working ag
 - Never claim a real STT service, LLM provider, microphone, audio device, Windows machine or the packaged app was exercised when it was not.
 - Never state a UI or latency claim as measured when it was derived from code. Say "from code" and say how to verify it.
 
-**Stealth**
-- Never weaken content protection, capture exclusion or the always-on-top / click-through window behaviour, and never add telemetry on meeting content, without the owner.
+**Screen-share privacy**
+- Never weaken "Hide from screen share" (content protection on all five windows, including the Windows hidden-first show) or the always-on-top / click-through window behaviour without the owner.
+- Never make Pika pretend to be another app (name, process title, helper name, icon, window title, AUMID) or hide its dock icon or tray (owner decision, 2026-10-28).
+- Never call content protection undetectable or guaranteed; copy states its limits (ScreenCaptureKit recorders on macOS, no Linux support).
+- Never add telemetry on meeting content without the owner.
 
 **Scope and shape**
 - Never add an abstraction before a second caller, a flag, an option or a dependency nobody asked for. Ask first for product scope, a new dependency, a new provider, or a persisted-shape change.
