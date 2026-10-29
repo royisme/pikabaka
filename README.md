@@ -2,8 +2,8 @@
 
 # Pika
 
-**The open-source AI interview copilot & meeting assistant.**
-Real-time transcription, AI-suggested answers, and screenshot reasoning — running on your machine.
+**The open-source live-translation and meeting assistant.**
+Real-time translation of the other party, meeting records you can search, and an AI agent that helps during the call — running on your machine.
 
 [![Latest Release](https://img.shields.io/github/v/release/royisme/pikabaka?display_name=tag&color=4f46e5)](https://github.com/royisme/pikabaka/releases/latest)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
@@ -43,7 +43,7 @@ Full demo video: [`demo/out/pika-demo.mp4`](demo/out/pika-demo.mp4) · Built wit
 
 ## Built for
 
-- **Interview practice & prep** — rehearse with realistic AI-suggested answers, not generic flashcards.
+- **Calls in another language** — live translation of what the other party says, shown under the original line.
 - **Sales & customer success calls** — surface objection handlers, pricing, and product facts in real time.
 - **Customer support** — instant context from your past tickets via on-device vector search.
 - **Lectures & research** — live transcribe, summarize, and ask follow-up questions on what you just heard.
@@ -98,7 +98,7 @@ You only need **one** LLM provider and **one** STT provider to get started. Keys
 | ------------ | ------------------------------ | ------------------------------------ |
 | Google Gemini | Cost + huge context window    | Recommended default for most users   |
 | OpenAI       | General quality, GPT-4o, o3    | Strong at chained reasoning          |
-| Anthropic Claude | Coding interviews          | Best Claude tier for technical depth |
+| Anthropic Claude | Code and long reasoning    | Best Claude tier for technical depth |
 | Groq         | Sub-second inference, vision   | Cheapest fast tier                   |
 | Local server | Fully offline, no key required | Ollama, LM Studio, vLLM: add an OpenAI-compatible connection with a local address |
 | Custom       | Any OpenAI, Anthropic or Gemini compatible host | Your own base URL and key |
@@ -164,8 +164,8 @@ Open source under AGPL-3.0, no subscription, you bring your own API key, and you
 **Why "Hide from screen share"?**
 So private notes don't appear on a screen you share. It is not a guarantee (ScreenCaptureKit recorders on macOS; no Linux support). Use Pika ethically and respect the rules of your conversations.
 
-**Can I use Pika during a coding interview?**
-Use it for **prep and rehearsal** before the interview — that's the legitimate use case. Real interviews almost always have explicit rules about external assistance; respect them.
+**Can I use Pika in a call that has rules about outside assistance?**
+Check the rules first and follow them. Exams, assessments and some interviews forbid outside help; Pika does not change that.
 
 **Does it work on Linux?**
 Not yet. Tracking on the [roadmap](#roadmap).
@@ -184,6 +184,6 @@ Pull requests welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CO
 
 If Pika is useful to you, [give it a star](https://github.com/royisme/pikabaka) — it helps others discover the project.
 
-**Keywords**: AI interview copilot, AI meeting assistant, real-time transcription, open source Cluely alternative, local AI assistant, Electron AI app, BYO API key meeting tool, privacy-first AI copilot, screenshot AI assistant, RAG meeting memory.
+**Keywords**: live translation, AI meeting assistant, meeting transcription, real-time transcription, open source Cluely alternative, local AI assistant, Electron AI app, BYO API key meeting tool, privacy-first AI copilot, screenshot AI assistant, RAG meeting memory.
 
 </div>

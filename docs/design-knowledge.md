@@ -1,5 +1,7 @@
 # Knowledge
 
+> **History, 2026-10-29.** The interview parts of this design (resume, job description, profile, interview prep, company research, negotiation) were removed in track X5 (`docs/design-interview-removal.md`). What remains of the knowledge store is notes, imported materials (K5b) and the index and re-index screens (K6); read the rest of this document as the record of how they were designed.
+
 Status: option A approved by the owner on 2026-10-27; built step by step (the queue and the status of each step are in `TASKS.md`; K1 is built). It was reviewed independently by gpt-6-astra the same day; the corrections below come from that review. Evidence is a source-only investigation (GPT, commit `fdd71df`); every claim below was cited there by file and line, and none was run.
 
 ## Why it is not a rename
