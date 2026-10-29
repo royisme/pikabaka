@@ -40,7 +40,7 @@ t.test('a changed row keeps its place and its first time', async (t) => {
 });
 
 const row = (segmentId: string, source: string, timestamp: number): TranscriptSegment => ({
-  segmentId, sourceText: source, translatedText: `T:${source}`, timestamp, speakerLabel: 'Interviewer',
+  segmentId, sourceText: source, translatedText: `T:${source}`, timestamp, speakerLabel: 'Them',
   translationState: 'complete', revision: 1, translatedRevision: 1, speaker: 'them',
 });
 const paragraphEvent = { final: true, text: 'A. B. C.', sourceText: 'A. B. C.', translatedText: 'P', segmentId: 'para1', speaker: 'them' as const, translationState: 'complete' as const, revision: 1, timestamp: 99 };

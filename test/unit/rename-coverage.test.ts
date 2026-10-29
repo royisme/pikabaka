@@ -7,11 +7,6 @@ import path from 'node:path';
  * entry needs a reason that survives the rename (a string a model reads, or the old stored value).
  */
 const ALLOWED: { file: string; line: RegExp; why: string }[] = [
-  // Prompt text the models read; X5-2 rewrites it (not part of the rename).
-  { file: 'electron/llm/prompts.ts', line: /interviewer/, why: 'built-in prompt text' },
-  { file: 'electron/llm/TemporalContextBuilder.ts', line: /You are responding to the interviewer/, why: 'prompt text' },
-  { file: 'src/hooks/useMeetingChat.ts', line: /latest interviewer context/, why: 'prompt text sent to the model' },
-  { file: 'electron/core/LLMHelper.ts', line: /brainstorm_script/, why: 'prompt text' },
   // The old stored value: only the migration that replaces it may name it.
   { file: 'electron/db/DatabaseManager.ts', line: /interviewer/, why: 'migration and its comment' },
   // The old persisted localStorage keys: only their legacy entries may name them.
@@ -26,8 +21,8 @@ function productionFiles(root: string): string[] {
   });
 }
 
-// Case-sensitive: the prompt-side labels are "INTERVIEWER" and UI copy is "Interviewer"; neither
-// is the speaker value, and the labels move in X5-2.
+// Case-sensitive: the speaker value is lowercase `interviewer`, so only the migration and the
+// legacy-key list may name it; prompt and UI labels no longer do.
 const leftovers = ['electron', 'src'].flatMap((root) =>
   productionFiles(path.resolve(root))
     .flatMap((file) => fs.readFileSync(file, 'utf8').split('\n')

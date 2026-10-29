@@ -32,14 +32,6 @@ export type { ConversationIntent, IntentResult } from "./IntentClassifier";
 export { MODE_CONFIGS } from "./types";
 export type { GenerationConfig, GeminiContent } from "./types";
 export {
-    HARD_SYSTEM_PROMPT,
-    ANSWER_MODE_PROMPT,
-    ASSIST_MODE_PROMPT,
-    FOLLOWUP_MODE_PROMPT,
-    RECAP_MODE_PROMPT,
-    WHAT_TO_ANSWER_PROMPT,
-    TEMPORAL_CONTEXT_TEMPLATE,
-    CODE_HINT_PROMPT,
-    buildCodeHintMessage,
-    BRAINSTORM_MODE_PROMPT
+    SYSTEM_PROMPT,
+    buildCodeHintMessage
 } from "./prompts";

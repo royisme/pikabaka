@@ -24,7 +24,7 @@ export interface TranscriptEventForSegment {
   sourceText?: string;
   translatedText?: string;
   segmentId?: string;
-  /** When `speakerLabel` is omitted, defaults: them -> Interviewer, user -> Me, unknown -> User 1 */
+  /** When `speakerLabel` is omitted, defaults: them -> Them, user -> Me, unknown -> User 1 */
   speaker?: 'them' | 'user';
   speakerLabel?: string;
   timestamp?: number;
@@ -38,7 +38,7 @@ export interface TranscriptEventForSegment {
 
 function defaultSpeakerLabelForEvent(event: TranscriptEventForSegment): string {
   if (event.speaker === 'user') return 'Me';
-  if (event.speaker === 'them') return 'Interviewer';
+  if (event.speaker === 'them') return 'Them';
   return 'User 1';
 }
 

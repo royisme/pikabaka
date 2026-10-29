@@ -243,7 +243,7 @@ function detectIntentByContext(
     if (assistantMessageCount >= 2) {
         // Check if the other party is drilling down
         const lines = recentTranscript.split('\n');
-        const themLines = lines.filter(l => l.includes('[INTERVIEWER'));
+        const themLines = lines.filter(l => l.includes('[THEM'));
 
         // Short other-party prompts after long exchanges = follow-up probe
         const lastThemLine = themLines[themLines.length - 1] || '';

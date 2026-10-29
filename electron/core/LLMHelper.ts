@@ -2,9 +2,7 @@ import { GoogleGenAI, ThinkingLevel } from "@google/genai"
 import OpenAI from "openai"
 import Anthropic from "@anthropic-ai/sdk"
 import fs from "fs"
-import {
-  HARD_SYSTEM_PROMPT, GROQ_SYSTEM_PROMPT, OPENAI_SYSTEM_PROMPT, CLAUDE_SYSTEM_PROMPT
-} from "../llm/prompts"
+import { SYSTEM_PROMPT, taskPrompt } from "../llm/prompts"
 import { openAiRoot, type Connection } from '../services/aiConnections';
 import { redactConnectionError } from '../services/connectionSecrets';
 import { CredentialsManager } from '../services/CredentialsManager';
@@ -58,7 +56,7 @@ export interface TranscriptTranslationRequest {
   context?: Array<{ source: string; translation: string }>;
 }
 
-// Simple prompt for image analysis (not interview copilot - kept separate)
+// Simple prompt for image analysis (not the chat prompt - kept separate)
 const IMAGE_ANALYSIS_PROMPT = `Analyze concisely. Be direct. No markdown formatting. Return plain text only.`
 
 export class LLMHelper {
@@ -401,13 +399,13 @@ export class LLMHelper {
     time_complexity: string;
     space_complexity: string;
   }> {
-    const systemPrompt = `You are an elite FAANG Senior Software Engineer taking a live technical interview.
-The user has provided a screenshot of a coding problem. You must generate a highly structured "Rolling Interview Script" that the candidate can read out loud to pass the interview perfectly.
+    const systemPrompt = `You are an elite senior software engineer working through a live technical problem.
+The user has provided a screenshot of a coding problem. You must generate a highly structured "Rolling Script" that the user can read out loud to walk through the problem well.
 
 Output EXACTLY this JSON structure, and nothing else (no markdown fences around the whole response):
 {
   "problem_identifier_script": "1-2 conversational sentences confirming you understand the problem and its edge cases. Start with 'So just to make sure I understand...'",
-  "brainstorm_script": "3-4 conversational sentences. First, mention a naive/brute-force approach and its complexity. Then, pivot to the optimal approach, mentioning the key data structure or algorithm. End by asking the interviewer if you can proceed with the optimal approach. Keep it natural.",
+  "brainstorm_script": "3-4 conversational sentences. First, mention a naive/brute-force approach and its complexity. Then, pivot to the optimal approach, mentioning the key data structure or algorithm. End by asking whether to proceed with the optimal approach. Keep it natural.",
   "code": "The full, production-ready, heavily-commented optimal code solution in the language shown or Python if unclear. Include all necessary imports.",
   "dry_run_script": "2-3 conversational sentences doing a quick dry-run of the code with a simple example input. E.g., 'Let\\'s trace this. If our array is [1,2], the loop starts...'",
   "time_complexity": "O(...) — brief 5-word explanation",
@@ -415,11 +413,11 @@ Output EXACTLY this JSON structure, and nothing else (no markdown fences around 
 }
 
 CRITICAL RULES:
-- The scripts MUST sound like a human speaking out loud in an interview. Use "I", "we", "my first thought is".
+- The scripts MUST sound like a human speaking out loud in a meeting. Use "I", "we", "my first thought is".
 - The JSON must be perfectly valid. Escape any internal quotes with backslash.
 - Do NOT wrap the JSON in markdown fences.`;
 
-    const userPrompt = `Please analyze the coding problem shown in the screenshot(s) and generate the Rolling Interview Script JSON.`;
+    const userPrompt = `Please analyze the coding problem shown in the screenshot(s) and generate the Rolling Script JSON.`;
 
     try {
       const raw = await this.generateWithVisionFallback(systemPrompt, userPrompt, imagePaths);
@@ -462,7 +460,7 @@ CRITICAL RULES:
   public async analyzeImageFiles(imagePaths: string[]) {
     try {
       const prompt = `Describe the content of ${imagePaths.length > 1 ? 'these images' : 'this image'} in a short, concise answer. If it contains code or a problem, solve it.`;
-      const text = await this.generateWithVisionFallback(HARD_SYSTEM_PROMPT, prompt, imagePaths);
+      const text = await this.generateWithVisionFallback(taskPrompt('assist'), prompt, imagePaths);
 
       return { text: text, timestamp: Date.now() };
 
@@ -479,7 +477,7 @@ CRITICAL RULES:
    * @returns Suggested response for the user
    */
   public async generateSuggestion(context: string, lastQuestion: string): Promise<string> {
-    const basePrompt = `You are an expert interview coach. Based on the conversation transcript, provide a concise, natural response the user could say.
+    const basePrompt = `You are an expert communication coach. Based on the conversation transcript, provide a concise, natural response the user could say.
 
 RULES:
 - Be direct and conversational
@@ -494,7 +492,7 @@ RULES:
 CONVERSATION SO FAR:
 ${context}
 
-LATEST QUESTION FROM INTERVIEWER:
+LATEST QUESTION FROM THE OTHER PARTY:
 ${lastQuestion}
 
 ANSWER DIRECTLY:`;
@@ -570,7 +568,7 @@ ANSWER DIRECTLY:`;
     }
   }
 
-  public async chatWithGemini(message: string, imagePaths?: string[], context?: string, skipSystemPrompt: boolean = false, alternateGroqMessage?: string): Promise<string> {
+  public async chatWithGemini(message: string, imagePaths?: string[], context?: string, skipSystemPrompt: boolean = false): Promise<string> {
     const sources = getAnswerSources();
     try {
       console.log('[LLMHelper] chatWithGemini called')
@@ -621,9 +619,7 @@ ANSWER DIRECTLY:`;
 
       const use = CredentialsManager.getInstance().resolveModelUse('chat');
       if ('error' in use) throw new Error(use.error);
-      const prompt = use.connection.id === 'groq'
-        ? alternateGroqMessage || this.injectLanguageInstruction(GROQ_SYSTEM_PROMPT)
-        : this.injectLanguageInstruction(use.connection.type === 'anthropic' ? CLAUDE_SYSTEM_PROMPT : use.connection.type === 'gemini' ? HARD_SYSTEM_PROMPT : OPENAI_SYSTEM_PROMPT);
+      const prompt = this.injectLanguageInstruction(SYSTEM_PROMPT);
       const userContent = context
         ? `CONTEXT:\n${context}\n\nUSER QUESTION:\n${message}`
         : message;
@@ -652,8 +648,7 @@ ANSWER DIRECTLY:`;
       : message;
     const use = CredentialsManager.getInstance().resolveModelUse('chat');
     if ('error' in use) throw new Error(use.error);
-    const systemPrompt = use.connection.id === 'groq' ? GROQ_SYSTEM_PROMPT : use.connection.type === 'anthropic' ? CLAUDE_SYSTEM_PROMPT : use.connection.type === 'gemini' ? HARD_SYSTEM_PROMPT : OPENAI_SYSTEM_PROMPT;
-    yield* this.streamChat(userContent, imagePaths, undefined, skipSystemPrompt ? '' : this.injectLanguageInstruction(systemPrompt), { signal, verbatimPrompt: true });
+    yield* this.streamChat(userContent, imagePaths, undefined, skipSystemPrompt ? '' : this.injectLanguageInstruction(SYSTEM_PROMPT), { signal, verbatimPrompt: true });
   }
 
   /**
@@ -663,7 +658,7 @@ ANSWER DIRECTLY:`;
     message: string | undefined,
     imagePaths?: string[],
     context?: string,
-    systemPromptOverride?: string, // Optional override (defaults to HARD_SYSTEM_PROMPT)
+    systemPromptOverride?: string, // Optional override (defaults to SYSTEM_PROMPT)
     options?: { history?: Array<{ role: 'user' | 'assistant'; content: string }>; signal?: AbortSignal; verbatimPrompt?: boolean }
   ): AsyncGenerator<string, void, unknown> {
 
@@ -717,8 +712,7 @@ ANSWER DIRECTLY:`;
     // The connection and model chosen for quick answers (Settings, Models & Agent): any host, any model id.
     const chatUse = CredentialsManager.getInstance().resolveModelUse('chat');
     if ('connection' in chatUse) {
-      const systemFor = chatUse.connection.id === 'groq' ? GROQ_SYSTEM_PROMPT : chatUse.connection.type === 'anthropic' ? CLAUDE_SYSTEM_PROMPT : OPENAI_SYSTEM_PROMPT;
-      yield* this.streamViaConnectionChat(chatUse.connection, chatUse.model, options?.verbatimPrompt ? systemPromptOverride ?? '' : this.injectLanguageInstruction(systemPromptOverride || systemFor), userContent, imagePaths, options?.history, options?.signal);
+      yield* this.streamViaConnectionChat(chatUse.connection, chatUse.model, options?.verbatimPrompt ? systemPromptOverride ?? '' : this.injectLanguageInstruction(systemPromptOverride || SYSTEM_PROMPT), userContent, imagePaths, options?.history, options?.signal);
       return;
     }
 

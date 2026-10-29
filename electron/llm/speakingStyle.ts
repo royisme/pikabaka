@@ -4,8 +4,8 @@ export const ANSWER_STYLE_MAX_LENGTH = 200;
 export const DEFAULT_ANSWER_STYLE = 'plain, direct and conversational';
 
 /**
- * How an answer sounds and how it is built, for answers the user says out loud in an interview or a
- * meeting. `style` is free text the user writes: a manner of speaking ("direct and first-principles, like
+ * How an answer sounds and how it is built, for a spoken reply in a conversation or meeting. `style` is
+ * free text the user writes: a manner of speaking ("direct and first-principles, like
  * Elon Musk"). It borrows the manner only (rhythm, bluntness, vocabulary), never anyone's words, claims or
  * life story.
  */
@@ -13,7 +13,7 @@ export function speakingStyleInstruction(style: string): { header: string; foote
   const manner = style.trim().slice(0, ANSWER_STYLE_MAX_LENGTH) || DEFAULT_ANSWER_STYLE;
   return {
     header: `[SPOKEN ANSWER — HOW IT SOUNDS AND HOW IT IS BUILT]
-Applies when the answer is something the user will SAY out loud (an interview or meeting reply). Ignore this block if the request is clearly something else (a summary, an email, code only).
+Applies when the answer is something the user will SAY out loud (a spoken reply in a conversation or meeting). Ignore this block if the request is clearly something else (a summary, an email, code only).
 Sound: talk like a person, not like a document. Manner of speaking: ${manner}. Borrow only that manner (rhythm, bluntness, word choice); never quote anyone, never claim anyone's opinions or life story as the user's.
 Words: short sentences, about 6 to 18 words, one idea each. Contractions. First person. Everyday words. A light spoken connector now and then ("So", "Honestly", "The way I see it"), never in every sentence. No headings, no bullet lists, no bold in the spoken lines, no "As an AI", no "Great question". Put each breath on its own line so the user can find the place again.
 Build by question type, decided from the last thing the other party said:

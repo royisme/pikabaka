@@ -60,7 +60,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
     partialText,
     displayMode = 'both',
     translationOn = false,
-    partialSpeakerLabel = 'Interviewer',
+    partialSpeakerLabel = 'Them',
     onTranslateSegment,
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -72,7 +72,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
 
     const hasContent = segments.length > 0 || !!partialText;
 
-    const partialLabel = useMemo(() => partialSpeakerLabel.trim() || 'Interviewer', [partialSpeakerLabel]);
+    const partialLabel = useMemo(() => partialSpeakerLabel.trim() || 'Them', [partialSpeakerLabel]);
 
     // One tick per second, and only while some translation is pending, so a slow one can show its elapsed time.
     const hasPending = segments.some((segment) => segment.translationState === 'pending');

@@ -1,5 +1,5 @@
 import { LLMHelper } from "../core/LLMHelper";
-import { UNIVERSAL_WHAT_TO_ANSWER_PROMPT } from "./prompts";
+import { taskPrompt } from "./prompts";
 import { TemporalContext } from "./TemporalContextBuilder";
 import { IntentResult } from "./IntentClassifier";
 
@@ -52,11 +52,7 @@ ANSWER SHAPE: ${intentResult.answerShape}
                 ? `${extraContext}\n\nCONVERSATION:\n${cleanedTranscript}`
                 : cleanedTranscript;
 
-            // Use Universal Prompt
-            // Note: WhatToAnswer has a very specific prompt. 
-            // We should use UNIVERSAL_WHAT_TO_ANSWER_PROMPT as override
-
-            yield* this.llmHelper.streamChat(fullMessage, imagePaths, undefined, UNIVERSAL_WHAT_TO_ANSWER_PROMPT);
+            yield* this.llmHelper.streamChat(fullMessage, imagePaths, undefined, taskPrompt('whatToAnswer'));
         }
     }
 }

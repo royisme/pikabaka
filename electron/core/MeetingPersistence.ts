@@ -15,7 +15,7 @@ const crypto = require('crypto');
 
 function contextFromTranscript(transcript: Array<{ speaker: string; text: string }>): string {
     return transcript.map(t => {
-        const label = t.speaker === 'them' ? 'INTERVIEWER' :
+        const label = t.speaker === 'them' ? 'THEM' :
             t.speaker === 'user' ? 'ME' : 'ASSISTANT';
         return `[${label}]: ${t.text}`;
     }).join('\n');
