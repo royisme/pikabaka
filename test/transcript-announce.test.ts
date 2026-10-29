@@ -6,7 +6,7 @@ const row = (id: string, over: Record<string, unknown> = {}) => ({
   sourceText: `source ${id}`,
   translatedText: `translation ${id}`,
   translationState: 'complete' as const,
-  speaker: 'interviewer' as const,
+  speaker: 'them' as const,
   revision: 1,
   translatedRevision: 1,
   ...over,

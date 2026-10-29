@@ -179,11 +179,11 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     }, [belowOverlay, isSettingsOpen]);
 
     const fixAudio = useCallback(() => { void window.electronAPI.openSettingsSection('audio'); }, []);
-    const hasTranscriptRows = transcript.transcriptSegments.length > 0 || transcript.isInterviewerSpeaking;
+    const hasTranscriptRows = transcript.transcriptSegments.length > 0 || transcript.isThemSpeaking;
     // Where the transcript area does not spell the status out (it is hidden), the bar's chip must.
     const statusInBar = hasTranscriptRows || !transcript.showTranscript;
 
-    replyContextRef.current = () => latestOtherPartyText(transcript.transcriptSegments, transcript.currentInterviewerPartial);
+    replyContextRef.current = () => latestOtherPartyText(transcript.transcriptSegments, transcript.currentThemPartial);
 
     const generalHandlersRef = useRef<GeneralHandlers>(null!);
     generalHandlersRef.current = {

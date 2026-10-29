@@ -103,7 +103,7 @@ interface ElectronAPI {
   chatModelSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
   summaryModelGet: () => Promise<{ connectionId: string; model: string }>
   summaryModelSet: (use: { connectionId: string; model: string }) => Promise<{ success: boolean; error?: string }>
-  translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string }>
+  translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'them' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string }>
 
   // STT Provider Management
   setSttProvider: (provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => Promise<{ success: boolean; error?: string }>
@@ -134,10 +134,10 @@ interface ElectronAPI {
   generateSuggestion: (context: string, lastQuestion: string) => Promise<{ suggestion: string }>
   getInputDevices: () => Promise<Array<{ id: string; name: string }>>
   getOutputDevices: () => Promise<Array<{ id: string; name: string }>>
-  setRecognitionLanguage: (key: string, speaker?: 'interviewer' | 'user') => Promise<{ success: boolean; error?: string }>
+  setRecognitionLanguage: (key: string, speaker?: 'them' | 'user') => Promise<{ success: boolean; error?: string }>
   getAiResponseLanguages: () => Promise<Array<{ label: string; code: string }>>
   setAiResponseLanguage: (language: string) => Promise<{ success: boolean; error?: string }>
-  getSttLanguage: (speaker?: 'interviewer' | 'user') => Promise<string>
+  getSttLanguage: (speaker?: 'them' | 'user') => Promise<string>
   getAiResponseLanguage: () => Promise<string>
   getAnswerStyle: () => Promise<string>
   getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean; profile: boolean }>
@@ -149,9 +149,9 @@ interface ElectronAPI {
     connected: boolean;
     meetingActive: boolean;
     hasRecentSystemAudioChunk: boolean;
-    hasRecentInterviewerTranscript: boolean;
+    hasRecentThemTranscript: boolean;
     lastSystemAudioChunkAt: number | null;
-    lastInterviewerTranscriptAt: number | null;
+    lastThemTranscriptAt: number | null;
     lastError: string | null;
   }>
 
@@ -599,7 +599,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   chatModelSet: (use: { connectionId: string; model: string }) => ipcRenderer.invoke("chat-model-set", use),
   summaryModelGet: () => ipcRenderer.invoke("summary-model-get"),
   summaryModelSet: (use: { connectionId: string; model: string }) => ipcRenderer.invoke("summary-model-set", use),
-  translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) =>
+  translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'them' | 'user'; speakerLabel?: string; timestamp?: number }) =>
     ipcRenderer.invoke("translate-transcript-segment", segment),
 
   // STT Provider Management
@@ -676,10 +676,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getNativeAudioStatus: () => ipcRenderer.invoke("native-audio-status"),
   getInputDevices: () => ipcRenderer.invoke("get-input-devices"),
   getOutputDevices: () => ipcRenderer.invoke("get-output-devices"),
-  setRecognitionLanguage: (key: string, speaker?: 'interviewer' | 'user') => ipcRenderer.invoke("set-recognition-language", key, speaker),
+  setRecognitionLanguage: (key: string, speaker?: 'them' | 'user') => ipcRenderer.invoke("set-recognition-language", key, speaker),
   getAiResponseLanguages: () => ipcRenderer.invoke("get-ai-response-languages"),
   setAiResponseLanguage: (language: string) => ipcRenderer.invoke("set-ai-response-language", language),
-  getSttLanguage: (speaker?: 'interviewer' | 'user') => ipcRenderer.invoke("get-stt-language", speaker),
+  getSttLanguage: (speaker?: 'them' | 'user') => ipcRenderer.invoke("get-stt-language", speaker),
   getAiResponseLanguage: () => ipcRenderer.invoke("get-ai-response-language"),
   getAnswerStyle: () => ipcRenderer.invoke("get-answer-style"),
   getAnswerSources: () => ipcRenderer.invoke("answer-sources:get"),

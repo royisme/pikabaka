@@ -16,7 +16,7 @@ import { createMeeting } from '../../electron/db/meetingRecord';
 
 const file = (name: string) => path.resolve(`electron/${name}.ts`);
 const segments = (count: number, label = 'Amber') => Array.from({ length: count }, (_, i) => ({
-    speaker: i % 2 ? 'user' : 'interviewer', text: `${label} lantern number ${i} glows.`, timestamp: i * 1000,
+    speaker: i % 2 ? 'user' : 'them', text: `${label} lantern number ${i} glows.`, timestamp: i * 1000,
 }));
 const provider = (name = 'example:first', dimensions = 3): IEmbeddingProvider => ({
     name, dimensions, isAvailable: async () => true,

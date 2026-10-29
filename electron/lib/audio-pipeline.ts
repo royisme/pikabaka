@@ -49,7 +49,7 @@ async function ensureMacMicrophoneAccess(context: string): Promise<boolean> {
   }
 }
 
-export function createSTTProvider(appState: AppState, speaker: 'interviewer' | 'user'): STTProvider {
+export function createSTTProvider(appState: AppState, speaker: 'them' | 'user'): STTProvider {
   const state = appState as any;
   const { CredentialsManager } = require('../services/CredentialsManager');
   const sttProvider = CredentialsManager.getInstance().getSttProvider();
@@ -139,7 +139,7 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
     if (trimmed) {
       state.echoFilter ??= new EchoFilter();
       const echoFilter = state.echoFilter as EchoFilter;
-      if (speaker === 'interviewer') {
+      if (speaker === 'them') {
         echoFilter.noteOther(trimmed, timestamp);
       } else if (echoFilter.isEcho(trimmed, timestamp)) {
         state.echoLinesDropped = (state.echoLinesDropped ?? 0) + 1;
@@ -190,9 +190,9 @@ export function createSTTProvider(appState: AppState, speaker: 'interviewer' | '
       });
     }
 
-    if (speaker === 'interviewer') {
+    if (speaker === 'them') {
       if (trimmed) {
-        state.lastInterviewerTranscriptAt = Date.now();
+        state.lastThemTranscriptAt = Date.now();
       }
       state.lastAudioPipelineError = null;
     }
@@ -217,7 +217,7 @@ export function setupSystemAudioPipeline(appState: AppState): void {
       });
       state.systemAudioCapture.on('speech_ended', () => {
         state.googleSTT?.notifySpeechEnded?.();
-        handleSpeakerSpeechEnded(appState, 'interviewer');
+        handleSpeakerSpeechEnded(appState, 'them');
       });
       state.systemAudioCapture.on('error', (err: Error) => {
         console.error('[Main] SystemAudioCapture Error:', err);
@@ -241,7 +241,7 @@ export function setupSystemAudioPipeline(appState: AppState): void {
     }
 
     if (!state.googleSTT) {
-      state.googleSTT = createSTTProvider(appState, 'interviewer');
+      state.googleSTT = createSTTProvider(appState, 'them');
     }
 
     if (!state.googleSTT_User) {
@@ -249,7 +249,7 @@ export function setupSystemAudioPipeline(appState: AppState): void {
     }
 
     const sysRate = state.systemAudioCapture?.getSampleRate() || 48000;
-    if (state._verboseLogging) console.log(`[Main] Configuring Interviewer STT to ${sysRate}Hz`);
+    if (state._verboseLogging) console.log(`[Main] Configuring Them STT to ${sysRate}Hz`);
     state.googleSTT?.setSampleRate(sysRate);
     state.googleSTT?.setAudioChannelCount?.(1);
 
@@ -372,7 +372,7 @@ export async function translateTranscriptSegment(appState: AppState, segment: {
   }
 
   return emitTranscriptWithTranslation(appState, {
-    speaker: segment.speaker || 'interviewer',
+    speaker: segment.speaker || 'them',
     text,
     timestamp: segment.timestamp ?? Date.now(),
     confidence: 1,
@@ -388,25 +388,25 @@ export function getNativeAudioStatus(appState: AppState): {
   connected: boolean;
   meetingActive: boolean;
   hasRecentSystemAudioChunk: boolean;
-  hasRecentInterviewerTranscript: boolean;
+  hasRecentThemTranscript: boolean;
   lastSystemAudioChunkAt: number | null;
-  lastInterviewerTranscriptAt: number | null;
+  lastThemTranscriptAt: number | null;
   lastError: string | null;
 } {
   const state = appState as any;
   const now = Date.now();
   const hasRecentSystemAudioChunk =
     state.lastSystemAudioChunkAt != null && now - state.lastSystemAudioChunkAt < 3000;
-  const hasRecentInterviewerTranscript =
-    state.lastInterviewerTranscriptAt != null && now - state.lastInterviewerTranscriptAt < 6000;
+  const hasRecentThemTranscript =
+    state.lastThemTranscriptAt != null && now - state.lastThemTranscriptAt < 6000;
 
   return {
     connected: state.isMeetingActive && !!state.systemAudioCapture && !!state.googleSTT,
     meetingActive: state.isMeetingActive,
     hasRecentSystemAudioChunk,
-    hasRecentInterviewerTranscript,
+    hasRecentThemTranscript,
     lastSystemAudioChunkAt: state.lastSystemAudioChunkAt,
-    lastInterviewerTranscriptAt: state.lastInterviewerTranscriptAt,
+    lastThemTranscriptAt: state.lastThemTranscriptAt,
     lastError: state.lastAudioPipelineError,
   };
 }

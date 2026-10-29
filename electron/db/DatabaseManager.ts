@@ -390,6 +390,35 @@ export class DatabaseManager {
             this.db.pragma('user_version = 11');
         }
 
+        // Version 11 → 12: The other party's speaker value is `them`, not `interviewer`.
+        if (version < 12) {
+            console.log('[DatabaseManager] Applying migration v11 → v12: Rename the other-party speaker to them');
+            // The backup is the way back (older builds do not know `them`); it is written once.
+            const backupPath = `${this.dbPath}.before-them`;
+            const hasOldRows = this.db.prepare(
+                "SELECT 1 FROM transcripts WHERE speaker = 'interviewer' UNION ALL SELECT 1 FROM chunks WHERE speaker = 'interviewer' LIMIT 1"
+            ).get() !== undefined;
+            // A database with no old rows (a new install) has nothing to protect.
+            let backupReady = !hasOldRows || (fs.existsSync(backupPath) && fs.statSync(backupPath).isFile());
+            if (!backupReady) {
+                try {
+                    // A WAL database's main file is incomplete until the WAL is checkpointed.
+                    this.db.pragma('wal_checkpoint(TRUNCATE)');
+                    fs.copyFileSync(this.dbPath, backupPath);
+                    backupReady = true;
+                } catch (e) {
+                    console.warn('[DatabaseManager] v12 migration skipped: the database backup could not be written; it retries at the next start');
+                }
+            }
+            if (backupReady) {
+                this.db.transaction(() => {
+                    this.db!.prepare("UPDATE transcripts SET speaker = 'them' WHERE speaker = 'interviewer'").run();
+                    this.db!.prepare("UPDATE chunks SET speaker = 'them' WHERE speaker = 'interviewer'").run();
+                    this.db!.pragma('user_version = 12');
+                })();
+            }
+        }
+
         console.log('[DatabaseManager] Migrations completed.');
     }
 
@@ -1027,20 +1056,20 @@ pika.contact@gmail.com`;
                 keyPoints: []
             },
             transcript: [
-                { speaker: 'interviewer', text: "Welcome to Pika! Let me show you how it works.", timestamp: 0 },
+                { speaker: 'them', text: "Welcome to Pika! Let me show you how it works.", timestamp: 0 },
                 { speaker: 'user', text: "Thanks! I'm excited to try it out.", timestamp: 5000 },
-                { speaker: 'interviewer', text: "You have 5 quick action buttons. 'What to answer' listens to the conversation and suggests what you should say.", timestamp: 10000 },
+                { speaker: 'them', text: "You have 5 quick action buttons. 'What to answer' listens to the conversation and suggests what you should say.", timestamp: 10000 },
                 { speaker: 'user', text: "That sounds helpful for interviews.", timestamp: 18000 },
-                { speaker: 'interviewer', text: "Check out the 'How to Use' section in the notes for API setup instructions.", timestamp: 20000 },
-                { speaker: 'interviewer', text: "'Clarify' asks a targeted question to get missing constraints. 'Recap' summarizes the entire conversation so far.", timestamp: 22000 },
+                { speaker: 'them', text: "Check out the 'How to Use' section in the notes for API setup instructions.", timestamp: 20000 },
+                { speaker: 'them', text: "'Clarify' asks a targeted question to get missing constraints. 'Recap' summarizes the entire conversation so far.", timestamp: 22000 },
                 { speaker: 'user', text: "What about the other buttons?", timestamp: 30000 },
-                { speaker: 'interviewer', text: "'Follow Up Questions' suggests questions you can ask. 'Answer' lets you speak a question and get an instant response.", timestamp: 35000 },
+                { speaker: 'them', text: "'Follow Up Questions' suggests questions you can ask. 'Answer' lets you speak a question and get an instant response.", timestamp: 35000 },
                 { speaker: 'user', text: "Can I take screenshots during calls?", timestamp: 45000 },
-                { speaker: 'interviewer', text: "Yes! Press Cmd+H for full screen or Cmd+Shift+H to select an area. The AI will analyze it and help you.", timestamp: 50000 },
+                { speaker: 'them', text: "Yes! Press Cmd+H for full screen or Cmd+Shift+H to select an area. The AI will analyze it and help you.", timestamp: 50000 },
                 { speaker: 'user', text: "How do I hide Pika during screen share?", timestamp: 60000 },
-                { speaker: 'interviewer', text: "Press Cmd+B to toggle visibility anytime. You can also enable 'Hide from screen share' in Settings.", timestamp: 65000 },
+                { speaker: 'them', text: "Press Cmd+B to toggle visibility anytime. You can also enable 'Hide from screen share' in Settings.", timestamp: 65000 },
                 { speaker: 'user', text: "This is amazing. What happens after the call?", timestamp: 75000 },
-                { speaker: 'interviewer', text: "You get detailed meeting notes with action items, key points, full transcript, and a log of all AI interactions.", timestamp: 80000 }
+                { speaker: 'them', text: "You get detailed meeting notes with action items, key points, full transcript, and a log of all AI interactions.", timestamp: 80000 }
             ],
             usage: [
                 { type: 'assist', timestamp: 15000, question: 'What features does Pika have?', answer: 'Pika offers 5 quick action buttons, screenshot analysis, real-time transcription, and comprehensive meeting notes.' },

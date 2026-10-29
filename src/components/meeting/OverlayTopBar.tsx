@@ -22,7 +22,7 @@ interface OverlayTopBarProps {
     targetLanguage: string;
     languageOptions: Array<{ value: string; label: string }>;
     onToggleTranslation: () => void;
-    onChangeSpokenLanguage: (speaker: 'interviewer' | 'user', key: string) => void;
+    onChangeSpokenLanguage: (speaker: 'them' | 'user', key: string) => void;
     onChangeTargetLanguage: (value: string) => void;
     onToggleOriginal: () => void;
     onSetUpTranslation: () => void;
@@ -108,7 +108,7 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
         label: option.label,
         role: 'menuitemradio',
         checked: option.value === theirLanguage,
-        onSelect: () => onChangeSpokenLanguage('interviewer', option.value),
+        onSelect: () => onChangeSpokenLanguage('them', option.value),
     }));
 
     const myLanguageItems: PopoverMenuItem[] = languageOptions.map((option) => ({

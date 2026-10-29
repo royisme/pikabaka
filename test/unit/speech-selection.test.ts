@@ -113,7 +113,7 @@ t.test('choosing a configured service saves that service, its model and language
     t.notMatch(host.html(), 'not configured');
     t.equal(host.button('Save speech settings').props.disabled, false);
     await (host.button('Save speech settings').props.onClick as () => Promise<void>)();
-    t.same(calls, ['service:deepgram', 'model:deepgram:invented-model', 'interviewer:english-us', 'user:english-us']);
+    t.same(calls, ['service:deepgram', 'model:deepgram:invented-model', 'them:english-us', 'user:english-us']);
     t.match(host.html(), 'Saved: deepgram');
     t.notMatch(host.html(), 'Google Cloud is not configured');
 });

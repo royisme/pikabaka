@@ -113,8 +113,8 @@ export class IntelligenceManager extends EventEmitter {
         return this.session.getFormattedContext(lastSeconds);
     }
 
-    getLastInterviewerTurn(): string | null {
-        return this.session.getLastInterviewerTurn();
+    getLastThemTurn(): string | null {
+        return this.session.getLastThemTurn();
     }
 
     logUsage(type: string, question: string, answer: string): void {

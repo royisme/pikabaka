@@ -47,7 +47,7 @@ t.test('skipped and same-language rows show the source as the lead', async (t) =
 });
 
 const ctx = { mode: 'both' as const, translationOn: true, now: 100_000 };
-const other = { speaker: 'interviewer' as const, receivedAt: 100_000 - 1000 };
+const other = { speaker: 'them' as const, receivedAt: 100_000 - 1000 };
 
 t.test('the slot exists from the first live words to the finished translation', async (t) => {
   t.same(rowSlot('live', ctx), { kind: 'live' });
@@ -60,11 +60,11 @@ t.test('the slot exists from the first live words to the finished translation', 
 });
 
 t.test('elapsed time appears only after the translation has been slow for 3 seconds', async (t) => {
-  const at = (ms: number) => rowSlot({ ...pending, speaker: 'interviewer', receivedAt: ctx.now - ms }, ctx);
+  const at = (ms: number) => rowSlot({ ...pending, speaker: 'them', receivedAt: ctx.now - ms }, ctx);
   t.same(at(2999), { kind: 'translating', elapsedSeconds: null });
   t.same(at(3000), { kind: 'translating', elapsedSeconds: 3 });
   t.same(at(4900), { kind: 'translating', elapsedSeconds: 4 });
-  t.same(rowSlot({ ...pending, speaker: 'interviewer' }, ctx), { kind: 'translating', elapsedSeconds: null }, 'no arrival time yet');
+  t.same(rowSlot({ ...pending, speaker: 'them' }, ctx), { kind: 'translating', elapsedSeconds: null }, 'no arrival time yet');
 });
 
 t.test('no slot when translation is off, the mode is original, or the row is own speech or skipped', async (t) => {
@@ -85,7 +85,7 @@ t.test('a stale translation is shown as updating only while a new one is pending
   t.equal(parts.kind, 'source');
   t.equal(parts.translationBelow, 'À lundi');
   t.equal(parts.updating, true);
-  t.same(rowSlot({ ...stale, translationState: 'pending', speaker: 'interviewer' }, ctx), { kind: 'translation' });
+  t.same(rowSlot({ ...stale, translationState: 'pending', speaker: 'them' }, ctx), { kind: 'translation' });
 });
 
 t.test('a stale translation with no request behind it is hidden, never shown as current', async (t) => {
@@ -94,7 +94,7 @@ t.test('a stale translation with no request behind it is hidden, never shown as 
     t.equal(parts.hasTranslation, false, translationState);
     t.equal(parts.lead, 'See you Monday morning');
   }
-  const failed = { ...stale, translationState: 'error' as const, speaker: 'interviewer' as const };
+  const failed = { ...stale, translationState: 'error' as const, speaker: 'them' as const };
   t.same(rowSlot(failed, ctx), { kind: 'failed', reason: undefined }, 'a failed redo shows the failure, not the old translation');
   t.equal(transcriptRowParts(failed, 'both', false).kind, 'awaiting');
 });
@@ -121,7 +121,7 @@ t.test('a failure names its reason in a few words', async (t) => {
 });
 
 t.test('a streaming translation shows the text so far under the source, and waits like pending before any text', async (t) => {
-  const streaming = { sourceText: 'Can we move the call to Friday?', translatedText: '我们能把电话', translationState: 'streaming' as const, revision: 1, translatedRevision: 1, speaker: 'interviewer' as const };
+  const streaming = { sourceText: 'Can we move the call to Friday?', translatedText: '我们能把电话', translationState: 'streaming' as const, revision: 1, translatedRevision: 1, speaker: 'them' as const };
   const parts = transcriptRowParts(streaming, 'both', false);
   t.equal(parts.kind, 'source');
   t.equal(parts.translationBelow, '我们能把电话');

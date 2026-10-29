@@ -3,11 +3,11 @@ import { resetBufferedTranscriptTurns, type BufferedTranscriptTurn } from '../el
 
 type Recorded = { segmentId: string; revision: number; speaker: string; text: string; timestampMs: number };
 
-function fakeAppState(buffers: { interviewer: BufferedTranscriptTurn | null; user: BufferedTranscriptTurn | null }) {
+function fakeAppState(buffers: { them: BufferedTranscriptTurn | null; user: BufferedTranscriptTurn | null }) {
   const recorded: Recorded[] = [];
   const state = {
     transcriptTurnBuffers: buffers,
-    lastFlushedTranscriptTurns: { interviewer: null, user: null },
+    lastFlushedTranscriptTurns: { them: null, user: null },
     transcriptSegmentRevisions: new Map<string, number>(),
     recentTranslatedTurns: [] as unknown[],
     recordTranscriptSegment: (segment: Recorded) => { recorded.push(segment); },
@@ -24,20 +24,20 @@ function turn(overrides: Partial<BufferedTranscriptTurn>): BufferedTranscriptTur
 
 t.test('a reset writes every turn still being assembled to the record, then clears it', async (t) => {
   const { state, recorded } = fakeAppState({
-    interviewer: turn({ segmentId: 'seg_a', revision: 2, text: '  Pricing is   per site ', startedAt: 1500 }),
+    them: turn({ segmentId: 'seg_a', revision: 2, text: '  Pricing is   per site ', startedAt: 1500 }),
     user: turn({ segmentId: 'user_b', text: 'Three works for us' }),
   });
   resetBufferedTranscriptTurns(state as any);
   t.same(recorded, [
-    { segmentId: 'seg_a', revision: 2, speaker: 'interviewer', text: 'Pricing is per site', timestampMs: 1500 },
+    { segmentId: 'seg_a', revision: 2, speaker: 'them', text: 'Pricing is per site', timestampMs: 1500 },
     { segmentId: 'user_b', revision: 1, speaker: 'user', text: 'Three works for us', timestampMs: 1000 },
   ]);
-  t.equal(state.transcriptTurnBuffers.interviewer, null);
+  t.equal(state.transcriptTurnBuffers.them, null);
   t.equal(state.transcriptTurnBuffers.user, null);
 });
 
 t.test('a reset with nothing pending, or only whitespace, writes nothing', async (t) => {
-  const { state, recorded } = fakeAppState({ interviewer: turn({ text: '   ' }), user: null });
+  const { state, recorded } = fakeAppState({ them: turn({ text: '   ' }), user: null });
   resetBufferedTranscriptTurns(state as any);
   t.same(recorded, []);
 });

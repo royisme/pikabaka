@@ -596,7 +596,7 @@ export class KnowledgeOrchestrator {
     this.depthScorer.feed(message);
   }
 
-  feedInterviewerUtterance(text: string): void {
+  feedThemUtterance(text: string): void {
     if (this.negotiationTracker?.feedUtterance) {
       this.negotiationTracker.feedUtterance(text);
 

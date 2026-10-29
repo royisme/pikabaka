@@ -22,7 +22,7 @@ export interface SuggestionTrigger {
 
 // Context item matching Swift ContextManager structure
 export interface ContextItem {
-    role: 'interviewer' | 'user' | 'assistant';
+    role: 'them' | 'user' | 'assistant';
     text: string;
     timestamp: number;
 }
@@ -63,17 +63,17 @@ export class SessionTracker {
     private transcriptEpochSummaries: string[] = [];
     private isCompacting: boolean = false;
 
-    // Track interim interviewer segment
-    private lastInterimInterviewer: TranscriptSegment | null = null;
+    // Track the interim other-party segment
+    private lastInterimThem: TranscriptSegment | null = null;
 
     // Detected coding question from transcript or screenshot extraction
     private detectedCodingQuestion: string | null = null;
     private codingQuestionSource: 'screenshot' | 'transcript' | null = null;
     private codingQuestionSetAt: number | null = null;
 
-    // Rolling buffer for multi-segment interviewer question detection
-    private recentInterviewerBuffer: { text: string; timestamp: number }[] = [];
-    private static readonly INTERVIEWER_BUFFER_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+    // Rolling buffer for multi-segment other-party question detection
+    private recentThemBuffer: { text: string; timestamp: number }[] = [];
+    private static readonly THEM_BUFFER_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
     // Screenshot-detected question stays sticky for 3 min before transcript can override
     private static readonly SCREENSHOT_STALE_MS = 3 * 60 * 1000;
 
@@ -162,11 +162,11 @@ export class SessionTracker {
         this.detectedCodingQuestion = null;
         this.codingQuestionSource = null;
         this.codingQuestionSetAt = null;
-        this.recentInterviewerBuffer = [];
+        this.recentThemBuffer = [];
     }
 
     /**
-     * Heuristic to decide if an interviewer statement looks like a coding question.
+     * Heuristic to decide if an other-party statement looks like a coding question.
      * Requires ≥2 of the signal patterns and minimum length to avoid false positives
      * on casual conversation ("can you implement X?" → yes, "sounds good!" → no).
      */
@@ -193,7 +193,7 @@ export class SessionTracker {
      * Only stores FINAL transcripts.
      * Returns { role, isRefinementCandidate } so the engine can decide whether to trigger follow-up.
      */
-    addTranscript(segment: TranscriptSegment): { role: 'interviewer' | 'user' | 'assistant' } | null {
+    addTranscript(segment: TranscriptSegment): { role: 'them' | 'user' | 'assistant' } | null {
         if (!segment.final) return null;
 
         const role = this.mapSpeakerToRole(segment.speaker);
@@ -283,7 +283,7 @@ export class SessionTracker {
         this.assistantResponseHistory.push({
             text: cleanText,
             timestamp: Date.now(),
-            questionContext: this.getLastInterviewerTurn() || 'unknown'
+            questionContext: this.getLastThemTurn() || 'unknown'
         });
 
         // Keep history bounded (last 10 responses)
@@ -298,34 +298,34 @@ export class SessionTracker {
     /**
      * Handle incoming transcript from native audio service
      */
-    handleTranscript(segment: TranscriptSegment): { role: 'interviewer' | 'user' | 'assistant' } | null {
-        // Track interim segments for interviewer to prevent data loss on stop
+    handleTranscript(segment: TranscriptSegment): { role: 'them' | 'user' | 'assistant' } | null {
+        // Track interim segments for the other party to prevent data loss on stop
         if (segment.speaker === 'user') {
             if (isVerboseLogging() && (Math.random() < 0.05 || segment.final)) {
                 console.log(`[SessionTracker] RX User Segment: Final=${segment.final}`);
             }
         }
-        if (segment.speaker === 'interviewer') {
+        if (segment.speaker === 'them') {
             if (isVerboseLogging() && (Math.random() < 0.05 || segment.final)) {
-                console.log(`[SessionTracker] RX Interviewer Segment: Final=${segment.final}`);
+                console.log(`[SessionTracker] RX Them Segment: Final=${segment.final}`);
             }
 
             if (!segment.final) {
-                this.lastInterimInterviewer = segment;
+                this.lastInterimThem = segment;
             } else {
-                this.lastInterimInterviewer = null;
+                this.lastInterimThem = null;
 
                 // Add segment to rolling buffer and evict old entries
-                this.recentInterviewerBuffer.push({ text: segment.text, timestamp: segment.timestamp });
-                const bufferCutoff = Date.now() - SessionTracker.INTERVIEWER_BUFFER_WINDOW_MS;
-                this.recentInterviewerBuffer = this.recentInterviewerBuffer.filter(e => e.timestamp >= bufferCutoff);
+                this.recentThemBuffer.push({ text: segment.text, timestamp: segment.timestamp });
+                const bufferCutoff = Date.now() - SessionTracker.THEM_BUFFER_WINDOW_MS;
+                this.recentThemBuffer = this.recentThemBuffer.filter(e => e.timestamp >= bufferCutoff);
 
                 // Test single segment first; if no match, test accumulated recent turns
-                // (interviewer may state a problem across multiple speech segments)
+                // (the other party may state a problem across multiple speech segments)
                 if (this.looksLikeCodingQuestion(segment.text)) {
                     this.setCodingQuestion(segment.text, 'transcript');
-                } else if (this.recentInterviewerBuffer.length > 1) {
-                    const combinedText = this.recentInterviewerBuffer.map(e => e.text).join(' ');
+                } else if (this.recentThemBuffer.length > 1) {
+                    const combinedText = this.recentThemBuffer.map(e => e.text).join(' ');
                     if (this.looksLikeCodingQuestion(combinedText)) {
                         this.setCodingQuestion(combinedText, 'transcript');
                     }
@@ -368,8 +368,8 @@ export class SessionTracker {
         return this.assistantResponseHistory;
     }
 
-    getLastInterimInterviewer(): TranscriptSegment | null {
-        return this.lastInterimInterviewer;
+    getLastInterimThem(): TranscriptSegment | null {
+        return this.lastInterimThem;
     }
 
     /**
@@ -378,7 +378,7 @@ export class SessionTracker {
     getFormattedContext(lastSeconds: number = 120): string {
         const items = this.getContext(lastSeconds);
         return items.map(item => {
-            const label = item.role === 'interviewer' ? 'INTERVIEWER' :
+            const label = item.role === 'them' ? 'INTERVIEWER' :
                 item.role === 'user' ? 'ME' :
                     'ASSISTANT (PREVIOUS SUGGESTION)';
             return `[${label}]: ${item.text}`;
@@ -386,11 +386,11 @@ export class SessionTracker {
     }
 
     /**
-     * Get the last interviewer turn
+     * Get the last other-party turn
      */
-    getLastInterviewerTurn(): string | null {
+    getLastThemTurn(): string | null {
         for (let i = this.contextItems.length - 1; i >= 0; i--) {
-            if (this.contextItems[i].role === 'interviewer') {
+            if (this.contextItems[i].role === 'them') {
                 return this.contextItems[i].text;
             }
         }
@@ -398,12 +398,12 @@ export class SessionTracker {
     }
 
     /**
-     * Get full session context from accumulated transcript (User + Interviewer + Assistant)
+     * Get full session context from accumulated transcript (user + them + assistant)
      */
     getFullSessionContext(): string {
         const recentTranscript = this.fullTranscript.map(segment => {
             const role = this.mapSpeakerToRole(segment.speaker);
-            const label = role === 'interviewer' ? 'INTERVIEWER' :
+            const label = role === 'them' ? 'INTERVIEWER' :
                 role === 'user' ? 'ME' :
                     'ASSISTANT';
             return `[${label}]: ${segment.text}`;
@@ -489,11 +489,11 @@ export class SessionTracker {
      * Force-save any pending interim transcript (called on meeting stop)
      */
     flushInterimTranscript(): void {
-        if (this.lastInterimInterviewer) {
+        if (this.lastInterimThem) {
             console.log('[SessionTracker] Force-saving pending interim transcript');
-            const finalSegment = { ...this.lastInterimInterviewer, final: true };
+            const finalSegment = { ...this.lastInterimThem, final: true };
             this.addTranscript(finalSegment);
-            this.lastInterimInterviewer = null;
+            this.lastInterimThem = null;
         }
     }
 
@@ -510,21 +510,21 @@ export class SessionTracker {
         this.meetingId = null;
         this.lastAssistantMessage = null;
         this.assistantResponseHistory = [];
-        this.lastInterimInterviewer = null;
+        this.lastInterimThem = null;
         this.detectedCodingQuestion = null;
         this.codingQuestionSource = null;
         this.codingQuestionSetAt = null;
-        this.recentInterviewerBuffer = [];
+        this.recentThemBuffer = [];
     }
 
     // ============================================
     // Private Helpers
     // ============================================
 
-    mapSpeakerToRole(speaker: string): 'interviewer' | 'user' | 'assistant' {
+    mapSpeakerToRole(speaker: string): 'them' | 'user' | 'assistant' {
         if (speaker === 'user') return 'user';
         if (speaker === 'assistant') return 'assistant';
-        return 'interviewer'; // system audio = interviewer
+        return 'them'; // system audio = the other party
     }
 
     private evictOldEntries(): void {
@@ -551,7 +551,7 @@ export class SessionTracker {
             const oldEntries = this.fullTranscript.slice(0, summarizeCount);
             const summaryInput = oldEntries.map(seg => {
                 const role = this.mapSpeakerToRole(seg.speaker);
-                const label = role === 'interviewer' ? 'INTERVIEWER' :
+                const label = role === 'them' ? 'INTERVIEWER' :
                     role === 'user' ? 'ME' : 'ASSISTANT';
                 return `[${label}]: ${seg.text}`;
             }).join('\n');

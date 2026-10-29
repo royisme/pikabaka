@@ -57,7 +57,7 @@ for (const [id, name, , provider] of services) {
     t.test(`${name}: a missing key refuses the selected service, never constructing Google`, t => {
         for (const key of [undefined, '', '   ']) {
             const f = pipeline(id, key);
-            for (const speaker of ['interviewer', 'user'] as const) {
+            for (const speaker of ['them', 'user'] as const) {
                 t.throws(() => f.audio.createSTTProvider({} as AppState, speaker), {
                     message: `${name} is not configured: add its key in Provider setup.`,
                 });
@@ -68,7 +68,7 @@ for (const [id, name, , provider] of services) {
     });
     t.test(`${name}: a saved key constructs only its own provider with the existing model and speaker languages`, t => {
         const f = pipeline(id, 'invented-key');
-        const theirs = f.audio.createSTTProvider({} as AppState, 'interviewer');
+        const theirs = f.audio.createSTTProvider({} as AppState, 'them');
         const yours = f.audio.createSTTProvider({} as AppState, 'user');
         t.same(f.constructed, [provider, provider]);
         const expected = provider === 'RestSTT'
@@ -86,12 +86,12 @@ for (const [id, name, , provider] of services) {
 t.test('Google, explicit or legacy default, requires the saved service-account file', t => {
     for (const selected of ['google', undefined]) {
         const missing = pipeline(selected);
-        t.throws(() => missing.audio.createSTTProvider({} as AppState, 'interviewer'), {
+        t.throws(() => missing.audio.createSTTProvider({} as AppState, 'them'), {
             message: 'Google Cloud is not configured: choose its service-account file in Provider setup.',
         });
         t.same(missing.constructed, []);
         const configured = pipeline(selected, '/synthetic/account.json');
-        const stt = configured.audio.createSTTProvider({} as AppState, 'interviewer');
+        const stt = configured.audio.createSTTProvider({} as AppState, 'them');
         t.same(configured.constructed, ['GoogleSTT']);
         t.equal(Reflect.get(stt, 'language'), 'english-us');
     }
@@ -200,7 +200,7 @@ t.test('the meeting overlay polls the retained setup error and shows its real me
     t.equal(polls, 1, 'the existing status IPC is read, not a fabricated UI error');
     t.equal(status.detail, state.lastAudioPipelineError);
     const html = renderToStaticMarkup(React.createElement(TranscriptPanel, {
-        transcriptSegments: [], isInterviewerSpeaking: false, currentInterviewerPartial: '',
+        transcriptSegments: [], isThemSpeaking: false, currentThemPartial: '',
         transcriptDisplayMode: 'original', translationEnabled: false, showTranscript: true,
         handleTranslateTranscriptSegment: () => {}, status, onFixAudio: () => {},
     }));

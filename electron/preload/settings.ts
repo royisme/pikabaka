@@ -139,7 +139,7 @@ export function settingsChannels() {
     getTranscriptTranslationSettings: () => ipcRenderer.invoke("get-transcript-translation-settings"),
     setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: 'ollama' | 'gemini' | 'groq' | 'openai' | 'claude'; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) =>
       ipcRenderer.invoke("set-transcript-translation-settings", settings),
-    translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) =>
+    translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'them' | 'user'; speakerLabel?: string; timestamp?: number }) =>
       ipcRenderer.invoke("translate-transcript-segment", segment),
     licenseActivate: (key: string) => ipcRenderer.invoke('license:activate', key),
     licenseCheckPremium: () => ipcRenderer.invoke('license:check-premium'),

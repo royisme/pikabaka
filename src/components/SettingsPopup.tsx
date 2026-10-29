@@ -30,7 +30,7 @@ const SettingsPopup = () => {
     });
 
     // Live transcript: external store via useLocalStorageValue
-    const [storedTranscript, setStoredTranscript] = useLocalStorageValue('pika_interviewer_transcript');
+    const [storedTranscript, setStoredTranscript] = useLocalStorageValue('pika_them_transcript');
     const showTranscript = storedTranscript !== 'false';
 
     // Action button mode: read via query, stream via useMainEvent
@@ -122,7 +122,7 @@ const SettingsPopup = () => {
                 </div>
 
 
-                {/* Interviewer Transcript Toggle */}
+                {/* Other-party transcript toggle */}
                 <div className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors duration-200 group cursor-default ${itemHoverClass}`}>
                     <div className="flex items-center gap-3">
                         <MessageSquare

@@ -88,7 +88,7 @@ const MeetingDetails: React.FC<MeetingDetailsProps> = ({ meeting: initialMeeting
             const result = await window.electronAPI?.translateTranscriptSegment({
                 segmentId: `dashboard_${meeting.id}_${index}`,
                 text: entry.text,
-                speaker: entry.speaker === 'user' ? 'user' : 'interviewer',
+                speaker: entry.speaker === 'user' ? 'user' : 'them',
                 speakerLabel: entry.speaker === 'user' ? 'Me' : 'Interviewer',
                 timestamp: entry.timestamp,
             });

@@ -2,36 +2,9 @@ import React from "react"
 import ReactDOM from "react-dom/client"
 import App from "./App"
 import "./index.css"
+import { migrateLegacyLocalStorage } from "./lib/legacyLocalStorage"
 
-const LEGACY_LOCALSTORAGE_KEYS: [string, string][] = [
-  ["natively_resolved_theme", "pika_resolved_theme"],
-  ["natively_interviewer_transcript", "pika_interviewer_transcript"],
-  ["natively_hideChatHidesWidget", "pika_hideChatHidesWidget"],
-  ["natively_undetectable", "pika_undetectable"],
-  ["natively_overlay_opacity", "pika_overlay_opacity"],
-  ["natively_last_meeting_start", "pika_last_meeting_start"],
-  ["natively_show_profile_toaster", "pika_show_profile_toaster"],
-  ["natively_feature_interest", "pika_feature_interest"],
-  ["natively_groq_fast_text", "pika_groq_fast_text"],
-  ["natively_has_launched", "pika_has_launched"],
-  ["natively_user_name", "pika_user_name"],
-];
-
-function migrateLegacyLocalStorage(): void {
-  try {
-    for (const [legacy, next] of LEGACY_LOCALSTORAGE_KEYS) {
-      const v = localStorage.getItem(legacy);
-      if (v !== null && localStorage.getItem(next) === null) {
-        localStorage.setItem(next, v);
-        localStorage.removeItem(legacy);
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-}
-
-migrateLegacyLocalStorage();
+migrateLegacyLocalStorage(localStorage);
 
 const THEME_CACHE_KEY = "pika_resolved_theme";
 

@@ -9,7 +9,7 @@ export interface TranscriptSegment {
   translationState: 'pending' | 'streaming' | 'complete' | 'error' | 'skipped';
   detectedLanguage?: string;
   revision?: number;
-  speaker?: 'interviewer' | 'user';
+  speaker?: 'them' | 'user';
   /** Why the latest translation failed; set only while `translationState` is `error`. */
   translationError?: 'timeout' | 'auth' | 'rate-limit' | 'network' | 'other';
   /** The `revision` of the source text that `translatedText` translates. */
@@ -24,8 +24,8 @@ export interface TranscriptEventForSegment {
   sourceText?: string;
   translatedText?: string;
   segmentId?: string;
-  /** When `speakerLabel` is omitted, defaults: interviewer -> Interviewer, user -> Me, unknown -> User 1 */
-  speaker?: 'interviewer' | 'user';
+  /** When `speakerLabel` is omitted, defaults: them -> Interviewer, user -> Me, unknown -> User 1 */
+  speaker?: 'them' | 'user';
   speakerLabel?: string;
   timestamp?: number;
   translationState?: 'pending' | 'streaming' | 'complete' | 'error' | 'skipped';
@@ -38,7 +38,7 @@ export interface TranscriptEventForSegment {
 
 function defaultSpeakerLabelForEvent(event: TranscriptEventForSegment): string {
   if (event.speaker === 'user') return 'Me';
-  if (event.speaker === 'interviewer') return 'Interviewer';
+  if (event.speaker === 'them') return 'Interviewer';
   return 'User 1';
 }
 

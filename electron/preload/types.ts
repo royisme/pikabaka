@@ -57,7 +57,7 @@ export interface ElectronAPI {
   getStoredCredentials: () => Promise<{ storage: CredentialStorageStatus; connectionHeaders?: Record<string, HeaderState[]>; hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: string; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; hasSonioxKey: boolean }>
   getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both' }>
   setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) => Promise<{ success: boolean; error?: string }>
-  translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'interviewer' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string; translatedText?: string }>
+  translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'them' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string; translatedText?: string }>
 
   // STT Provider Management
   setSttProvider: (provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => Promise<{ success: boolean; error?: string }>
@@ -95,9 +95,9 @@ export interface ElectronAPI {
     connected: boolean;
     meetingActive: boolean;
     hasRecentSystemAudioChunk: boolean;
-    hasRecentInterviewerTranscript: boolean;
+    hasRecentThemTranscript: boolean;
     lastSystemAudioChunkAt: number | null;
-    lastInterviewerTranscriptAt: number | null;
+    lastThemTranscriptAt: number | null;
     lastError: string | null;
   }>
 

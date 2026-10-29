@@ -1,6 +1,6 @@
 // electron/knowledge/DepthScorer.ts
 // Tracks question topics and depth within an interview session.
-// Used to provide progressively deeper answers as the interviewer
+// Used to provide progressively deeper answers as the other party
 // digs into the same topic.
 
 interface QuestionEntry {
