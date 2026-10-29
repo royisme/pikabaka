@@ -541,15 +541,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getOpenAtLogin: () => ipcRenderer.invoke("get-open-at-login"),
   getPermissionStatus: () => ipcRenderer.invoke("get-permission-status"),
   openPrivacySettings: (type: 'microphone' | 'screen') => ipcRenderer.invoke("open-privacy-settings", type),
-  setDisguise: (mode: 'terminal' | 'settings' | 'activity' | 'none') => ipcRenderer.invoke("set-disguise", mode),
-  getDisguise: () => ipcRenderer.invoke("get-disguise"),
-  onDisguiseChanged: (callback: (mode: 'terminal' | 'settings' | 'activity' | 'none') => void) => {
-    const subscription = (_: any, mode: any) => callback(mode)
-    ipcRenderer.on('disguise-changed', subscription)
-    return () => {
-      ipcRenderer.removeListener('disguise-changed', subscription)
-    }
-  },
 
   onSettingsVisibilityChange: (callback: (isVisible: boolean) => void) => {
     const subscription = (_: any, isVisible: boolean) => callback(isVisible)

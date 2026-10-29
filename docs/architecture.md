@@ -8,6 +8,8 @@ Stack, folders and the pipelines that matter for the conversation UI and live tr
 2. **React renderer** (`src/`): Vite, React, TypeScript, Tailwind. React Query and local `useState`; no Redux or Zustand. Entry `src/main.tsx`; `src/App.tsx` switches on window mode (main, settings, cropper).
 3. **Rust native module** (`native-module/`, crate `natively-audio`): low-latency audio capture with cpal, WebRTC VAD, rubato resampling and silence suppression. Speaker capture is CoreAudio/ScreenCaptureKit on macOS and WASAPI on Windows. Built by `scripts/build-native.js`.
 
+`electron/lib/lifecycle.ts` owns startup identity: the Pika app name (still guarded while Undetectable is on) and the default Windows AUMID `com.pika.assistant.none`. `stealth.ts` no longer manages process identity; dormant `disguiseMode` values remain in `settings.json`, preserved with other unknown keys by `SettingsManager`.
+
 ## Native echo cancellation
 
 `native-module/src/echo_cancellation.rs` owns a process-wide, bounded speaker reference and a per-microphone SpeexDSP echo state. The system DSP thread copies ungated mono PCM into the reference without waiting for the microphone; its existing output signal, frame size and buffering are unchanged. The microphone DSP thread aligns the reference, converts it to the microphone's hardware rate, cancels echo in 20ms frames with a 250ms filter, then runs the existing silence/VAD gate. Hardware-rate PCM and `get_sample_rate()` remain the STT contract; `resampler.rs` is not in this capture path.

@@ -11,8 +11,8 @@ import { useMainEvent } from '../hooks/useMainEvent';
 import { useLocalStorageValue } from '../hooks/useLocalStorageValue';
 import {
     X, Mic, Speaker, Monitor, Keyboard, BookOpen,
-    RotateCcw, Eye, Layout, MessageSquare,
-    ChevronDown, ChevronRight, Check, Power, Palette, Ghost, Sun, Moon, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink,
+    RotateCcw, Eye, MessageSquare,
+    ChevronDown, ChevronRight, Check, Power, Palette, Ghost, Sun, Moon, Info, Globe, FlaskConical, Terminal, Settings, ExternalLink,
     MapPin, PointerOff,
     AlertCircle, Shield
 } from 'lucide-react';
@@ -247,15 +247,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     );
     useMainEvent(window.electronAPI?.onOverlayMousePassthroughChanged, (enabled: boolean) => {
         queryClient.setQueryData(['overlay-mouse-passthrough'], enabled);
-    });
-
-    const { data: disguiseMode = 'none' } = useQuery<'terminal' | 'settings' | 'activity' | 'none'>(
-        ['settings', 'disguise'],
-        () => window.electronAPI?.getDisguise?.() ?? Promise.resolve('none'),
-        { enabled: isOpen && !!window.electronAPI?.getDisguise }
-    );
-    useMainEvent(window.electronAPI?.onDisguiseChanged, (newMode: any) => {
-        queryClient.setQueryData(['settings', 'disguise'], newMode);
     });
 
     const { data: openOnLogin = false } = useQuery<boolean>(
@@ -1009,58 +1000,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
                                         </div>
 
-                                    </div>
-
-                                    {/* Process Disguise */}
-                                    {/* Process Disguise */}
-                                    <div className={`${isLight ? 'bg-bg-card' : 'bg-bg-item-surface'} rounded-xl p-5 border border-border-subtle`}>
-                                        <div className="flex flex-col gap-1 mb-3">
-                                            <div className="flex items-center gap-2">
-                                                <h3 className="text-lg font-bold text-text-primary">Process Disguise</h3>
-                                            </div>
-                                            <p className="text-xs text-text-secondary">
-                                                Changes Pika's process name and window titles, with platform-specific icons. This does not exclude it from screen capture.
-                                                <span className="block mt-1 text-text-tertiary">
-                                                    Your choice applies immediately, even with Undetectable mode off.
-                                                </span>
-                                            </p>
-                                        </div>
-
-                                        <div className={`grid grid-cols-2 gap-3 ${isUndetectable ? 'opacity-50 pointer-events-none' : ''}`}>
-                                            {isUndetectable && (
-                                                <p className="col-span-2 text-xs text-state-warning -mt-1 mb-1">
-                                                    ⚠️ Disable Undetectable mode first to change disguise.
-                                                </p>
-                                            )}
-                                            {[
-                                                { id: 'none', label: 'None (Default)', icon: <Layout size={14} /> },
-                                                { id: 'terminal', label: 'Terminal', icon: <Terminal size={14} /> },
-                                                { id: 'settings', label: 'System Settings', icon: <Settings size={14} /> },
-                                                { id: 'activity', label: 'Activity Monitor', icon: <Activity size={14} /> }
-                                            ].map((option) => (
-                                                <button
-                                                    key={option.id}
-                                                    disabled={isUndetectable}
-                                                    onClick={() => {
-                                                        if (isUndetectable) return;
-                                                        queryClient.setQueryData(['settings', 'disguise'], option.id);
-                                                        // @ts-ignore
-                                                        window.electronAPI?.setDisguise(option.id);
-                                                        // Analytics
-                                                    }}
-                                                    className={`p-3 rounded-lg border text-left flex items-center gap-3 transition-all ${disguiseMode === option.id
-                                                        ? 'bg-accent-primary border-accent-primary text-on-primary shadow-lg shadow-blue-500/20'
-                                                        : 'bg-bg-input border-border-subtle text-text-secondary hover:text-text-primary hover:bg-bg-subtle-hover'
-                                                        } ${isUndetectable ? 'cursor-not-allowed' : ''}`}
-                                                >
-                                                    <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${disguiseMode === option.id ? 'bg-white/20 text-white' : 'bg-bg-item-surface text-text-secondary'
-                                                        }`}>
-                                                        {option.icon}
-                                                    </div>
-                                                    <span className="text-xs font-medium">{option.label}</span>
-                                                </button>
-                                            ))}
-                                        </div>
                                     </div>
 
                                 </div>

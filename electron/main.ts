@@ -98,11 +98,7 @@ import {
   getOverlayMousePassthrough as getOverlayMousePassthroughFn,
   getVerboseLogging as getVerboseLoggingFn,
   setVerboseLogging as setVerboseLoggingFn,
-  setDisguise as setDisguiseFn,
-  applyInitialDisguise as applyInitialDisguiseFn,
-  _applyDisguise as applyDisguiseFn,
   _broadcastToAllWindows as broadcastToAllWindowsFn,
-  getDisguise as getDisguiseFn,
 } from "./helpers/stealth"
 import { initializeApp } from "./lib/lifecycle"
 
@@ -146,7 +142,6 @@ export class AppState {
   private knowledgeOrchestrator: any = null
   public tray: Tray | null = null
   public updateAvailable: boolean = false
-  public disguiseMode: 'terminal' | 'settings' | 'activity' | 'none' = 'none'
 
   // View management
   private view: "queue" | "solutions" = "queue"
@@ -167,7 +162,6 @@ export class AppState {
   private endingMeeting: Promise<void> | undefined;
   private _isQuitting: boolean = false;
   public _verboseLogging: boolean = false;
-  public _disguiseTimers: NodeJS.Timeout[] = []; // Track forceUpdate timeouts
   public _dockDebounceTimer: NodeJS.Timeout | null = null; // Debounce dock state changes
   public _dockReassertTimers: NodeJS.Timeout[] = []; // Re-assert dock-hidden state after show+focus
   private _ollamaBootstrapPromise: Promise<void> | null = null;
@@ -196,14 +190,13 @@ export class AppState {
     // 1. Load boot-critical settings first (used by WindowHelpers)
     const settingsManager = SettingsManager.getInstance();
     this.isUndetectable = settingsManager.get('isUndetectable') ?? false;
-    this.disguiseMode = settingsManager.get('disguiseMode') ?? 'none';
     const transcriptAssemblerProfile = settingsManager.get('transcriptAssemblerProfile');
     this.transcriptAssemblerProfile = isTranscriptAssemblerProfile(transcriptAssemblerProfile)
       ? transcriptAssemblerProfile
       : DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE;
     this._verboseLogging = settingsManager.get('verboseLogging') ?? false;
     setVerboseLoggingFlag(this._verboseLogging);
-    console.log(`[AppState] Initialized with isUndetectable=${this.isUndetectable}, disguiseMode=${this.disguiseMode}, verboseLogging=${this._verboseLogging}`);
+    console.log(`[AppState] Initialized with isUndetectable=${this.isUndetectable}, verboseLogging=${this._verboseLogging}`);
 
     // 2. Initialize Helpers with loaded state
     this.windowHelper = new WindowHelper(this)
@@ -1424,26 +1417,11 @@ export class AppState {
     setVerboseLoggingFn(this, enabled)
   }
 
-  public setDisguise(mode: 'terminal' | 'settings' | 'activity' | 'none'): void {
-    setDisguiseFn(this, mode)
-  }
-
-  public applyInitialDisguise(): void {
-    applyInitialDisguiseFn(this)
-  }
-
-  public _applyDisguise(mode: 'terminal' | 'settings' | 'activity' | 'none'): void {
-    applyDisguiseFn(this, mode)
-  }
-
   // Helper: broadcast an IPC event to all windows
   public _broadcastToAllWindows(channel: string, ...args: any[]): void {
     broadcastToAllWindowsFn(this, channel, ...args)
   }
 
-  public getDisguise(): string {
-    return getDisguiseFn(this)
-  }
 }
 
 // Start the application
