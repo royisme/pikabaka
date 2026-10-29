@@ -1,7 +1,6 @@
 import { app, BrowserWindow } from "electron"
 import { initializeIpcHandlers } from "../ipc"
 import { KeybindManager } from "../services/KeybindManager"
-import { SettingsManager } from "../services/SettingsManager"
 import { OllamaManager } from "../services/OllamaManager"
 import { AppState } from "../main"
 import { reportAgentError } from '../agent/MeetingAgent'
@@ -30,18 +29,6 @@ export async function initializeApp() {
   // 2. Wait for app to be ready
   await app.whenReady()
 
-  // 2b. PRE-EMPTIVE dock hide: must happen before ANY operation that causes macOS to
-  // register a dock entry (app.setName, BrowserWindow creation, etc.).
-  // We read isUndetectable directly from settings here — AppState singleton isn't
-  // constructed yet, so we cannot call appState.getUndetectable().
-  if (process.platform === 'darwin') {
-    // SettingsManager is already statically imported — no require() needed.
-    const isUndetectableOnStartup = SettingsManager.getInstance().get('isUndetectable') ?? false;
-    if (isUndetectableOnStartup) {
-      app.dock.hide();
-    }
-  }
-
   // 3. Initialize Managers
   // Initialize CredentialsManager and load keys explicitly
   // This fixes the issue where keys (especially in production) aren't loaded in time for RAG/LLM
@@ -57,7 +44,7 @@ export async function initializeApp() {
   // Initialize IPC handlers before window creation
   initializeIpcHandlers(appState)
 
-  if (!appState.getUndetectable()) app.setName("Pika");
+  app.setName("Pika");
   if (process.platform === 'win32') app.setAppUserModelId("com.pika.assistant.none");
 
   // Start the Ollama lifecycle manager
@@ -77,14 +64,7 @@ export async function initializeApp() {
 
   appState.createWindow()
 
-  // Apply initial stealth state based on isUndetectable setting.
-  // NOTE: app.dock.hide() was already called pre-emptively before createWindow()
-  // when isUndetectable=true. Here we only need to initialize the tray for non-stealth mode.
-  if (!appState.getUndetectable()) {
-    // Normal mode: show tray (dock is already showing — no need to call dock.show() again)
-    appState.showTray();
-  }
-  // Stealth mode: dock is already hidden, tray stays hidden, no action needed here.
+  appState.showTray();
   // Register global shortcuts using KeybindManager
   KeybindManager.getInstance().registerGlobalShortcuts()
 
@@ -103,18 +83,8 @@ export async function initializeApp() {
     console.error('[Main] Failed to recover unprocessed meetings:', err);
   });
 
-  // Note: We do NOT force dock show here anymore, respecting stealth mode.
-
   app.on("activate", () => {
     console.log("App activated")
-    if (process.platform === 'darwin') {
-      // Do NOT call dock.show() while a meeting is running — the dock icon
-      // appearing mid-meeting is a critical stealth failure.
-      if (!appState.getUndetectable() && !appState.getIsMeetingActive()) {
-        app.dock.show();
-      }
-    }
-
     // If no window exists, create it
     if (appState.getMainWindow() === null) {
       appState.createWindow()

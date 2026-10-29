@@ -86,7 +86,6 @@ import {
   createTray as createTrayFn,
   showTray as showTrayFn,
   updateTrayMenu as updateTrayMenuFn,
-  hideTray as hideTrayFn,
 } from "./lib/tray-menu"
 import {
   setHasDebugged as setHasDebuggedFn,
@@ -162,8 +161,6 @@ export class AppState {
   private endingMeeting: Promise<void> | undefined;
   private _isQuitting: boolean = false;
   public _verboseLogging: boolean = false;
-  public _dockDebounceTimer: NodeJS.Timeout | null = null; // Debounce dock state changes
-  public _dockReassertTimers: NodeJS.Timeout[] = []; // Re-assert dock-hidden state after show+focus
   private _ollamaBootstrapPromise: Promise<void> | null = null;
   public screenshotCaptureInProgress: boolean = false;
 
@@ -1372,10 +1369,6 @@ export class AppState {
 
   public updateTrayMenu() {
     updateTrayMenuFn(this)
-  }
-
-  public hideTray(): void {
-    hideTrayFn(this)
   }
 
   public setHasDebugged(value: boolean): void {
