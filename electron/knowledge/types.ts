@@ -6,6 +6,7 @@ export enum DocType {
   JD = 'jd',
   /** Facts the user wrote about themselves, one per line. */
   NOTES = 'notes',
+  MATERIAL = 'material',
 }
 
 // ─── Profile Types ───────────────────────────────────────────
@@ -185,6 +186,21 @@ export interface NegotiationState {
 
 // ─── Knowledge Engine Types ──────────────────────────────────
 
+export type DocumentIndexState = 'indexing' | 'indexed' | 'needs-reindex' | 'failed' | 'not-indexed';
+
+export interface ImportedDocument {
+  id: number;
+  name: string;
+  kind: 'txt' | 'md' | 'docx';
+  importedAt: string;
+  passages: number;
+  state: DocumentIndexState;
+  provider: string | null;
+  dimensions: number | null;
+  indexedAt: string | null;
+  error: string | null;
+}
+
 export interface NotesIndexStatus {
   state: 'indexed' | 'not-indexed' | 'unknown' | 'needs-reindex';
   provider: string | null;
@@ -231,7 +247,7 @@ export interface KnowledgeEmbedding {
 export type EmbedFn = (text: string) => Promise<KnowledgeEmbedding>;
 export type EmbedQueryFn = EmbedFn;
 
-/** A passage of the user's own notes, quoted as data: no candidate framing. */
+/** A passage of the user's notes or documents, quoted as data: no candidate framing. */
 export interface MaterialPassage {
   text: string;
   source: string;

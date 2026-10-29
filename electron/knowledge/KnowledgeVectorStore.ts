@@ -35,7 +35,7 @@ export class KnowledgeVectorStore {
         throw new Error('Embedding dimensions do not match the provider.');
       }
       if (vectors.length && (result.provider !== vectors[0].provider || result.dimensions !== vectors[0].dimensions)) {
-        throw new Error('Embedding provider changed while indexing. Save the document again to retry.');
+        throw new Error('Embedding provider changed while indexing. Re-index the document to retry.');
       }
       vectors.push({ ...result, id: chunk.id });
     }
@@ -45,11 +45,7 @@ export class KnowledgeVectorStore {
       // A replaced/deleted source must not receive an older background result.
       const current = this.db.prepare('SELECT id FROM knowledge_chunks WHERE doc_id = ? ORDER BY chunk_index').all(docId) as Array<{ id: number }>;
       if (current.length !== chunks.length || current.some((chunk, index) => chunk.id !== chunks[index].id)) return;
-      const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name GLOB 'vec_knowledge_*'").all() as Array<{ name: string }>;
-      for (const { name } of tables) {
-        if (!/^vec_knowledge_\d+$/.test(name)) continue;
-        this.db.prepare(`DELETE FROM ${name} WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE doc_id = ?)`).run(docId);
-      }
+      this.deleteNativeVectorsForDocument(docId);
       for (const vector of vectors) {
         const blob = this.embeddingToBlob(vector.embedding);
         this.db.prepare('UPDATE knowledge_chunks SET embedding = ? WHERE id = ?').run(blob, vector.id);
@@ -84,15 +80,20 @@ export class KnowledgeVectorStore {
     return this.searchSimilarJS(queryEmbedding, limit, providerName, docType);
   }
 
-  /**
-   * Check if any chunks have embeddings stored.
-   */
-  hasEmbeddings(): boolean {
-    const row = this.db
-      .prepare('SELECT COUNT(*) as count FROM knowledge_chunks WHERE embedding IS NOT NULL')
-      .get() as { count: number };
+  hasEmbeddings(docType: DocType | DocType[]): boolean {
+    const types = Array.isArray(docType) ? docType : [docType];
+    return this.db.prepare(`SELECT 1 FROM knowledge_chunks
+      WHERE embedding IS NOT NULL AND doc_type IN (${types.map(() => '?').join(',')}) LIMIT 1`)
+      .get(...types) !== undefined;
+  }
 
-    return row.count > 0;
+  /** Called inside the transaction while the document's passage ids still exist. */
+  deleteNativeVectorsForDocument(docId: number): void {
+    const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name GLOB 'vec_knowledge_*'").all() as Array<{ name: string }>;
+    for (const { name } of tables) {
+      if (!/^vec_knowledge_\d+$/.test(name)) continue;
+      this.db.prepare(`DELETE FROM ${name} WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE doc_id = ?)`).run(docId);
+    }
   }
 
   /**

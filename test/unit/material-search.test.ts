@@ -163,7 +163,7 @@ t.test('on with a hit quotes the passages and on with no hit says so in words', 
     t.same(await f.execute({ query: question }, {}, {}), { output: [{ type: 'text', text: JSON.stringify(passages) }] });
     const empty = agent(t, { searchMaterials: async () => [] });
     empty.manager.set('answerUsesMaterials', true);
-    t.same(await empty.execute({ query: question }, {}, {}), { output: [{ type: 'text', text: 'No notes match that question.' }] });
+    t.same(await empty.execute({ query: question }, {}, {}), { output: [{ type: 'text', text: 'No notes or documents match that question.' }] });
     t.end();
 });
 

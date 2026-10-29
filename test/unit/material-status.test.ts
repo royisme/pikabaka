@@ -144,7 +144,7 @@ for (const invalid of ['dimensions', 'provider'] as const) {
         const doc = f.manager.getDocumentByType(DocType.NOTES)!;
         t.equal(calls, 2);
         t.equal(f.orchestrator.getStatus().notesIndex?.state, 'not-indexed');
-        t.equal(doc.index_error, invalid === 'dimensions' ? 'Embedding dimensions do not match the provider.' : 'Embedding provider changed while indexing. Save the document again to retry.');
+        t.equal(doc.index_error, invalid === 'dimensions' ? 'Embedding dimensions do not match the provider.' : 'Embedding provider changed while indexing. Re-index the document to retry.');
         t.same([doc.embedding_provider, doc.embedding_dimensions, doc.indexed_at], [null, null, null]);
         t.same(f.manager.getChunksForDoc(doc.id).map(chunk => chunk.embedding), [null, null]);
     });

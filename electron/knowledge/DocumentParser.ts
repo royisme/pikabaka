@@ -1,6 +1,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { execFileSync } from 'child_process';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 
 export class DocumentParser {
   /**
@@ -23,36 +26,30 @@ export class DocumentParser {
   }
 
   private async parsePlainText(filePath: string, format: string) {
-    const text = fs.readFileSync(filePath, 'utf-8');
+    const text = await fs.promises.readFile(filePath, 'utf-8');
     return { text, metadata: { format } };
   }
 
   private async parsePDF(filePath: string) {
     try {
-      // Use execFileSync to avoid shell injection — arguments passed as array
-      const text = execFileSync('pdftotext', [filePath, '-'], { encoding: 'utf-8', timeout: 30000 });
+      const { stdout: text } = await execFileAsync('pdftotext', [filePath, '-'], { encoding: 'utf-8', timeout: 30000 });
       return { text: text.trim(), metadata: { format: 'pdf' } };
     } catch {
       throw new Error(
-        'PDF parsing failed. Please install pdftotext (brew install poppler) or convert your resume to .md/.txt format.'
+        'PDF parsing failed. Please install pdftotext (brew install poppler) or convert the document to .md/.txt format.'
       );
     }
   }
 
   private async parseDOCX(filePath: string) {
-    const tmpFile = filePath + '.tmp.txt';
     try {
-      // Use execFileSync to avoid shell injection — arguments passed as array
-      execFileSync('textutil', ['-convert', 'txt', '-output', tmpFile, filePath], { timeout: 30000 });
-      const text = fs.readFileSync(tmpFile, 'utf-8');
+      if (process.platform !== 'darwin') throw new Error('DOCX conversion requires macOS');
+      const { stdout: text } = await execFileAsync('textutil', ['-convert', 'txt', '-stdout', filePath], { encoding: 'utf-8', timeout: 30000 });
       return { text: text.trim(), metadata: { format: 'docx' } };
     } catch {
       throw new Error(
-        'DOCX parsing failed. Please convert your resume to .md/.txt format.'
+        'DOCX parsing failed. Please convert the document to .md/.txt format.'
       );
-    } finally {
-      // Clean up temp file regardless of success/failure
-      try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
     }
   }
 }
