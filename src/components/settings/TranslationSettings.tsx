@@ -92,7 +92,7 @@ const TranslationSettings = ({ languages }: { languages: Array<{ value: string; 
     return (
         <div className="min-w-0 bg-bg-card rounded-xl border border-border-subtle p-4">
             <h3 className="text-lg font-bold text-text-primary mb-1">Translation</h3>
-            <p className="text-xs text-text-secondary mb-5">STT is realtime. Translation is applied asynchronously to final interviewer segments.</p>
+            <p className="text-xs text-text-secondary mb-5">STT is realtime. Translation is applied asynchronously to final segments from the other party.</p>
 
             <div className="space-y-4">
                 <div className="flex items-center justify-between gap-3">
@@ -149,7 +149,7 @@ const TranslationSettings = ({ languages }: { languages: Array<{ value: string; 
                     >
                         {savedShown ? '✓ Saved' : 'Save Translation Settings'}
                     </button>
-                    <p className="text-[11px] text-text-tertiary sm:pl-1">Only final interviewer transcript segments are translated.</p>
+                    <p className="text-[11px] text-text-tertiary sm:pl-1">Only final transcript segments from the other party are translated.</p>
                 </div>
                 {saveError ? <p role="alert" className="text-[11px] text-state-danger break-words [overflow-wrap:anywhere]">{saveError}</p> : null}
 

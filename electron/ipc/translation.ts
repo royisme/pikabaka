@@ -55,7 +55,7 @@ export function registerTranslationHandlers(appState: AppState): void {
   safeHandle("translate-transcript-segment", async (_, segment: {
     segmentId: string;
     text: string;
-    speaker?: 'interviewer' | 'user';
+    speaker?: 'them' | 'user';
     speakerLabel?: string;
     timestamp?: number;
   }) => {

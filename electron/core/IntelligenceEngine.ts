@@ -254,17 +254,17 @@ export class IntelligenceEngine extends EventEmitter {
             const contextItems = this.session.getContext(180);
 
             // Inject latest interim transcript if available
-            const lastInterim = this.session.getLastInterimInterviewer();
+            const lastInterim = this.session.getLastInterimThem();
             if (lastInterim && lastInterim.text.trim().length > 0) {
                 const lastItem = contextItems[contextItems.length - 1];
                 const isDuplicate = lastItem &&
-                    lastItem.role === 'interviewer' &&
+                    lastItem.role === 'them' &&
                     (lastItem.text === lastInterim.text || Math.abs(lastItem.timestamp - lastInterim.timestamp) < 1000);
 
                 if (!isDuplicate) {
                     console.log(`[IntelligenceEngine] Injecting interim transcript: "${lastInterim.text.substring(0, 50)}..."`);
                     contextItems.push({
-                        role: 'interviewer',
+                        role: 'them',
                         text: lastInterim.text,
                         timestamp: lastInterim.timestamp
                     });
@@ -285,9 +285,9 @@ export class IntelligenceEngine extends EventEmitter {
                 180
             );
 
-            const lastInterviewerTurn = this.session.getLastInterviewerTurn();
+            const lastThemTurn = this.session.getLastThemTurn();
             const intentResult = await classifyIntent(
-                lastInterviewerTurn,
+                lastThemTurn,
                 preparedTranscript,
                 this.session.getAssistantResponseHistory().length
             );
@@ -487,7 +487,7 @@ export class IntelligenceEngine extends EventEmitter {
 
     /**
      * MODE: Clarify
-     * Ask a clarifying question to the interviewer
+     * Ask a clarifying question to the other party
      */
     async runClarify(): Promise<string | null> {
         console.log('[IntelligenceEngine] runClarify called');
@@ -649,7 +649,7 @@ export class IntelligenceEngine extends EventEmitter {
      * Analyzes a screenshot of partially written code against the detected/provided question
      * and returns a short targeted hint. Question comes from (priority order):
      *   1. problemStatement passed in from ipcHandler (screenshot extraction — highest confidence)
-     *   2. session.detectedCodingQuestion (detected from interviewer transcript)
+     *   2. session.detectedCodingQuestion (detected from the other party's transcript)
      *   3. transcriptContext (last N seconds of conversation — fallback for inference)
      */
     async runCodeHint(imagePaths?: string[], problemStatement?: string): Promise<string | null> {

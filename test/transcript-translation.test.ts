@@ -39,12 +39,12 @@ t.test('upsertTranscriptSegment accepts custom speakerLabel', (t) => {
   t.end();
 });
 
-t.test('upsertTranscriptSegment defaults interviewer label when speaker is interviewer', (t) => {
+t.test('upsertTranscriptSegment defaults the other-party label when speaker is them', (t) => {
   const rows = upsertTranscriptSegment([], {
     final: true,
     text: 'hello',
     segmentId: 'seg_int',
-    speaker: 'interviewer',
+    speaker: 'them',
   });
   t.equal(rows[0].speakerLabel, 'Interviewer');
   t.end();
@@ -74,12 +74,12 @@ t.test('translation executor helpers validate config and build prompt', (t) => {
 });
 
 t.test('receivedAt is stamped by each pending event and kept by later ones', (t) => {
-  const pending = upsertTranscriptSegment([], { final: true, text: 'Hello', segmentId: 's1', speaker: 'interviewer', translationState: 'pending' }, 1000);
+  const pending = upsertTranscriptSegment([], { final: true, text: 'Hello', segmentId: 's1', speaker: 'them', translationState: 'pending' }, 1000);
   t.equal(pending[0].receivedAt, 1000);
-  t.equal(pending[0].speaker, 'interviewer');
+  t.equal(pending[0].speaker, 'them');
   const done = upsertTranscriptSegment(pending, { final: true, text: 'Hello', translatedText: 'Bonjour', segmentId: 's1', translationState: 'complete' }, 2000);
   t.equal(done[0].receivedAt, 1000, 'complete keeps the time the wait began');
-  t.equal(done[0].speaker, 'interviewer', 'speaker survives an update that omits it');
+  t.equal(done[0].speaker, 'them', 'speaker survives an update that omits it');
   const reopened = upsertTranscriptSegment(done, { final: true, text: 'Hello there', segmentId: 's1', translationState: 'pending' }, 3000);
   t.equal(reopened[0].receivedAt, 3000, 'a reopened turn starts a new wait');
   const skipped = upsertTranscriptSegment([], { final: true, text: 'Hi', segmentId: 's2', translationState: 'skipped' }, 4000);

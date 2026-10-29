@@ -289,7 +289,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         'document'
     );
 
-    const [storedTranscript, setStoredTranscript] = useLocalStorageValue('pika_interviewer_transcript');
+    const [storedTranscript, setStoredTranscript] = useLocalStorageValue('pika_them_transcript');
     const showTranscript = storedTranscript !== 'false';
 
     // Recognition Language
@@ -546,13 +546,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 const modelResult = await api.setSttModel(sttProvider, wantModel);
                 if (!modelResult.success) throw new Error(modelResult.error || 'The model was not saved');
             }
-            await api.setRecognitionLanguage(recognitionLanguage, 'interviewer');
+            await api.setRecognitionLanguage(recognitionLanguage, 'them');
             await api.setRecognitionLanguage(userRecognitionLanguage || recognitionLanguage, 'user');
 
             // Read back what the app holds now.
             const [creds, theirs, yours, running] = await Promise.all([
                 api.getStoredCredentials(),
-                api.getSttLanguage('interviewer'),
+                api.getSttLanguage('them'),
                 api.getSttLanguage('user'),
                 api.getMeetingActive().catch(() => false),
             ]);
@@ -904,7 +904,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         </div>
                                                         <div>
                                                             <h3 className="text-sm font-bold text-text-primary">Live transcript</h3>
-                                                            <p className="text-xs text-text-secondary mt-0.5">Show the live transcript for both the interviewer and you</p>
+                                                            <p className="text-xs text-text-secondary mt-0.5">Show the live transcript for both the other party and you</p>
                                                         </div>
                                                     </div>
                                                     <div

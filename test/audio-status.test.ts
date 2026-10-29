@@ -5,7 +5,7 @@ const base: AudioStatusInput = {
   meetingActive: true,
   isConnected: true,
   hasRecentSystemAudioChunk: false,
-  hasRecentInterviewerTranscript: false,
+  hasRecentThemTranscript: false,
   lastError: null,
   activeSince: 1000,
   noSystemAudioSince: null,
@@ -52,7 +52,7 @@ t.test('with no error text, stopped points at the permission', async (t) => {
 });
 
 t.test('a transcript means live, whatever else is reported', async (t) => {
-  const status = audioStatus({ ...base, hasRecentInterviewerTranscript: true, hasRecentSystemAudioChunk: true, lastError: 'old error' });
+  const status = audioStatus({ ...base, hasRecentThemTranscript: true, hasRecentSystemAudioChunk: true, lastError: 'old error' });
   t.equal(status.key, 'live');
   t.equal(status.dot, 'success');
   t.equal(status.zone, null, 'there are rows, so no empty-area text');
@@ -88,7 +88,7 @@ t.test('every chip has a short form of at most 12 characters', async (t) => {
     { isConnected: false },
     { isConnected: false, lastError: 'e' },
     { hasRecentSystemAudioChunk: true },
-    { hasRecentInterviewerTranscript: true },
+    { hasRecentThemTranscript: true },
     { noSystemAudioSince: 0, now: NO_AUDIO_AFTER_MS },
     {},
   ];

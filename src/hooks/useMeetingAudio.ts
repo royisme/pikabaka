@@ -5,9 +5,9 @@ type NativeAudioHealth = {
   connected: boolean;
   meetingActive: boolean;
   hasRecentSystemAudioChunk: boolean;
-  hasRecentInterviewerTranscript: boolean;
+  hasRecentThemTranscript: boolean;
   lastSystemAudioChunkAt: number | null;
-  lastInterviewerTranscriptAt: number | null;
+  lastThemTranscriptAt: number | null;
   lastError: string | null;
 };
 
@@ -15,9 +15,9 @@ const fallbackStatus: NativeAudioHealth = {
   connected: false,
   meetingActive: false,
   hasRecentSystemAudioChunk: false,
-  hasRecentInterviewerTranscript: false,
+  hasRecentThemTranscript: false,
   lastSystemAudioChunkAt: null,
-  lastInterviewerTranscriptAt: null,
+  lastThemTranscriptAt: null,
   lastError: null,
 };
 
@@ -102,7 +102,7 @@ export function useMeetingAudio() {
     nativeAudioHealth.meetingActive &&
     isConnected &&
     !nativeAudioHealth.hasRecentSystemAudioChunk &&
-    !nativeAudioHealth.hasRecentInterviewerTranscript;
+    !nativeAudioHealth.hasRecentThemTranscript;
 
   if (!shouldTrackMissingSystemAudio) {
     noSystemAudioSinceRef.current = null;
@@ -125,7 +125,7 @@ export function useMeetingAudio() {
       meetingActive: nativeAudioHealth.meetingActive,
       isConnected,
       hasRecentSystemAudioChunk: nativeAudioHealth.hasRecentSystemAudioChunk,
-      hasRecentInterviewerTranscript: nativeAudioHealth.hasRecentInterviewerTranscript,
+      hasRecentThemTranscript: nativeAudioHealth.hasRecentThemTranscript,
       lastError: nativeAudioHealth.lastError,
       activeSince,
       noSystemAudioSince,

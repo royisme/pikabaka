@@ -82,7 +82,7 @@ export function registerCoreHandlers(appState: AppState): void {
     return { success: true };
   });
 
-  safeHandle("get-stt-language", async (_, speaker?: 'interviewer' | 'user') => {
+  safeHandle("get-stt-language", async (_, speaker?: 'them' | 'user') => {
     const { CredentialsManager } = require('../services/CredentialsManager');
     return speaker === 'user'
       ? CredentialsManager.getInstance().getSttLanguageUser()

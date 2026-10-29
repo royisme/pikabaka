@@ -487,17 +487,17 @@ export class AppState {
   public microphoneCapture: any = null;
   public audioTestCapture: any = null; // For audio settings test
   private _audioTestStarting = false;               // P2-12: in-flight guard against concurrent calls
-  public googleSTT: STTProvider | null = null; // Interviewer
+  public googleSTT: STTProvider | null = null; // Them
   public googleSTT_User: STTProvider | null = null; // User
   public lastSystemAudioChunkAt: number | null = null;
-  public lastInterviewerTranscriptAt: number | null = null;
+  public lastThemTranscriptAt: number | null = null;
   public lastAudioPipelineError: string | null = null;
   public transcriptAssemblerProfile: TranscriptAssemblerProfile = 'sentence_bias';
   public transcriptTurnBuffers: Record<TranscriptSpeaker, BufferedTranscriptTurn | null> = {
-    interviewer: null,
+    them: null,
     user: null,
   };
-  public lastFlushedTranscriptTurns: Record<TranscriptSpeaker, FlushedTranscriptTurn | null> = { interviewer: null, user: null };
+  public lastFlushedTranscriptTurns: Record<TranscriptSpeaker, FlushedTranscriptTurn | null> = { them: null, user: null };
   public transcriptSegmentRevisions: Map<string, number> = new Map();
   public recentTranslatedTurns: Array<{ segmentId: string; source: string; translation: string }> = [];
 
@@ -555,7 +555,7 @@ export class AppState {
     if (!this.currentMeetingId) return;
     try {
       const written = DatabaseManager.getInstance().upsertSegment({ meetingId: this.currentMeetingId, ...segment });
-      if (written && segment.speaker === 'interviewer') {
+      if (written && segment.speaker === 'them') {
         getGate().onSegment({ meetingId: this.currentMeetingId, segmentId: segment.segmentId, revision: segment.revision });
       }
     } catch (err) {
@@ -579,7 +579,7 @@ export class AppState {
     return emitTranscriptWithTranslationFn(this, params)
   }
 
-  public createSTTProvider(speaker: 'interviewer' | 'user'): STTProvider {
+  public createSTTProvider(speaker: 'them' | 'user'): STTProvider {
     return createSTTProviderFn(this, speaker)
   }
 
@@ -611,7 +611,7 @@ export class AppState {
       });
       this.systemAudioCapture.on('speech_ended', () => {
         this.googleSTT?.notifySpeechEnded?.();
-        this.handleSpeakerSpeechEnded('interviewer');
+        this.handleSpeakerSpeechEnded('them');
       });
       this.systemAudioCapture.on('error', (err: Error) => {
         console.error('[Main] SystemAudioCapture Error:', err);
@@ -632,7 +632,7 @@ export class AppState {
         });
         this.systemAudioCapture.on('speech_ended', () => {
           this.googleSTT?.notifySpeechEnded?.();
-          this.handleSpeakerSpeechEnded('interviewer');
+          this.handleSpeakerSpeechEnded('them');
         });
         this.systemAudioCapture.on('error', (err: Error) => {
           console.error('[Main] SystemAudioCapture (Default) Error:', err);
@@ -764,9 +764,9 @@ export class AppState {
     connected: boolean;
     meetingActive: boolean;
     hasRecentSystemAudioChunk: boolean;
-    hasRecentInterviewerTranscript: boolean;
+    hasRecentThemTranscript: boolean;
     lastSystemAudioChunkAt: number | null;
-    lastInterviewerTranscriptAt: number | null;
+    lastThemTranscriptAt: number | null;
     lastError: string | null;
   } {
     return getNativeAudioStatusFn(this)
@@ -786,7 +786,7 @@ export class AppState {
     this.setMicrophoneMuted(false);
     this.resetBufferedTranscriptTurns();
     this.lastSystemAudioChunkAt = null;
-    this.lastInterviewerTranscriptAt = null;
+    this.lastThemTranscriptAt = null;
     this.lastAudioPipelineError = null;
     this.broadcastMeetingState();
     if (metadata) {
@@ -880,7 +880,7 @@ export class AppState {
     this.googleSTT_User?.stop();
     this.resetBufferedTranscriptTurns();
     this.lastSystemAudioChunkAt = null;
-    this.lastInterviewerTranscriptAt = null;
+    this.lastThemTranscriptAt = null;
     this.lastAudioPipelineError = null;
 
     // Save session state and reset context — MeetingPersistence.stopMeeting() is
@@ -1043,7 +1043,7 @@ export class AppState {
   }
 
   // Each speaker has its own recognition language; only that speaker's stream restarts.
-  public setRecognitionLanguage(key: string, speaker: 'interviewer' | 'user' = 'interviewer'): void {
+  public setRecognitionLanguage(key: string, speaker: 'them' | 'user' = 'them'): void {
     console.log(`[AppState] Setting ${speaker} recognition language to: ${key}`);
     const { CredentialsManager } = require('./services/CredentialsManager');
     if (speaker === 'user') {

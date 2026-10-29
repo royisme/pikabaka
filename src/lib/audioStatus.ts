@@ -2,7 +2,7 @@ export type AudioStatusInput = {
   meetingActive: boolean;
   isConnected: boolean;
   hasRecentSystemAudioChunk: boolean;
-  hasRecentInterviewerTranscript: boolean;
+  hasRecentThemTranscript: boolean;
   lastError: string | null;
   /** When the meeting became active; null if it is not. */
   activeSince: number | null;
@@ -61,7 +61,7 @@ export function audioStatus(input: AudioStatusInput): AudioStatus {
     return stopped(detail);
   }
 
-  if (input.hasRecentInterviewerTranscript) {
+  if (input.hasRecentThemTranscript) {
     return { key: 'live', level: 'ok', dot: 'success', chip: 'Live', chipShort: 'Live', zone: null, action: null, detail: null };
   }
 

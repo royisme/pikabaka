@@ -11,9 +11,9 @@ export function registerMiscHandlers(appState: AppState): void {
     const status = appState.getNativeAudioStatus();
     return {
       hasRecentSystemAudioChunk: status.hasRecentSystemAudioChunk,
-      hasRecentInterviewerTranscript: status.hasRecentInterviewerTranscript,
+      hasRecentThemTranscript: status.hasRecentThemTranscript,
       lastSystemAudioChunkAt: status.lastSystemAudioChunkAt,
-      lastInterviewerTranscriptAt: status.lastInterviewerTranscriptAt,
+      lastThemTranscriptAt: status.lastThemTranscriptAt,
     };
   });
 

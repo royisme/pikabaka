@@ -475,7 +475,7 @@ CRITICAL RULES:
    * Generate a suggestion based on conversation transcript - Pika-style
    * Uses the Quick answers model to reason about what the user should say
    * @param context - The full conversation transcript
-   * @param lastQuestion - The most recent question from the interviewer
+   * @param lastQuestion - The most recent question from the other party
    * @returns Suggested response for the user
    */
   public async generateSuggestion(context: string, lastQuestion: string): Promise<string> {
@@ -583,7 +583,7 @@ ANSWER DIRECTLY:`;
       // ============================================================
       if ((sources.materials || sources.profile) && this.knowledgeOrchestrator?.isKnowledgeMode()) {
         try {
-          // Feed only to the depth scorer — NOT feedInterviewerUtterance, which also routes to the
+          // Feed only to the depth scorer — NOT feedThemUtterance, which also routes to the
           // negotiation tracker and would misclassify the user's typed question as a recruiter utterance.
           // Recruiter utterances reach the tracker exclusively via the STT path in main.ts.
           this.knowledgeOrchestrator.feedForDepthScoring(message);

@@ -30,7 +30,7 @@ t.test('leading space is ignored and a code fence stays whole in the rest', asyn
 
 t.test('latestOtherPartyText skips own speech and falls back to the live partial', async (t) => {
   const rows = [
-    { sourceText: 'Can we move the call?', speaker: 'interviewer' as const },
+    { sourceText: 'Can we move the call?', speaker: 'them' as const },
     { sourceText: 'Sure, when?', speaker: 'user' as const },
   ];
   t.equal(latestOtherPartyText(rows), 'Can we move the call?');
@@ -38,5 +38,5 @@ t.test('latestOtherPartyText skips own speech and falls back to the live partial
   t.equal(latestOtherPartyText(rows, '   '), 'Can we move the call?', 'a blank partial is ignored');
   t.equal(latestOtherPartyText([{ sourceText: 'Me only', speaker: 'user' }], '  Are you there  '), 'Are you there');
   t.equal(latestOtherPartyText([]), undefined);
-  t.equal(latestOtherPartyText([{ sourceText: '  ', speaker: 'interviewer' }]), undefined);
+  t.equal(latestOtherPartyText([{ sourceText: '  ', speaker: 'them' }]), undefined);
 });

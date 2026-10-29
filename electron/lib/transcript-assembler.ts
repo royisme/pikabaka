@@ -9,7 +9,7 @@ import type { AppState } from "../main"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { isTranscriptTranslationConfigured, isSameLanguage } from "../transcript/translationExecutor"
 
-export type TranscriptSpeaker = 'interviewer' | 'user';
+export type TranscriptSpeaker = 'them' | 'user';
 
 export interface BufferedTranscriptTurn {
   segmentId: string;
@@ -163,8 +163,8 @@ export function sealFlushedTranscriptTurn(appState: AppState, speaker: Transcrip
         timestamp: flushed.startedAt,
       }]);
     }
-    if (speaker === 'interviewer') {
-      state.knowledgeOrchestrator?.feedInterviewerUtterance?.(flushed.text);
+    if (speaker === 'them') {
+      state.knowledgeOrchestrator?.feedThemUtterance?.(flushed.text);
     }
   }
   state.lastFlushedTranscriptTurns[speaker] = null;
@@ -333,7 +333,7 @@ export function handleSpeakerSpeechEnded(appState: AppState, speaker: Transcript
       : thresholds.speechEndedFragmentFlushMs
   );
   // Only the other party is translated. Start the request now, ahead of the flush that is scheduled above.
-  if (speaker === 'interviewer') startSpeculativeTranslation(appState, buffer);
+  if (speaker === 'them') startSpeculativeTranslation(appState, buffer);
 }
 
 /** Writes one assembled turn to the meeting record. The write is synchronous, before any translation is awaited. */
@@ -415,8 +415,8 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
         timestamp,
       }]);
     }
-    if (speaker === 'interviewer') {
-      state.knowledgeOrchestrator?.feedInterviewerUtterance?.(text);
+    if (speaker === 'them') {
+      state.knowledgeOrchestrator?.feedThemUtterance?.(text);
     }
     state.lastFlushedTranscriptTurns[speaker] = null;
   } else {
@@ -438,7 +438,7 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
     state.lastFlushedTranscriptTurns[speaker] = flushed;
   }
 
-  if (speaker === 'interviewer') {
+  if (speaker === 'them') {
     noteParagraphRow(appState, buffer.segmentId, buffer.revision, text);
     await emitTranscriptWithTranslation(appState, {
       speaker,
@@ -857,7 +857,7 @@ async function joinParagraph(appState: AppState): Promise<void> {
     if (!translatedText || rows.some((row) => isSupersededRevision(state.transcriptSegmentRevisions, row.segmentId, row.revision))) return;
     const displayMode = CredentialsManager.getInstance().getTranscriptTranslationDisplayMode();
     emitNativeAudioTranscript(appState, {
-      speaker: 'interviewer',
+      speaker: 'them',
       text: displayMode === 'translated' ? translatedText : sourceText,
       sourceText,
       translatedText,

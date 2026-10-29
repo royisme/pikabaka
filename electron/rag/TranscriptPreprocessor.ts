@@ -78,7 +78,7 @@ function cleanText(text: string): string {
  */
 function normalizeSpeaker(speaker: string): string {
     const lower = speaker.toLowerCase();
-    if (lower === 'interviewer' || lower === 'speaker') {
+    if (lower === 'them' || lower === 'speaker') {
         return 'Speaker';
     }
     if (lower === 'user' || lower === 'me') {

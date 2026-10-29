@@ -20,7 +20,7 @@ type LastAction =
 
 export type Message = {
   id: string;
-  role: 'user' | 'system' | 'interviewer';
+  role: 'user' | 'system' | 'them';
   text: string;
   isStreaming?: boolean;
   /** A failure message: shown as an error, not as an answer. */
@@ -171,7 +171,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   const allMessagesForContext = useMemo(() => {
     const fromChat: Message[] = chatMessages.map((m) => ({
       id: m.id,
-      role: m.role === 'assistant' ? ('interviewer' as const) : ('user' as const),
+      role: m.role === 'assistant' ? ('them' as const) : ('user' as const),
       text: m.parts
         .filter((p) => p.type === 'text')
         .map((p) => (p as { type: 'text'; text: string }).text)
@@ -183,7 +183,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   const conversationContext = useMemo(() => {
     return allMessagesForContext
       .filter((m) => m.role !== 'user' || !m.hasScreenshot)
-      .map((m) => `${m.role === 'interviewer' ? 'Interviewer' : m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
+      .map((m) => `${m.role === 'them' ? 'Interviewer' : m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
       .slice(-20)
       .join('\n');
   }, [allMessagesForContext]);
@@ -194,7 +194,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     const lastChatId = chatMessages[chatMessages.length - 1]?.id;
     const fromChat: Message[] = chatMessages.map((m) => ({
       id: m.id,
-      role: m.role === 'assistant' ? ('interviewer' as const) : ('user' as const),
+      role: m.role === 'assistant' ? ('them' as const) : ('user' as const),
       text: m.parts
         .filter((p) => p.type === 'text')
         .map((p) => (p as { type: 'text'; text: string }).text)

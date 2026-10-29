@@ -30,7 +30,7 @@ import { NegotiationCoachingCard } from '../../premium';
 
 interface Message {
   id: string;
-  role: 'user' | 'system' | 'interviewer';
+  role: 'user' | 'system' | 'them';
   text: string;
   isStreaming?: boolean;
   isError?: boolean;
@@ -421,9 +421,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 : ''
               }
               ${msg.role === 'system' ? (msg.isError ? 'text-state-danger-strong font-normal' : 'overlay-text-primary font-normal') : ''}
-              ${msg.role === 'interviewer' ? 'overlay-text-muted italic pl-0 text-sm' : ''}
+              ${msg.role === 'them' ? 'overlay-text-muted italic pl-0 text-sm' : ''}
             `}>
-              {msg.role === 'interviewer' && (
+              {msg.role === 'them' && (
                 <div className="flex items-center gap-1.5 mb-1 text-[11px] font-medium tracking-[0.08em] overlay-text-muted">
                   Interviewer
                   {msg.isStreaming && <span className="w-1 h-1 bg-state-success rounded-full animate-pulse" />}

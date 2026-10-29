@@ -1,5 +1,5 @@
 // With the speakers on, the microphone hears the other party's audio again, so the "Me" stream
-// transcribes the same sentences as the "Interviewer" stream. This recognises such a line by its
+// transcribes the same sentences as the other party's stream. This recognises such a line by its
 // words: it repeats, almost word for word, something the other party's stream produced a moment ago.
 // It works on text only; real echo cancellation (using the system audio as the reference) belongs in
 // the native module. Headphones remove the cause.
