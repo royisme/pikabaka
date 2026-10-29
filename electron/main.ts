@@ -414,13 +414,6 @@ export class AppState {
         // Wire up LLM functions
         const llmHelper = this.processingHelper.getLLMHelper();
 
-        // generateContent function for LLM calls
-        this.knowledgeOrchestrator.setGenerateContentFn(async (contents: any[]) => {
-          return await llmHelper.generateContentStructured(
-            contents[0]?.text || ''
-          );
-        });
-
         // Embedding function — lazily delegate to the cascaded EmbeddingPipeline
         // (OpenAI → Gemini → Ollama → Local bundled model).
         // We await waitForReady() so uploads during boot wait for the pipeline

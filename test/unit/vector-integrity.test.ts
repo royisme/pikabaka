@@ -143,10 +143,12 @@ async function ragHandlers(manager: Manager, orchestrator?: unknown) {
 
 for (const native of [true, false]) {
     const mode = native ? 'native' : 'JS';
-    t.test(`${mode}: flush removes every meeting vector including orphans, but preserves knowledge`, async t => {
+    t.test(`${mode}: flush removes every meeting vector including orphans and the dormant interview rows, but preserves other knowledge`, async t => {
         const f = await setup(t, native);
-        f.db.exec(`CREATE TABLE knowledge_documents (id INTEGER PRIMARY KEY, raw_text TEXT);
-            INSERT INTO knowledge_documents VALUES (1, 'Invented retained notes.');
+        f.db.exec(`CREATE TABLE knowledge_documents (id INTEGER PRIMARY KEY, doc_type TEXT, raw_text TEXT);
+            INSERT INTO knowledge_documents VALUES (1, 'notes', 'Invented retained notes.'), (2, 'resume', 'Invented dormant resume.');
+            CREATE TABLE knowledge_chunks (id INTEGER PRIMARY KEY, doc_id INTEGER, doc_type TEXT, text TEXT);
+            INSERT INTO knowledge_chunks VALUES (1, 2, 'resume', 'Invented dormant resume passage.');
             CREATE VIRTUAL TABLE vec_knowledge_3 USING vec0(chunk_id INTEGER PRIMARY KEY, embedding float[3]);`);
         f.db.prepare('INSERT INTO vec_knowledge_3 VALUES (?, ?)').run(1n, blob(oldVector));
         f.db.exec(`INSERT INTO transcripts VALUES (1, 'meeting-a', 'Invented line.', 'Speaker', 1000);
@@ -159,7 +161,8 @@ for (const native of [true, false]) {
             t.same(f.db.prepare(`SELECT * FROM ${table}`).all(), [], `${table} is empty`);
         }
         t.match(f.db.prepare('SELECT * FROM knowledge_documents').all(), [{ raw_text: 'Invented retained notes.' }]);
-        t.same(f.db.prepare('SELECT * FROM vec_knowledge_3').all(), [{ chunk_id: 1, embedding: blob(oldVector) }]);
+        t.same(f.db.prepare('SELECT * FROM knowledge_chunks').all(), [], 'the dormant passages are gone');
+        t.same(f.db.prepare('SELECT * FROM vec_knowledge_3').all(), [], 'the dormant vectors are gone');
     });
 
     t.test(`${mode}: processMeeting summary replacement removes the previous summary native id`, async t => {

@@ -3,16 +3,15 @@ import { useMutation, useQuery, useQueryClient } from 'react-query';
 
 const quietButton = 'px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-component text-xs font-medium text-text-secondary hover:bg-bg-input hover:text-text-primary disabled:opacity-50';
 
-type AnswerSources = { meetings: boolean; materials: boolean; profile: boolean };
+type AnswerSources = { meetings: boolean; materials: boolean };
 
 const ROWS: Array<{ key: keyof AnswerSources; label: string; sentence: string }> = [
     { key: 'meetings', label: 'Past meetings', sentence: 'Pika may search your recorded meetings when you ask a question.' },
     { key: 'materials', label: 'Materials (notes and documents)', sentence: 'Pika may search your notes and imported documents when you ask a question. Off until you turn it on.' },
-    { key: 'profile', label: 'Interview profile', sentence: 'Interview practice answers may use your resume and target roles. Off until you turn it on.' },
 ];
 
 /**
- * The three "Use when answering" switches on the Sources page. Their defaults are whatever the main
+ * The two "Use when answering" switches on the Sources page. Their defaults are whatever the main
  * process reports; nothing is turned on here before that reply arrives.
  */
 const AnswerSourcesSettings: React.FC = () => {

@@ -26,7 +26,6 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import { NegotiationCoachingCard } from '../../premium';
 
 interface Message {
   id: string;
@@ -40,30 +39,12 @@ interface Message {
   screenshotPreview?: string;
   isCode?: boolean;
   intent?: string;
-  isNegotiationCoaching?: boolean;
-  negotiationCoachingData?: {
-    tacticalNote: string;
-    exactScript: string;
-    showSilenceTimer: boolean;
-    phase: string;
-    theirOffer: number | null;
-    yourTarget: number | null;
-    currency: string;
-  };
-}
-
-interface KnowledgeContext {
-  matchedJDSignals: Array<{ requirement: string; relevance: number }>;
-  resumeEvidence: Array<{ source: string; text: string }>;
-  mustHitKeywords: string[];
-  questionCategory: string;
 }
 
 interface ChatPanelProps {
   onCaptureScreen?: () => void;
   onCaptureArea?: () => void;
   messages: Message[];
-  knowledgeContext: KnowledgeContext | null;
   attachedContext: Array<{ path: string; preview: string }>;
   setAttachedContext: React.Dispatch<React.SetStateAction<Array<{ path: string; preview: string }>>>;
   actionButtonMode: 'recap' | 'brainstorm';
@@ -91,14 +72,12 @@ interface ChatPanelProps {
   shortcuts: ShortcutConfig;
   scrollContainerRef: React.RefObject<HTMLDivElement>;
   textInputRef: React.RefObject<HTMLInputElement>;
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = ({
   onCaptureScreen,
   onCaptureArea,
   messages,
-  knowledgeContext,
   attachedContext,
   setAttachedContext,
   actionButtonMode,
@@ -121,7 +100,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   shortcuts,
   scrollContainerRef,
   textInputRef,
-  setMessages,
 }) => {
   const codeTheme = isLightTheme ? oneLight : vscDarkPlus;
   const codeLineNumberColor = isLightTheme ? 'rgba(15,23,42,0.35)' : 'rgba(255,255,255,0.2)';
@@ -194,22 +172,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   );
 
   const renderMessageText = (msg: Message) => {
-    if (msg.isNegotiationCoaching && msg.negotiationCoachingData) {
-      return (
-        <NegotiationCoachingCard
-          {...msg.negotiationCoachingData}
-          phase={msg.negotiationCoachingData.phase as any}
-          onSilenceTimerEnd={() => {
-            setMessages(prev => prev.map(m =>
-              m.id === msg.id
-                ? { ...m, negotiationCoachingData: m.negotiationCoachingData ? { ...m.negotiationCoachingData, showSilenceTimer: false } : undefined }
-                : m
-            ));
-          }}
-        />
-      );
-    }
-
     // An answer with its own layout below (what to say, recap, ...) keeps it even when it contains a code fence.
     const hasOwnLayout = msg.intent === 'shorten' || msg.intent === 'recap' || msg.intent === 'follow_up_questions' || msg.intent === 'what_to_answer';
     if (msg.isCode || (msg.role === 'system' && !hasOwnLayout && msg.text.includes('```'))) {
@@ -471,53 +433,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         ))}
 
-        {knowledgeContext && knowledgeContext.matchedJDSignals.length > 0 && (
-          <div className="mx-3 mb-2 p-3.5 rounded-2xl border border-white/12 bg-[rgba(10,14,28,0.82)] shadow-[0_10px_28px_rgba(0,0,0,0.18)]">
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="text-[11px] font-semibold text-blue-100/90 tracking-[0.08em]">Role focus</span>
-            </div>
-            <div className="space-y-1.5">
-              {knowledgeContext.matchedJDSignals.slice(0, 5).map((sig, i) => (
-                <div key={i} className="flex items-center gap-2.5">
-                  <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-300" />
-                  <span className="text-xs text-white/88 leading-relaxed">{sig.requirement}</span>
-                  <div className="ml-auto w-8 h-1.5 rounded-full bg-white/10 overflow-hidden shrink-0">
-                    <div className="h-full rounded-full bg-blue-300" style={{ width: `${Math.round(sig.relevance * 100)}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {knowledgeContext && (knowledgeContext.mustHitKeywords.length > 0 || knowledgeContext.resumeEvidence.length > 0) && (
-          <div className="mx-3 mb-3 p-3.5 rounded-2xl border border-white/12 bg-[rgba(10,14,28,0.88)] shadow-[0_10px_28px_rgba(0,0,0,0.2)]">
-            {knowledgeContext.mustHitKeywords.length > 0 && (
-              <div className="mb-3">
-                <span className="text-[11px] font-semibold text-blue-100/90 tracking-[0.08em]">Language to weave in</span>
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {knowledgeContext.mustHitKeywords.slice(0, 8).map((kw, i) => (
-                    <span key={i} className="text-xs font-medium text-blue-50 px-2 py-1 rounded-md bg-blue-400/16 border border-blue-300/20">
-                      {kw}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {knowledgeContext.resumeEvidence.length > 0 && (
-              <div>
-                <span className="text-[11px] font-semibold text-state-success tracking-[0.08em]">Good examples to mention</span>
-                <div className="space-y-1.5 mt-1.5">
-                  {knowledgeContext.resumeEvidence.slice(0, 3).map((ev, i) => (
-                    <div key={i} className="text-[11px] leading-relaxed text-white/80">
-                      <span className="font-semibold text-emerald-200">{ev.source}:</span> {ev.text.slice(0, 100)}{ev.text.length > 100 ? '...' : ''}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       <div className="shrink-0 px-3 min-[560px]:px-4 py-2 no-drag">

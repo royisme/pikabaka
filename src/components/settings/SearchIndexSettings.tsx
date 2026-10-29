@@ -29,7 +29,6 @@ const SearchIndexSettings: React.FC = () => {
             },
             onSettled: () => Promise.all([
                 queryClient.invalidateQueries(['embedding-status']),
-                queryClient.invalidateQueries(['profile', 'status']),
                 queryClient.invalidateQueries(['knowledge-documents']),
             ]),
         }
@@ -44,7 +43,6 @@ const SearchIndexSettings: React.FC = () => {
     const refresh = () => Promise.all([
         queryClient.invalidateQueries(['embedding-status']),
         queryClient.invalidateQueries(['embedding-queue']),
-        queryClient.invalidateQueries(['profile', 'status']),
     ]);
     const retry = useMutation(
         async () => {
@@ -68,7 +66,7 @@ const SearchIndexSettings: React.FC = () => {
         <section className="space-y-3">
             <h3 className="text-sm font-bold text-text-primary">Search index</h3>
             <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-3">
-                <p className="text-xs text-text-secondary">The embedding model makes meetings (transcript passages and summaries), your notes, imported documents, resume and target roles searchable. One model serves both meetings and materials.</p>
+                <p className="text-xs text-text-secondary">The embedding model makes meetings (transcript passages and summaries), your notes and imported documents searchable. One model serves both meetings and materials.</p>
                 <fieldset disabled={busy} className="space-y-3 min-w-0">
                     <ConnectionModelPicker
                         id="embedding"

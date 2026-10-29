@@ -52,12 +52,12 @@ function materials(t: Test) {
     return { ...s, db, manager, orchestrator, embedded, add };
 }
 
-t.test('the notes lookup returns only notes, with the file name and the real score', async t => {
+t.test('the notes lookup returns only notes and materials, with the file name and the real score', async t => {
     const f = materials(t);
     const shared = 'Invented violet note passage.';
     await f.add(DocType.NOTES, 'notes.txt', [shared], [[1, 0, 0]]);
-    await f.add(DocType.RESUME, 'resume.txt', [shared], [[1, 0, 0]]);
-    await f.add(DocType.JD, 'role.txt', [shared], [[1, 0, 0]]);
+    await f.add('resume' as DocType, 'resume.txt', [shared], [[1, 0, 0]]);
+    await f.add('jd' as DocType, 'role.txt', [shared], [[1, 0, 0]]);
     const passages = await f.orchestrator.searchMaterials(question);
     t.same(f.embedded, [question], 'the existing query embedding is used once');
     t.same(passages.map(passage => passage.text), [shared]);

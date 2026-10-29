@@ -889,6 +889,23 @@ export class DatabaseManager {
                 this.db!.exec('DELETE FROM ai_interactions');
                 this.db!.exec('DELETE FROM transcripts');
                 this.db!.exec('DELETE FROM meetings');
+
+                // Dormant interview data goes with Clear all data: a stored resume or job description,
+                // its passages and vectors, and the tables the removed feature wrote. Notes and imported
+                // materials are kept. Guarded by table existence so an older database still flushes.
+                const tables = new Set((this.db!.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map(row => row.name));
+                if (tables.has('knowledge_chunks')) {
+                    for (const name of tables) {
+                        if (/^vec_knowledge_\d+$/.test(name)) {
+                            this.db!.prepare(`DELETE FROM ${name} WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE doc_type IN ('resume', 'jd'))`).run();
+                        }
+                    }
+                    this.db!.exec("DELETE FROM knowledge_chunks WHERE doc_type IN ('resume', 'jd')");
+                }
+                if (tables.has('knowledge_documents')) this.db!.exec("DELETE FROM knowledge_documents WHERE doc_type IN ('resume', 'jd')");
+                for (const table of ['knowledge_company_cache', 'knowledge_negotiation', 'interview_sessions', 'resume_nodes', 'user_profile']) {
+                    if (tables.has(table)) this.db!.exec(`DELETE FROM ${table}`);
+                }
             })();
 
             console.log('[DatabaseManager] All data cleared from database.');

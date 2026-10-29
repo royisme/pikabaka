@@ -5,13 +5,6 @@ import type { Message } from '../../hooks/useMeetingChat';
 import type { getOverlayAppearance } from '../../lib/overlayAppearance';
 import type { AudioStatusKey } from '../../lib/audioStatus';
 
-type KnowledgeContext = {
-    matchedJDSignals: Array<{ requirement: string; relevance: number }>;
-    resumeEvidence: Array<{ source: string; text: string }>;
-    mustHitKeywords: string[];
-    questionCategory: string;
-};
-
 type AttachedContext = Array<{ path: string; preview: string }>;
 
 interface ChatColumnProps {
@@ -19,7 +12,6 @@ interface ChatColumnProps {
     onCaptureScreen?: () => void;
     onCaptureArea?: () => void;
     messages: Message[];
-    knowledgeContext: KnowledgeContext | null;
     attachedContext: AttachedContext;
     setAttachedContext: React.Dispatch<React.SetStateAction<AttachedContext>>;
     actionButtonMode: 'recap' | 'brainstorm';
@@ -42,14 +34,12 @@ interface ChatColumnProps {
     shortcuts: ShortcutConfig;
     scrollContainerRef: React.RefObject<HTMLDivElement>;
     textInputRef: React.RefObject<HTMLInputElement>;
-    setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 }
 
 const ChatColumn: React.FC<ChatColumnProps> = ({
     onCaptureScreen,
     onCaptureArea,
     messages,
-    knowledgeContext,
     attachedContext,
     setAttachedContext,
     actionButtonMode,
@@ -72,14 +62,12 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
     shortcuts,
     scrollContainerRef,
     textInputRef,
-    setMessages,
 }) => {
     return (
         <ChatPanel
             messages={messages}
             onCaptureScreen={onCaptureScreen}
             onCaptureArea={onCaptureArea}
-            knowledgeContext={knowledgeContext}
             attachedContext={attachedContext}
             setAttachedContext={setAttachedContext}
             actionButtonMode={actionButtonMode}
@@ -102,7 +90,6 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
             shortcuts={shortcuts}
             scrollContainerRef={scrollContainerRef}
             textInputRef={textInputRef}
-            setMessages={setMessages}
         />
     );
 };

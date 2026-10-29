@@ -1,4 +1,5 @@
 import t from 'tap';
+import { buildContextEnhancementPrompt, buildNoMatchPrompt } from '../../electron/knowledge/prompts';
 import {
     ANSWER_TASK,
     ASSIST_TASK,
@@ -65,6 +66,8 @@ t.test('no text the app can send still talks about the interview', (t) => {
         CODE_HINT_TASK,
         BRAINSTORM_TASK,
         CHAT_TASK,
+        notesNoMatch: buildNoMatchPrompt('Invented question'),
+        notesMatched: buildContextEnhancementPrompt('Invented question', ['Invented note one', 'Invented note two']),
         styleHeader: style.header,
         styleFooter: style.footer,
         defaultStyleHeader: emptyStyle.header,
@@ -139,5 +142,16 @@ t.test('the fixed rules do not change the shape of a bullet or numbered output',
     t.notMatch(taskPrompt('recap'), /\*\*bold\*\*/, 'the recap is plain dash bullets');
     t.notMatch(taskPrompt('followUpQuestions'), /\*\*bold\*\*/, 'the follow-up questions are a plain numbered list');
     t.notMatch(taskPrompt('answer'), /no pronouns[\s\S]*first person|first person[\s\S]*no pronouns/, 'the answer task does not contradict itself');
+    t.end();
+});
+
+t.test('the notes prompts say what they use and keep the no-invention rule', (t) => {
+    const matched = buildContextEnhancementPrompt('Invented question', ['Invented note one', 'Invented note two']);
+    t.match(matched, '[1] Invented note one');
+    t.match(matched, '[2] Invented note two');
+    t.match(matched, 'Question: Invented question');
+    const none = buildNoMatchPrompt('Invented question');
+    t.match(none, /Do not invent a past/);
+    t.match(none, 'Question: Invented question');
     t.end();
 });

@@ -31,10 +31,10 @@ for (const [status, expected] of [
     [{ state: 'unknown', provider: null, dimensions: null, indexedAt: null, error: null }, '○ Unknown'],
     [{ state: 'needs-reindex', provider: 'example:amber', dimensions: 3, indexedAt, error: null }, '▲ Needs re-index'],
 ] as Array<[NotesIndexStatus, string]>) {
-    t.test(`Sources renders notes status ${status.state} from the existing electronAPI reply`, async t => {
+    t.test(`Sources renders notes status ${status.state} from the status reply`, async t => {
         const previous = globalThis.window;
         globalThis.window = { electronAPI: {
-            profileGetStatus: async () => ({ hasProfile: false, profileMode: false, notesIndex: status }),
+            profileGetStatus: async () => ({ notesIndex: status }),
             profileGetNotes: async () => 'Invented lantern inventory.',
             getRecentMeetings: async () => [],
         } } as unknown as Window & typeof globalThis;
@@ -60,11 +60,11 @@ for (const [status, expected] of [
 
 function sourcesClient() {
     const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
-    client.setQueryData(['profile', 'status'], { hasProfile: false, profileMode: false });
+    client.setQueryData(['profile', 'status'], {});
     return client;
 }
 
-t.test('Sources works without a resume and shows the actual empty results', t => {
+t.test('Sources shows the actual empty results', t => {
     const client = sourcesClient();
     client.setQueryData(['recent-meetings'], []);
     client.setQueryData(['profile-notes'], '');
@@ -75,7 +75,6 @@ t.test('Sources works without a resume and shows the actual empty results', t =>
     t.match(html, 'Write a note');
     t.match(html, 'Open meeting history');
     t.match(html, /aria-pressed="true"[^>]*>Sources</);
-    t.notMatch(html, 'Add resume', 'the default page is not a resume invitation');
     t.end();
 });
 
@@ -115,16 +114,15 @@ t.test('Sources shows one Use when answering row per kind, with the reply state 
     const client = sourcesClient();
     client.setQueryData(['recent-meetings'], []);
     client.setQueryData(['profile-notes'], '');
-    client.setQueryData(['answer-sources'], { meetings: true, materials: false, profile: false });
+    client.setQueryData(['answer-sources'], { meetings: true, materials: false });
     const html = renderSources(client);
     t.match(html, 'Use when answering');
-    t.equal((html.match(/role="switch"/g) ?? []).length, 3);
+    t.equal((html.match(/role="switch"/g) ?? []).length, 2);
     t.match(html, 'Past meetings');
     t.match(html, 'Materials (notes and documents)');
-    t.match(html, 'Interview profile');
+    t.notMatch(html, /interview profile/i);
     t.match(html, 'Pika may search your recorded meetings when you ask a question.');
     t.match(html, 'Pika may search your notes and imported documents when you ask a question. Off until you turn it on.');
-    t.match(html, 'Interview practice answers may use your resume and target roles. Off until you turn it on.');
     t.match(html, '● On');
     t.match(html, '○ Off');
     t.match(html, 'bg-bg-component');
@@ -155,7 +153,7 @@ function importedDocument(overrides: Partial<ImportedDocument> = {}): ImportedDo
 function documentsClient(documents: ImportedDocument[], materials = false) {
     const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
     client.setQueryData(['knowledge-documents'], documents);
-    client.setQueryData(['answer-sources'], { meetings: true, materials, profile: false });
+    client.setQueryData(['answer-sources'], { meetings: true, materials });
     return client;
 }
 
@@ -262,7 +260,7 @@ t.test('the Materials-off line appears only when documents exist and the switch 
 
 t.test('a failed list shows its real error instead of the empty line', t => {
     const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
-    client.setQueryData(['answer-sources'], { meetings: true, materials: true, profile: false });
+    client.setQueryData(['answer-sources'], { meetings: true, materials: true });
     client.getQueryCache().build(client, { queryKey: ['knowledge-documents'] }).setState({
         status: 'error', error: new Error('Synthetic document listing unavailable'),
     });
@@ -349,7 +347,7 @@ t.test('Remove asks first and sends nothing when the user cancels, then refetche
     const calls = { list: 0, remove: [] as number[] };
     const page = documentsHost({
         knowledgeListDocuments: async () => { calls.list++; return { success: true, documents: [importedDocument()] }; },
-        getAnswerSources: async () => ({ meetings: true, materials: true, profile: false }),
+        getAnswerSources: async () => ({ meetings: true, materials: true }),
         knowledgeRemoveDocument: async (id: number) => { calls.remove.push(id); return { success: true }; },
     });
     t.teardown(page.close);
@@ -370,7 +368,7 @@ t.test('a failed import shows the real message and leaves the list unchanged', a
     const calls = { list: 0, import: 0 };
     const page = documentsHost({
         knowledgeListDocuments: async () => { calls.list++; return { success: true, documents: [importedDocument()] }; },
-        getAnswerSources: async () => ({ meetings: true, materials: true, profile: false }),
+        getAnswerSources: async () => ({ meetings: true, materials: true }),
         knowledgeImportDocument: async () => { calls.import++; return { success: false, error: 'This document has no text Pika can read.' }; },
     });
     t.teardown(page.close);
@@ -390,7 +388,7 @@ t.test('a cancelled import is not an error and a successful one refetches the li
     let next: { cancelled: true } | { success: true; document: ImportedDocument } = { cancelled: true };
     const page = documentsHost({
         knowledgeListDocuments: async () => { list++; return { success: true, documents: [] }; },
-        getAnswerSources: async () => ({ meetings: true, materials: true, profile: false }),
+        getAnswerSources: async () => ({ meetings: true, materials: true }),
         knowledgeImportDocument: async () => next,
     });
     t.teardown(page.close);
@@ -411,7 +409,7 @@ t.test('Re-index sends the row id and refetches, and only the listed states offe
             importedDocument({ id: 7, name: 'agenda.txt', kind: 'txt', state: 'not-indexed', provider: null, dimensions: null, indexedAt: null }),
             importedDocument({ id: 8, name: 'planning.md' }),
         ] }),
-        getAnswerSources: async () => ({ meetings: true, materials: true, profile: false }),
+        getAnswerSources: async () => ({ meetings: true, materials: true }),
         knowledgeReindexDocument: async (id: number) => { reindexed.push(id); return { success: true }; },
     });
     t.teardown(page.close);
@@ -424,7 +422,7 @@ t.test('Re-index sends the row id and refetches, and only the listed states offe
 t.test('the list polls every two seconds only while a document is indexing', async t => {
     const page = documentsHost({
         knowledgeListDocuments: async () => ({ success: true, documents: [importedDocument({ state: 'indexing', provider: null, dimensions: null, indexedAt: null })] }),
-        getAnswerSources: async () => ({ meetings: true, materials: true, profile: false }),
+        getAnswerSources: async () => ({ meetings: true, materials: true }),
     });
     t.teardown(page.close);
     page.draw(); await page.settle();

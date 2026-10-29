@@ -11,7 +11,7 @@ import type { AgentProactiveCard } from '../types/electron';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { getDefaultOverlayOpacity, getOverlayAppearance } from '../lib/overlayAppearance';
-import { useMeetingChat, type Message } from '../hooks/useMeetingChat';
+import { useMeetingChat } from '../hooks/useMeetingChat';
 import { useMeetingTranscript } from '../hooks/useMeetingTranscript';
 import { useMeetingAudio } from '../hooks/useMeetingAudio';
 import { isNearBottom, nextScrollAction } from '../lib/answerScroll';
@@ -224,9 +224,8 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         setTimeout(() => { isStealthRef.current = false; }, 500);
     });
 
-    const setMessages = useCallback((updater: React.SetStateAction<Message[]>) => { chat.setSystemMessages((prev) => (typeof updater === 'function' ? (updater as (p: Message[]) => Message[])(prev) : updater)); }, [chat.setSystemMessages]);
     const transcriptProps = { ...transcript, ...audio, appearance, isLightTheme };
-    const chatProps = { onCaptureScreen: () => void generalHandlersRef.current.takeScreenshot(), onCaptureArea: () => void generalHandlersRef.current.selectiveScreenshot(), messages: chat.messages, knowledgeContext: chat.knowledgeContext, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, actionButtonMode: chat.actionButtonMode, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleWhatToSay: chat.handleWhatToSay, primaryQuiet: audioState.action === 'fix-audio' || (audioState.key !== 'live' && !hasTranscriptRows), onStop: chat.stopGeneration, onRetry: chat.canRetry ? chat.retryLast : undefined, audioKey: audioState.key, hasTranscriptRows, handleClarify: chat.handleClarify, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleBrainstorm: chat.handleBrainstorm, handleManualSubmit: chat.handleManualSubmit, appearance, isLightTheme, shortcuts, scrollContainerRef, textInputRef, setMessages };
+    const chatProps = { onCaptureScreen: () => void generalHandlersRef.current.takeScreenshot(), onCaptureArea: () => void generalHandlersRef.current.selectiveScreenshot(), messages: chat.messages, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, actionButtonMode: chat.actionButtonMode, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleWhatToSay: chat.handleWhatToSay, primaryQuiet: audioState.action === 'fix-audio' || (audioState.key !== 'live' && !hasTranscriptRows), onStop: chat.stopGeneration, onRetry: chat.canRetry ? chat.retryLast : undefined, audioKey: audioState.key, hasTranscriptRows, handleClarify: chat.handleClarify, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleBrainstorm: chat.handleBrainstorm, handleManualSubmit: chat.handleManualSubmit, appearance, isLightTheme, shortcuts, scrollContainerRef, textInputRef };
 
     return (
         <div ref={contentRef} className={`flex flex-col items-center w-full mx-auto ${isExpanded ? 'h-screen' : 'h-fit'} min-h-0 bg-transparent p-0 rounded-[24px] font-sans overlay-text-primary`}>

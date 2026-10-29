@@ -1,7 +1,7 @@
 import type { ConnectionType, ConnectionView } from '../services/aiConnections'
 import type { HeaderEdit, HeaderState } from '../services/connectionHeaders'
 import type { KeybindStatus, KeybindResult } from '../services/KeybindManager'
-import type { ImportedDocument, NotesIndexStatus } from '../knowledge/types'
+import type { ImportedDocument } from '../knowledge/types'
 import type { CredentialStorageStatus } from '../services/CredentialsManager'
 import type { PromptsEdit, PromptsReply } from '../llm/prompts'
 
@@ -92,8 +92,8 @@ export interface ElectronAPI {
   getAiResponseLanguage: () => Promise<string>
   getPrompts: () => Promise<PromptsReply>
   setPrompts: (edit: PromptsEdit) => Promise<{ success: boolean; error?: string }>
-  getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean; profile: boolean }>
-  setAnswerSources: (sources: { meetings?: boolean; materials?: boolean; profile?: boolean }) => Promise<{ success: boolean; error?: string }>
+  getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean }>
+  setAnswerSources: (sources: { meetings?: boolean; materials?: boolean }) => Promise<{ success: boolean; error?: string }>
   getNativeAudioStatus: () => Promise<{
     connected: boolean;
     meetingActive: boolean;
@@ -229,28 +229,11 @@ export interface ElectronAPI {
   markDonationToastShown: () => Promise<{ success: boolean }>;
   setDonationComplete: () => Promise<{ success: boolean }>;
 
-  // Profile Engine API
-  profileUploadResume: (filePath: string) => Promise<{ success: boolean; error?: string }>;
-  profileGetStatus: () => Promise<{ hasProfile: boolean; profileMode: boolean; name?: string; role?: string; totalExperienceYears?: number; notesIndex?: NotesIndexStatus | null }>;
-  profileSetMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
-  profileDelete: () => Promise<{ success: boolean; error?: string }>;
-  profileGetProfile: () => Promise<any>;
-  profileSelectFile: () => Promise<{ success?: boolean; cancelled?: boolean; filePath?: string; error?: string }>;
-
-  // JD & Research API
-  profileUploadJD: (filePath: string) => Promise<{ success: boolean; error?: string }>;
-  profileDeleteJD: () => Promise<{ success: boolean; error?: string }>;
-  profileResearchCompany: (companyName: string) => Promise<{ success: boolean; dossier?: any; error?: string }>;
-  profileGenerateNegotiation: (force?: boolean) => Promise<{ success: boolean; script?: any; error?: string }>;
-  profileGetNegotiationState: () => Promise<{ success: boolean; state?: any; isActive?: boolean; error?: string }>;
-  profileResetNegotiation: () => Promise<{ success: boolean; error?: string }>;
+  // Imported documents
   knowledgeListDocuments: () => Promise<{ success: true; documents: ImportedDocument[] } | { success: false; error: string }>;
   knowledgeImportDocument: () => Promise<{ cancelled: true } | { success: true; document: ImportedDocument } | { success: false; error: string }>;
   knowledgeRemoveDocument: (id: number) => Promise<{ success: boolean; error?: string }>;
   knowledgeReindexDocument: (id: number) => Promise<{ success: boolean; error?: string }>;
-
-  // Tavily Search API
-  setTavilyApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>;
 
   // Overlay Opacity (Stealth Mode)
   setOverlayOpacity: (opacity: number) => Promise<void>;

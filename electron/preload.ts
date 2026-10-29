@@ -143,9 +143,10 @@ interface ElectronAPI {
   getAnswerStyle: () => Promise<string>
   getPrompts: () => Promise<PromptsReply>
   setPrompts: (edit: PromptsEdit) => Promise<{ success: boolean; error?: string }>
-  getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean; profile: boolean }>
-  setAnswerSources: (sources: { meetings?: boolean; materials?: boolean; profile?: boolean }) => Promise<{ success: boolean; error?: string }>
+  getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean }>
+  setAnswerSources: (sources: { meetings?: boolean; materials?: boolean }) => Promise<{ success: boolean; error?: string }>
   profileGetNotes: () => Promise<string>
+  profileGetStatus: () => Promise<{ notesIndex?: NotesIndexStatus | null }>
   profileSetNotes: (text: string) => Promise<{ success: boolean; error?: string }>
   setAnswerStyle: (style: string) => Promise<{ success: boolean; error?: string }>
   getNativeAudioStatus: () => Promise<{
@@ -181,7 +182,6 @@ interface ElectronAPI {
   onIntelligenceAssistUpdate: (callback: (data: { insight: string }) => void) => () => void
   onIntelligenceSuggestedAnswer: (callback: (data: { answer: string; question: string; confidence: number }) => void) => () => void
   onIntelligenceRefinedAnswer: (callback: (data: { answer: string; intent: string }) => void) => () => void
-  onKnowledgeContextUpdate: (callback: (data: { matchedJDSignals: any[]; resumeEvidence: any[]; mustHitKeywords: string[]; questionCategory: string }) => void) => () => void
   onIntelligenceRecap: (callback: (data: { summary: string }) => void) => () => void
   onIntelligenceClarify: (callback: (data: { clarification: string }) => void) => () => void
   onIntelligenceClarifyToken: (callback: (data: { token: string }) => void) => () => void
@@ -296,37 +296,11 @@ interface ElectronAPI {
   markDonationToastShown: () => Promise<{ success: boolean }>;
   setDonationComplete: () => Promise<{ success: boolean }>;
 
-  // Profile Engine API
-  profileUploadResume: (filePath: string) => Promise<{ success: boolean; error?: string }>;
-  profileGetStatus: () => Promise<{ hasProfile: boolean; profileMode: boolean; name?: string; role?: string; totalExperienceYears?: number; notesIndex?: NotesIndexStatus | null }>;
-  profileSetMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
-  profileDelete: () => Promise<{ success: boolean; error?: string }>;
-  profileGetProfile: () => Promise<any>;
-  profileSelectFile: () => Promise<{ success?: boolean; cancelled?: boolean; filePath?: string; error?: string }>;
-
-  // JD & Research API
-  profileUploadJD: (filePath: string) => Promise<{ success: boolean; error?: string }>;
-  profileDeleteJD: () => Promise<{ success: boolean; error?: string }>;
-
-  // Multi-JD Management
-  knowledgeGetAllJDs: () => Promise<any[]>;
-  knowledgeSetActiveJD: (docId: number) => Promise<{ success: boolean; error?: string }>;
-  knowledgeDeleteJD: (docId: number) => Promise<{ success: boolean; error?: string }>;
-  knowledgeUploadJD: (filePath: string) => Promise<{ success: boolean; error?: string }>;
-  knowledgeUpdateProfile: (updates: any) => Promise<{ success: boolean; error?: string }>;
-  knowledgeGeneratePrep: (jdId?: number) => Promise<{ success: boolean; data?: any; error?: string }>;
+  // Imported documents
   knowledgeListDocuments: () => Promise<{ success: true; documents: ImportedDocument[] } | { success: false; error: string }>;
   knowledgeImportDocument: () => Promise<{ cancelled: true } | { success: true; document: ImportedDocument } | { success: false; error: string }>;
   knowledgeRemoveDocument: (id: number) => Promise<{ success: boolean; error?: string }>;
   knowledgeReindexDocument: (id: number) => Promise<{ success: boolean; error?: string }>;
-  profileResearchCompany: (companyName: string) => Promise<{ success: boolean; dossier?: any; error?: string }>;
-  profileGenerateNegotiation: (force?: boolean) => Promise<{ success: boolean; script?: any; error?: string }>;
-  profileGetNegotiationState: () => Promise<{ success: boolean; state?: any; isActive?: boolean; error?: string }>;
-  profileResetNegotiation: () => Promise<{ success: boolean; error?: string }>;
-
-  // Tavily Search API
-  setTavilyApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>;
-
   // Overlay Opacity (Stealth Mode)
   setOverlayOpacity: (opacity: number) => Promise<void>;
   onOverlayOpacityChanged: (callback: (opacity: number) => void) => () => void;
@@ -688,8 +662,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getPrompts: () => ipcRenderer.invoke("prompts:get"),
   setPrompts: (edit: PromptsEdit) => ipcRenderer.invoke("prompts:set", edit),
   getAnswerSources: () => ipcRenderer.invoke("answer-sources:get"),
-  setAnswerSources: (sources: { meetings?: boolean; materials?: boolean; profile?: boolean }) => ipcRenderer.invoke("answer-sources:set", sources),
+  setAnswerSources: (sources: { meetings?: boolean; materials?: boolean }) => ipcRenderer.invoke("answer-sources:set", sources),
   profileGetNotes: () => ipcRenderer.invoke("profile:get-notes"),
+  profileGetStatus: () => ipcRenderer.invoke("profile:get-status"),
   profileSetNotes: (text: string) => ipcRenderer.invoke("profile:set-notes", text),
   setAnswerStyle: (style: string) => ipcRenderer.invoke("set-answer-style", style),
 
@@ -770,13 +745,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("intelligence-refined-answer", subscription)
     return () => {
       ipcRenderer.removeListener("intelligence-refined-answer", subscription)
-    }
-  },
-  onKnowledgeContextUpdate: (callback: (data: { matchedJDSignals: any[]; resumeEvidence: any[]; mustHitKeywords: string[]; questionCategory: string }) => void) => {
-    const subscription = (_event: any, data: any) => callback(data)
-    ipcRenderer.on("knowledge:context-update", subscription)
-    return () => {
-      ipcRenderer.removeListener("knowledge:context-update", subscription)
     }
   },
   onIntelligenceRecapToken: (callback: (data: { token: string }) => void) => {
@@ -1120,37 +1088,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   markDonationToastShown: () => ipcRenderer.invoke("mark-donation-toast-shown"),
   setDonationComplete: () => ipcRenderer.invoke('set-donation-complete'),
 
-  // Profile Engine API
-  profileUploadResume: (filePath: string) => ipcRenderer.invoke('profile:upload-resume', filePath),
-  profileGetStatus: () => ipcRenderer.invoke('profile:get-status'),
-  profileSetMode: (enabled: boolean) => ipcRenderer.invoke('profile:set-mode', enabled),
-  profileDelete: () => ipcRenderer.invoke('profile:delete'),
-  profileGetProfile: () => ipcRenderer.invoke('profile:get-profile'),
-  profileSelectFile: () => ipcRenderer.invoke('profile:select-file'),
-
-  // JD & Research API
-  profileUploadJD: (filePath: string) => ipcRenderer.invoke('profile:upload-jd', filePath),
-  profileDeleteJD: () => ipcRenderer.invoke('profile:delete-jd'),
-
-  // Multi-JD Management
-  knowledgeGetAllJDs: () => ipcRenderer.invoke('knowledge:get-all-jds'),
-  knowledgeSetActiveJD: (docId: number) => ipcRenderer.invoke('knowledge:set-active-jd', docId),
-  knowledgeDeleteJD: (docId: number) => ipcRenderer.invoke('knowledge:delete-jd', docId),
-  knowledgeUploadJD: (filePath: string) => ipcRenderer.invoke('knowledge:upload-jd', filePath),
-  knowledgeUpdateProfile: (updates: any) => ipcRenderer.invoke('knowledge:update-profile', updates),
-  knowledgeGeneratePrep: (jdId?: number) => ipcRenderer.invoke('knowledge:generate-prep', jdId),
+  // Imported documents
   knowledgeListDocuments: () => ipcRenderer.invoke('knowledge:list-documents'),
   knowledgeImportDocument: () => ipcRenderer.invoke('knowledge:import-document'),
   knowledgeRemoveDocument: (id: number) => ipcRenderer.invoke('knowledge:remove-document', id),
   knowledgeReindexDocument: (id: number) => ipcRenderer.invoke('knowledge:reindex-document', id),
-  profileResearchCompany: (companyName: string) => ipcRenderer.invoke('profile:research-company', companyName),
-  profileGenerateNegotiation: (force?: boolean) => ipcRenderer.invoke('profile:generate-negotiation', force),
-  profileGetNegotiationState: () => ipcRenderer.invoke('profile:get-negotiation-state'),
-  profileResetNegotiation: () => ipcRenderer.invoke('profile:reset-negotiation'),
-
-  // Tavily Search API
-  setTavilyApiKey: (apiKey: string) => ipcRenderer.invoke('set-tavily-api-key', apiKey),
-
   // License Management
   licenseActivate: (key: string) => ipcRenderer.invoke('license:activate', key),
   licenseCheckPremium: () => ipcRenderer.invoke('license:check-premium'),

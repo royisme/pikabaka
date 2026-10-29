@@ -28,7 +28,7 @@ function setup(t: Test, native = false) {
     db.pragma('foreign_keys = ON');
     if (native) sqliteVec.load(db);
     const manager = new KnowledgeDatabaseManager(db);
-    const switches = { meetings: true, materials: true, profile: true };
+    const switches = { meetings: true, materials: true };
     const { KnowledgeOrchestrator } = mockRequire(path.resolve('electron/knowledge/KnowledgeOrchestrator.ts'), {
         [path.resolve('electron/services/SettingsManager.ts')]: { getAnswerSources: () => switches },
     }) as { KnowledgeOrchestrator: typeof Orchestrator };
@@ -77,9 +77,9 @@ t.test('material is a value in the existing document type', t => {
 });
 
 for (const native of [false, true]) {
-    t.test(`${native ? 'native' : 'JS'}: imports coexist without an LLM or changes to notes, resume or JD`, async t => {
+    t.test(`${native ? 'native' : 'JS'}: imports coexist without an LLM or changes to notes or dormant interview rows`, async t => {
         const f = setup(t, native);
-        for (const type of [DocType.NOTES, DocType.RESUME, DocType.JD]) await f.add(type, `${type}.txt`);
+        for (const type of [DocType.NOTES, 'resume' as DocType, 'jd' as DocType]) await f.add(type, `${type}.txt`);
         const before = f.snapshot();
         const first = await f.orchestrator.importDocument(f.file('first.md'));
         await f.idle();
@@ -323,7 +323,7 @@ t.test('an earlier index stays searchable while re-indexing; no embedder records
 
 t.test('Remove and re-index refuse ids that are not material rows', async t => {
     const f = setup(t);
-    const jd = await f.add(DocType.JD, 'role.txt');
+    const jd = await f.add('jd' as DocType, 'role.txt');
     const before = f.snapshot();
     for (const id of [0.5, -1, 900, jd]) {
         t.throws(() => f.orchestrator.removeDocument(id), { message: 'That document is not in Pika.' });
@@ -333,17 +333,17 @@ t.test('Remove and re-index refuse ids that are not material rows', async t => {
 });
 
 for (const native of [false, true]) {
-    t.test(`${native ? 'native' : 'JS'}: both answer switches never put documents in the candidate prompt`, async t => {
+    t.test(`${native ? 'native' : 'JS'}: only the notes answer, never a document or a dormant interview row`, async t => {
         const f = setup(t, native);
         await f.add(DocType.NOTES, 'notes.txt', 'Invented candidate note passage.');
-        await f.add(DocType.RESUME, 'resume.txt', 'Invented candidate resume passage.');
-        await f.add(DocType.JD, 'role.txt', 'Invented candidate target role passage.');
+        await f.add('resume' as DocType, 'resume.txt', 'Invented dormant resume passage.');
+        await f.add('jd' as DocType, 'role.txt', 'Invented dormant role passage.');
         await f.add(material, 'private.txt', 'Invented document passage must never reach a candidate prompt.');
         const result = await f.orchestrator.processQuestion('What is the invented plan?');
-        t.match(result?.systemPromptInjection, /Answer in first person as the candidate/);
+        t.match(result?.systemPromptInjection, /Answer in first person, as the user/);
         t.match(result?.contextBlock, /Invented candidate note passage/);
-        t.match(result?.contextBlock, /Invented candidate resume passage/);
-        t.match(result?.contextBlock, /Invented candidate target role passage/);
+        t.notMatch(JSON.stringify(result), /Invented dormant resume passage/);
+        t.notMatch(JSON.stringify(result), /Invented dormant role passage/);
         t.notMatch(JSON.stringify(result), /Invented document passage/);
     });
 }
@@ -355,7 +355,7 @@ t.test('document vectors alone do not turn unindexed notes into a knowledge miss
     await f.add(material, 'only.txt', text, { ...vector, embedding: [0, 1, 0] });
     let calls = 0;
     f.orchestrator.setEmbedQueryFn(async () => { calls++; return vector; });
-    t.equal(f.store.hasEmbeddings([DocType.NOTES, DocType.RESUME, DocType.JD]), false);
+    t.equal(f.store.hasEmbeddings([DocType.NOTES, 'resume' as DocType, 'jd' as DocType]), false);
     t.equal(f.store.hasEmbeddings(material), true);
     t.equal(await f.orchestrator.processQuestion('What is the invented plan?'), null);
     t.equal(calls, 0);
@@ -366,7 +366,7 @@ for (const native of [false, true]) {
         const f = setup(t, native);
         await f.add(DocType.NOTES, 'notes.txt', 'Invented note ranked below the first document.', { ...vector, embedding: [0.98, 0.02, 0] });
         for (let i = 0; i < 7; i++) await f.add(material, `source-${i}.md`, `Invented document ${i}. ${'lantern '.repeat(70)}`, { ...vector, embedding: [1, i / 20, 0] });
-        await f.add(DocType.RESUME, 'decoy.txt', 'Invented excluded profile decoy.');
+        await f.add('resume' as DocType, 'decoy.txt', 'Invented excluded dormant decoy.');
         await f.add(material, 'wrong-model.md', text, { ...vector, provider: 'example:other' });
         await f.add(material, 'unrelated.md', text, { ...vector, embedding: [0, 1, 0] });
         let calls = 0;
@@ -378,7 +378,7 @@ for (const native of [false, true]) {
         t.equal(passages[0].text.length, 400);
         t.ok(passages.every(passage => passage.text.length <= 400 && passage.score >= 0.3));
         t.ok(passages.every((passage, i) => i === 0 || passage.score <= passages[i - 1].score));
-        f.orchestrator.deleteDocumentsByType(DocType.NOTES);
+        f.manager.deleteDocumentsByType(DocType.NOTES);
         t.equal((await f.orchestrator.searchMaterials('What is the invented plan?'))[0].source, 'source-0.md', 'works with documents and no notes');
     });
 }

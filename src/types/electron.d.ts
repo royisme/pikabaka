@@ -167,9 +167,10 @@ export interface ElectronAPI {
   getAnswerStyle: () => Promise<string>
   getPrompts: () => Promise<PromptsReply>
   setPrompts: (edit: PromptsEdit) => Promise<{ success: boolean; error?: string }>
-  getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean; profile: boolean }>
-  setAnswerSources: (sources: { meetings?: boolean; materials?: boolean; profile?: boolean }) => Promise<{ success: boolean; error?: string }>
+  getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean }>
+  setAnswerSources: (sources: { meetings?: boolean; materials?: boolean }) => Promise<{ success: boolean; error?: string }>
   profileGetNotes: () => Promise<string>
+  profileGetStatus: () => Promise<{ notesIndex?: NotesIndexStatus | null }>
   profileSetNotes: (text: string) => Promise<{ success: boolean; error?: string }>
   setAnswerStyle: (style: string) => Promise<{ success: boolean; error?: string }>
 
@@ -218,7 +219,6 @@ export interface ElectronAPI {
   onIntelligenceSuggestedAnswer: (callback: (data: { answer: string; question: string; confidence: number }) => void) => () => void
   onIntelligenceRefinedAnswerToken: (callback: (data: { token: string; intent: string }) => void) => () => void
   onIntelligenceRefinedAnswer: (callback: (data: { answer: string; intent: string }) => void) => () => void
-  onKnowledgeContextUpdate: (callback: (data: { matchedJDSignals: Array<{ requirement: string; relevance: number }>; resumeEvidence: Array<{ source: string; text: string }>; mustHitKeywords: string[]; questionCategory: string }) => void) => () => void
   onIntelligenceFollowUpQuestionsUpdate: (callback: (data: { questions: string }) => void) => () => void
   onIntelligenceFollowUpQuestionsToken: (callback: (data: { token: string }) => void) => () => void
   onIntelligenceRecap: (callback: (data: { summary: string }) => void) => () => void
@@ -317,36 +317,11 @@ export interface ElectronAPI {
   onKeybindsUpdate: (callback: (keybinds: KeybindStatus[]) => void) => () => void
   onGlobalShortcut: (callback: (data: { action: string }) => void) => () => void
 
-  // Profile Engine API
-  profileUploadResume: (filePath: string) => Promise<{ success: boolean; error?: string }>
-  profileGetStatus: () => Promise<{ hasProfile: boolean; profileMode: boolean; name?: string; role?: string; totalExperienceYears?: number; notesIndex?: NotesIndexStatus | null }>
-  profileSetMode: (enabled: boolean) => Promise<{ success: boolean; error?: string }>
-  profileDelete: () => Promise<{ success: boolean; error?: string }>
-  profileGetProfile: () => Promise<any>
-  profileSelectFile: () => Promise<{ success?: boolean; cancelled?: boolean; filePath?: string; error?: string }>
-
-  // JD & Research API
-  profileUploadJD: (filePath: string) => Promise<{ success: boolean; error?: string }>
-  profileDeleteJD: () => Promise<{ success: boolean; error?: string }>
-  profileResearchCompany: (companyName: string) => Promise<{ success: boolean; dossier?: any; error?: string }>
-  profileGenerateNegotiation: (force?: boolean) => Promise<{ success: boolean; script?: any; error?: string }>
-  profileGetNegotiationState: () => Promise<{ success: boolean; state?: any; isActive?: boolean; error?: string }>
-  profileResetNegotiation: () => Promise<{ success: boolean; error?: string }>
-
-  // Multi-JD Management
-  knowledgeGetAllJDs: () => Promise<any[]>
-  knowledgeSetActiveJD: (docId: number) => Promise<{ success: boolean; error?: string }>
-  knowledgeDeleteJD: (docId: number) => Promise<{ success: boolean; error?: string }>
-  knowledgeUploadJD: (filePath: string) => Promise<{ success: boolean; error?: string }>
-  knowledgeUpdateProfile: (updates: any) => Promise<{ success: boolean; error?: string }>
-  knowledgeGeneratePrep: (jdId?: number) => Promise<{ success: boolean; data?: any; error?: string }>
+  // Imported documents
   knowledgeListDocuments: () => Promise<{ success: true; documents: ImportedDocument[] } | { success: false; error: string }>
   knowledgeImportDocument: () => Promise<{ cancelled: true } | { success: true; document: ImportedDocument } | { success: false; error: string }>
   knowledgeRemoveDocument: (id: number) => Promise<{ success: boolean; error?: string }>
   knowledgeReindexDocument: (id: number) => Promise<{ success: boolean; error?: string }>
-
-  // Tavily Search API
-  setTavilyApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
 
   // License Management
   licenseActivate: (key: string) => Promise<{ success: boolean; error?: string }>

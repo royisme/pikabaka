@@ -23,8 +23,8 @@ const FEATURES: FeatureSlide[] = [
         id: 'tailored_answers',
         headline: 'Upcoming features',
         subtitle: 'Answers, tailored to you',
-        bullets: ['Repo aware explanations', 'System design interview specialization'],
-        footer: 'Designed to work silently during live interviews.',
+        bullets: ['Repo aware explanations', 'System design walkthroughs'],
+        footer: 'Designed to work quietly during live calls.',
         type: 'premium',
     },
 

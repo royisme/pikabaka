@@ -29,18 +29,18 @@ function settings(t: Test) {
 
 t.test('missing source keys use the approved defaults; each read sees changes on the same settings object', t => {
     const f = settings(t);
-    t.same(f.getAnswerSources(), { meetings: true, materials: false, profile: false });
+    t.same(f.getAnswerSources(), { meetings: true, materials: false });
     f.manager.set('answerUsesMeetings', false);
     f.manager.set('answerUsesMaterials', true);
     f.manager.set('answerUsesProfile', true);
-    t.same(f.getAnswerSources(), { meetings: false, materials: true, profile: true });
+    t.same(f.getAnswerSources(), { meetings: false, materials: true }, 'the dormant profile setting is not read');
     t.same(JSON.parse(readFileSync(f.settingsPath, 'utf8')), {
         answerUsesMeetings: false, answerUsesMaterials: true, answerUsesProfile: true,
-    });
+    }, 'the stored profile value stays written but unread');
     f.manager.set('answerUsesMeetings', true);
     f.manager.set('answerUsesMaterials', false);
     f.manager.set('answerUsesProfile', false);
-    t.same(f.getAnswerSources(), { meetings: true, materials: false, profile: false });
+    t.same(f.getAnswerSources(), { meetings: true, materials: false });
     t.end();
 });
 
@@ -177,11 +177,8 @@ t.test('live and viewed-meeting IPC and scoped smart queries retain meeting cont
 });
 
 const noteText = 'Invented violet material fact.';
-const resumeText = 'Invented copper resume fact.';
-const roleText = 'Invented silver role fact.';
-const identity = 'Invented Candidate Cedar';
 const vector = { embedding: [1, 0, 0], provider: 'example:index', dimensions: 3 };
-async function knowledge(t: Test, native = false, notesOnly = false) {
+async function knowledge(t: Test, native = false) {
     const s = settings(t);
     const db = new Database(':memory:');
     t.teardown(() => db.close());
@@ -192,28 +189,12 @@ async function knowledge(t: Test, native = false, notesOnly = false) {
     }) as { KnowledgeOrchestrator: typeof KnowledgeOrchestrator };
     const orchestrator = new Orchestrator(manager);
     const store = new KnowledgeVectorStore(db);
-    for (const [type, text, parsed] of [
-        [DocType.NOTES, noteText, null],
-        ...notesOnly ? [] : [
-            [DocType.RESUME, resumeText, { identity: { name: identity }, skills: ['InventedCopperSkill'],
-                experience: [{ role: 'InventedCopperRole', company: 'Invented Copper Co', highlights: [resumeText] }],
-                projects: [], education: [], totalExperienceYears: 3 }],
-            [DocType.JD, roleText, { title: 'InventedSilverRole', company: 'Invented Silver Co',
-                requirements: [roleText], technologies: ['InventedSilverTech'], keywords: ['InventedSilverKeyword'] }],
-        ],
-    ] as Array<[DocType, string, unknown]>) {
-        const id = manager.insertDocument(type, 'invented.txt', text, parsed);
-        if (type === DocType.JD) manager.setActiveDocument(id);
-        const [chunkId] = manager.saveChunks(id, [{ text, metadata: { docType: type } }]);
-        await store.storeEmbeddings(id, [{ id: chunkId, text }], async () => vector);
-    }
-    orchestrator.setKnowledgeMode(true);
+    const id = manager.insertDocument(DocType.NOTES, 'notes.txt', noteText, null);
+    const [chunkId] = manager.saveChunks(id, [{ text: noteText, metadata: { docType: DocType.NOTES } }]);
+    await store.storeEmbeddings(id, [{ id: chunkId, text: noteText }], async () => vector);
     orchestrator.setEmbedQueryFn(async () => vector);
     orchestrator.setEmbeddingStatusFn(() => ({ providerName: vector.provider, dimensions: 3 }));
     const prompts: string[] = [];
-    orchestrator.setGenerateContentFn(async contents => {
-        prompts.push(JSON.stringify(contents)); return 'Invented intro reply.';
-    });
     const { LLMHelper: Helper } = mockRequire(file('core/LLMHelper'), {
         '@google/genai': {}, openai: {}, '@anthropic-ai/sdk': {},
         [file('services/SettingsManager')]: s,
@@ -229,168 +210,71 @@ async function knowledge(t: Test, native = false, notesOnly = false) {
     Reflect.set(helper, 'streamViaConnectionChat', async function* (_connection: unknown, _model: string, system: string, user: string) {
         prompts.push(`${system}\n${user}`); yield 'Invented model reply.';
     });
-    const ask = (stream: boolean, question = 'Explain the invented silver plan') => stream
+    const ask = (stream: boolean, question = 'Explain the invented violet plan') => stream
         ? collect(helper.streamChat(question, undefined, 'Invented live transcript context.'))
         : helper.chatWithGemini(question, undefined, 'Invented live transcript context.');
     return { ...s, db, knowledgeDb: manager, orchestrator, helper, prompts, ask };
 }
 
 for (const native of [false, true]) {
-    t.test(`${native ? 'native' : 'JS'} disabled kinds cannot crowd permitted evidence out of the top five`, async t => {
-        for (const [disabled, materials, profile, expected] of [
-            [DocType.NOTES, false, true, resumeText], [DocType.RESUME, true, false, noteText],
-        ] as const) {
-            const f = await knowledge(t, native);
-            const store = new KnowledgeVectorStore(f.db);
-            const id = f.knowledgeDb.insertDocument(disabled, 'invented.txt', 'Invented unrelated passage.', null);
-            const chunks = Array.from({ length: 8 }, () => ({ text: 'Invented unrelated passage.', metadata: { docType: disabled } }));
-            const ids = f.knowledgeDb.saveChunks(id, chunks);
-            await store.storeEmbeddings(id, ids.map(id => ({ id, text: 'Invented unrelated passage.' })), async () => vector);
-            f.manager.set('answerUsesMaterials', materials);
-            f.manager.set('answerUsesProfile', profile);
-            f.prompts.length = 0;
-            t.match(await f.ask(true), 'Invented model reply.');
-            t.match(f.prompts[0], expected);
-            t.notMatch(f.prompts[0], 'Invented unrelated passage.');
-        }
-    });
-
     for (const stream of [false, true]) {
-        t.test(`${native ? 'native' : 'JS'} ${stream ? 'stream' : 'non-stream'} interceptor isolates all four source combinations and re-reads toggles`, async t => {
+        t.test(`${native ? 'native' : 'JS'} ${stream ? 'stream' : 'non-stream'} notes contribute only with the materials switch on, and a dormant profile setting is unread`, async t => {
             const f = await knowledge(t, native);
-            for (const [materials, profile] of [[false, false], [true, false], [false, true], [true, true], [false, false]]) {
-                f.manager.set('answerUsesMaterials', materials);
-                f.manager.set('answerUsesProfile', profile);
-                f.prompts.length = 0;
-                const reply = await f.ask(stream);
-                t.match(reply, 'Invented model reply.', 'a real fake-model result is delivered');
-                t.equal(f.prompts.length, 1);
-                const prompt = f.prompts[0];
-                t.equal(prompt.includes(noteText), materials, 'only opted-in materials reach the model');
-                // Identity and role keywords travel in the knowledge system prompt, which non-streaming chat has never applied.
-                for (const text of [resumeText, roleText, ...(stream ? [identity, 'InventedSilverKeyword'] : [])]) {
-                    t.equal(prompt.includes(text), profile, 'only opted-in profile/roles reach the model');
-                }
-                if (!profile) for (const text of [identity, 'InventedSilverKeyword']) t.notMatch(prompt, text);
-                t.match(prompt, 'Invented live transcript context.', 'current context always survives');
-                if (!profile) t.notMatch(prompt, /Candidate identity:|0 years of experience/, 'off profile contributes no invented stand-in identity');
-                t.equal(reply, 'Invented model reply.', 'a switched-off kind adds nothing to the answer text');
-            }
+            t.match(await f.ask(stream), 'Invented model reply.');
+            t.notMatch(f.prompts.join('\n'), noteText, 'materials are off by default');
+            t.equal(f.orchestrator.getNotes(), noteText, 'the notes are saved and searchable');
+
+            f.manager.set('answerUsesProfile', true);
+            f.prompts.length = 0;
+            t.match(await f.ask(stream), 'Invented model reply.');
+            t.notMatch(f.prompts.join('\n'), noteText, 'the stored profile setting is ignored');
+
+            f.manager.set('answerUsesProfile', false);
+            f.manager.set('answerUsesMaterials', true);
+            f.prompts.length = 0;
+            t.match(await f.ask(stream), 'Invented model reply.');
+            t.match(f.prompts.join('\n'), noteText, 'the materials switch lets the notes answer');
+            t.match(f.prompts.join('\n'), 'Invented live transcript context.', 'current context always survives');
+
+            f.manager.set('answerUsesMaterials', false);
+            f.prompts.length = 0;
+            t.match(await f.ask(stream), 'Invented model reply.');
+            t.notMatch(f.prompts.join('\n'), noteText, 'a later call sees the switch turned off');
+        });
+
+        t.test(`${stream ? 'stream' : 'non-stream'} both off skips the interceptor entirely; processing failure keeps live context`, async t => {
+            const f = await knowledge(t);
+            let intercepted = 0;
+            Reflect.set(f.orchestrator, 'processQuestion', () => { intercepted++; throw new Error('Synthetic knowledge unavailable'); });
+            t.match(await f.ask(stream), 'Invented model reply.');
+            t.equal(intercepted, 0, 'with materials off the interceptor is never asked');
+            f.manager.set('answerUsesMaterials', true);
+            f.prompts.length = 0;
+            t.match(await f.ask(stream), 'Invented model reply.');
+            t.equal(intercepted, 1);
+            t.match(f.prompts[0], 'Invented live transcript context.');
+            t.notMatch(f.prompts[0], /Invented violet material fact/, 'a failing lookup adds no notes');
         });
     }
 }
 
-for (const stream of [false, true]) {
-    t.test(`notes-only ${stream ? 'stream' : 'non-stream'} user: default-off contributes nothing, opt-in contributes notes`, async t => {
-        const f = await knowledge(t, false, true);
-        t.match(await f.ask(stream), 'Invented model reply.');
-        t.notMatch(f.prompts.join('\n'), noteText);
-        f.manager.set('answerUsesProfile', true);
-        f.prompts.length = 0;
-        t.match(await f.ask(stream), 'Invented model reply.');
-        t.notMatch(f.prompts.join('\n'), noteText, 'profile opt-in cannot enable notes');
-        f.manager.set('answerUsesProfile', false);
-        f.manager.set('answerUsesMaterials', true);
-        f.prompts.length = 0;
-        t.match(await f.ask(stream), 'Invented model reply.');
-        t.match(f.prompts.join('\n'), noteText);
-        t.notMatch(f.prompts.join('\n'), identity);
-    });
-
-    t.test(`${stream ? 'stream' : 'non-stream'} both-off skips the interceptor entirely; processing failure keeps live context`, async t => {
-        const f = await knowledge(t);
-        let intercepted = 0;
-        Reflect.set(f.orchestrator, 'isKnowledgeMode', () => { intercepted++; return true; });
-        Reflect.set(f.orchestrator, 'processQuestion', () => { throw new Error('Synthetic knowledge unavailable'); });
-        t.match(await f.ask(stream), 'Invented model reply.');
-        t.equal(intercepted, 0, 'even isKnowledgeMode is skipped');
-        f.manager.set('answerUsesMaterials', true);
-        f.prompts.length = 0;
-        t.match(await f.ask(stream), 'Invented model reply.');
-        t.equal(intercepted, 1);
-        t.match(f.prompts[0], 'Invented live transcript context.');
-        t.notMatch(f.prompts[0], /Invented Candidate Cedar|Invented violet material fact|Invented copper resume fact|Invented silver role fact/);
-    });
-
-    t.test(`${stream ? 'stream' : 'non-stream'} live coaching is profile-gated and preserves its existing structured answer`, async t => {
-        const f = await knowledge(t);
-        Reflect.set(f.orchestrator, 'negotiationTracker', {
-            isActive: () => true, getCoachingResponse: () => ({ line: 'Invented copper coaching.' }),
-        });
-        f.manager.set('answerUsesMaterials', true);
-        t.match(await f.ask(stream), 'Invented model reply.');
-        f.manager.set('answerUsesProfile', true);
-        f.manager.set('answerUsesMaterials', false);
-        f.prompts.length = 0;
-        t.same(JSON.parse(await f.ask(stream)), { __negotiationCoaching: { line: 'Invented copper coaching.' } });
-        t.same(f.prompts, [], 'coaching remains a shortcut, not a second model request');
-    });
-
-    t.test(`${stream ? 'stream' : 'non-stream'} intro and no-index/no-match/throw fallbacks cannot reintroduce off kinds`, async t => {
-        const f = await knowledge(t);
-        f.manager.set('answerUsesMaterials', true);
-        t.match(await f.ask(stream, 'Tell me about yourself'), 'Invented model reply.');
-        t.notMatch(f.prompts.join('\n'), identity, 'intro shortcut cannot load an opted-out profile');
-        f.manager.set('answerUsesProfile', true);
-        f.prompts.length = 0;
-        t.match(await f.ask(stream, 'Tell me about yourself'), 'Invented intro reply.');
-        t.match(f.prompts.join('\n'), identity);
-        t.notMatch(f.prompts.join('\n'), noteText, 'intro remains profile-only');
-        f.db.exec('UPDATE knowledge_chunks SET embedding = NULL');
-        f.manager.set('answerUsesProfile', false);
-        f.prompts.length = 0;
-        t.match(await f.ask(stream), 'Invented model reply.');
-        t.notMatch(f.prompts.join('\n'), /Invented Candidate Cedar|Invented copper resume fact|Invented silver role fact/);
-        f.manager.set('answerUsesProfile', true);
-        f.manager.set('answerUsesMaterials', false);
-        f.prompts.length = 0;
-        t.match(await f.ask(stream), 'Invented model reply.');
-        t.match(f.prompts.join('\n'), resumeText, 'profile fallback still works without vectors');
-        // Role keywords and identity reach the model through the knowledge system prompt, which non-streaming chat has never applied.
-        if (stream) t.match(f.prompts.join('\n'), 'InventedSilverKeyword');
-        t.notMatch(f.prompts.join('\n'), noteText);
-        f.db.prepare('UPDATE knowledge_chunks SET embedding = ?').run(Buffer.from(new Float32Array([1, 0, 0]).buffer));
-        f.orchestrator.setEmbedQueryFn(async () => ({ ...vector, embedding: [0, 1, 0] }));
-        f.prompts.length = 0;
-        t.match(await f.ask(stream), 'Invented model reply.');
-        if (stream) t.match(f.prompts.join('\n'), identity, 'no-match identity is allowed only with profile on');
-        t.notMatch(f.prompts.join('\n'), noteText);
-        f.manager.set('answerUsesProfile', false);
-        f.manager.set('answerUsesMaterials', true);
-        f.prompts.length = 0;
-        t.match(await f.ask(stream), 'Invented model reply.');
-        t.notMatch(f.prompts.join('\n'), identity);
-        f.orchestrator.setEmbedQueryFn(async () => { throw new Error('Synthetic embedding unavailable'); });
-        f.prompts.length = 0;
-        t.match(await f.ask(stream), 'Invented model reply.');
-        t.notMatch(f.prompts.join('\n'), /Invented Candidate Cedar|Invented copper resume fact|Invented silver role fact/);
-    });
-}
-
-
-t.test('knowledge mode needs the mode flag and an opted-in kind that has stored content', async t => {
-    const full = await knowledge(t);
-    const notesOnly = await knowledge(t, false, true);
-    const resumeOnly = await knowledge(t);
-    resumeOnly.orchestrator.deleteDocumentsByType(DocType.NOTES);
-    for (const [materials, profile] of [[false, false], [true, false], [false, true], [true, true]]) {
-        for (const f of [full, notesOnly, resumeOnly]) {
-            f.manager.set('answerUsesMaterials', materials);
-            f.manager.set('answerUsesProfile', profile);
-        }
-        t.equal(full.orchestrator.isKnowledgeMode(), materials || profile);
-        t.equal(notesOnly.orchestrator.isKnowledgeMode(), materials, 'the profile switch cannot make notes count');
-        t.equal(resumeOnly.orchestrator.isKnowledgeMode(), profile, 'the materials switch cannot make a resume count');
-    }
-    full.orchestrator.setKnowledgeMode(false);
-    t.equal(full.orchestrator.isKnowledgeMode(), false, 'opted-in kinds do not switch the mode on by themselves');
+t.test('notes Save with an empty text removes them, so they stop answering', async t => {
+    const f = await knowledge(t);
+    f.manager.set('answerUsesMaterials', true);
+    f.prompts.length = 0;
+    t.match(await f.ask(false), 'Invented model reply.');
+    t.match(f.prompts.join('\n'), noteText);
+    await f.orchestrator.setNotes('   ');
+    t.equal(f.orchestrator.getNotes(), '');
+    f.prompts.length = 0;
+    t.match(await f.ask(false), 'Invented model reply.');
+    t.notMatch(f.prompts.join('\n'), noteText);
 });
 
 for (const stream of [false, true]) {
-    t.test(`${stream ? 'stream' : 'non-stream'} chat answers normally when no knowledge store is attached, even with every kind opted in`, async t => {
+    t.test(`${stream ? 'stream' : 'non-stream'} chat answers normally when no knowledge store is attached, even with materials opted in`, async t => {
         const f = await knowledge(t);
         f.manager.set('answerUsesMaterials', true);
-        f.manager.set('answerUsesProfile', true);
         f.helper.setKnowledgeOrchestrator(null as never);
         t.equal(await f.ask(stream), 'Invented model reply.');
         t.match(f.prompts[0], 'Invented live transcript context.');
