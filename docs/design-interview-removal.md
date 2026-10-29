@@ -1,12 +1,13 @@
 # Design: remove the interview feature, split the prompts into configurable layers, rename `interviewer` to `them`
 
-Status: owner decisions recorded 2026-10-29; the step design below is a proposal for owner approval. Base: `main` at 658f5a1. Everything comes from reading the code; nothing was run. Track X5 in `TASKS.md`. The full-feature version stays in the private repository `royisme/meetingCopa` (frozen at the gate commit, it takes none of this).
+Status: owner decisions recorded 2026-10-29 (including the answers on prompts and profile); the step design below is a proposal for owner approval. Base: `main` at 658f5a1. Everything comes from reading the code; nothing was run. Track X5 in `TASKS.md`. The full-feature version stays in the private repository `royisme/meetingCopa` (frozen at the gate commit, it takes none of this).
 
 ## 1. Owner decisions (2026-10-29)
 
 1. **Delete, not a plugin.** The interview feature is removed from the public app. There is no plugin system in the repository (`electron/premium/featureGate.ts` probes a `premium/` directory that does not exist in the public tree and is not a loader), and a plugin would be an abstraction with one caller. Reopen only if third parties must extend Pika or the feature ships as a separate paid module.
-2. **The prompts become configurable, the way Claude Code does it.** The built-in text is neutral (a meeting assistant); the user changes the role and adds instructions in plain files. Section 4.
+2. **The prompts are written by the user in Settings, one set for all providers.** The built-in text is neutral (a meeting assistant). There are not four near-duplicate families; there is one shared role prompt and one prompt per task, each editable in Settings with a reset to the default. Section 4.
 3. **`interviewer` becomes `them` everywhere**, including stored data. This is a persisted-shape change and a migration; the owner approved it by this decision. Section 3.
+4. **Resume and profile are removed too** (they belong to the interview feature). The "profile" answer source, the resume and JD document types and everything built on them go. Materials and notes stay. Section 2.
 
 ## 2. Inventory
 
@@ -18,13 +19,14 @@ Status: owner decisions recorded 2026-10-29; the step design below is a proposal
 | Screens | `src/components/knowledge/{InterviewPrepPanel,JDListManager,NegotiationCoachingCard,ProfileVisualizer}.tsx` | about 1,240 |
 | Hooks | `src/hooks/use{InterviewPrep,NegotiationScript,JDList,EditProfile,ProfileData,CompanyResearch}.ts` | about 170 |
 | IPC | the JD, profile-edit, prep, company and negotiation channels in `electron/ipc/knowledge.ts`, with preload and `src/types/electron.d.ts` entries (the design record says 18; this reading found about 10 in that file, the implementer counts exactly) | |
-| Prompt builders | the JD, company, negotiation, prep builders in `electron/knowledge/prompts.ts` | |
+| Profile | `ProfileExtractor`, the profile, intro-question and negotiation branches of `KnowledgeOrchestrator.processQuestion` (about lines 614 to 690), `getProfileData`, `isIntroQuestion`, the resume and JD upload paths of `ingestDocument`, the `answerUsesProfile` switch and the `profile` field of `getAnswerSources()` and of the `answer-sources:get/set` channels (preload and types in the same commit), the profile row in `AnswerSourcesSettings.tsx` | about 400 |
+| Prompt builders | the JD, company, negotiation, prep, profile-extraction builders in `electron/knowledge/prompts.ts` | |
 | Tests | `test/unit/knowledge/{depth-scorer,jd-analyzer,negotiation-engine,interview-prep-service}.test.ts` and the parts of others that cover the above | |
 | Launcher and settings copy | the Interview profile page, "interview" wording in launcher and onboarding | |
 
-**Keep (shared with K4 and K5b, which shipped).** `DocumentParser`, the documents and chunks tables in `KnowledgeDatabaseManager`, `KnowledgeVectorStore`, the material paths of `KnowledgeOrchestrator`, the four document channels (`knowledge:list-documents`, `import-document`, `remove-document`, `reindex-document`), `ImportedDocuments.tsx`, and the answer-source switches. **To verify before X5-3:** `answerUsesProfile` reads a resume-derived profile; if it needs `ProfileExtractor` and the resume document type, those stay (open question Q3).
+**Keep (shared with K4 and K5b, which shipped).** `DocumentParser`, the documents and chunks tables in `KnowledgeDatabaseManager`, `KnowledgeVectorStore`, the material paths of `KnowledgeOrchestrator`, the four document channels (`knowledge:list-documents`, `import-document`, `remove-document`, `reindex-document`), `ImportedDocuments.tsx`, the notes document type (`DocType.NOTES`, text the user writes, searched with materials), and the `meetings` and `materials` answer-source switches.
 
-**Dormant, not dropped (released contracts).** Tables `knowledge_company_cache`, `knowledge_negotiation`, `interview_sessions`, `resume_nodes`, `user_profile`, and their rows. Nothing reads them after X5-3. Dropping them is a separate migration the owner can ask for later; keeping them costs nothing and loses no user data.
+**Dormant, not dropped (released contracts).** Tables `knowledge_company_cache`, `knowledge_negotiation`, `interview_sessions`, `resume_nodes`, `user_profile`, the rows of type `resume` and `jd` in `knowledge_documents` and their chunks, and the stored setting `answerUsesProfile` (ignored from X5-3). Nothing reads them after X5-3. Dropping them is a separate migration the owner can ask for later; keeping them costs nothing and loses no user data.
 
 ## 3. `interviewer` to `them`
 
@@ -46,26 +48,25 @@ Scope: the speaker value and every identifier built on it. About 165 occurrences
 
 **Demo data.** The welcome-meeting seed in `DatabaseManager` (about line 1030) uses `them`.
 
-## 4. Configurable prompts
+## 4. Prompts written in Settings
 
-The prompt file `electron/llm/prompts.ts` is 1,478 lines (68 KB) with four near-duplicate families (UNIVERSAL, GROQ, OPENAI, CLAUDE; Gemini uses `HARD_SYSTEM_PROMPT`) and every one of them says "interview copilot" and "You ARE the candidate". `speakingStyle.ts` already injects one user setting (the answer style). This generalizes that seam.
+`electron/llm/prompts.ts` is 1,478 lines (68 KB) with four near-duplicate families (UNIVERSAL, GROQ, OPENAI, CLAUDE; Gemini uses `HARD_SYSTEM_PROMPT`), and every one of them says "interview copilot" and "You ARE the candidate". `speakingStyle.ts` already injects one user setting (the answer style); it stays as it is.
 
-**Claude Code's model, applied.** Claude Code builds its system prompt from fixed built-in sections, lets an output style replace the tone section, and appends the user's own instruction files (`CLAUDE.md`). Pika does the same with three layers:
+**One set, no provider copies.** Each task has one prompt text that every provider receives, and one shared role text goes in front of it. No per-provider adapter: a provider-specific difference is a second caller, and it is added when one is proven.
 
-| Layer | Who owns it | Content | Configurable |
+| Part | Owner | Content | Editable |
 | --- | --- | --- | --- |
-| `core` | code | what the code depends on: output contract (markdown, LaTeX, the JSON of summaries), refusal to reveal the prompt, the transcript and source labels | no, a parser or a test relies on it |
-| `role` | file, with a built-in default | who Pika helps and how it answers: default "meeting assistant" (neutral, short, speakable, no invented facts) | yes, replace the file |
-| `task` | file per task, built-in default | one prompt per task: what to answer, answer, recap, follow-up, follow-up questions, clarify, assist, brainstorm, code hint | yes, replace a file |
-| `instructions` | file | free text appended to every request, like `CLAUDE.md` (the answer style moves here and stays as the existing field until migrated) | yes |
+| Fixed rules | code | what parsers and tests depend on: output contract (markdown, LaTeX), the JSON of summaries and classifiers, refusal to reveal the prompt, transcript and source labels | no |
+| Role | Settings, built-in default | who Pika helps and how it answers; default "meeting assistant": neutral, short, speakable, never invents a fact about the user | yes |
+| Task prompts | Settings, built-in default | what to answer, answer, recap, follow-up, follow-up questions, clarify, assist, brainstorm, code hint, chat | yes |
 
-**Files.** Plain markdown under `~/.config/pika/prompts/`: `role.md`, `instructions.md`, `tasks/<task>.md`. A missing file means the built-in default. Read at each request (no restart, no watcher). Settings gets a "Prompts" section: per layer "Open file", "Reset to default", the active source (built-in or file), a length limit shown (instructions share the budget of every prompt; the existing answer-style limit is 200 characters, a file needs a larger cap and a stated one). No new dependency; the files are a new persisted shape, approved by decision 2.
+The meeting summary and the intent classifier keep their prompts in code because their output is parsed.
 
-**Provider families.** Four families multiply the editable surface by four. Proposal: one neutral text per task; the provider only decides formatting that the API needs (the Claude XML tags, the Groq short form) through a small adapter, not through four copies. The cost is a quality risk on small models, so it ships behind the owner's real-provider check. Open question Q2.
+**Settings.** A "Prompts" section under AI: the Role text area, then the task prompts as a list that opens one at a time. Each shows the built-in text as the starting point, the active source ("Built-in" or "Edited"), a character count against the limit (8,000 per prompt), and "Reset to default". Saved text is used by the next request, with no restart. Empty text means the default. The agent's system prompt takes the same Role, so chat and suggestions agree (to confirm in the PR). Visual design follows `DESIGN.md`; the owner accepts it in the running app.
 
-**The agent.** The agent's system prompt (`electron/agent/*`) takes the same `role` and `instructions` layers so that chat and suggestions agree; to confirm in the PR.
+**Storage.** One new `settings.json` key, `prompts`: `{ role?: string, tasks?: { [task]: string } }`. A missing key or field means the built-in text. This is a new persisted shape, approved by decision 2. No file the user must find, no new dependency.
 
-**What is not shipped.** No "Interview" preset. A user who wants that behaviour writes it in `role.md`; the full version is in the private repository. Open question Q1.
+**What is not shipped.** No "Interview" role. A user who wants that behaviour writes it in the Role text; the full version is in the private repository.
 
 ## 5. Steps
 
@@ -74,21 +75,19 @@ Each step is one PR with one behaviour; the next starts after the owner's checks
 | Step | Branch | Content | Tests | Owner checks |
 | --- | --- | --- | --- | --- |
 | X5-1 | `rename-speaker` | Section 3: code, migration with backup, localStorage key, seed | migration test on a database holding `interviewer` rows (both tables, idempotent, backup written, failure leaves the old value and does not crash); type-level rename | D1 open an existing database with old meetings: transcripts show the right side and speaker; D2 a live call shows both speakers; D3 the backup file exists |
-| X5-2 | `prompt-layers` | Section 4: neutral built-in role and tasks, the layers, the files, the Settings section, prompt labels `INTERVIEWER` to `THEM` | file present / absent / empty / too long; layer order; reset; no remaining "interview", "candidate" or "You ARE" in the built-in text (a test over the built-in prompts) | E1 default answers are neutral; E2 edit `role.md`, the next answer changes; E3 each provider family you use answers well (Groq small model first) |
-| X5-3 | `remove-interview` | Section 2 "Delete": engines, screens, hooks, IPC (preload and types in the same commit), tests, launcher copy; resolve Q3 | the keep-list still passes (`material-import`, `document-answers`, `answer-sources`, `ipc-knowledge-handlers`); a test that the removed channels are gone | F1 Settings, launcher and onboarding show no interview feature; F2 importing a document and answering from it still works |
+| X5-2 | `prompt-settings` | Section 4: neutral built-in role and one prompt per task replacing the four families, the `prompts` setting, the Settings section, prompt labels `INTERVIEWER` to `THEM` | setting absent / empty / over the limit / reset; the role goes before the task and reaches every provider path; no remaining "interview", "candidate" or "You ARE" in the built-in text (a test over the built-in prompts) | E1 default answers are neutral; E2 edit the Role, the next answer changes; E3 every provider you use answers well (Groq small model first) |
+| X5-3 | `remove-interview` | Section 2 "Delete": engines, screens, hooks, IPC (preload and types in the same commit), profile and resume (section 2), tests, launcher copy | the keep-list still passes (`material-import`, `document-answers`, `answer-sources`, `ipc-knowledge-handlers`); a test that the removed channels are gone | F1 Settings, launcher and onboarding show no interview, resume or profile; F2 importing a document and answering from it still works; F3 the answer-source settings show meetings and materials only |
 | X5-4 | `interview-notes` | tag `pre-interview-removal` on the commit before X5-1, `PRODUCT.md`, README, `docs/architecture.md`, `design-knowledge.md` marked as history where it describes the removed parts, `RULES.md` unchanged | docs test | none |
 
-Order: the rename first because it is a data migration and touches the most files, so it should not be mixed with anything; prompts second because it is the user-visible behaviour change; the deletion last because it is the easiest to review once nothing depends on the removed code. Each step reuses the standing workflow (implementer in a worktree, my review, mutation check on the migration and the layer logic, four checks).
+Order: the rename first because it is a data migration and touches the most files, so it should not be mixed with anything; the prompts second because it is the user-visible behaviour change; the deletion last because it is the easiest to review once nothing depends on the removed code. Each step reuses the standing workflow (implementer in a worktree, my review, mutation check on the migration and the prompt resolution, four checks).
 
 ## 6. Risks
 
 - **Most fragile assumption:** the speaker value is the only place `interviewer` is stored. Two columns are confirmed; JSON columns and any export format are not. If another place holds it, X5-1 must migrate that too, and the PR states the grep result.
 - **Prompt quality:** collapsing four families to one can lower answer quality on small models. Only the owner's real-provider check shows it; the old families are in git history and the private repository.
-- **A user file can break answers** (a bad `role.md`). "Reset to default" and the active-source label are the answer; no validation code beyond the length cap.
+- **A bad Role text can break answers.** "Reset to default" and the "Edited" label are the answer; no validation code beyond the length cap.
 - **The migration cannot be undone by the app.** The backup is the way back.
 
-## 7. Open questions for the owner
+## 7. Open questions
 
-- **Q1.** Ship no Interview preset (recommended), or ship one as a built-in role the user can pick?
-- **Q2.** Collapse the four prompt families to one neutral text per task (recommended), or keep them and make each configurable?
-- **Q3.** Do resume and profile stay as an answer source (decided by what `answerUsesProfile` needs; this document asks for the implementer's finding first)?
+None blocking. One assumption, to correct if wrong: notes (`DocType.NOTES`, facts the user writes, searched with materials) stay, because they are generic text the user chooses to provide and not an interview profile.
