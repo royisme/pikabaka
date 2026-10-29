@@ -2,26 +2,26 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
-## 2026-10-28: document rows, step K5b2 (branch `document-rows`, uncommitted)
+## 2026-10-28: document rows, step K5b2 (branch `document-rows`, PR #81)
 
 - Four `knowledge:*` channels list, import, remove and re-index an imported document. The import handler opens the file dialog itself (`.docx` only on macOS); a cancelled dialog is a normal reply. A non-integer, a missing id and an id that is not an imported document are refused with "That document is not in Pika."
 - Sources shows a Documents block under Notes: name, kind, date, passages, and each state in words plus a mark. Re-index is only on needs-re-index, failed and not-indexed rows. Remove asks first. The list refetches every 2 s while a row is indexing, and a model save refreshes it. The Materials switch and the Search index sentence now name imported documents.
 - Tests failed first because the channels and `ImportedDocuments` did not exist. Handler fakes and a fake `window.electronAPI` cover the reply shapes, a refused import, confirmation, and polling. Both typechecks, lint and the full tap run are recorded in the step report. Owner: both themes, 560px with a long name and a long error, keyboard and focus, a real import, Remove and Re-index, a model switch then Re-index, a restart during indexing, and a Windows dialog that does not offer `.docx`. No app, real provider or Windows ran. Next: K5b3.
 
-## 2026-10-28: neutral document quick answers, step K5b3 (branch `document-answers`, uncommitted)
+## 2026-10-28: neutral document quick answers, step K5b3 (branch `document-answers`, PR #80)
 
 - Both quick-answer paths prepend the document-only quoted-data block outside the candidate-mode gate. Materials off and verbatim streaming add nothing; lookup failures leave the answer working. The existing neutral lookup supplies file names, provider/dimension/score checks and the five-passage/400-character caps. A per-call embedding promise is shared with candidate retrieval; notes, interview prompts and shortcuts are unchanged.
 - Thirty new native/JS cases use synthetic SQLite/settings and fake model/embedding boundaries. The document-only tracer failed first for the missing block and embedding; the complete pre-change run failed 56 assertions for the missing document behavior before final implementation. All four checks exit 0: both typechecks, lint (904 warnings, no errors), full tap (4886 assertions). Existing answer-source/material suites also pass. No mutation run: `mutator` is unavailable.
 - The addendum wins over the prompt's broader wording: notes are not duplicated in the new block, and existing base system prompts (which already mention candidates) stay unchanged. `chatWithGemini` has no `verbatimPrompt` option; both existing verbatim entry points are tested without inventing one. Found, not changed: intro/coaching shortcuts return before document context assembly. Owner: a real document quick answer and first-token latency with/without documents. No app, real provider/device, Windows or packaged build ran; K5b2, dependencies and persisted contracts are untouched.
 
-## 2026-10-28: material import backend, step K5b1 (branch `material-import`, uncommitted)
+## 2026-10-28: material import backend, step K5b1 (branch `material-import`, PR #79)
 
 - Material imports coexist without an LLM or migration. Async parsing supports text/Markdown and macOS DOCX through stdout; material imports refuse PDF. Limits and identical-text refusals store nothing. Main-process list/status, atomic all-dimension Remove and stored-passage Re-index are implemented; no IPC, preload, UI or settings change.
 - Neutral `search_materials` ranks notes and documents together with per-file sources and the existing caps. The candidate interceptor and its vector-presence check explicitly exclude documents. The final addendum decision authorizes the two neutral error-string/assertion changes; the tool's empty-result string/assertion changes too.
 - Tests failed first for the missing API/type, leaked candidate context, unscoped vectors, notes-only lookup, synchronous parsing, DOCX sidecar and old strings. Final checks: both typechecks, lint (904 warnings, no errors) and full tap (4594 assertions) exit 0. Twenty-nine new backend cases plus four parser cases and the extended invented-DOCX test cover the acceptance list, exact cap boundaries, rollback, indexing/removal races, all six state cases and log privacy on synthetic stores with fake embeddings.
 - The shared chunker drops sections shorter than 20 characters, so an import that would leave zero passages is refused with a readable message (added in review). Found, not changed: it also does not hard-split one long sentence, so an unpunctuated document can become one very large passage, which the embedding service may refuse; the row then shows the real error. Short sections inside a longer document are dropped silently. Owner: a real DOCX on macOS; no app, real provider, Windows or packaged build ran. `AGENTS.md` was absent here; the main checkout's copy was read. Next: K5b2, then K5b3.
 
-## 2026-10-28: material import design addendum, step K5b (branch `import-design`, uncommitted)
+## 2026-10-28: material import design addendum, step K5b (branch `import-design`, PR #73)
 
 - The design addendum is written and awaiting the owner's review. It is `docs/design-knowledge.md`, section "K5b: material import". It covers:
   - a `material` value in the existing `doc_type` column (no migration);
@@ -36,11 +36,11 @@ What is done, what is broken, what is unverified. `TASKS.md` is what to do next;
 - Four questions are open for the owner: the unused `pdf-parse` and `mammoth` dependencies; a downgrade to v2.4.0 reading documents (its interceptor has no type filter); deleted text left in free SQLite pages; and the parser-message assertion.
 - Docs only. No code was changed and no check was run. The `textutil -stdout` conversion was tried once on macOS with an invented file.
 
-## 2026-10-28: custom headers editor, step S5b (branch `headers-editor`, uncommitted)
+## 2026-10-28: custom headers editor, step S5b (branch `headers-editor`, PR #68)
 
 ## 2026-10-28: owner acceptance checklist before track X
 
-Everything below is merged (PRs #56 to #77) except K5b. None of it was run in the real app by the agent; automated checks (tsc, eslint, tap, a mutation pass on changed logic) are green on `main`. The checks need real accounts, devices and eyes, so they are yours.
+Everything below is merged (PRs #56 to #81), including the material import (K5b). None of it was run in the real app by the agent; automated checks (tsc, eslint, tap, a mutation pass on changed logic) are green on `main`. The checks need real accounts, devices and eyes, so they are yours.
 
 **Do first (data safety).** Back up `~/.config/pika/`. Then start the app on a Mac that has a current `credentials.json` (SEC1, #77): provider and speech Tests still pass, `credentials.json` is gone and `credentials.enc` exists, restart works, a changed key survives a restart. Deny or lock the keychain and confirm the "locked" notice and that saving is refused. Downgrading afterwards makes an older Pika blind to the keys.
 
@@ -55,6 +55,7 @@ Everything below is merged (PRs #56 to #77) except K5b. None of it was run in th
 - AI functions: answer language and style, the "Also used by" lines, Test disclosures (#57 #70).
 - Audio & Translation: configured-only service selector, stale selection, the translation block and its Advanced disclosure (#70 #74).
 - Knowledge > Sources: notes status, the three Use when answering switches, Search index with failed count, Retry failed and the two-press Re-index all (#64 #69 #75).
+- Knowledge > Sources > Documents (K5b, #79 #80 #81): import a `.txt`, a `.md` and, on macOS, a real `.docx` (the text imports and no `.tmp.txt` appears next to your file; on Windows the dialog does not offer `.docx`); a refused file shows its reason; Remove and Re-index; change the search model and see "Needs re-index"; quit during indexing and see "indexing stopped"; then ask a quick answer and the agent about something in a document with Materials on, and see them ignore it with Materials off.
 
 **Try with real services.**
 - A real call: live indexing, then the summary appears in global chat search after the meeting (K2, K3, #53 to #62); the agent's `search_materials` with Materials on and off (#69); flush database leaves no old meetings in global chat (#75).
