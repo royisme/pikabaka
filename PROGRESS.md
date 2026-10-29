@@ -9,6 +9,12 @@ What is done, what is broken, what is unverified. `TASKS.md` is what to do next;
 - No unit test: there is no logic left. Checks: `package.json` still parses; both typechecks, lint and the tap run are unaffected by a build script (not re-run for a deletion with no importer).
 - Owner (needs a release build): a signed and notarized build passes `codesign --verify --deep --strict` and `spctl -a -vv`; Activity Monitor shows "Pika Helper (Renderer)", "(GPU)" and "(Plugin)"; the app launches and audio capture works.
 
+## 2026-10-29: stealth rule text, track X step X0 (branch `stealth-rule`)
+
+- `RULES.md` section "Stealth" is now "Screen-share privacy": never weaken "Hide from screen share" (content protection on all five windows) or the always-on-top / click-through behaviour; never make Pika pretend to be another app (name, process title, helper name, icon, window title, AUMID) or hide its dock icon or tray; never call content protection undetectable or guaranteed (copy states its limits); never add telemetry on meeting content. The text is the design's section 6; the owner approved the track on 2026-10-28.
+- `AGENTS.md` carries the same sentence but is git-ignored (a local file), so it is not part of this PR; it was updated in the owner's checkout.
+- Docs only. The code that breaks this rule today (the process disguise, the helper rename, the dock and tray hiding) is removed by X1 to X3.
+
 ## 2026-10-28: document rows, step K5b2 (branch `document-rows`, PR #81)
 
 - Four `knowledge:*` channels list, import, remove and re-index an imported document. The import handler opens the file dialog itself (`.docx` only on macOS); a cancelled dialog is a normal reply. A non-integer, a missing id and an id that is not an imported document are refused with "That document is not in Pika."
