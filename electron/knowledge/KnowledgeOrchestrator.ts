@@ -1,4 +1,5 @@
 import path from 'path';
+import { stat } from 'fs/promises';
 import { getAnswerSources } from '../services/SettingsManager';
 
 import { KnowledgeDatabaseManager } from './KnowledgeDatabaseManager';
@@ -23,16 +24,20 @@ import {
   JDListItem,
   InterviewPrepData,
   MaterialPassage,
+  ImportedDocument,
 } from './types';
 import { buildContextEnhancementPrompt, buildIntroResponsePrompt, buildNoMatchPrompt } from './prompts';
 
 /** The least cosine similarity at which a passage of the user's materials counts as about the question. */
 const MIN_MATCH_SCORE = 0.3;
-/** The neutral notes lookup: at most this many passages, each at most this many characters. */
+/** The neutral materials lookup: at most this many passages, each at most this many characters. */
 const MATERIALS_LIMIT = 5;
 const MATERIALS_MAX_CHARS = 400;
 /** The notes the user writes about themselves: at most this many characters. */
 const NOTES_MAX_LENGTH = 20_000;
+const IMPORT_MAX_BYTES = 20 * 1024 * 1024;
+const IMPORT_MAX_CHARS = 200_000;
+const IMPORT_MAX_PASSAGES = 1_000;
 
 export class KnowledgeOrchestrator {
   private db: KnowledgeDatabaseManager;
@@ -41,6 +46,7 @@ export class KnowledgeOrchestrator {
   private jdAnalyzer: JDAnalyzer | null = null;
   private vectorStore: KnowledgeVectorStore;
   private depthScorer: DepthScorer;
+  private indexingDocuments = new Set<number>();
 
   private generateContentFn: GenerateContentFn | null = null;
   private embedFn: EmbedFn | null = null;
@@ -151,6 +157,84 @@ export class KnowledgeOrchestrator {
     }
   }
 
+  async importDocument(filePath: string): Promise<ImportedDocument> {
+    const { size } = await stat(filePath);
+    if (size > IMPORT_MAX_BYTES) {
+      throw new Error(`This file is ${Math.ceil(size / (1024 * 1024))} MB. Pika imports files up to 20 MB.`);
+    }
+    const extension = path.extname(filePath).toLowerCase();
+    if (!['.txt', '.md', '.docx'].includes(extension)) {
+      throw new Error(`Unsupported file format: ${extension}. Please use .md, .txt, or .docx`);
+    }
+    const { text } = await this.parser.parse(filePath);
+    if (!text.trim()) throw new Error('This document has no text Pika can read.');
+    if (text.length > IMPORT_MAX_CHARS) {
+      throw new Error(`This document is too long: ${text.length.toLocaleString('en-US')} characters. The limit is 200,000; split it into smaller files.`);
+    }
+    const chunks = this.chunkDocument(text, DocType.MATERIAL);
+    // The shared chunker drops sections under 20 characters, so a short text can leave nothing to search.
+    if (chunks.length === 0) throw new Error('This document has no passage of at least 20 characters to search.');
+    if (chunks.length > IMPORT_MAX_PASSAGES) {
+      throw new Error(`This document has too many short passages: ${chunks.length.toLocaleString('en-US')}. The limit is 1,000.`);
+    }
+    const duplicate = this.db.getAllDocumentsByType(DocType.MATERIAL).find(doc => doc.raw_text === text);
+    if (duplicate) {
+      const date = new Date(`${duplicate.created_at.replace(' ', 'T')}Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+      throw new Error(`Already imported as ${duplicate.file_name} on ${date}.`);
+    }
+    const docId = this.db.getDb().transaction(() => {
+      const id = this.db.insertDocument(DocType.MATERIAL, path.basename(filePath), text, null);
+      this.db.saveChunks(id, chunks);
+      return id;
+    })();
+    void this.embedChunksBackground(docId, this.db.getChunksForDoc(docId));
+    return this.listDocuments().find(doc => doc.id === docId)!;
+  }
+
+  listDocuments(): ImportedDocument[] {
+    const active = this.embeddingStatusFn?.();
+    return this.db.getAllDocumentsByType(DocType.MATERIAL)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id - a.id)
+      .map(doc => {
+        const known = doc.embedding_provider != null && doc.embedding_dimensions != null;
+        const mismatch = known && active?.providerName != null && active.dimensions != null
+          && (doc.embedding_provider !== active.providerName || doc.embedding_dimensions !== active.dimensions);
+        return {
+          id: doc.id,
+          name: doc.file_name,
+          kind: path.extname(doc.file_name).toLowerCase().slice(1) as ImportedDocument['kind'],
+          importedAt: new Date(`${doc.created_at.replace(' ', 'T')}Z`).toISOString(),
+          passages: this.db.getChunksForDoc(doc.id).length,
+          state: this.indexingDocuments.has(doc.id) ? 'indexing' : mismatch ? 'needs-reindex'
+            : doc.index_error ? 'failed' : known && doc.indexed_at ? 'indexed' : 'not-indexed',
+          provider: doc.embedding_provider ?? null,
+          dimensions: doc.embedding_dimensions ?? null,
+          indexedAt: doc.indexed_at ?? null,
+          error: doc.index_error ?? null,
+        };
+      });
+  }
+
+  removeDocument(docId: number): void {
+    this.requireMaterialDocument(docId);
+    this.db.getDb().transaction(() => {
+      this.vectorStore.deleteNativeVectorsForDocument(docId);
+      this.db.deleteDocumentById(docId);
+    })();
+  }
+
+  reindexDocument(docId: number): void {
+    this.requireMaterialDocument(docId);
+    if (this.indexingDocuments.has(docId)) throw new Error('That document is already indexing.');
+    void this.embedChunksBackground(docId, this.db.getChunksForDoc(docId));
+  }
+
+  private requireMaterialDocument(docId: number): void {
+    if (!Number.isInteger(docId) || this.db.getDocumentById(docId)?.doc_type !== DocType.MATERIAL) {
+      throw new Error('That document is not in Pika.');
+    }
+  }
+
   getStatus(): KnowledgeStatus {
     const resumeDoc = this.db.getDocumentByType(DocType.RESUME);
     const notesIndex = this.getNotesIndexStatus();
@@ -251,23 +335,22 @@ export class KnowledgeOrchestrator {
   }
 
   /**
-   * The best passages of the user's notes for a question, quoted as data: no resume, no roles and no
+   * The best passages of the user's notes and documents, quoted as data: no resume, no roles and no
    * candidate framing. Uses the same provider/dimension guard and score cut as the answer interceptor.
    */
   async searchMaterials(query: string): Promise<MaterialPassage[]> {
-    if (!this.embedQueryFn || !this.vectorStore.hasEmbeddings()) return [];
-    const source = this.db.getDocumentByType(DocType.NOTES);
-    if (!source) return [];
+    const docTypes = [DocType.NOTES, DocType.MATERIAL];
+    if (!this.embedQueryFn || !this.vectorStore.hasEmbeddings(docTypes)) return [];
     const { embedding, provider, dimensions } = await this.embedQueryFn(query);
     const active = this.embeddingStatusFn?.();
     // The model changed while this query was being embedded: the vectors belong to another model.
     if (active && (active.providerName !== provider || active.dimensions !== dimensions)) return [];
-    const sources = this.db.getChunkSources(DocType.NOTES);
-    return this.vectorStore.searchSimilar(embedding, MATERIALS_LIMIT, provider, DocType.NOTES)
+    const sources = this.db.getChunkSources(docTypes);
+    return this.vectorStore.searchSimilar(embedding, MATERIALS_LIMIT, provider, docTypes)
       .filter((result) => result.score >= MIN_MATCH_SCORE)
       .map((result) => ({
         text: result.text.slice(0, MATERIALS_MAX_CHARS),
-        source: sources.get(result.id) ?? source.file_name,
+        source: sources.get(result.id)!,
         score: result.score,
       }));
   }
@@ -536,13 +619,13 @@ export class KnowledgeOrchestrator {
       }
 
       let searchedWithoutMatch = false;
-      if (this.embedQueryFn && this.vectorStore.hasEmbeddings()) {
+      const docTypes = sources.materials && sources.profile ? [DocType.NOTES, DocType.RESUME, DocType.JD]
+        : sources.materials ? DocType.NOTES : [DocType.RESUME, DocType.JD];
+      if (this.embedQueryFn && this.vectorStore.hasEmbeddings(docTypes)) {
         const { embedding: queryEmbedding, provider, dimensions } = await this.embedQueryFn(message);
         const active = this.embeddingStatusFn?.();
         const modelChanged = active && (active.providerName !== provider || active.dimensions !== dimensions);
         // Below this similarity a passage is not about the question: it is dropped, not sent as "background".
-        const docTypes = sources.materials && sources.profile ? undefined
-          : sources.materials ? DocType.NOTES : [DocType.RESUME, DocType.JD];
         const results = modelChanged ? [] : this.vectorStore.searchSimilar(queryEmbedding, 5, provider, docTypes).filter((result) => result.score >= MIN_MATCH_SCORE);
         searchedWithoutMatch = results.length === 0;
 
@@ -758,13 +841,17 @@ export class KnowledgeOrchestrator {
   }
 
   private async embedChunksBackground(docId: number, chunks: Array<{ id: number; text: string }>): Promise<void> {
+    this.indexingDocuments.add(docId);
     try {
-      await this.vectorStore.storeEmbeddings(docId, chunks, this.embedFn!);
+      if (!this.embedFn) throw new Error('Embedding provider not initialized');
+      await this.vectorStore.storeEmbeddings(docId, chunks, this.embedFn);
       console.log(`[KnowledgeOrchestrator] Embedded ${chunks.length} chunks`);
     } catch (error) {
       const message = (error instanceof Error ? error.message : String(error)).split(/[\r\n]/, 1)[0];
       this.db.getDb().prepare('UPDATE knowledge_documents SET index_error = ? WHERE id = ?').run(message, docId);
       console.error(`[KnowledgeOrchestrator] Background embedding failed for document ${docId}`);
+    } finally {
+      this.indexingDocuments.delete(docId);
     }
   }
 

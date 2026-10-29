@@ -56,7 +56,7 @@ export function getMeetingAgent(): MeetingAgent {
       const knowledge = state.getKnowledgeOrchestrator();
       if (!knowledge) throw new Error('Materials search unavailable');
       const passages = await knowledge.searchMaterials(query);
-      return passages.length ? JSON.stringify(passages) : 'No notes match that question.';
+      return passages.length ? JSON.stringify(passages) : 'No notes or documents match that question.';
     },
     captureScreenshot: async () => ({
       data: (await readFile(await state.takeScreenshot(false))).toString('base64'), mimeType: 'image/png',

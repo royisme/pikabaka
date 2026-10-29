@@ -107,6 +107,10 @@ export class KnowledgeDatabaseManager {
     return upsert();
   }
 
+  getDocumentById(docId: number): DocumentRow | null {
+    return this.db.prepare('SELECT * FROM knowledge_documents WHERE id = ?').get(docId) as DocumentRow | undefined ?? null;
+  }
+
   getDocumentByType(docType: DocType): DocumentRow | null {
     const row = this.db
       .prepare('SELECT * FROM knowledge_documents WHERE doc_type = ? LIMIT 1')
@@ -149,14 +153,14 @@ export class KnowledgeDatabaseManager {
     return save(chunks);
   }
 
-  /** Each passage's own document name or label, keyed by chunk id, for one document type. */
-  getChunkSources(docType: DocType): Map<number, string> {
+  /** Each passage's own document name or label, keyed by chunk id. */
+  getChunkSources(docTypes: DocType[]): Map<number, string> {
     const rows = this.db.prepare(`
       SELECT c.id, d.label, d.file_name
       FROM knowledge_chunks c
       JOIN knowledge_documents d ON d.id = c.doc_id
-      WHERE d.doc_type = ?
-    `).all(docType) as Array<{ id: number; label: string | null; file_name: string }>;
+      WHERE d.doc_type IN (${docTypes.map(() => '?').join(',')})
+    `).all(...docTypes) as Array<{ id: number; label: string | null; file_name: string }>;
     return new Map(rows.map((row) => [row.id, row.label || row.file_name]));
   }
 

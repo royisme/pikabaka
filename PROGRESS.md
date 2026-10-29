@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: material import backend, step K5b1 (branch `material-import`, uncommitted)
+
+- Material imports coexist without an LLM or migration. Async parsing supports text/Markdown and macOS DOCX through stdout; material imports refuse PDF. Limits and identical-text refusals store nothing. Main-process list/status, atomic all-dimension Remove and stored-passage Re-index are implemented; no IPC, preload, UI or settings change.
+- Neutral `search_materials` ranks notes and documents together with per-file sources and the existing caps. The candidate interceptor and its vector-presence check explicitly exclude documents. The final addendum decision authorizes the two neutral error-string/assertion changes; the tool's empty-result string/assertion changes too.
+- Tests failed first for the missing API/type, leaked candidate context, unscoped vectors, notes-only lookup, synchronous parsing, DOCX sidecar and old strings. Final checks: both typechecks, lint (904 warnings, no errors) and full tap (4594 assertions) exit 0. Twenty-nine new backend cases plus four parser cases and the extended invented-DOCX test cover the acceptance list, exact cap boundaries, rollback, indexing/removal races, all six state cases and log privacy on synthetic stores with fake embeddings.
+- The shared chunker drops sections shorter than 20 characters, so an import that would leave zero passages is refused with a readable message (added in review). Found, not changed: it also does not hard-split one long sentence, so an unpunctuated document can become one very large passage, which the embedding service may refuse; the row then shows the real error. Short sections inside a longer document are dropped silently. Owner: a real DOCX on macOS; no app, real provider, Windows or packaged build ran. `AGENTS.md` was absent here; the main checkout's copy was read. Next: K5b2, then K5b3.
+
 ## 2026-10-28: material import design addendum, step K5b (branch `import-design`, uncommitted)
 
 - The design addendum is written and awaiting the owner's review. It is `docs/design-knowledge.md`, section "K5b: material import". It covers:
