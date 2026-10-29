@@ -756,23 +756,28 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     ) : (
                                                         <Ghost size={18} className="text-text-primary" />
                                                     )}
-                                                    <h3 className="text-lg font-bold text-text-primary">Undetectable mode: {isUndetectable ? 'on' : 'off'}</h3>
+                                                    <h3 className="text-lg font-bold text-text-primary">Hide from screen share</h3>
                                                 </div>
                                                 <p className="text-xs text-text-secondary">
-                                                    Requests capture exclusion on Windows and macOS. macOS apps using ScreenCaptureKit can still capture Pika. Not supported on Linux.
+                                                    Asks macOS and Windows to keep Pika's windows out of screen sharing and recording. Not guaranteed: macOS apps that record with ScreenCaptureKit can still capture them. Not supported on Linux.
                                                 </p>
                                             </div>
-                                            <div
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                aria-label="Hide from screen share"
+                                                aria-pressed={isUndetectable}
+                                                aria-checked={isUndetectable}
                                                 onClick={() => {
                                                     const newState = !isUndetectable;
                                                     queryClient.setQueryData(['undetectable'], newState);
                                                     window.electronAPI?.setUndetectable(newState);
                                                     // Analytics: Undetectable Mode Toggle
                                                 }}
-                                                className={`w-11 h-6 rounded-full relative transition-colors ${isUndetectable ? 'bg-accent-primary' : 'bg-bg-toggle-switch border border-border-muted'}`}
+                                                className={`w-11 h-6 shrink-0 rounded-full relative transition-colors ${isUndetectable ? 'bg-accent-primary' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                             >
                                                 <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${isUndetectable ? 'translate-x-5' : 'translate-x-0'}`} />
-                                            </div>
+                                            </button>
                                         </div>
 
                                         {/* Mouse Passthrough Toggle — Adapted from public PR #113 */}

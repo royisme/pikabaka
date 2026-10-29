@@ -219,10 +219,10 @@ const Launcher: React.FC<LauncherProps> = ({
                                             <button onClick={handleRefresh} disabled={isRefreshing} className={`rounded-full p-2 text-text-secondary transition-colors hover:bg-bg-input hover:text-text-primary ${isRefreshing ? 'animate-spin text-state-info' : ''}`} title="Refresh State" aria-label="Refresh meetings">
                                                 <RefreshCw size={18} />
                                             </button>
-                                            <div className="flex min-w-36 items-center gap-3 rounded-full border border-border-muted bg-bg-elevated px-3 py-1.5">
+                                            <div className="flex min-w-36 shrink-0 items-center gap-3 rounded-full border border-border-muted bg-bg-elevated px-3 py-1.5">
                                                 <Ghost size={14} className="text-text-secondary" />
-                                                <span className="flex-1 text-xs font-medium text-text-secondary">{isDetectable ? 'Detectable' : 'Undetectable'}</span>
-                                                <button type="button" onClick={toggleDetectable} className={`relative h-4 w-8 rounded-full transition-colors ${!isDetectable ? 'bg-accent-primary' : 'bg-bg-toggle-switch'}`} aria-label={isDetectable ? 'Switch to undetectable mode' : 'Switch to detectable mode'}>
+                                                <span className="flex-1 whitespace-nowrap text-xs font-medium text-text-secondary">Hide from screen share</span>
+                                                <button type="button" role="switch" onClick={toggleDetectable} className={`relative h-4 w-8 shrink-0 rounded-full transition-colors ${!isDetectable ? 'bg-accent-primary' : 'bg-bg-toggle-switch'}`} aria-label="Hide from screen share" aria-pressed={!isDetectable} aria-checked={!isDetectable}>
                                                     <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-all ${!isDetectable ? 'left-4' : 'left-0.5'}`} />
                                                 </button>
                                             </div>

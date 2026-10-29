@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-28: screen-share label, step X4 (branch `screen-share-label`)
+
+- Settings General, the launcher pill and the 200 px popup use the static name "Hide from screen share" and native button switches with stateful aria attributes. Settings alone carries the approved request/ScreenCaptureKit/Linux explanation. Only label-fit spacing/type changed; icons, callbacks, identifiers, query/storage/IPC keys and content protection stay unchanged. The demo seed wording changes for new installs only; README/PRODUCT use the design's specified copy.
+- After fixing windowless-host setup, tests failed first for the old labels, missing accessible names, Settings heading/copy and missing approved docs text. Six renderer cases (three surfaces, two themes, both toggle directions) and one docs case pass, 111 assertions. Both typechecks exit 0; lint exits 0 (900 warnings, no errors); full tap exits 0 (5128 assertions). Diff read; no dependency or persisted-shape change; no responsibilities moved, so architecture stays unchanged.
+- Owner C1: check the full label fits without wrapping in the 200 px popup and launcher pill in light/dark at 11 px or larger, plus keyboard focus/activation. No app, Vite, package manager, packaged build, real device/provider or Windows ran; no real capture-exclusion claim was tested. Mutation testing is not required for copy/styling. `AGENTS.md` is absent here; the main checkout's copy was read. Found outside the three specified PRODUCT edits, not changed: section 3 still says capture exclusion "ensures stealth"; the owner should review that claim separately. X3 remains a separate review.
+
 ## 2026-10-28: dock/tray hiding removed, step X3 (branch `stop-dock-hiding`)
 
 - Removed dock/tray hiding, debounce and focus/blur juggling; startup always shows the tray and sets the Pika name, and activation only restores windows. Protection, persisted/IPC names, UI wording and overlay policies are unchanged. Searches confirmed no remaining callers before deleting the blur APIs and tray-hide wrappers.
