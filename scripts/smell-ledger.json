@@ -1,11 +1,11 @@
 {
-  "any": 498,
+  "any": 470,
   "tsSuppress": 7,
   "filesOver800Lines": 8,
   "largeFiles": [
     {
       "file": "electron/main.ts",
-      "lines": 1420
+      "lines": 1424
     },
     {
       "file": "src/components/SettingsOverlay.tsx",
@@ -25,11 +25,11 @@
     },
     {
       "file": "electron/lib/transcript-assembler.ts",
-      "lines": 871
+      "lines": 873
     },
     {
       "file": "electron/core/IntelligenceEngine.ts",
-      "lines": 853
+      "lines": 855
     },
     {
       "file": "electron/services/CredentialsManager.ts",

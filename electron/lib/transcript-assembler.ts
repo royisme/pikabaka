@@ -147,7 +147,7 @@ export function countTranscriptWords(appState: AppState, text: string): number {
 }
 
 export function sealFlushedTranscriptTurn(appState: AppState, speaker: TranscriptSpeaker): void {
-  const state = appState as any;
+  const state = appState;
   const flushed = state.lastFlushedTranscriptTurns[speaker] as FlushedTranscriptTurn | null;
   if (!flushed) return;
   if (flushed.sealTimer) {
@@ -156,8 +156,9 @@ export function sealFlushedTranscriptTurn(appState: AppState, speaker: Transcrip
   }
   if (!flushed.ragFed) {
     flushed.ragFed = true;
-    if (state.ragManager) {
-      state.ragManager.feedLiveTranscript([{
+    const ragManager = appState.getRAGManager();
+    if (ragManager) {
+      ragManager.feedLiveTranscript([{
         speaker,
         text: flushed.text,
         timestamp: flushed.startedAt,
@@ -199,7 +200,7 @@ export function mergeTranscriptText(appState: AppState, existing: string, incomi
 }
 
 export function scheduleBufferedTranscriptFlush(appState: AppState, speaker: TranscriptSpeaker, delayMs: number): void {
-  const state = appState as any;
+  const state = appState;
   const buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   if (!buffer) return;
   if (buffer.flushTimer) {
@@ -220,7 +221,7 @@ const SPEAKING_RECHECK_MS = 500;
 const MAX_HOLD_MS = 20000;
 
 function flushWhenQuiet(appState: AppState, speaker: TranscriptSpeaker): void {
-  const buffer = (appState as any).transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
+  const buffer = appState.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   if (!buffer) return;
   const now = Date.now();
   const speaking = now - (buffer.lastActivityAt ?? 0) < SPEAKING_HOLD_MS;
@@ -234,7 +235,7 @@ function flushWhenQuiet(appState: AppState, speaker: TranscriptSpeaker): void {
 
 /** Words that are not final yet were heard: the turn being assembled is still going on. */
 export function noteTranscriptActivity(appState: AppState, speaker: TranscriptSpeaker, timestamp: number): void {
-  const buffer = (appState as any).transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
+  const buffer = appState.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   if (!buffer) return;
   buffer.lastActivityAt = timestamp;
   // The silence that ends a turn is counted from the last words heard, not from the last final.
@@ -243,7 +244,7 @@ export function noteTranscriptActivity(appState: AppState, speaker: TranscriptSp
 
 /** The words of the turn being assembled, which are final but not yet in a row. */
 export function getBufferedTranscriptText(appState: AppState, speaker: TranscriptSpeaker): string {
-  const buffer = (appState as any).transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
+  const buffer = appState.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   return buffer ? normalizeTranscriptText(appState, buffer.text) : '';
 }
 
@@ -255,7 +256,7 @@ export function bufferFinalTranscriptChunk(
   confidence: number,
   detectedLanguage?: string
 ): void {
-  const state = appState as any;
+  const state = appState;
   const thresholds = getTranscriptAssemblerThresholds(appState);
   const normalizedText = normalizeTranscriptText(appState, text);
   if (!normalizedText) return;
@@ -317,7 +318,7 @@ export function bufferFinalTranscriptChunk(
 }
 
 export function handleSpeakerSpeechEnded(appState: AppState, speaker: TranscriptSpeaker): void {
-  const state = appState as any;
+  const state = appState;
   const buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   if (!buffer) return;
   const thresholds = getTranscriptAssemblerThresholds(appState);
@@ -339,7 +340,7 @@ function recordTranscriptTurn(appState: AppState, speaker: TranscriptSpeaker, tu
 }
 
 export function resetBufferedTranscriptTurns(appState: AppState): void {
-  const state = appState as any;
+  const state = appState;
   for (const speaker of Object.keys(state.transcriptTurnBuffers) as TranscriptSpeaker[]) {
     const buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
     // A turn still being assembled is written as it stands, so stopping or reconfiguring audio loses nothing.
@@ -365,7 +366,7 @@ export function resetBufferedTranscriptTurns(appState: AppState): void {
  * carried into a new turn, so a row never ends in the middle of a sentence; `all` flushes everything.
  */
 export async function flushBufferedTranscriptTurn(appState: AppState, speaker: TranscriptSpeaker, options?: { all?: boolean }): Promise<void> {
-  const state = appState as any;
+  const state = appState;
   const buffer = state.transcriptTurnBuffers[speaker] as BufferedTranscriptTurn | null;
   if (!buffer) return;
 
@@ -405,8 +406,9 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
   recordTranscriptTurn(appState, speaker, buffer, text);
 
   if (endedSentence) {
-    if (state.ragManager) {
-      state.ragManager.feedLiveTranscript([{
+    const ragManager = appState.getRAGManager();
+    if (ragManager) {
+      ragManager.feedLiveTranscript([{
         speaker,
         text,
         timestamp,
@@ -521,7 +523,7 @@ function runTranslationRequest(
   turn: { text: string; segmentId: string; detectedLanguage?: string; noContext?: boolean },
   onProgress: (textSoFar: string) => void
 ): Promise<string> {
-  const state = appState as any;
+  const state = appState;
   const recentTurns = turn.noContext ? [] : ((state.recentTranslatedTurns ?? []) as Array<{ segmentId: string; source: string; translation: string }>);
   const context = recentTurns
     .filter((t) => t.segmentId !== turn.segmentId)
@@ -581,7 +583,7 @@ export async function emitTranscriptWithTranslation(appState: AppState, params: 
   /** When the last words of this turn were heard; only used to log how long the flush delay was. */
   lastSpeechAt?: number;
 }): Promise<{ success: boolean; error?: string; translatedText?: string }> {
-  const state = appState as any;
+  const state = appState;
   const { speaker, text, timestamp, confidence, segmentId, speakerLabel, forceTranslate = false, detectedLanguage, revision, lastSpeechAt } = params;
   const config = resolveTranslationConfig(forceTranslate);
   const { displayMode, provider: translationProvider, model: effectiveTranslationModel } = config;
@@ -827,7 +829,7 @@ function noteParagraphRow(appState: AppState, segmentId: string, revision: numbe
  * replaces those rows on screen; the meeting record keeps the sentences as they were said.
  */
 async function joinParagraph(appState: AppState): Promise<void> {
-  const state = appState as any;
+  const state = appState;
   const rows = paragraphQueue.takeDue(Date.now());
   if (paragraphQueue.size() > 0) {
     paragraphTimer = setTimeout(() => {

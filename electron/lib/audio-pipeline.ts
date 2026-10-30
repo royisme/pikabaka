@@ -50,7 +50,7 @@ async function ensureMacMicrophoneAccess(context: string): Promise<boolean> {
 }
 
 export function createSTTProvider(appState: AppState, speaker: 'them' | 'user'): STTProvider {
-  const state = appState as any;
+  const state = appState;
   const { CredentialsManager } = require('../services/CredentialsManager');
   const sttProvider = CredentialsManager.getInstance().getSttProvider();
   const sttLanguage = speaker === 'user'
@@ -127,7 +127,7 @@ export function createSTTProvider(appState: AppState, speaker: 'them' | 'user'):
   stt.setRecognitionLanguage(sttLanguage);
 
   stt.on('transcript', (segment: { text: string, isFinal: boolean, confidence: number, detectedLanguage?: string, boundary?: boolean }) => {
-    if (!state.isMeetingActive) {
+    if (!appState.getIsMeetingActive()) {
       return;
     }
 
@@ -138,7 +138,7 @@ export function createSTTProvider(appState: AppState, speaker: 'them' | 'user'):
     // just produced is that audio again, not the user speaking.
     if (trimmed) {
       state.echoFilter ??= new EchoFilter();
-      const echoFilter = state.echoFilter as EchoFilter;
+      const echoFilter = state.echoFilter;
       if (speaker === 'them') {
         echoFilter.noteOther(trimmed, timestamp);
       } else if (echoFilter.isEcho(trimmed, timestamp)) {
@@ -152,7 +152,7 @@ export function createSTTProvider(appState: AppState, speaker: 'them' | 'user'):
 
     // Boundary-only events (empty text) must not reach intelligence handling
     if (trimmed) {
-      state.intelligenceManager.handleTranscript({
+      appState.getIntelligenceManager().handleTranscript({
         speaker: speaker,
         text: segment.text,
         timestamp,
@@ -207,7 +207,7 @@ export function createSTTProvider(appState: AppState, speaker: 'them' | 'user'):
 }
 
 export function setupSystemAudioPipeline(appState: AppState): void {
-  const state = appState as any;
+  const state = appState;
   try {
     if (!state.systemAudioCapture) {
       state.systemAudioCapture = new SystemAudioCapture();
@@ -267,7 +267,7 @@ export function setupSystemAudioPipeline(appState: AppState): void {
 }
 
 export async function startAudioTest(appState: AppState, deviceId?: string): Promise<{ fallbackUsed: boolean }> {
-  const state = appState as any;
+  const state = appState;
   if (state._audioTestStarting) return { fallbackUsed: false };
   state._audioTestStarting = true;
   try {
@@ -312,7 +312,7 @@ export function attachAudioTestListeners(appState: AppState, capture: Microphone
 }
 
 export async function _startAudioTestImpl(appState: AppState, deviceId?: string): Promise<{ fallbackUsed: boolean }> {
-  const state = appState as any;
+  const state = appState;
   console.log(`[Main] Starting Audio Test on device: ${deviceId || 'default'}`);
   stopAudioTest(appState);
 
@@ -342,7 +342,7 @@ export async function _startAudioTestImpl(appState: AppState, deviceId?: string)
 }
 
 export function stopAudioTest(appState: AppState): void {
-  const state = appState as any;
+  const state = appState;
   if (state.audioTestCapture) {
     console.log('[Main] Stopping Audio Test');
     state.audioTestCapture.stop();
@@ -351,7 +351,7 @@ export function stopAudioTest(appState: AppState): void {
 }
 
 export function finalizeMicSTT(appState: AppState): void {
-  const state = appState as any;
+  const state = appState;
   if (state.googleSTT_User?.finalize) {
     console.log('[Main] Finalizing STT');
     state.googleSTT_User.finalize();
@@ -393,7 +393,7 @@ export function getNativeAudioStatus(appState: AppState): {
   lastThemTranscriptAt: number | null;
   lastError: string | null;
 } {
-  const state = appState as any;
+  const state = appState;
   const now = Date.now();
   const hasRecentSystemAudioChunk =
     state.lastSystemAudioChunkAt != null && now - state.lastSystemAudioChunkAt < 3000;
@@ -401,8 +401,8 @@ export function getNativeAudioStatus(appState: AppState): {
     state.lastThemTranscriptAt != null && now - state.lastThemTranscriptAt < 6000;
 
   return {
-    connected: state.isMeetingActive && !!state.systemAudioCapture && !!state.googleSTT,
-    meetingActive: state.isMeetingActive,
+    connected: appState.getIsMeetingActive() && !!state.systemAudioCapture && !!state.googleSTT,
+    meetingActive: appState.getIsMeetingActive(),
     hasRecentSystemAudioChunk,
     hasRecentThemTranscript,
     lastSystemAudioChunkAt: state.lastSystemAudioChunkAt,
