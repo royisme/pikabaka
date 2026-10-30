@@ -116,6 +116,7 @@ Rules:
 - An effect that only runs while `[]` and reads no props is suspect: ask what it is connecting to. If the answer is "main process data", it is a query.
 - Never add state whose only job is to trigger an effect (a counter, a flag, a "version"). Call the function from the handler.
 - Never `setState` inside an effect to derive state from other state.
+- State that must start empty for each meeting or session lives under a component with `key={session}`, and the hook that owns an in-flight run stops it on unmount (`chat.stop()`). Never clear it by hand in a `session-reset` handler: every new field would need a new reset line, and one missed line is the bug where the last meeting's content shows in the next one.
 - Every subscription returns its unsubscribe. A fetch that can be outrun (a stale response) belongs in react-query, not in an effect with an `ignore` flag.
 - Prefer one custom hook with a name (`useMeetingChat`) over several effects in a component; the effects that stay live in a hook that says what they connect to.
 - Do not "fix" a dependency list by removing a dependency. If the effect needs a value that changes often but should not resubscribe, the latest-ref pattern in `useMainEvent` and `useWindowEvent` is the answer.

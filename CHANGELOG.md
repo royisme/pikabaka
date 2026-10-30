@@ -1,5 +1,120 @@
 # Changelog
 
+## [3.0.0](https://github.com/royisme/pikabaka/compare/v2.4.0...v3.0.0) (2026-10-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **release:** the interview feature, resume and JD import, the profile and negotiation tools are removed; the stored speaker value "interviewer" becomes "them" (the database is backed up to <db>.before-them first); prompts are now edited as text in Settings.
+
+### Features
+
+* **connections:** carry optional custom headers on custom providers ([41fd4bf](https://github.com/royisme/pikabaka/commit/41fd4bfdd77fc14cc7d300bbf735e61c833ae78b))
+* **connections:** carry optional custom headers on custom providers ([a7d5e02](https://github.com/royisme/pikabaka/commit/a7d5e025c43e12ee5464b630824b685cd3569ee7))
+* **credentials:** encrypt stored credentials with the operating system's secure storage ([a93db88](https://github.com/royisme/pikabaka/commit/a93db881d5e0e0f9720a28b40913c3b3db1529a9))
+* **credentials:** encrypt stored credentials with the operating system's secure storage ([ea3ebb1](https://github.com/royisme/pikabaka/commit/ea3ebb1436fbbb45385bf8cb166f70986af60569))
+* **knowledge:** import documents as searchable materials, backend only ([2eecd29](https://github.com/royisme/pikabaka/commit/2eecd299929542ca2272e9377c9182b914f30a5b))
+* **knowledge:** import documents as searchable materials, backend only ([46772fb](https://github.com/royisme/pikabaka/commit/46772fba6e03c98b245172bbbe7c491f71e3a905))
+* **knowledge:** let the user decide which stored sources answers may use ([356123e](https://github.com/royisme/pikabaka/commit/356123eb97be02915b39c5ba0be95521fbed6b03))
+* **knowledge:** let the user decide which stored sources answers may use ([72d82d3](https://github.com/royisme/pikabaka/commit/72d82d3b8105e20dcd20a5f3237569086009c9e6))
+* **knowledge:** list, import, remove and re-index documents on the Sources page ([87226e8](https://github.com/royisme/pikabaka/commit/87226e8fca84271d84523738c658fd47e2fb223d))
+* **knowledge:** list, import, remove and re-index documents on the Sources page ([2e50c98](https://github.com/royisme/pikabaka/commit/2e50c98678b473f2fafba73f8b360ff7e688bcce))
+* **knowledge:** quote matching imported documents in quick answers ([75750ca](https://github.com/royisme/pikabaka/commit/75750ca406aabbdadcfc0a0037f20d5cc6246c4c))
+* **knowledge:** quote matching imported documents in quick answers ([3931925](https://github.com/royisme/pikabaka/commit/39319253033cd72be20eedd7ce8b2367aefdddd0))
+* **knowledge:** record how each note was indexed and skip a mismatched model ([a5ccb94](https://github.com/royisme/pikabaka/commit/a5ccb94247e1b56adb0128a50d0744eaa14467f1))
+* **knowledge:** record how each note was indexed and skip a mismatched model ([c7190c1](https://github.com/royisme/pikabaka/commit/c7190c1e1d8219aecc634125446127edb033f8f7))
+* **knowledge:** search notes as data and switch what answers may use ([d4a69cc](https://github.com/royisme/pikabaka/commit/d4a69ccd92e230c7e3dc2066e1c45185786a65a9))
+* **knowledge:** search notes as data and switch what answers may use ([1e30d69](https://github.com/royisme/pikabaka/commit/1e30d69ba914980b643cf287c5a0982c293cdc5c))
+* **prompt:** edit the role and task prompts in Settings ([3b3b02e](https://github.com/royisme/pikabaka/commit/3b3b02ebb6b7a27cd1a4a845686e721390e729ed))
+* **prompt:** edit the role and task prompts in Settings ([ecbec37](https://github.com/royisme/pikabaka/commit/ecbec37f3cab536cfebe0cc44154b6787d328a7a))
+* **rag:** keep the summary index current after commit, recovery and edit ([e35f8ba](https://github.com/royisme/pikabaka/commit/e35f8ba7b4bc71d885e98c2ae486920157731645))
+* **rag:** keep the summary index current after commit, recovery and edit ([1295d06](https://github.com/royisme/pikabaka/commit/1295d062360a1de70f411ab19bd3ca3c42d76ef7))
+* **rag:** refresh the summary index safely ([85a45d8](https://github.com/royisme/pikabaka/commit/85a45d846017ec34660a8c813c33739048c27b7b))
+* **rag:** refresh the summary index safely ([fd98cd3](https://github.com/royisme/pikabaka/commit/fd98cd352362beb5a15ed11888d226ba86a16062))
+* **rag:** retry failed indexing, re-index everything, and leave no orphan vectors ([edae2fd](https://github.com/royisme/pikabaka/commit/edae2fd9d3ffc14f3b8dd4cbca736e0f550c14fe))
+* **rag:** retry failed indexing, re-index everything, and leave no orphan vectors ([13b4c54](https://github.com/royisme/pikabaka/commit/13b4c549ddc260e346996e842adb2b69a3ed88ce))
+* **settings:** add a Provider setup tab for connections ([cc5a264](https://github.com/royisme/pikabaka/commit/cc5a264a0564da02a363ac0e19db716a01187ba0))
+* **settings:** add a Provider setup tab for connections ([e835bee](https://github.com/royisme/pikabaka/commit/e835bee6c97370a8cfa557649428c1f890e91ccf))
+* **settings:** add an Updates card to the About tab ([536a86e](https://github.com/royisme/pikabaka/commit/536a86e7054abeb072edfa3eefe9da7820612b06))
+* **settings:** add an Updates card to the About tab ([7022290](https://github.com/royisme/pikabaka/commit/70222903a475cb66e7f73c05ffcc2d9502a62732))
+* **settings:** cut the shortcuts to six defaults and fix settings wording ([b213e1b](https://github.com/royisme/pikabaka/commit/b213e1b8b60b04e4cbbaf3ef6499c72da590b756))
+* **settings:** cut the shortcuts to six, fix settings wording, reorder audio settings ([5b804c0](https://github.com/royisme/pikabaka/commit/5b804c03ffa5f44e2a6851fe1a9437e0af7df55c))
+* **settings:** edit custom headers on a custom provider ([2d0596d](https://github.com/royisme/pikabaka/commit/2d0596d159835ae92eecf59a4373cf9fc20405cd))
+* **settings:** edit custom headers on a custom provider ([31d5c69](https://github.com/royisme/pikabaka/commit/31d5c69d145a627459fc8fa41b66ffde7be88d54))
+* **settings:** list one row per configured provider ([11f0775](https://github.com/royisme/pikabaka/commit/11f0775ab5f0c7f3f7640856bb7764c00a4325f3))
+* **settings:** list one row per configured provider ([986d5e1](https://github.com/royisme/pikabaka/commit/986d5e1c67511fbf625de6ffcda014a967a811a8))
+* **settings:** never replace a speech service that is not configured ([90a05ed](https://github.com/royisme/pikabaka/commit/90a05edaf54c94d6ecce8db93fd95fb3694bbcd3))
+* **settings:** never replace a speech service that is not configured ([91e3f2b](https://github.com/royisme/pikabaka/commit/91e3f2b3eb23329dc0b060d86130bbba8c7a3799))
+* **settings:** reorder the audio settings and drop the fake opacity preview ([0879f9a](https://github.com/royisme/pikabaka/commit/0879f9a0689ecc63158a1c6d5e8e5b6616b0c471))
+* **settings:** replace Your Background with a Knowledge tab ([16a85bc](https://github.com/royisme/pikabaka/commit/16a85bc3b5c0ef203cc723db79aeb2af6e9cc8d8))
+* **settings:** replace Your Background with a Knowledge tab ([2db26f6](https://github.com/royisme/pikabaka/commit/2db26f6ac1f6eb89297c96e4dc0668c6347aa331))
+* **update:** download updates in the background and publish the feed ([3a8ad29](https://github.com/royisme/pikabaka/commit/3a8ad298d53b96b96f964922c5d156190ed7517f))
+* **update:** download updates in the background and publish the feed ([452e4a0](https://github.com/royisme/pikabaka/commit/452e4a069cf8c4208b67837428ef49118cb75124))
+
+
+### Bug Fixes
+
+* **meeting:** start every meeting with an empty overlay and stop answers from crossing meetings ([051b2a7](https://github.com/royisme/pikabaka/commit/051b2a76b4687478d237c961dffa5e93b7c0772d))
+* **meeting:** start every meeting with an empty overlay and stop answers from crossing meetings ([ff0c3a5](https://github.com/royisme/pikabaka/commit/ff0c3a5cee35b7bec5ca976ab211da5610c9bff4))
+* **rag:** index live meetings under the recorded meeting id ([fd9ae40](https://github.com/royisme/pikabaka/commit/fd9ae400c2c7bb99ca3f826f2f7097f9899b2caa))
+* **rag:** index live meetings under the recorded meeting id ([96626fc](https://github.com/royisme/pikabaka/commit/96626fc412285a0ce0231c7c69d817f9f6f18026))
+* **rag:** keep embedding vectors consistent and stop the whole-meeting fallback ([b18ea25](https://github.com/royisme/pikabaka/commit/b18ea2530d1cdc86b2e4b53bb77512b1dda79d7d))
+* **rag:** keep embedding vectors consistent and stop the whole-meeting fallback ([e06a757](https://github.com/royisme/pikabaka/commit/e06a7572188dc022ceebd86119e4b5f6b8bdb9a8))
+* **rag:** make live meeting indexing safe to stop and restart ([30e9f3d](https://github.com/royisme/pikabaka/commit/30e9f3de5fdd21a23860055dadc1a574d083a939))
+* **rag:** make live meeting indexing safe to stop and restart ([a9d9baf](https://github.com/royisme/pikabaka/commit/a9d9bafcb309c385312a7eb9c878d1a840bd2144))
+* **settings:** make update errors readable and follow the design rules ([0eae301](https://github.com/royisme/pikabaka/commit/0eae3013dc847b3d5a36b2f2fa703fa79ee1dbe6))
+* **settings:** stop inventing results and honour what the user typed ([894d131](https://github.com/royisme/pikabaka/commit/894d131c0bb46886bd589d5fd1c6b45fe2c768f1))
+* **settings:** stop inventing results and honour what the user typed ([b4a12a3](https://github.com/royisme/pikabaka/commit/b4a12a38a34c01aea5b4f2effdebff20375e5373))
+
+
+### Build & Release
+
+* **deps:** move the app to React 19, TanStack Query 5, TypeScript 7, Vite 8, Tailwind 4 and Electron 45 ([4d540c7](https://github.com/royisme/pikabaka/commit/4d540c7084fed5eb55acbe702deb27789244a702))
+* **deps:** move the app to React 19, TanStack Query 5, TypeScript 7, Vite 8, Tailwind 4 and Electron 45 ([d12ae4f](https://github.com/royisme/pikabaka/commit/d12ae4f89ba005fd72e53057e0edcefde9d00cb5))
+* **lint:** fail the lint run when a code smell count rises above its ledger ([3f21698](https://github.com/royisme/pikabaka/commit/3f21698ff97f9e677414b4d73ed310e5e89fc07b))
+* **lint:** fail the lint run when a code smell count rises above its ledger ([530b7ae](https://github.com/royisme/pikabaka/commit/530b7aef64f74cdd4875ee1d119108c00f4be694))
+* **lint:** lower the any ledger to 470 ([c0ddc39](https://github.com/royisme/pikabaka/commit/c0ddc3971a12c25faaa6c59b627262de1b612bd5))
+* stop the module.register deprecation warning in tests ([b73679c](https://github.com/royisme/pikabaka/commit/b73679c0038b7702320033dd5da16c5dc29cb9cd))
+* stop the module.register deprecation warning in tests ([de0bc9d](https://github.com/royisme/pikabaka/commit/de0bc9d22ef4950ef53e51147e7f6f10b2ee1665))
+* **test:** rebuild tap's plugin set before the tests so the TypeScript plugin stays off ([90aef24](https://github.com/royisme/pikabaka/commit/90aef240a6ee88008f86b63a8e2476125c15217e))
+* **test:** turn the tap TypeScript plugin off on the command line ([96a4013](https://github.com/royisme/pikabaka/commit/96a4013fce5a60f1d616fdb5d77f2d1e753d8fd5))
+
+
+### Refactoring
+
+* **agent:** claim a generation once per answer run instead of at nine sites ([54747ba](https://github.com/royisme/pikabaka/commit/54747ba3be87f7765af9a2dc309a516a5ef3d933))
+* **agent:** claim a generation once per answer run instead of at nine sites ([9d508b3](https://github.com/royisme/pikabaka/commit/9d508b3f62cefcddd0a9973396725723b77e3c93))
+* **build:** stop renaming the helper processes at build time ([57a4256](https://github.com/royisme/pikabaka/commit/57a42564f7930412466f3297b5be1f0c3605fff4))
+* **build:** stop renaming the helper processes at build time ([4804795](https://github.com/royisme/pikabaka/commit/4804795a6f02a1fcba61b93a464e2a138bb34ce4))
+* **electron:** type the AppState members the audio and stealth modules reach instead of casting to any ([65429fc](https://github.com/royisme/pikabaka/commit/65429fc7aad519fb2f9b5ded37a72650d857b82e))
+* **electron:** type the AppState members the audio and stealth modules reach instead of casting to any ([9c790c1](https://github.com/royisme/pikabaka/commit/9c790c196524462bd07d386368fb856d2a05e8a9))
+* **interview:** remove the interview feature, the resume and the profile ([69fe349](https://github.com/royisme/pikabaka/commit/69fe349afeeb650979df3725998f14cad09c2bb5))
+* **interview:** remove the interview feature, the resume and the profile ([31493be](https://github.com/royisme/pikabaka/commit/31493be122173e732597ea7164baa74cf04c9f39))
+* **prompt:** one neutral role and task text for every provider ([abb7e6e](https://github.com/royisme/pikabaka/commit/abb7e6e1a32042735184e92f7469dd3dec405288))
+* **prompt:** one neutral role and task text for every provider ([3fff443](https://github.com/royisme/pikabaka/commit/3fff4435ca977495ebed0129cfb95b596b8adffe))
+* **settings:** give translation its own settings component and name shared model rows ([c7b96c7](https://github.com/royisme/pikabaka/commit/c7b96c79992cd8ef11a3cc4f019c662782fa3423))
+* **settings:** give translation its own settings component and name shared model rows ([036aa26](https://github.com/royisme/pikabaka/commit/036aa268cb52759c4f2dfb77c726a5d1e0cad1dd))
+* **settings:** list speech providers in Provider setup ([39be9b6](https://github.com/royisme/pikabaka/commit/39be9b6dd92ed6fdaf77a032257813d909862a13))
+* **settings:** list speech providers in Provider setup ([ff3d8df](https://github.com/royisme/pikabaka/commit/ff3d8df6c87085e7ea22a785f93e2d1aaef7371f))
+* **settings:** move answer language and style beside Quick answers ([5f9b81a](https://github.com/royisme/pikabaka/commit/5f9b81af23c031883b224f298ca2a619d4c3eadc))
+* **settings:** move answer language and style beside Quick answers ([54aefe2](https://github.com/royisme/pikabaka/commit/54aefe23aedd9d15b8c9c24dd6088dd78aae0509))
+* **settings:** remove the unused settings Sidebar ([a69d308](https://github.com/royisme/pikabaka/commit/a69d308993f5bbf9fa7006ff0ce54bae7bdbc341))
+* **settings:** set up the proactive-help decision service in Provider setup ([38929a4](https://github.com/royisme/pikabaka/commit/38929a48a04faa6e055a1a3364f34d1c63aa8e80))
+* **settings:** set up the proactive-help decision service in Provider setup ([1c71cbb](https://github.com/royisme/pikabaka/commit/1c71cbbb3ee559221af060eb5ca014b6425d4c8e))
+* **stealth:** call it Hide from screen share ([658f5a1](https://github.com/royisme/pikabaka/commit/658f5a1fc50ab161d0ab0a6fb060ae0df77fa10b))
+* **stealth:** call it Hide from screen share ([92f3434](https://github.com/royisme/pikabaka/commit/92f34347e8654f76726ad23289d8703398156cbc))
+* **stealth:** remove the process disguise ([4be7773](https://github.com/royisme/pikabaka/commit/4be777321b91ee69a71816dccd37c798ebb78626))
+* **stealth:** remove the process disguise ([8595574](https://github.com/royisme/pikabaka/commit/85955748254772c7e40810d7ac10c6c0da2d3a3a))
+* **stealth:** stop hiding the dock icon and the tray ([376b5dc](https://github.com/royisme/pikabaka/commit/376b5dc734020c7bbe96521a4183a3b5f643a447))
+* **stealth:** stop hiding the dock icon and the tray ([7bbc8b7](https://github.com/royisme/pikabaka/commit/7bbc8b78719da71b9927b1682f9c985dc11af538))
+* **transcript:** rename the other-party speaker to them ([810fc2f](https://github.com/royisme/pikabaka/commit/810fc2f4de0b96aafaee17e8da34ed4e29f53b3a))
+* **transcript:** rename the other-party speaker to them ([39225c2](https://github.com/royisme/pikabaka/commit/39225c2ca2b2aaa5a2df146771c0fca1577de39d))
+
+
+### Chores
+
+* **release:** release 3.0.0 ([90cf46a](https://github.com/royisme/pikabaka/commit/90cf46ad86d3b097b0c7e2292066fd3e0e5d25ed))
+
 ## [2.4.0](https://github.com/royisme/pikabaka/compare/v2.3.0...v2.4.0) (2026-10-27)
 
 
