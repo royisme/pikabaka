@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: the speech service is told the microphone's real sample rate (uncommitted)
+
+- `electron/audio/MicrophoneCapture.ts`: `getSampleRate` looked for `get_sample_rate`, but napi-rs exposes `getSampleRate`, so the check never passed and the method always returned 48000. A microphone that opens at another rate (a Bluetooth headset opens at 16000Hz) was sent to the speech service labelled 48000Hz: the audio plays 3x too fast for it and words are lost or garbled. It now calls `getSampleRate`. `SystemAudioCapture` has the same wrong name, but its rate is only published after a background start and nothing reads it back, so it is left alone.
+- `test/unit/microphone-sample-rate.test.ts`: the wrapper reports what the native class reports.
+- Found in the dev log: `Rate: 16000Hz` from the native side, then `MicrophoneCapture rate: 48000Hz` from the app.
+- Checks: both tsc 0, oxlint 0, tap 5302/5302. Not verified: a real call with a 16000Hz or 44100Hz microphone (owner).
+
 ## 2026-10-30: startup no longer flips the embedding provider and no longer shows "Provider Changed" (uncommitted)
 
 - `electron/helpers/ProcessingHelper.ts`: `loadStoredCredentials` re-initialized the embeddings with only the OpenAI and Gemini keys, which dropped the connection chosen in Settings. The pipeline treated "selected connection removed" as a config change, fell back to Gemini and saved it as `last_embedding_provider`; a later full init switched back. The Gemini step was compared with the saved name and fired the "Provider Changed" warning on every start. It now passes `buildEmbeddingConfig(credManager)`, the same config the RAG manager was built with, so the call is skipped.
