@@ -8,6 +8,12 @@ What is done, what is broken, what is unverified. `TASKS.md` is what to do next;
 - Not changed: the Deepgram endpointing (800ms) and the transcript flush timers; the owner also reported the Me line as slow, and that is not yet investigated.
 - Checks: `cargo test --locked` below. Not verified: a real call (owner). The app's `.node` must be rebuilt (`build-native`) to take effect.
 
+## 2026-10-30: a meeting prints how much each speech stream delivered (uncommitted)
+
+- `electron/lib/audio-stats.ts` (new): counts final lines and words per stream (Me, other party) and what the echo filter dropped (final and interim lines). Numbers only, no text. `audio-pipeline.ts` records them, `startMeeting` resets and `finishMeeting` logs one line: `[Main] Meeting audio stats: ...`. It replaces the old `echoLinesDropped` counter and its every-25th-line log.
+- Why: the owner saw the "Me" side recorded incompletely in question-and-answer calls. The line tells whether the echo filter dropped final lines, or the stream itself delivered little.
+- Checks: both tsc 0, oxlint 0, ratchet 0, tap 5306/5306. Not verified: a real call. Owner: end a meeting and read the stats line in the terminal output.
+
 ## 2026-10-30: startup no longer flips the embedding provider and no longer shows "Provider Changed" (uncommitted)
 
 - `electron/helpers/ProcessingHelper.ts`: `loadStoredCredentials` re-initialized the embeddings with only the OpenAI and Gemini keys, which dropped the connection chosen in Settings. The pipeline treated "selected connection removed" as a config change, fell back to Gemini and saved it as `last_embedding_provider`; a later full init switched back. The Gemini step was compared with the saved name and fired the "Provider Changed" warning on every start. It now passes `buildEmbeddingConfig(credManager)`, the same config the RAG manager was built with, so the call is skipped.
