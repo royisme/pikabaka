@@ -54,6 +54,7 @@ export type MeetingTranscriptAction =
   | { type: 'themPartial'; text: string }
   | { type: 'mePartial'; text: string }
   | { type: 'meArrival'; event: TranscriptEventForSegment; now: number }
+  | { type: 'meSpeakingEnded' }
   | { type: 'themArrival'; event: TranscriptEventForSegment; now: number; displayMode?: TranscriptDisplayMode }
   | { type: 'themSpeakingEnded' }
   | { type: 'settingsChanged'; patch: TranscriptSettingsPatch }
@@ -81,6 +82,8 @@ export function meetingTranscriptReducer(
       return { ...state, isThemSpeaking: true, currentThemPartial: action.text, liveSpeaker: 'them' };
     case 'mePartial':
       return { ...state, myPartial: action.text, liveSpeaker: 'user' };
+    case 'meSpeakingEnded':
+      return { ...state, myPartial: '', liveSpeaker: 'them' };
     case 'meArrival':
       // Own speech is never translated, so its `skipped` says nothing about whether translation is on.
       return {
