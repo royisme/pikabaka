@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: a meeting prints where audio could wait on our side (uncommitted)
+
+- `electron/lib/send-lag.ts` (new): measures the main process event loop delay (p50, p99, max) and, per stream, the chunk count, the longest gap between chunks, gaps over 300 ms and the slowest write. `audio-pipeline.ts` times each write, `startMeeting` resets and `finishMeeting` logs one `[Main] Send lag:` line. Numbers only.
+- Why: the owner saw text appear very late with every speech service and suspects our sending. The probes showed server-side final latency of 1.3 to 5 s, which does not rule out a stall on our side.
+- Checks: both tsc 0, oxlint 0, ratchet 0, tap 5303/5303. Not verified: a real call (owner): read the line at meeting end.
+
 ## 2026-10-30: startup no longer flips the embedding provider and no longer shows "Provider Changed" (uncommitted)
 
 - `electron/helpers/ProcessingHelper.ts`: `loadStoredCredentials` re-initialized the embeddings with only the OpenAI and Gemini keys, which dropped the connection chosen in Settings. The pipeline treated "selected connection removed" as a config change, fell back to Gemini and saved it as `last_embedding_provider`; a later full init switched back. The Gemini step was compared with the saved name and fired the "Provider Changed" warning on every start. It now passes `buildEmbeddingConfig(credManager)`, the same config the RAG manager was built with, so the call is skipped.

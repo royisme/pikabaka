@@ -101,6 +101,7 @@ import {
 } from "./helpers/stealth"
 import { initializeApp } from "./lib/lifecycle"
 import type { EchoFilter } from "./lib/echo-filter"
+import { sendLag } from "./lib/send-lag"
 
 /** Unified type for all STT providers with optional extended capabilities */
 type ScreenshotWindowMode = 'launcher' | 'overlay';
@@ -782,6 +783,7 @@ export class AppState {
     }
 
     this.isMeetingActive = true;
+    sendLag.start();
     this.setMicrophoneMuted(false);
     this.resetBufferedTranscriptTurns();
     this.lastSystemAudioChunkAt = null;
@@ -865,6 +867,7 @@ export class AppState {
     console.log('[Main] Ending Meeting...');
     const stoppedAtMs = Date.now();
     this.isMeetingActive = false; // Block new data immediately
+    console.log(sendLag.summary());
     this.broadcastMeetingState();
 
     // Cancel the engine before the first await: stopping the agent and draining the indexer take time, and an

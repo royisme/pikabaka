@@ -1,4 +1,5 @@
 import { EchoFilter } from './echo-filter';
+import { sendLag } from './send-lag';
 import { BrowserWindow, systemPreferences } from "electron"
 import type { AppState } from "../main"
 import { SystemAudioCapture } from "../audio/SystemAudioCapture"
@@ -213,7 +214,7 @@ export function setupSystemAudioPipeline(appState: AppState): void {
       state.systemAudioCapture = new SystemAudioCapture();
       state.systemAudioCapture.on('data', (chunk: Buffer) => {
         state.lastSystemAudioChunkAt = Date.now();
-        state.googleSTT?.write(chunk);
+        sendLag.timed('them', () => state.googleSTT?.write(chunk));
       });
       state.systemAudioCapture.on('speech_ended', () => {
         state.googleSTT?.notifySpeechEnded?.();
@@ -229,7 +230,7 @@ export function setupSystemAudioPipeline(appState: AppState): void {
       state.microphoneCapture = new MicrophoneCapture();
       state.microphoneCapture.on('data', (chunk: Buffer) => {
         // Muted: silence of the same length goes on, so the speech service keeps its connection.
-        state.googleSTT_User?.write(state.microphoneMuted ? Buffer.alloc(chunk.length) : chunk);
+        sendLag.timed('user', () => state.googleSTT_User?.write(state.microphoneMuted ? Buffer.alloc(chunk.length) : chunk));
       });
       state.microphoneCapture.on('speech_ended', () => {
         state.googleSTT_User?.notifySpeechEnded?.();
