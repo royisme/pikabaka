@@ -344,6 +344,7 @@ for (const short of [false, true]) {
         };
         Reflect.set(state, 'ragManager', f.manager);
         Reflect.set(state, 'intelligenceManager', {
+            cancelGeneration: () => {},
             startMeeting: () => {
                 const id = `real-${++next}`;
                 f.addMeeting(id);

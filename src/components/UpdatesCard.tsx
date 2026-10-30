@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import packageJson from '../../package.json';
 import { useMainEvent } from '../hooks/useMainEvent';
 import { describeUpdateError } from '../lib/updateError';
@@ -25,11 +25,7 @@ export const UpdatesCard: React.FC = () => {
     const [checkedAt, setCheckedAt] = useState<number | null>(null);
     const [autoCheckDraft, setAutoCheckDraft] = useState<boolean>();
     const [now, setNow] = useState(Date.now);
-    const { data, error } = useQuery(
-        ['update-state'],
-        () => window.electronAPI.getUpdateState(),
-        { cacheTime: 0, retry: false, refetchOnWindowFocus: false, refetchOnReconnect: false }
-    );
+    const { data, error } = useQuery({ queryKey: ['update-state'], queryFn: () => window.electronAPI.getUpdateState(), gcTime: 0, retry: false, refetchOnWindowFocus: false, refetchOnReconnect: false });
 
     useEffect(() => {
         const timer = setInterval(() => setNow(Date.now()), 30000);

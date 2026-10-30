@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import { isTranscriptArrival, translationEnabledAfterEvent, upsertTranscriptSegment, type TranscriptDisplayMode, type TranscriptSegment } from '../lib/transcriptSegments';
 import { useLocalStorageValue } from './useLocalStorageValue';
 import { useMainEvent } from './useMainEvent';
@@ -26,16 +26,12 @@ export function useMeetingTranscript() {
   );
   const speakingTimeoutRef = useRef<number | null>(null);
 
-  const { data: languageOptions = [] } = useQuery(
-    ['recognition-languages'],
-    async () => {
+  const { data: languageOptions = [] } = useQuery({ queryKey: ['recognition-languages'], queryFn: async () => {
       const languages = await window.electronAPI?.getRecognitionLanguages?.();
       return Object.entries(languages ?? {})
         .map(([value, language]) => ({ value, label: (language as { label?: string }).label || value }))
         .sort((a, b) => a.label.localeCompare(b.label));
-    },
-    { staleTime: Infinity }
-  );
+    }, staleTime: Infinity });
 
   const loadTranslationSettings = useCallback(() => {
     window.electronAPI?.getTranscriptTranslationSettings?.()

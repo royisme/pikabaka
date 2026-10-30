@@ -70,8 +70,8 @@ interface ChatPanelProps {
   appearance: any;
   isLightTheme: boolean;
   shortcuts: ShortcutConfig;
-  scrollContainerRef: React.RefObject<HTMLDivElement>;
-  textInputRef: React.RefObject<HTMLInputElement>;
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+  textInputRef: React.RefObject<HTMLInputElement | null>;
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = ({

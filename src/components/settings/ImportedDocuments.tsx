@@ -1,5 +1,5 @@
 import React from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DocumentIndexState, ImportedDocument } from '../../../electron/knowledge/types';
 
 const quietButton = 'px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-component text-xs font-medium text-text-secondary hover:bg-bg-input hover:text-text-primary disabled:opacity-50';
@@ -27,32 +27,30 @@ function stateWords(doc: ImportedDocument): string {
  */
 const ImportedDocuments: React.FC = () => {
     const queryClient = useQueryClient();
-    const documents = useQuery(['knowledge-documents'], async () => {
+    const documents = useQuery({ queryKey: ['knowledge-documents'], queryFn: async () => {
         const result = await window.electronAPI.knowledgeListDocuments();
         if (!result.success) throw new Error(result.error);
         return result.documents;
-    }, {
-        refetchInterval: (rows?: ImportedDocument[]) => rows?.some(doc => doc.state === 'indexing') ? 2000 : false,
-    });
-    const sources = useQuery(['answer-sources'], () => window.electronAPI.getAnswerSources());
-    const refetch = () => queryClient.invalidateQueries(['knowledge-documents']);
-    const importDocument = useMutation(async () => {
+    }, refetchInterval: (query) => query.state.data?.some(doc => doc.state === 'indexing') ? 2000 : false });
+    const sources = useQuery({ queryKey: ['answer-sources'], queryFn: () => window.electronAPI.getAnswerSources() });
+    const refetch = () => queryClient.invalidateQueries({ queryKey: ['knowledge-documents'] });
+    const importDocument = useMutation({ mutationFn: async () => {
         const result = await window.electronAPI.knowledgeImportDocument();
         if ('cancelled' in result) return result;
         if (!result.success) throw new Error(result.error);
         await refetch();
         return result;
-    });
-    const remove = useMutation(async (id: number) => {
+    } });
+    const remove = useMutation({ mutationFn: async (id: number) => {
         const result = await window.electronAPI.knowledgeRemoveDocument(id);
         if (!result.success) throw new Error(result.error || 'Could not remove the document');
         await refetch();
-    });
-    const reindex = useMutation(async (id: number) => {
+    } });
+    const reindex = useMutation({ mutationFn: async (id: number) => {
         const result = await window.electronAPI.knowledgeReindexDocument(id);
         if (!result.success) throw new Error(result.error || 'Could not re-index the document');
         await refetch();
-    });
+    } });
     const rows = documents.data;
     const message = (error: unknown) => error instanceof Error ? error.message : error ? String(error) : '';
     const queryError = message(documents.error);
@@ -61,8 +59,8 @@ const ImportedDocuments: React.FC = () => {
         <div className="border-t border-border-subtle pt-3 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h4 className="text-sm font-semibold text-text-primary">Documents</h4>
-                <button type="button" disabled={importDocument.isLoading} onClick={() => { importDocument.reset(); importDocument.mutate(); }} className={quietButton}>
-                    {importDocument.isLoading ? 'Importing…' : 'Import a document'}
+                <button type="button" disabled={importDocument.isPending} onClick={() => { importDocument.reset(); importDocument.mutate(); }} className={quietButton}>
+                    {importDocument.isPending ? 'Importing…' : 'Import a document'}
                 </button>
             </div>
             {message(importDocument.error) ? <p role="alert" className="text-xs text-text-primary">✕ {message(importDocument.error)}</p> : null}
@@ -82,17 +80,17 @@ const ImportedDocuments: React.FC = () => {
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {(doc.state === 'needs-reindex' || doc.state === 'failed' || doc.state === 'not-indexed') && (
-                            <button type="button" disabled={reindex.isLoading} onClick={() => { reindex.reset(); reindex.mutate(doc.id); }} className={quietButton}>
-                                {reindex.isLoading ? 'Re-indexing…' : 'Re-index'}
+                            <button type="button" disabled={reindex.isPending} onClick={() => { reindex.reset(); reindex.mutate(doc.id); }} className={quietButton}>
+                                {reindex.isPending ? 'Re-indexing…' : 'Re-index'}
                             </button>
                         )}
                         <button
                             type="button"
-                            disabled={remove.isLoading}
+                            disabled={remove.isPending}
                             onClick={() => { if (confirm(`Remove ${doc.name}?`)) { remove.reset(); remove.mutate(doc.id); } }}
                             className={quietButton}
                         >
-                            {remove.isLoading ? 'Removing…' : 'Remove'}
+                            {remove.isPending ? 'Removing…' : 'Remove'}
                         </button>
                     </div>
                 </div>

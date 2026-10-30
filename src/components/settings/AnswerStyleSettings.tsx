@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 const PRESETS = [
     'Direct and first-principles, short blunt sentences, like Elon Musk',
@@ -13,23 +13,18 @@ const PRESETS = [
  */
 const AnswerStyleSettings: React.FC = () => {
     const queryClient = useQueryClient();
-    const { data: saved } = useQuery(['answer-style'], () => window.electronAPI.getAnswerStyle());
+    const { data: saved } = useQuery({ queryKey: ['answer-style'], queryFn: () => window.electronAPI.getAnswerStyle() });
     const [draft, setDraft] = useState<string | null>(null);
     const [expanded, setExpanded] = useState(false);
     const value = draft ?? saved ?? '';
 
-    const save = useMutation(
-        async (style: string) => {
+    const save = useMutation({ mutationFn: async (style: string) => {
             const result = await window.electronAPI.setAnswerStyle(style);
             if (!result.success) throw new Error(result.error || 'Could not save');
-        },
-        {
-            onSuccess: async () => {
-                await queryClient.invalidateQueries(['answer-style']);
+        }, onSuccess: async () => {
+                await queryClient.invalidateQueries({ queryKey: ['answer-style'] });
                 setDraft(null);
-            },
-        }
-    );
+            } });
 
     return (
         <div className="min-w-0 space-y-2">
@@ -58,10 +53,10 @@ const AnswerStyleSettings: React.FC = () => {
                     />
                     <button
                         onClick={() => save.mutate(value)}
-                        disabled={save.isLoading || draft === null}
+                        disabled={save.isPending || draft === null}
                         className={`shrink-0 h-11 px-4 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${save.isSuccess && draft === null ? 'bg-state-success-soft text-state-success' : 'bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary'}`}
                     >
-                        {save.isLoading ? 'Saving…' : save.isSuccess && draft === null ? 'Saved!' : 'Save'}
+                        {save.isPending ? 'Saving…' : save.isSuccess && draft === null ? 'Saved!' : 'Save'}
                     </button>
                 </div>
                 <div className="flex flex-wrap gap-1.5">

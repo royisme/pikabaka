@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs');
 
 async function downloadModels() {
-    const { pipeline, env } = await import('@xenova/transformers');
+    const { pipeline, env } = await import('@huggingface/transformers');
     const modelsDir = path.join(__dirname, '../resources/models');
     
     // Ensure the directory exists
@@ -16,12 +16,12 @@ async function downloadModels() {
     try {
         // 1. Embedding model (RAG)
         console.log('[download-models] Downloading Xenova/all-MiniLM-L6-v2...');
-        await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+        await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { dtype: 'q8' });
         console.log('[download-models] all-MiniLM-L6-v2 downloaded.');
 
         // 2. Zero-shot classification model (Intent Classifier)
         console.log('[download-models] Downloading Xenova/mobilebert-uncased-mnli...');
-        await pipeline('zero-shot-classification', 'Xenova/mobilebert-uncased-mnli');
+        await pipeline('zero-shot-classification', 'Xenova/mobilebert-uncased-mnli', { dtype: 'q8' });
         console.log('[download-models] mobilebert-uncased-mnli downloaded.');
 
         console.log('[download-models] All models downloaded successfully!');

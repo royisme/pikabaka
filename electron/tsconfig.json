@@ -8,12 +8,11 @@
     "noImplicitAny": true,
     "sourceMap": true,
     "jsx": "react-jsx",
-    "baseUrl": ".",
     "rootDir": "..",
     "outDir": "../dist-electron",
     "moduleResolution": "nodenext",
     "resolveJsonModule": true,
-    "types": ["node", "better-sqlite3", "ws", "uuid", "screenshot-desktop"]
+    "types": ["node", "better-sqlite3", "ws", "screenshot-desktop"]
   },
   "include": [
     "**/*.ts",

@@ -1,34 +1,29 @@
 import React, { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 const AnswerLanguageSetting: React.FC = () => {
     const queryClient = useQueryClient();
-    const { data: availableAiLanguages = [], error: languagesError } = useQuery(['ai-response-languages'], async () => {
+    const { data: availableAiLanguages = [], error: languagesError } = useQuery({ queryKey: ['ai-response-languages'], queryFn: async () => {
         const languages = await window.electronAPI.getAiResponseLanguages();
         return [...languages].sort((a, b) => {
             if (a.label === 'English') return -1;
             if (b.label === 'English') return 1;
             return a.label.localeCompare(b.label);
         });
-    });
-    const { data: saved = 'English', error: languageError } = useQuery(['ai-response-language'], async () =>
-        (await window.electronAPI.getAiResponseLanguage()) || 'English');
+    } });
+    const { data: saved = 'English', error: languageError } = useQuery({ queryKey: ['ai-response-language'], queryFn: async () =>
+        (await window.electronAPI.getAiResponseLanguage()) || 'English' });
     const [draft, setDraft] = useState<string | null>(null);
     const aiResponseLanguage = draft ?? saved;
 
-    const save = useMutation(
-        async (language: string) => {
+    const save = useMutation({ mutationFn: async (language: string) => {
             const result = await window.electronAPI.setAiResponseLanguage(language);
             if (result && !result.success) throw new Error(result.error || 'Could not save');
-        },
-        {
-            onSuccess: (_, language) => {
+        }, onSuccess: (_, language) => {
                 queryClient.setQueryData(['ai-response-language'], language);
                 setDraft(null);
             },
-            onError: () => setDraft(null),
-        }
-    );
+            onError: () => setDraft(null) });
     const error = save.error || languageError || languagesError;
 
     const handleAiLanguageChange = (language: string) => {

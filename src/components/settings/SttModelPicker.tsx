@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import ModelCombobox from './ModelCombobox';
 
 export const STT_MODEL_DEFAULTS: Record<string, string> = {
@@ -21,15 +21,11 @@ interface SttModelPickerProps {
 /** A speech service's model: its default unless one is typed or picked from what the service lists. */
 const SttModelPicker: React.FC<SttModelPickerProps> = ({ provider, model, apiKey, onChange }) => {
     // On demand (the button), cached per service: another service never shows this one's list.
-    const models = useQuery(
-        ['stt-models', provider],
-        async () => {
+    const models = useQuery({ queryKey: ['stt-models', provider], queryFn: async () => {
             const result = await window.electronAPI.fetchSttModels(provider, apiKey || undefined);
             if (!result.success) throw new Error(result.error || 'Could not fetch models');
             return (result.models ?? []).map((m) => m.id);
-        },
-        { enabled: false, retry: false, cacheTime: 5 * 60_000 }
-    );
+        }, enabled: false, retry: false, gcTime: 5 * 60_000 });
 
     const note = models.isFetching
         ? { tone: 'info', text: 'Asking the service…' }

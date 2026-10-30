@@ -179,7 +179,7 @@ const reply = (edited: { role?: string; tasks?: Record<string, string> } = {}): 
 };
 
 function host(t: Test, api: Record<string, unknown>, data: Prompts.PromptsReply = reply()) {
-    const h = settingsModuleHost('src/components/settings/PromptsSettings.tsx', api, [['prompts', data]]);
+    const h = settingsModuleHost('src/components/settings/PromptsSettings.tsx', api, [[['prompts'], data]]);
     t.teardown(h.unmount);
     h.click('Prompts');
     return h;

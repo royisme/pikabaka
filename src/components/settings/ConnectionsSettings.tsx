@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AiConnectionType, AiConnectionView, HeaderEdit } from '../../types/electron';
 import { connectionNeedsKey } from '../../../electron/services/aiConnections';
 import { configuredProvider, interfaceLabel, ProviderNavigation } from './ConnectionModelPicker';
@@ -90,16 +90,16 @@ export function ProviderEditor({ connection, onClose, onSaved, onTest, onBusy, d
     const [headers, setHeaders] = useState<HeaderRow[]>((connection?.headers ?? []).map(header => ({ name: header.name, value: '', saved: true, removed: false })));
     const headerErrors = headers.map((_, index) => headerRowError(headers, index));
     const headerEdits = headerEditsOf(headers);
-    const save = useMutation(async () => {
+    const save = useMutation({ mutationFn: async () => {
         const result = await window.electronAPI.aiConnectionSave({ ...draft, apiKey: draft.apiKey || undefined, ...(headerEdits.length ? { headerEdits } : {}) });
         if (!result.success) throw new Error(result.error || 'Could not save provider');
-    });
-    const test = useMutation(async () => {
+    } });
+    const test = useMutation({ mutationFn: async () => {
         const result = await window.electronAPI.aiConnectionModels({ id: draft.id, type: draft.type, baseUrl: draft.baseUrl, apiKey: draft.apiKey || undefined, ...(headerEdits.length ? { headerEdits } : {}) });
         if (!result.success) throw new Error(result.error || 'Could not fetch models');
         return `The host lists ${result.models?.length ?? 0} models.`;
-    });
-    const busy = disabled || save.isLoading || test.isLoading;
+    } });
+    const busy = disabled || save.isPending || test.isPending;
     const change = (next: Partial<typeof draft>) => { setDraft({ ...draft, ...next }); save.reset(); test.reset(); };
     const changeHeaders = (next: HeaderRow[]) => { setHeaders(next); save.reset(); test.reset(); };
     const changeHeader = (index: number, next: Partial<HeaderRow>) => changeHeaders(headers.map((row, i) => i === index ? { ...row, ...next } : row));
@@ -151,12 +151,12 @@ export function ProviderEditor({ connection, onClose, onSaved, onTest, onBusy, d
             <button type="button" disabled={busy || headerErrors.some(Boolean)} className={smallButton} onClick={() => test.mutate(undefined, {
                 onSuccess: message => onTest({ success: true, message }),
                 onError: error => onTest({ success: false, message: (error as Error).message }),
-            })}>{test.isLoading ? 'Testing…' : 'Test'}</button>
+            })}>{test.isPending ? 'Testing…' : 'Test'}</button>
             <button type="button" disabled={busy || headerErrors.some(Boolean)} className="min-h-9 px-4 py-2 rounded-lg text-xs bg-primary text-on-primary disabled:opacity-50" onClick={() => {
                 onBusy(true);
                 save.mutate(undefined, { onSuccess: onSaved, onSettled: () => onBusy(false) });
-            }}>{save.isLoading ? 'Saving…' : 'Save'}</button>
-            <button type="button" disabled={disabled || save.isLoading} onClick={onClose} className={smallButton}>Cancel</button>
+            }}>{save.isPending ? 'Saving…' : 'Save'}</button>
+            <button type="button" disabled={disabled || save.isPending} onClick={onClose} className={smallButton}>Cancel</button>
         </div>
         <div aria-live="polite" className="text-xs text-text-primary break-words [overflow-wrap:anywhere]">
             {test.isError ? <p>✕ Test failed: {(test.error as Error).message}</p> : test.data ? <p>● {test.data}</p> : null}
@@ -168,8 +168,8 @@ export function ProviderEditor({ connection, onClose, onSaved, onTest, onBusy, d
 const ConnectionsSettings: React.FC<{ onChanged?: () => void }> = ({ onChanged }) => {
     const queryClient = useQueryClient();
     const navigation = useContext(ProviderNavigation);
-    const connections = useQuery(['ai-connections'], () => window.electronAPI.aiConnectionsList());
-    const uses = useQuery(['connection-uses'], async () => {
+    const connections = useQuery({ queryKey: ['ai-connections'], queryFn: () => window.electronAPI.aiConnectionsList() });
+    const uses = useQuery({ queryKey: ['connection-uses'], queryFn: async () => {
         const [chat, summary, agent, embedding, translation] = await Promise.all([
             window.electronAPI.chatModelGet(), window.electronAPI.summaryModelGet(), window.electronAPI.agentModelGet(),
             window.electronAPI.embeddingUseGet(), window.electronAPI.getTranscriptTranslationSettings(),
@@ -179,29 +179,29 @@ const ConnectionsSettings: React.FC<{ onChanged?: () => void }> = ({ onChanged }
             { name: 'Agent', connectionId: agent.connectionId }, { name: 'Search index', connectionId: embedding.connectionId },
             { name: 'Translation', connectionId: translation.provider },
         ];
-    });
+    } });
     const [editor, setEditor] = useState<AiConnectionView | string | null>(navigation?.editorId ?? null);
     const [saving, setSaving] = useState(false);
     const [confirmId, setConfirmId] = useState<string>();
     const [results, setResults] = useState<Record<string, TestResult>>({});
     const changed = () => {
-        void queryClient.invalidateQueries(['ai-connections']);
-        void queryClient.invalidateQueries(['connection-models']);
+        void queryClient.invalidateQueries({ queryKey: ['ai-connections'] });
+        void queryClient.invalidateQueries({ queryKey: ['connection-models'] });
         onChanged?.();
     };
-    const remove = useMutation(async (c: AiConnectionView) => {
+    const remove = useMutation({ mutationFn: async (c: AiConnectionView) => {
         const result = c.builtin
             ? await window.electronAPI.aiConnectionSave({ id: c.id, baseUrl: '', apiKey: '' })
             : await window.electronAPI.aiConnectionDelete(c.id);
         if (!result.success) throw new Error(result.error || 'Could not remove provider');
-    }, { onSuccess: (_, c) => {
+    }, onSuccess: (_, c) => {
         setConfirmId(undefined);
         if (editor === c.id || (typeof editor === 'object' && editor?.id === c.id)) setEditor(null);
         setResults(previous => { const next = { ...previous }; delete next[c.id]; return next; });
         changed();
     } });
     const selected = typeof editor === 'object' ? editor ?? undefined : connections.data?.find(c => c.id === editor);
-    const busy = saving || remove.isLoading;
+    const busy = saving || remove.isPending;
     return <div className="space-y-5">
         <section className="bg-bg-item-surface rounded-xl border border-border-subtle">
             <div className="p-4 flex flex-wrap items-center justify-between gap-3">
@@ -216,7 +216,7 @@ const ConnectionsSettings: React.FC<{ onChanged?: () => void }> = ({ onChanged }
             {uses.isError && <p role="alert" className="p-4 text-xs text-text-primary">✕ Could not check provider uses: {(uses.error as Error).message}</p>}
             {remove.isError && <p role="alert" className="p-4 text-xs text-text-primary">✕ {(remove.error as Error).message}</p>}
         </section>
-        {(editor === 'add' || selected) && <ProviderEditor key={selected?.id ?? 'add'} connection={selected} disabled={remove.isLoading}
+        {(editor === 'add' || selected) && <ProviderEditor key={selected?.id ?? 'add'} connection={selected} disabled={remove.isPending}
             onClose={() => setEditor(null)} onBusy={setSaving} onSaved={() => { setEditor(null); changed(); }}
             onTest={result => { if (selected) setResults(previous => ({ ...previous, [selected.id]: result })); }}
         />}

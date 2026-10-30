@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
 import ConnectionModelPicker from './ConnectionModelPicker';
 import TranslationTest from './TranslationTest';
@@ -37,16 +37,8 @@ const disclosureButton = 'bg-bg-component hover:bg-bg-elevated border border-bor
  * sends all seven fields at once, as the transcript assembler reads them. Segmentation applies on press.
  */
 const TranslationSettings = ({ languages }: { languages: Array<{ value: string; label: string }> }) => {
-    const { data: credentials } = useQuery(
-        ['speech-credentials'],
-        () => window.electronAPI.getStoredCredentials(),
-        { enabled: !!window.electronAPI?.getStoredCredentials }
-    );
-    const savedProfile = useQuery<TranscriptAssemblerProfile>(
-        ['transcript-assembler-profile'],
-        async () => (await window.electronAPI.getTranscriptAssemblerProfile()) || 'sentence_bias',
-        { enabled: !!window.electronAPI?.getTranscriptAssemblerProfile }
-    );
+    const { data: credentials } = useQuery({ queryKey: ['speech-credentials'], queryFn: () => window.electronAPI.getStoredCredentials(), enabled: !!window.electronAPI?.getStoredCredentials });
+    const savedProfile = useQuery<TranscriptAssemblerProfile>({ queryKey: ['transcript-assembler-profile'], queryFn: async () => (await window.electronAPI.getTranscriptAssemblerProfile()) || 'sentence_bias', enabled: !!window.electronAPI?.getTranscriptAssemblerProfile });
 
     const [draft, setDraft] = useState<Partial<TranslationValues>>({});
     const [profileDraft, setProfileDraft] = useState<TranscriptAssemblerProfile | null>(null);

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useQuery, useQueryClient } from 'react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { acceleratorToKeys, keysToAccelerator } from '../utils/keyboardUtils';
 import { isMac, isWindows } from '../utils/platformUtils';
 import { useMainEvent } from './useMainEvent';
@@ -43,10 +43,7 @@ export const DEFAULT_SHORTCUTS = buildDefaultShortcuts();
 
 export const useShortcuts = () => {
     const queryClient = useQueryClient();
-    const { data: keybinds = [] } = useQuery<BackendKeybind[]>(
-        ['keybinds'],
-        () => window.electronAPI.getKeybinds()
-    );
+    const { data: keybinds = [] } = useQuery<BackendKeybind[]>({ queryKey: ['keybinds'], queryFn: () => window.electronAPI.getKeybinds() });
     const shortcuts = buildDefaultShortcuts();
     for (const actionId of Object.keys(SHORTCUT_IDS) as (keyof ShortcutConfig)[]) {
         const keybind = keybinds.find(kb => kb.id === SHORTCUT_IDS[actionId]);
@@ -63,7 +60,7 @@ export const useShortcuts = () => {
 
     const updateShortcut = useCallback(async (actionId: keyof ShortcutConfig, keys: string[]) => {
         const result = await window.electronAPI.setKeybind(SHORTCUT_IDS[actionId], keysToAccelerator(keys));
-        if (result.success) await queryClient.invalidateQueries(['keybinds']);
+        if (result.success) await queryClient.invalidateQueries({ queryKey: ['keybinds'] });
         return result;
     }, [queryClient]);
 

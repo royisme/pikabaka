@@ -1,10 +1,7 @@
 import t from 'tap';
-import * as ReactQuery from 'react-query';
+import * as ReactQuery from '@tanstack/react-query';
 import { speechHost } from '../helpers/speechSettingsHost';
 
-const noop = () => {};
-ReactQuery.setLogger({ log: noop, warn: noop, error: noop });
-t.teardown(() => ReactQuery.setLogger(console));
 
 t.test('Add speech provider starts with Service and changes credential fields, never the transcription service', async t => {
     let selectionWrites = 0;

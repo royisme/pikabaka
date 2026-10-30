@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useQuery, useQueryClient } from 'react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AgentApprovalRequest } from '../../types/electron';
 
 const TITLE: Record<AgentApprovalRequest['tool'], string> = {
@@ -15,7 +15,7 @@ const TITLE: Record<AgentApprovalRequest['tool'], string> = {
  */
 const ApprovalDock: React.FC = () => {
     const queryClient = useQueryClient();
-    const { data: pending = [] } = useQuery<AgentApprovalRequest[]>(['agent-approvals'], () => window.electronAPI.agentApprovalsList());
+    const { data: pending = [] } = useQuery<AgentApprovalRequest[]>({ queryKey: ['agent-approvals'], queryFn: () => window.electronAPI.agentApprovalsList() });
 
     // The one effect: the main process pushes requests and answers, so the list follows that stream.
     useEffect(

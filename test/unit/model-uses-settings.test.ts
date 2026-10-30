@@ -1,10 +1,7 @@
 import t from 'tap';
-import * as ReactQuery from 'react-query';
+import * as ReactQuery from '@tanstack/react-query';
 import { modelUsesHost } from '../helpers/modelUsesHost';
 
-const noop = () => {};
-ReactQuery.setLogger({ log: noop, warn: noop, error: noop });
-t.teardown(() => ReactQuery.setLogger(console));
 
 const own = { connectionId: 'invented-gateway', model: 'invented-model' };
 const other = { connectionId: 'invented-other', model: 'invented-other-model' };

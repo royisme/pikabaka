@@ -29,6 +29,7 @@ What an agent (or a person) must never do in this repository, and the working ag
 - Never reformat or rewrite code you are not changing.
 
 **Tests**
+- Prioritize core product behaviour and simple business code. Keep tests proportional to real risks; do not add defensive abstractions, speculative guards or tests solely to improve coverage or mutation scores. Mutation testing is optional (owner decision, 2026-10-30).
 - Never weaken, delete or loosen an existing assertion to make a change pass. If an assertion is wrong, say so and get it changed on its own.
 - Never write a test by copying the implementation's logic. Derive it from the step's acceptance line.
 

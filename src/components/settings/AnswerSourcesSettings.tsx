@@ -1,5 +1,5 @@
 import React from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 const quietButton = 'px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-component text-xs font-medium text-text-secondary hover:bg-bg-input hover:text-text-primary disabled:opacity-50';
 
@@ -16,14 +16,11 @@ const ROWS: Array<{ key: keyof AnswerSources; label: string; sentence: string }>
  */
 const AnswerSourcesSettings: React.FC = () => {
     const queryClient = useQueryClient();
-    const sources = useQuery(['answer-sources'], () => window.electronAPI.getAnswerSources());
-    const save = useMutation(
-        async ({ key, value }: { key: keyof AnswerSources; value: boolean }) => {
+    const sources = useQuery({ queryKey: ['answer-sources'], queryFn: () => window.electronAPI.getAnswerSources() });
+    const save = useMutation({ mutationFn: async ({ key, value }: { key: keyof AnswerSources; value: boolean }) => {
             const result = await window.electronAPI.setAnswerSources({ [key]: value });
             if (!result.success) throw new Error(result.error || 'Could not save');
-        },
-        { onSuccess: () => queryClient.invalidateQueries(['answer-sources']) }
-    );
+        }, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['answer-sources'] }) });
     const queryError = sources.error instanceof Error ? sources.error.message : sources.error ? String(sources.error) : '';
     const saveError = save.error instanceof Error ? save.error.message : save.error ? String(save.error) : '';
     // Nothing is assumed before the reply: an unreported state is neither On nor Off.
@@ -44,7 +41,7 @@ const AnswerSourcesSettings: React.FC = () => {
                             role="switch"
                             aria-label={`Use ${label} when answering`}
                             aria-checked={on}
-                            disabled={sources.data === undefined || save.isLoading}
+                            disabled={sources.data === undefined || save.isPending}
                             onClick={() => {
                                 save.reset();
                                 save.mutate({ key, value: !on });

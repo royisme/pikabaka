@@ -91,7 +91,6 @@ export function loadNativeModule(): NativeModule | null {
     // when this module is accidentally imported in a renderer or worker context.
     let appPath: string;
     try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { app } = require('electron') as typeof import('electron');
         appPath = app.getAppPath();
     } catch (e) {

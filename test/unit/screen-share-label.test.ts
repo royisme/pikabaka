@@ -3,9 +3,9 @@ import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { QueryClient, QueryClientProvider, QueryObserver } from 'react-query';
-import type { QueryObserverOptions } from 'react-query';
-import * as ReactQuery from 'react-query';
+import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
+import type { QueryObserverOptions } from '@tanstack/react-query';
+import * as ReactQuery from '@tanstack/react-query';
 import * as FramerMotion from 'framer-motion';
 import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 
@@ -40,7 +40,7 @@ function host(page: Page, initial: boolean, theme: 'light' | 'dark') {
         getItem: (key: string) => storage.get(key) ?? null,
         setItem: (key: string, value: string) => storage.set(key, value),
     } });
-    const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity, staleTime: Infinity, retry: false } } });
     const queries = new Map<string, QueryObserver>();
     const unsubscribes: Array<() => void> = [];
     const state: unknown[] = [];
@@ -55,8 +55,8 @@ function host(page: Page, initial: boolean, theme: 'light' | 'dark') {
             useEffect: noop, useLayoutEffect: noop,
             useRef: (value: unknown) => ({ current: value }), useMemo: (fn: () => unknown) => fn(),
         },
-        'react-query': { ...ReactQuery, useQueryClient: () => client,
-            useQuery: (queryKey: string[], queryFn: () => Promise<unknown>, options: QueryObserverOptions = {}) => {
+        '@tanstack/react-query': { ...ReactQuery, useQueryClient: () => client,
+            useQuery: ({ queryKey, queryFn, ...options }: { queryKey: readonly unknown[]; queryFn?: () => Promise<unknown> } & QueryObserverOptions) => {
                 const key = JSON.stringify(queryKey);
                 let observer = queries.get(key);
                 if (!observer) {

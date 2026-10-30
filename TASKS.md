@@ -8,7 +8,7 @@ Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR 
 
 ## Execution order (owner, 2026-10-28)
 
-The owner's order of work: finish and merge every open step below, sync `main` to the private repository `royisme/meetingCopa` (remote `private`), and only then start the removal of the interview framing from the public product (track X). Each wave is at most two steps that touch different files; every step is one branch and one PR, GPT implements at `max` thinking, the agent reviews (reads the diff, re-runs the four checks, runs the mutation check on changed production functions) and Haiku merges. Waves are limited by GPT's five-hour quota window, not by the plan.
+The owner's order of work: finish and merge every open step below, sync `main` to the private repository `royisme/meetingCopa` (remote `private`), and only then start the removal of the interview framing from the public product (track X). Each wave is at most two steps that touch different files; every step is one branch and one PR, GPT implements at `max` thinking, the agent reviews (reads the diff and re-runs the required checks; mutation testing is optional under the owner decision of 2026-10-30) and Haiku merges. Waves are limited by GPT's five-hour quota window, not by the plan.
 
 | Wave | Steps (parallel) | Files they own | Needs from the owner first |
 | --- | --- | --- | --- |

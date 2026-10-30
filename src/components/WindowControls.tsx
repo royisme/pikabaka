@@ -1,26 +1,19 @@
 import React from 'react';
-import { useQuery, useQueryClient } from 'react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Minus, X } from 'lucide-react';
 import { isMac } from '../utils/platformUtils';
 import { useMainEvent } from '../hooks/useMainEvent';
 
 /**
  * WindowControls — Custom minimize / maximize / close buttons.
- * Returns null immediately on macOS (native traffic lights are used there).
- * The null-return is at the TOP, before any hooks, satisfying React's rules.
+ * macOS draws native traffic lights, so the buttons are routed away in a hook-free wrapper and the
+ * component that owns the hooks stays unconditional.
  */
-const WindowControls: React.FC = () => {
-  // Return null early if on macOS — BEFORE any hooks would be called.
-  // NOTE: isMac is a module-level constant evaluated once at module load, so it
-  // is safe to use as an early-return guard (same value every render, no hook).
-  if (isMac) return null;
+const WindowControls: React.FC = () => (isMac ? null : <WindowControlButtons />);
 
-  // Hooks — only reachable on Windows / Linux
+const WindowControlButtons: React.FC = () => {
   const queryClient = useQueryClient();
-  const { data: isMaximized = false } = useQuery<boolean>(
-    ['window-maximized'],
-    () => window.electronAPI?.windowIsMaximized() ?? Promise.resolve(false)
-  );
+  const { data: isMaximized = false } = useQuery<boolean>({ queryKey: ['window-maximized'], queryFn: () => window.electronAPI?.windowIsMaximized() ?? Promise.resolve(false) });
 
   useMainEvent(window.electronAPI?.onWindowMaximizedChanged, (maximized: boolean) => {
     queryClient.setQueryData(['window-maximized'], maximized);

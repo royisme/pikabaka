@@ -2,8 +2,8 @@ import t from 'tap';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { QueryClient, MutationObserver } from 'react-query';
-import * as ReactQuery from 'react-query';
+import { QueryClient, MutationObserver } from '@tanstack/react-query';
+import * as ReactQuery from '@tanstack/react-query';
 import type { AiConnectionView, HeaderState } from '../../src/types/electron';
 import { BUILTIN_CONNECTIONS } from '../../electron/services/aiConnections';
 import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
@@ -40,7 +40,7 @@ function editorHost(connection: AiConnectionView | undefined, api: object) {
     const queryHooks = {
         ...ReactQuery,
         useQueryClient: () => client,
-        useMutation: (mutationFn: () => Promise<unknown>, options: object = {}) => {
+        useMutation: ({ mutationFn, ...options }: { mutationFn: () => Promise<unknown> } & object) => {
             const index = mutationIndex++;
             if (!observers[index]) {
                 observers[index] = new MutationObserver(client, { ...options, mutationFn });
@@ -51,7 +51,7 @@ function editorHost(connection: AiConnectionView | undefined, api: object) {
         },
     };
     const { ProviderEditor: Editor } = mockRequire(path.resolve('src/components/settings/ConnectionsSettings.tsx'), {
-        react: hooks, 'react-query': queryHooks,
+        react: hooks, '@tanstack/react-query': queryHooks,
     }) as typeof import('../../src/components/settings/ConnectionsSettings');
     const draw = () => {
         stateIndex = 0;

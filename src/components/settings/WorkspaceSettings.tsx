@@ -1,5 +1,5 @@
 import React from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 /**
  * The one folder the agent's commands run under. Inside it each day gets a folder and each meeting a
@@ -8,17 +8,14 @@ import { useMutation, useQuery, useQueryClient } from 'react-query';
  */
 const WorkspaceSettings: React.FC = () => {
     const queryClient = useQueryClient();
-    const { data } = useQuery(['agent-workspace'], () => window.electronAPI.agentWorkspaceGet());
-    const refresh = () => queryClient.invalidateQueries(['agent-workspace']);
+    const { data } = useQuery({ queryKey: ['agent-workspace'], queryFn: () => window.electronAPI.agentWorkspaceGet() });
+    const refresh = () => queryClient.invalidateQueries({ queryKey: ['agent-workspace'] });
 
-    const pick = useMutation(
-        async () => {
+    const pick = useMutation({ mutationFn: async () => {
             const result = await window.electronAPI.agentWorkspacePick();
             if (result.error) throw new Error(result.error);
-        },
-        { onSuccess: refresh }
-    );
-    const clear = useMutation(() => window.electronAPI.agentWorkspaceClear(), { onSuccess: refresh });
+        }, onSuccess: refresh });
+    const clear = useMutation({ mutationFn: () => window.electronAPI.agentWorkspaceClear(), onSuccess: refresh });
 
     const root = data?.root ?? '';
     const problem = pick.error ? (pick.error as Error).message : data?.error ?? '';

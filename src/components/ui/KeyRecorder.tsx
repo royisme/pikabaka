@@ -1,5 +1,5 @@
 import React, { useId, useState } from 'react';
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import { SHORTCUT_IDS, type ShortcutConfig } from '../../hooks/useShortcuts';
 import type { KeybindStatus } from '../../types/electron';
 
@@ -13,7 +13,7 @@ interface KeyRecorderProps {
 
 export const KeyRecorder: React.FC<KeyRecorderProps> = ({ actionId, label, currentKeys, onSave, className }) => {
     // The parent owns fetching and events; each row only observes the shared list.
-    const { data: keybinds = [] } = useQuery<KeybindStatus[]>(['keybinds'], { enabled: false });
+    const { data: keybinds = [] } = useQuery<KeybindStatus[]>({ queryKey: ['keybinds'], enabled: false });
     const registered = keybinds.find(kb => kb.id === SHORTCUT_IDS[actionId])?.registered;
     const [isRecording, setIsRecording] = useState(false);
     const [error, setError] = useState<{ keys: string; message: string } | null>(null);

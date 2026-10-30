@@ -72,11 +72,11 @@ function host(t: Test, electronAPI: Record<string, unknown>) {
     let query: { data?: AnswerSources; error?: Error; isLoading: boolean } = { isLoading: true };
     let mutationError: Error | undefined;
     const { default: Component } = mockRequire(path.resolve('src/components/settings/AnswerSourcesSettings.tsx'), {
-        'react-query': {
+        '@tanstack/react-query': {
             useQueryClient: () => ({ invalidateQueries: async () => {} }),
             useQuery: () => query,
-            useMutation: (fn: (payload: unknown) => Promise<void>, options: { onSuccess?: () => void } = {}) => ({
-                isLoading: false,
+            useMutation: ({ mutationFn: fn, ...options }: { mutationFn: (payload: unknown) => Promise<void> } & { onSuccess?: () => void }) => ({
+                isPending: false,
                 error: mutationError,
                 reset: () => { mutationError = undefined; },
                 mutate: (payload: unknown) => {

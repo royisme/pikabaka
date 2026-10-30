@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 type Credentials = Awaited<ReturnType<typeof window.electronAPI.getStoredCredentials>>;
 type Service = Credentials['sttProvider'];
@@ -33,7 +33,7 @@ function setSpeechKey(provider: Exclude<Service, 'google'>, key: string) {
 
 const SpeechProvidersSettings = () => {
     const queryClient = useQueryClient();
-    const credentials = useQuery(['speech-credentials'], () => window.electronAPI.getStoredCredentials());
+    const credentials = useQuery({ queryKey: ['speech-credentials'], queryFn: () => window.electronAPI.getStoredCredentials() });
     const visible = speechServices.filter(service => credentials.data && service.configured(credentials.data));
     const [editor, setEditor] = useState<Service | 'add' | null>(null);
     const [service, setService] = useState<Service>('google');
@@ -50,7 +50,7 @@ const SpeechProvidersSettings = () => {
         const result = await window.electronAPI.testSttConnection(sttProvider, sttKey.trim(), sttProvider === 'azure' ? region : undefined);
         if (!result.success) throw new Error(result.error || 'Connection failed');
     };
-    const save = useMutation(async () => {
+    const save = useMutation({ mutationFn: async () => {
         if (sttProvider === 'google') return;
         if (sttKey.trim()) {
             await checkKey();
@@ -61,29 +61,27 @@ const SpeechProvidersSettings = () => {
             const result = await window.electronAPI.setAzureRegion(region.trim());
             if (!result.success) throw new Error(result.error || 'Could not save region');
         }
-    }, { onSuccess: () => { setEditor(null); void queryClient.invalidateQueries(['speech-credentials']); } });
-    const test = useMutation(checkKey, {
-        onSuccess: () => setResults(previous => ({ ...previous, [sttProvider]: { success: true, message: 'The key is accepted' } })),
-        onError: (error: Error) => setResults(previous => ({ ...previous, [sttProvider]: { success: false, message: error.message } })),
-    });
-    const remove = useMutation(async (service: Exclude<Service, 'google'>) => {
+    }, onSuccess: () => { setEditor(null); void queryClient.invalidateQueries({ queryKey: ['speech-credentials'] }); } });
+    const test = useMutation({ mutationFn: checkKey, onSuccess: () => setResults(previous => ({ ...previous, [sttProvider]: { success: true, message: 'The key is accepted' } })),
+        onError: (error: Error) => setResults(previous => ({ ...previous, [sttProvider]: { success: false, message: error.message } })) });
+    const remove = useMutation({ mutationFn: async (service: Exclude<Service, 'google'>) => {
         const result = await setSpeechKey(service, '');
         if (!result.success) throw new Error(result.error || 'Could not remove key');
-    }, { onSuccess: (_, service) => {
+    }, onSuccess: (_, service) => {
         setConfirmService(undefined);
         if (editor === service) setEditor(null);
         setResults(previous => { const next = { ...previous }; delete next[service]; return next; });
-        void queryClient.invalidateQueries(['speech-credentials']);
+        void queryClient.invalidateQueries({ queryKey: ['speech-credentials'] });
     } });
-    const chooseFile = useMutation(async () => {
+    const chooseFile = useMutation({ mutationFn: async () => {
         const result = await window.electronAPI.selectServiceAccount();
         if (result.cancelled) return;
         if (!result.success) throw new Error(result.error || 'Could not select service account');
         return result.path;
-    }, { onSuccess: path => {
-        if (path) { setEditor(null); void queryClient.invalidateQueries(['speech-credentials']); }
+    }, onSuccess: path => {
+        if (path) { setEditor(null); void queryClient.invalidateQueries({ queryKey: ['speech-credentials'] }); }
     } });
-    const busy = save.isLoading || test.isLoading || remove.isLoading || chooseFile.isLoading;
+    const busy = save.isPending || test.isPending || remove.isPending || chooseFile.isPending;
     const testResult = results[sttProvider];
     const open = (next: Service | 'add') => {
         save.reset();
@@ -117,7 +115,7 @@ const SpeechProvidersSettings = () => {
                 {service.id === 'google' ? <p className="text-[11px] text-text-secondary">Account removal is not available.</p>
                     : confirmService === service.id ? <div className="flex flex-wrap items-center gap-2 text-xs text-text-primary min-w-0">
                         <span className="break-words [overflow-wrap:anywhere]">Remove {service.name}?</span>
-                        <button type="button" disabled={busy} onClick={() => { if (service.id !== 'google') remove.mutate(service.id); }} className={smallButton}>{remove.isLoading ? 'Removing…' : 'Remove'}</button>
+                        <button type="button" disabled={busy} onClick={() => { if (service.id !== 'google') remove.mutate(service.id); }} className={smallButton}>{remove.isPending ? 'Removing…' : 'Remove'}</button>
                         <button type="button" disabled={busy} onClick={() => setConfirmService(undefined)} className={smallButton}>Keep</button>
                     </div> : <button type="button" aria-label={`Remove ${service.name}`} disabled={busy} onClick={() => { remove.reset(); setConfirmService(service.id); }} className={smallButton}>Remove</button>}
             </div>)}
@@ -135,7 +133,7 @@ const SpeechProvidersSettings = () => {
         {sttProvider === 'google' ? <div className="space-y-2">
             <p className="text-xs text-text-secondary">Service account file</p>
             <p className="text-xs text-text-primary break-words [overflow-wrap:anywhere]">{credentials.data?.googleServiceAccountPath?.split(/[\\/]/).pop() || 'No file selected'}</p>
-            <button type="button" disabled={busy} onClick={() => chooseFile.mutate()} className={smallButton}>{chooseFile.isLoading ? 'Choosing file…' : 'Choose file'}</button>
+            <button type="button" disabled={busy} onClick={() => chooseFile.mutate()} className={smallButton}>{chooseFile.isPending ? 'Choosing file…' : 'Choose file'}</button>
             <p className="text-[11px] text-text-secondary">Choosing a file saves it immediately. Account Test and removal are not available.</p>
         </div> : <div className="space-y-3">
             <p className="text-xs text-text-secondary">{configured ? '● Key saved' : '○ No key'}</p>
@@ -146,8 +144,8 @@ const SpeechProvidersSettings = () => {
         </div>}
         </fieldset>
         <div className="flex flex-wrap gap-2">
-            {sttProvider !== 'google' && <button type="button" disabled={busy} onClick={() => test.mutate()} className={smallButton}>{test.isLoading ? 'Testing…' : 'Test'}</button>}
-            {sttProvider !== 'google' && <button type="button" disabled={busy || (!sttKey.trim() && !(sttProvider === 'azure' && configured)) || (sttProvider === 'azure' && !region.trim())} onClick={() => save.mutate()} className={smallButton}>{save.isLoading ? 'Saving…' : 'Save'}</button>}
+            {sttProvider !== 'google' && <button type="button" disabled={busy} onClick={() => test.mutate()} className={smallButton}>{test.isPending ? 'Testing…' : 'Test'}</button>}
+            {sttProvider !== 'google' && <button type="button" disabled={busy || (!sttKey.trim() && !(sttProvider === 'azure' && configured)) || (sttProvider === 'azure' && !region.trim())} onClick={() => save.mutate()} className={smallButton}>{save.isPending ? 'Saving…' : 'Save'}</button>}
             <button type="button" disabled={busy} onClick={() => setEditor(null)} className={smallButton}>Cancel</button>
             {keyUrls[sttProvider] && <button type="button" disabled={busy} onClick={() => void window.electronAPI.openExternal(keyUrls[sttProvider]!)} className={smallButton}>Get API key</button>}
         </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMutation } from 'react-query';
+import { useMutation } from '@tanstack/react-query';
 
 interface TranslationTestProps {
     provider: string;
@@ -19,10 +19,7 @@ function seconds(ms?: number): string {
  */
 const TranslationTest: React.FC<TranslationTestProps> = ({ provider, model, prompt, targetLanguage }) => {
     const [showTest, setShowTest] = useState(false);
-    const test = useMutation(
-        () => window.electronAPI.testTranscriptTranslation({ provider, model, prompt, targetLanguage }),
-        { onSuccess: () => setShowTest(true), onError: () => setShowTest(true) }
-    );
+    const test = useMutation({ mutationFn: () => window.electronAPI.testTranscriptTranslation({ provider, model, prompt, targetLanguage }), onSuccess: () => setShowTest(true), onError: () => setShowTest(true) });
     const result = test.data;
 
     return (
@@ -40,10 +37,10 @@ const TranslationTest: React.FC<TranslationTestProps> = ({ provider, model, prom
                 <div className="flex flex-wrap items-center gap-2">
                     <button
                         onClick={() => test.mutate()}
-                        disabled={test.isLoading || !model.trim()}
+                        disabled={test.isPending || !model.trim()}
                         className="px-3 py-1.5 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary transition-colors disabled:opacity-50"
                     >
-                        {test.isLoading ? '● Translating…' : 'Test translation'}
+                        {test.isPending ? '● Translating…' : 'Test translation'}
                     </button>
                     <span className="text-[11px] text-text-tertiary">Sends one sample sentence with this model and prompt. Nothing is saved.</span>
                 </div>
