@@ -605,7 +605,7 @@ export class AppState {
       this.systemAudioCapture.on('data', (chunk: Buffer) => {
         // console.log('[Main] SysAudio chunk', chunk.length);
         this.lastSystemAudioChunkAt = Date.now();
-        this.googleSTT?.write(chunk);
+        sendLag.timed('them', () => this.googleSTT?.write(chunk));
       });
       this.systemAudioCapture.on('speech_ended', () => {
         this.googleSTT?.notifySpeechEnded?.();
@@ -626,7 +626,7 @@ export class AppState {
 
         this.systemAudioCapture.on('data', (chunk: Buffer) => {
           this.lastSystemAudioChunkAt = Date.now();
-          this.googleSTT?.write(chunk);
+          sendLag.timed('them', () => this.googleSTT?.write(chunk));
         });
         this.systemAudioCapture.on('speech_ended', () => {
           this.googleSTT?.notifySpeechEnded?.();
@@ -656,7 +656,7 @@ export class AppState {
 
       this.microphoneCapture.on('data', (chunk: Buffer) => {
         // console.log('[Main] Mic chunk', chunk.length);
-        this.googleSTT_User?.write(chunk);
+        sendLag.timed('user', () => this.googleSTT_User?.write(chunk));
       });
       this.microphoneCapture.on('speech_ended', () => {
         this.googleSTT_User?.notifySpeechEnded?.();
@@ -675,7 +675,7 @@ export class AppState {
         this.googleSTT_User?.setSampleRate(rate);
 
         this.microphoneCapture.on('data', (chunk: Buffer) => {
-          this.googleSTT_User?.write(chunk);
+          sendLag.timed('user', () => this.googleSTT_User?.write(chunk));
         });
         this.microphoneCapture.on('speech_ended', () => {
           this.googleSTT_User?.notifySpeechEnded?.();
