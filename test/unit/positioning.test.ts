@@ -17,3 +17,10 @@ t.test('the shipped description and docs do not present Pika as an interview cop
     t.match(read('README.md'), /live-translation and meeting assistant/, 'the README leads with live translation and meetings');
     t.end();
 });
+
+t.test('the README describes Pika by what it does and names no competing product', (t) => {
+    const text = read('README.md');
+    t.notMatch(text, /cluely|granola|otter/i, 'no competitor name');
+    t.notMatch(text, /alternative to/i, 'no "alternative to" framing');
+    t.end();
+});
