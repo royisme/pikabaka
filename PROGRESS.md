@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: the audio, transcript and stealth modules read `AppState` with its real type (uncommitted)
+
+- `electron/helpers/stealth.ts`, `electron/lib/audio-pipeline.ts`, `electron/lib/transcript-assembler.ts`: every `appState as any` / `state as any` is gone (28 casts, 0 left in the three files). Members that already had a public getter use it (`getIsMeetingActive`, `getIntelligenceManager`, `getRAGManager`); the rest are public fields on `AppState` in `electron/main.ts` — `overlayMousePassthrough` and `_audioTestStarting` changed from `private` to `public`, and the two fields `audio-pipeline` had been writing as undeclared dynamic properties (`echoFilter`, `echoLinesDropped`) are now declared with their types (`EchoFilter | null`, `number`). No behaviour, name, lifetime or persisted shape changes; no accessor was added because none was needed.
+- `node scripts/smell-ratchet.js` does not exist on this tree (H1 lives on branch `smell-ratchet`), so the ledger could not be lowered here; the measured drop is 30 → 2 `any` occurrences in the three files (the two left are `payload: any` and `...args: any[]` parameters, outside this step).
+- Checks: root `tsc --noEmit` 0, electron `tsc --noEmit` 0, `oxlint src electron test --max-warnings 814` 0, tap build 0, full tap **5252 of 5252 in 92 files** 0, with no test changed. The `as any` left in `lib/lifecycle.ts` (`win.skipTaskbar`) and `lib/auto-updater.ts` (`files: [] as any[]`) is a different cause and was left alone.
+- Not verified: the running app, a real microphone/speaker echo case and the overlay mouse-passthrough toggle. Owner: one short meeting to confirm the live transcript still drops echoed microphone lines and the audio status reads the same, and one toggle of mouse passthrough.
+
 ## 2026-10-30: one generation guard for every answer path (uncommitted)
 
 - `electron/core/IntelligenceEngine.ts`: the nine `run*` paths no longer hand-write `++this.currentGenerationId` and its comparisons. One private `beginRun()` claims the id and returns an `isCurrent()` closure; every post-await check, stream-loop check and `catch` calls it. `cancelGeneration` and `reset` are unchanged and no `run*` increments the id itself. Behaviour is the same events, returns and mode changes.

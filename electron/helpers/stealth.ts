@@ -3,23 +3,21 @@ import { setVerboseLoggingFlag } from "../lib/verboseLog"
 import type { AppState } from "../main"
 
 export function setHasDebugged(appState: AppState, value: boolean): void {
-  (appState as any).hasDebugged = value
+  appState.hasDebugged = value
 }
 
 export function getHasDebugged(appState: AppState): boolean {
-  return (appState as any).hasDebugged
+  return appState.hasDebugged
 }
 
 export function setUndetectable(appState: AppState, state: boolean): void {
-  const appStateInternal = appState as any;
-
   // Guard: skip if state hasn't actually changed to prevent
   // duplicate dock hide/show cycles from renderer feedback loops
-  if (appStateInternal.isUndetectable === state) return;
+  if (appState.isUndetectable === state) return;
 
   console.log(`[Stealth] setUndetectable(${state}) called`);
 
-  appStateInternal.isUndetectable = state
+  appState.isUndetectable = state
   appState.windowHelper.setContentProtection(state)
   appState.settingsWindowHelper.setContentProtection(state)
   appState.modelSelectorWindowHelper.setContentProtection(state)
@@ -33,37 +31,35 @@ export function setUndetectable(appState: AppState, state: boolean): void {
 }
 
 export function getUndetectable(appState: AppState): boolean {
-  return (appState as any).isUndetectable
+  return appState.isUndetectable
 }
 
 export function setOverlayMousePassthrough(appState: AppState, state: boolean): void {
-  const appStateInternal = appState as any;
-
-  if (appStateInternal.overlayMousePassthrough === state) return;
+  if (appState.overlayMousePassthrough === state) return;
 
   console.log(`[Overlay] setOverlayMousePassthrough(${state}) called`);
 
-  appStateInternal.overlayMousePassthrough = state;
+  appState.overlayMousePassthrough = state;
   appState.windowHelper.syncOverlayInteractionPolicy();
   _broadcastToAllWindows(appState, 'overlay-mouse-passthrough-changed', state);
 }
 
 export function toggleOverlayMousePassthrough(appState: AppState): boolean {
-  const next = !(appState as any).overlayMousePassthrough;
+  const next = !appState.overlayMousePassthrough;
   setOverlayMousePassthrough(appState, next);
   return next;
 }
 
 export function getOverlayMousePassthrough(appState: AppState): boolean {
-  return (appState as any).overlayMousePassthrough;
+  return appState.overlayMousePassthrough;
 }
 
 export function getVerboseLogging(appState: AppState): boolean {
-  return (appState as any)._verboseLogging;
+  return appState._verboseLogging;
 }
 
 export function setVerboseLogging(appState: AppState, enabled: boolean): void {
-  (appState as any)._verboseLogging = enabled;
+  appState._verboseLogging = enabled;
   setVerboseLoggingFlag(enabled);
   SettingsManager.getInstance().set('verboseLogging', enabled);
   console.log(`[AppState] verboseLogging set to ${enabled}`);

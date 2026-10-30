@@ -100,6 +100,7 @@ import {
   _broadcastToAllWindows as broadcastToAllWindowsFn,
 } from "./helpers/stealth"
 import { initializeApp } from "./lib/lifecycle"
+import type { EchoFilter } from "./lib/echo-filter"
 
 /** Unified type for all STT providers with optional extended capabilities */
 type ScreenshotWindowMode = 'launcher' | 'overlay';
@@ -479,12 +480,15 @@ export class AppState {
   public systemAudioCapture: any = null;
   public microphoneCapture: any = null;
   public audioTestCapture: any = null; // For audio settings test
-  private _audioTestStarting = false;               // P2-12: in-flight guard against concurrent calls
+  public _audioTestStarting = false;                // P2-12: in-flight guard against concurrent calls
   public googleSTT: STTProvider | null = null; // Them
   public googleSTT_User: STTProvider | null = null; // User
   public lastSystemAudioChunkAt: number | null = null;
   public lastThemTranscriptAt: number | null = null;
   public lastAudioPipelineError: string | null = null;
+  // The microphone hears the speakers: lines that repeat the other party's stream are dropped. Created on first use.
+  public echoFilter: EchoFilter | null = null;
+  public echoLinesDropped: number = 0;
   public transcriptAssemblerProfile: TranscriptAssemblerProfile = 'sentence_bias';
   public transcriptTurnBuffers: Record<TranscriptSpeaker, BufferedTranscriptTurn | null> = {
     them: null,
@@ -1387,7 +1391,7 @@ export class AppState {
   }
 
   // --- Mouse Passthrough (Adapted from public PR #113 — verify premium interaction) ---
-  private overlayMousePassthrough: boolean = false;
+  public overlayMousePassthrough: boolean = false;
 
   public setOverlayMousePassthrough(state: boolean): void {
     setOverlayMousePassthroughFn(this, state)
