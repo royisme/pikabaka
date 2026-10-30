@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: ElevenLabs lines become final, and its debug audio file and raw log are gone (uncommitted)
+
+- `electron/audio/ElevenLabsStreamingSTT.ts`: the connection did not ask for a commit strategy, the server answered `vad_commit_strategy: false` (manual commit) and nothing here sends a commit, so a whole meeting produced only partial text and no final line (stats: Me 0 final lines). The URL now has `commit_strategy=vad&vad_silence_threshold_secs=0.8`.
+- Removed the development-only `~/elevenlabs_debug.raw` stream (raw meeting audio, one file shared by both streams) and the log of the first ten raw server messages (they carried transcript text).
+- `electron/utils/sttModels.ts`: `GET /v1/models` lists text-to-speech models, so the filtered list was empty; the model list for ElevenLabs is now the one realtime model id, without a request.
+- `test/unit/elevenlabs-stt.test.ts`: the model list and the commit parameters in the URL.
+- Checks: both tsc 0, oxlint 0, ratchet 0, tap 5305/5305. Not verified: a real ElevenLabs call (owner): final lines should appear about 0.8 s after a pause.
+
 ## 2026-10-30: startup no longer flips the embedding provider and no longer shows "Provider Changed" (uncommitted)
 
 - `electron/helpers/ProcessingHelper.ts`: `loadStoredCredentials` re-initialized the embeddings with only the OpenAI and Gemini keys, which dropped the connection chosen in Settings. The pipeline treated "selected connection removed" as a config change, fell back to Gemini and saved it as `last_embedding_provider`; a later full init switched back. The Gemini step was compared with the saved name and fired the "Provider Changed" warning on every start. It now passes `buildEmbeddingConfig(credManager)`, the same config the RAG manager was built with, so the call is skipped.
