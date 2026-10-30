@@ -28,6 +28,8 @@ export async function fetchSttModels(provider: SttModelProvider, apiKey: string)
             const response = await axios.get(url, { headers: { Authorization: `Bearer ${key}` }, timeout: TIMEOUT_MS });
             return only((response.data?.data ?? []).map((m: { id?: string }) => m.id), id => /whisper|transcribe/i.test(id));
         }
+        // Live transcription is one model family; an id can also be typed.
+        if (provider === 'gemini') return [{ id: 'gemini-3.5-transcribe-live', label: 'gemini-3.5-transcribe-live' }];
         if (provider === 'elevenlabs') {
             const response = await axios.get('https://api.elevenlabs.io/v1/models', { headers: { 'xi-api-key': key }, timeout: TIMEOUT_MS });
             return only((Array.isArray(response.data) ? response.data : []).map((m: { model_id?: string }) => m.model_id), id => /scribe|stt|speech_to_text/i.test(id));

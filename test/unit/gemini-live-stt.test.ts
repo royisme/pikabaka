@@ -16,6 +16,8 @@ function load() {
     }) as { GeminiLiveSTT: new (key: string) => Adapter };
     return { stt: new GeminiLiveSTT('invented-key'), connects, sent };
 }
+import { fetchSttModels } from '../../electron/utils/sttModels';
+
 const ready = () => new Promise<void>(resolve => setImmediate(resolve));
 
 t.test('interim text is not final, the turn text is final with a boundary', async t => {
@@ -46,4 +48,8 @@ t.test('48 kHz audio is sent as 16 kHz in 100 ms pieces and the language is a hi
     t.equal(sent[0].audio.mimeType, 'audio/pcm;rate=16000');
     t.equal(Buffer.from(sent[0].audio.data, 'base64').length, 1600 * 2, '4800 samples at 48 kHz become 1600 at 16 kHz');
     stt.stop();
+});
+
+t.test('the Gemini model list is its one live transcription model, without asking another service', async t => {
+    t.same(await fetchSttModels('gemini', 'invented-key'), [{ id: 'gemini-3.5-transcribe-live', label: 'gemini-3.5-transcribe-live' }]);
 });
