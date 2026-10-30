@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type SetStateAction } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -6,6 +6,7 @@ import { electronChatFetch } from '../lib/electronChatFetch';
 import { userEchoMessage } from '../lib/userEcho';
 import { useMainEvent } from './useMainEvent';
 import { failureReasonText } from '../lib/transcriptRow';
+import { initialMeetingChatFlags, meetingChatFlagsReducer } from './meetingChatFlagsReducer';
 
 /** " (check the API key)" and the like for a failed agent run; empty when the reason is unknown. */
 function agentFailureWords(errorClass: string): string {
@@ -57,15 +58,19 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   const queryClient = useQueryClient();
   const [attachedContext, setAttachedContext] = useState<AttachedContext>([]);
   const [inputValue, setInputValue] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [flags, dispatchFlags] = useReducer(meetingChatFlagsReducer, initialMeetingChatFlags);
+  const { isProcessing, canRetry } = flags;
+  const setIsProcessing = useCallback(
+    (value: SetStateAction<boolean>) => dispatchFlags({ type: 'processingChanged', value }),
+    []
+  );
   // After the user stops an answer, tokens already on their way must not open a new message; the next request clears this.
   const cancelledRef = useRef(false);
   const lastActionRef = useRef<LastAction | null>(null);
-  const [canRetry, setCanRetry] = useState(false);
   // Remember what was asked so Retry can ask it again; null where asking again would not repeat it (a screenshot, a rewrite).
   const remember = (action: LastAction | null) => {
     lastActionRef.current = action;
-    setCanRetry(action !== null);
+    dispatchFlags({ type: 'retryChanged', canRetry: action !== null });
   };
   const beginProcessing = () => {
     cancelledRef.current = false;
@@ -518,9 +523,9 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     }
 
     return () => cleanups.forEach((fn) => fn());
-  }, [setSystemMessagesIfLive]);
+  }, [setSystemMessagesIfLive, setIsProcessing]);
 
-  // Clarify streaming listeners — intentionally empty dep array so they survive
+  // Clarify streaming listeners — mounted once (the deps are stable) so they survive
   // expand/collapse cycles without orphaning an in-flight stream.
   useEffect(() => {
     if (!window.electronAPI) return;
@@ -551,7 +556,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
       cleanupToken();
       cleanupFinal();
     };
-  }, []); // intentionally empty — these listeners must survive isExpanded changes
+  }, [setIsProcessing]); // setIsProcessing is stable, so these listeners still survive isExpanded changes
 
   const submitPrompt = useCallback(async ({
     userText,
@@ -699,7 +704,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
       pushSystemError(err);
       setIsProcessing(false);
     }
-  }, [pushSystemError]);
+  }, [pushSystemError, setIsProcessing]);
 
   const handleFollowUpQuestions = useCallback(async () => {
     remember({ kind: 'follow_up_questions' });
@@ -711,7 +716,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     } finally {
       setIsProcessing(false);
     }
-  }, [pushSystemError]);
+  }, [pushSystemError, setIsProcessing]);
 
   const handleRecap = useCallback(async () => {
     remember({ kind: 'recap' });
@@ -723,7 +728,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     } finally {
       setIsProcessing(false);
     }
-  }, [pushSystemError]);
+  }, [pushSystemError, setIsProcessing]);
 
   const handleBrainstorm = useCallback(async () => {
     remember({ kind: 'brainstorm' });
@@ -743,7 +748,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     } finally {
       setIsProcessing(false);
     }
-  }, [attachedContext, pushSystemError]);
+  }, [attachedContext, pushSystemError, setIsProcessing]);
 
   const handleAnswerNow = useCallback(async () => {
     remember(null);
@@ -865,7 +870,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
         });
       }
     }
-  }, [inputValue, attachedContext, submitPrompt, pushSystemError]);
+  }, [inputValue, attachedContext, submitPrompt, pushSystemError, setIsProcessing]);
 
   /**
    * Stops the answer being generated. The main process ends its streams at their next token; the tokens
@@ -895,7 +900,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     );
     // Tokens already on their way arrive within moments; after that, answers the engine starts by itself are wanted again.
     window.setTimeout(() => { cancelledRef.current = false; }, 1000);
-  }, [stop]);
+  }, [stop, setIsProcessing]);
 
   /** Asks again what was asked last; a failure message at the end of the list is removed first. */
   const retryLast = useCallback(async () => {
@@ -960,7 +965,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
         return submitPrompt({ userText: action.text, placeholderIntent: 'manual', echoPrompt: false });
       }
     }
-  }, [handleWhatToSay, handleClarify, handleRecap, handleFollowUpQuestions, handleBrainstorm, handleCodeHint, submitPrompt]);
+  }, [handleWhatToSay, handleClarify, handleRecap, handleFollowUpQuestions, handleBrainstorm, handleCodeHint, submitPrompt, setIsProcessing]);
 
   return {
     stopGeneration,
