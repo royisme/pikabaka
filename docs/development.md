@@ -32,7 +32,7 @@ pnpm 11 checks that `node_modules` matches the lockfile before running any `pnpm
 ```sh
 ./node_modules/.bin/tsc --noEmit
 ./node_modules/.bin/tsc -p electron/tsconfig.json --noEmit
-node node_modules/tap/dist/esm/run.mjs --plugin="!@tapjs/typescript" --node-arg=--import=tsx "test/**/*.test.ts"
+node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.ts"
 ```
 
 `pnpm run dev` starts Vite only (the renderer in a browser, without `window.electronAPI`). The app is `pnpm start` (`app:dev`).
@@ -54,14 +54,14 @@ The donation record is a separate file (`electron-store`). The installed store 1
 
 CI runs two workflows on pull requests: `verify.yml` (typecheck, lint, tests) and `build-smoke.yml` (the two builds). Neither was exercised on GitHub from this checkout: the files are checked in, and a first run will show whether the macOS runner can run the tests.
 
-Under an agent's shell, run the tools without pnpm when `node_modules` may be out of step (see "pnpm caveat"): `./node_modules/.bin/tsc --noEmit`, `./node_modules/.bin/oxlint src electron test --max-warnings 814`, `node node_modules/tap/dist/esm/run.mjs --plugin="!@tapjs/typescript" --node-arg=--import=tsx "test/**/*.test.ts"`.
+Under an agent's shell, run the tools without pnpm when `node_modules` may be out of step (see "pnpm caveat"): `./node_modules/.bin/tsc --noEmit`, `./node_modules/.bin/oxlint src electron test --max-warnings 814`, `node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.ts"`.
 
 ### Mutation check
 
 Mutation testing is optional, reserved for a specific unresolved risk in important business logic. It is not a default development step or a delivery requirement (owner decision, 2026-10-30). Prefer a small regression test for the actual bug and checks at real integration boundaries.
 
 - Tool: [unclebob/mutator](https://github.com/unclebob/mutator) (BSD-0, Python, tree-sitter only). It lives outside the repository and is not a dependency in `package.json`. Run it from a scratch worktree (`git worktree add --detach ../pika-wt/<name> main`, `node_modules` symlinked), never from the main checkout: it writes `.metrics/` and `target/`.
-- Command: `mutator --no-coverage --max-workers 4 --test-command "node node_modules/tap/dist/esm/run.mjs --plugin="!@tapjs/typescript" --node-arg=--import=tsx --node-arg=--disable-warning=DEP0205 --disable-coverage test/unit/<the test>.test.ts" electron/<changed file>.ts`. `--no-coverage` is needed because tap with tsx writes no usable line coverage. A file of about 130 sites takes about two minutes.
+- Command: `mutator --no-coverage --max-workers 4 --test-command "node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx --node-arg=--disable-warning=DEP0205 --disable-coverage test/unit/<the test>.test.ts" electron/<changed file>.ts`. `--no-coverage` is needed because tap with tsx writes no usable line coverage. A file of about 130 sites takes about two minutes.
 - Read only the functions the change touches. Functions that the single test file does not exercise report 0% and mean nothing.
 - A surviving mutant does not automatically require another assertion. Add a test only when the behaviour matters to the product and existing coverage does not protect it; stop once the identified risk is resolved.
 
@@ -85,4 +85,4 @@ Mutation testing is optional, reserved for a specific unresolved risk in importa
 
 release-please opens and updates a release PR from the conventional commits on `main` (`.github/workflows/release-please.yml`, config in `.release-please-config.json`). `feat`, `fix`, `perf`, `build`, `deps`, `refactor` and `revert` appear in release notes; `docs`, `style`, `chore`, `test` and `ci` are hidden. Pick the type with that in mind. Packaging, notarization and publishing are owner-run (`scripts/release.js`, `scripts/notarize-only.js`). The release script uploads `latest-mac.yml` with the installers. Installed apps read it to update themselves (see `docs/design-auto-update.md`).
 
-tap runs without its TypeScript plugin (`--plugin="!@tapjs/typescript"`) because that plugin needs the TypeScript compiler API, which TypeScript 7 does not have; tests are loaded through `tsx`. The flag must be on the command line: `.taprc` only takes effect where a local, git-ignored `.tap/plugins` folder was generated, so CI and fresh worktrees ignore it.
+tap runs without its TypeScript plugin (`.taprc`: `plugin: ["!@tapjs/typescript"]`) because that plugin needs the TypeScript compiler API, which TypeScript 7 does not have; tests are loaded through `tsx`. `.taprc` only takes effect after `tap build` regenerates the plugin set (a git-ignored build in `node_modules` and `.tap`), so the `test` script runs `tap build` first. When you call tap by hand in a fresh checkout or worktree, run `node node_modules/tap/dist/esm/run.mjs build` once.
