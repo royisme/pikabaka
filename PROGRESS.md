@@ -2,6 +2,11 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: audio capture is wired to the speech service in one place (uncommitted)
+
+- `main.ts` `reconfigureAudio` had its own copy of the `data`, `speech_ended` and `error` wiring (four copies with the fallbacks), and the copy in `audio-pipeline.ts` only ran when no capture existed, which a meeting start never hits. The copies had drifted: the live one did not apply the microphone mute, so muting probably did not silence what was sent. `audio-pipeline.ts` now has `wireSystemAudio` and `wireMicrophone`; `reconfigureAudio` creates the captures and calls them. The send timing lives there only.
+- Checks: both tsc 0, oxlint 0, ratchet 0, tap 5303/5303. No test covers the mute path. Not verified: a real meeting (owner): start, mute the microphone and speak (nothing should be transcribed for Me), unmute, other party speaks, end.
+
 ## 2026-10-30: a meeting prints where audio could wait on our side (uncommitted)
 
 - `electron/lib/send-lag.ts` (new): measures the main process event loop delay (p50, p99, max) and, per stream, the chunk count, the longest gap between chunks, gaps over 300 ms and the slowest write. `audio-pipeline.ts` times each write, `startMeeting` resets and `finishMeeting` logs one `[Main] Send lag:` line. Numbers only.
