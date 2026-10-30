@@ -11,6 +11,13 @@ import { RECOGNITION_LANGUAGES, AI_RESPONSE_LANGUAGES } from "../config/language
 let _chatStreamId = 0
 
 export function registerCoreHandlers(appState: AppState): void {
+  // An answer belongs to the meeting it was asked in. Ending that meeting, or starting another one, while the
+  // model is still answering must not write the answer, its usage or its stream events into the newer meeting.
+  // A request made outside a meeting keeps working while no meeting is open.
+  const meetingStillCurrent = (meetingId: string | null): boolean =>
+    appState.getCurrentMeetingId() === meetingId
+    && (meetingId === null || appState.getIsMeetingActive());
+
   // --- NEW Test Helper ---
   safeHandle("test-release-fetch", async () => {
     try {
@@ -284,6 +291,7 @@ export function registerCoreHandlers(appState: AppState): void {
 
   safeHandle("gemini-chat", async (event, message: string, imagePaths?: string[], context?: string, options?: { skipSystemPrompt?: boolean }) => {
     try {
+      const meetingId = appState.getCurrentMeetingId();
       const result = await appState.processingHelper.getLLMHelper().chatWithGemini(message, imagePaths, context, options?.skipSystemPrompt);
 
       // Don't process empty responses
@@ -291,6 +299,10 @@ export function registerCoreHandlers(appState: AppState): void {
         console.warn("[IPC] Empty response from LLM, not updating IntelligenceManager");
         throw new Error('The quick answers model returned no text');
       }
+
+      // The meeting ended or another one started while the model was answering: the text still returns to its
+      // caller, but it is not written into the session of a meeting it was never asked in.
+      if (!meetingStillCurrent(meetingId)) return result;
 
       // Sync with IntelligenceManager so Follow-Up/Recap work
       const intelligenceManager = appState.getIntelligenceManager();
@@ -331,6 +343,8 @@ export function registerCoreHandlers(appState: AppState): void {
 
       // Claim a new stream ID — any prior stream will detect this and stop emitting.
       const myStreamId = ++_chatStreamId;
+      // The meeting this stream answers in, captured before it starts: ending the meeting must stop it too.
+      const meetingId = appState.getCurrentMeetingId();
 
       // Update IntelligenceManager with USER message immediately
       const intelligenceManager = appState.getIntelligenceManager();
@@ -368,8 +382,8 @@ export function registerCoreHandlers(appState: AppState): void {
         const stream = llmHelper.streamChat(message, imagePaths, context, options?.skipSystemPrompt ? "" : undefined);
 
         for await (const token of stream) {
-          // Bail if a newer stream has taken over (user triggered a new request)
-          if (_chatStreamId !== myStreamId) {
+          // Bail if a newer stream has taken over, or this stream's meeting ended.
+          if (_chatStreamId !== myStreamId || !meetingStillCurrent(meetingId)) {
             console.log(`[IPC] gemini-chat-stream ${myStreamId} superseded by ${_chatStreamId}, stopping.`);
             return null;
           }
@@ -377,8 +391,8 @@ export function registerCoreHandlers(appState: AppState): void {
           fullResponse += token;
         }
 
-        // Final check: only send done if we are still the active stream
-        if (_chatStreamId === myStreamId) {
+        // Final check: only send done if we are still the active stream of the same meeting
+        if (_chatStreamId === myStreamId && meetingStillCurrent(meetingId)) {
           event.sender.send("gemini-stream-done");
 
           // Update IntelligenceManager with ASSISTANT message after completion
@@ -391,7 +405,7 @@ export function registerCoreHandlers(appState: AppState): void {
 
       } catch (streamError: any) {
         console.error("[IPC] Streaming request failed");
-        if (_chatStreamId === myStreamId) {
+        if (_chatStreamId === myStreamId && meetingStillCurrent(meetingId)) {
           event.sender.send("gemini-stream-error", streamError.message || "Unknown streaming error");
         }
       }

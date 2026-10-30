@@ -74,6 +74,8 @@ export class IntelligenceEngine extends EventEmitter {
     // Concurrency tracking
     private assistCancellationToken: AbortController | null = null;
     private currentGenerationId: number = 0;
+    // Each run claims ++currentGenerationId before its first await; a run that no longer holds it writes nothing
+    // (no token, session row, usage or final event) and never sets the mode the newer run owns.
 
     // Keep reference to LLMHelper for client access
     private llmHelper: LLMHelper;
@@ -173,6 +175,8 @@ export class IntelligenceEngine extends EventEmitter {
             return null;
         }
 
+        const runGeneration = ++this.currentGenerationId;
+
         if (this.assistCancellationToken) {
             this.assistCancellationToken.abort();
         }
@@ -194,6 +198,8 @@ export class IntelligenceEngine extends EventEmitter {
 
             const insight = await this.assistLLM.generate(context);
 
+            // A stale run says nothing and leaves the mode of the newer run alone.
+            if (this.currentGenerationId !== runGeneration) return null;
             if (this.assistCancellationToken?.signal.aborted) {
                 return null;
             }
@@ -205,6 +211,7 @@ export class IntelligenceEngine extends EventEmitter {
             return insight;
 
         } catch (error) {
+            if (this.currentGenerationId !== runGeneration) return null;
             if ((error as Error).name === 'AbortError') {
                 return null;
             }
@@ -231,6 +238,7 @@ export class IntelligenceEngine extends EventEmitter {
             this.assistCancellationToken = null;
         }
 
+        const runGeneration = ++this.currentGenerationId;
         this.setMode('what_to_say');
         this.lastTriggerTime = now;
 
@@ -242,6 +250,7 @@ export class IntelligenceEngine extends EventEmitter {
                 }
                 const context = this.session.getFormattedContext(180);
                 const answer = await this.answerLLM.generate(question || '', context);
+                if (this.currentGenerationId !== runGeneration) return null;
                 if (answer) {
                     this.session.addAssistantMessage(answer);
                     this.emit('suggested_answer', answer, question || 'inferred', confidence);
@@ -292,21 +301,20 @@ export class IntelligenceEngine extends EventEmitter {
                 this.session.getAssistantResponseHistory().length
             );
 
+            // The classification awaited; a newer run or the end of the meeting may have happened since.
+            if (this.currentGenerationId !== runGeneration) return null;
+
             console.log(`[IntelligenceEngine] Temporal RAG: ${temporalContext.previousResponses.length} responses, tone: ${temporalContext.toneSignals[0]?.type || 'neutral'}, intent: ${intentResult.intent}${imagePaths?.length ? `, with ${imagePaths.length} image(s)` : ''}`);
 
-            const generationId = ++this.currentGenerationId;
+            const generationId = runGeneration;
             let fullAnswer = "";
-            // RC-03 fix: hold a reference to the generator so we can call .return()
-            // to properly terminate the network request when a new generation starts.
             const stream = this.whatToAnswerLLM.generateStream(preparedTranscript, temporalContext, intentResult, imagePaths);
             let streamAborted = false;
 
             for await (const token of stream) {
                 if (this.currentGenerationId !== generationId) {
                     console.log('[IntelligenceEngine] _what_to_say stream aborted by new generation');
-                    // RC-03 fix: .return() signals the generator to clean up and stops
-                    // the underlying network request (SDK generators honour this).
-                    await stream.return(undefined);
+                    // Leaving the loop closes the generator; the newer run owns the mode, the session and the final event.
                     streamAborted = true;
                     break;
                 }
@@ -314,11 +322,8 @@ export class IntelligenceEngine extends EventEmitter {
                 fullAnswer += token;
             }
 
-            if (streamAborted) {
-                // Aborted mid-stream — don't update session or emit final event
-                this.setMode('idle');
-                return null;
-            }
+            // The iterator can also end while cancelled without yielding a token, so the id is checked here too.
+            if (streamAborted || this.currentGenerationId !== generationId) return null;
 
             // An empty answer is a failure to report, not a sentence to put in the user's mouth.
             if (!fullAnswer || fullAnswer.trim().length < 5) throw new Error('The model returned no text.');
@@ -340,6 +345,7 @@ export class IntelligenceEngine extends EventEmitter {
             return fullAnswer;
 
         } catch (error) {
+            if (this.currentGenerationId !== runGeneration) return null;
             this.emit('error', error as Error, 'what_to_say');
             this.setMode('idle');
             return null;
@@ -358,6 +364,7 @@ export class IntelligenceEngine extends EventEmitter {
             return null;
         }
 
+        const runGeneration = ++this.currentGenerationId;
         this.setMode('follow_up');
 
         try {
@@ -370,7 +377,7 @@ export class IntelligenceEngine extends EventEmitter {
             const context = this.session.getFormattedContext(60);
             const refinementRequest = userRequest || intent;
 
-            const generationId = ++this.currentGenerationId;
+            const generationId = runGeneration;
             let fullRefined = "";
             const stream = this.followUpLLM.generateStream(
                 lastMsg,
@@ -382,7 +389,7 @@ export class IntelligenceEngine extends EventEmitter {
             for await (const token of stream) {
                 if (this.currentGenerationId !== generationId) {
                     console.log('[IntelligenceEngine] _follow_up stream aborted by new generation');
-                    await stream.return(undefined);
+                    // Leaving the loop closes the generator; the newer run owns the mode, the session and the final event.
                     streamAborted = true;
                     break;
                 }
@@ -390,6 +397,7 @@ export class IntelligenceEngine extends EventEmitter {
                 fullRefined += token;
             }
 
+            if (this.currentGenerationId !== generationId) return null;
             if (!streamAborted && fullRefined) {
                 this.session.addAssistantMessage(fullRefined);
                 this.emit('refined_answer', fullRefined, intent);
@@ -414,10 +422,12 @@ export class IntelligenceEngine extends EventEmitter {
                 });
             }
 
+            if (this.currentGenerationId !== generationId) return null;
             this.setMode('idle');
             return fullRefined;
 
         } catch (error) {
+            if (this.currentGenerationId !== runGeneration) return null;
             this.emit('error', error as Error, 'follow_up');
             this.setMode('idle');
             return null;
@@ -430,6 +440,7 @@ export class IntelligenceEngine extends EventEmitter {
      */
     async runRecap(): Promise<string | null> {
         console.log('[IntelligenceEngine] runRecap called');
+        const runGeneration = ++this.currentGenerationId;
         this.setMode('recap');
 
         try {
@@ -446,7 +457,7 @@ export class IntelligenceEngine extends EventEmitter {
                 return null;
             }
 
-            const generationId = ++this.currentGenerationId;
+            const generationId = runGeneration;
             let fullSummary = "";
             const stream = this.recapLLM.generateStream(context);
             let streamAborted = false;
@@ -454,7 +465,6 @@ export class IntelligenceEngine extends EventEmitter {
             for await (const token of stream) {
                 if (this.currentGenerationId !== generationId) {
                     console.log('[IntelligenceEngine] _recap stream aborted by new generation');
-                    await stream.return(undefined);
                     streamAborted = true;
                     break;
                 }
@@ -462,8 +472,9 @@ export class IntelligenceEngine extends EventEmitter {
                 fullSummary += token;
             }
 
-            // Only emit final if not aborted
-            if (!streamAborted && fullSummary && this.currentGenerationId === generationId) {
+            // An iterator that ends after a cancel yields no token, so the run is checked again before writing.
+            if (this.currentGenerationId !== generationId) return null;
+            if (!streamAborted && fullSummary) {
                 this.emit('recap', fullSummary);
 
                 this.session.pushUsage({
@@ -473,12 +484,11 @@ export class IntelligenceEngine extends EventEmitter {
                     answer: fullSummary
                 });
             }
-            if (this.currentGenerationId === generationId) {
-                this.setMode('idle');
-            }
+            this.setMode('idle');
             return fullSummary;
 
         } catch (error) {
+            if (this.currentGenerationId !== runGeneration) return null;
             this.emit('error', error as Error, 'recap');
             this.setMode('idle');
             return null;
@@ -491,6 +501,7 @@ export class IntelligenceEngine extends EventEmitter {
      */
     async runClarify(): Promise<string | null> {
         console.log('[IntelligenceEngine] runClarify called');
+        const runGeneration = ++this.currentGenerationId;
         this.setMode('clarify');
 
         try {
@@ -504,7 +515,7 @@ export class IntelligenceEngine extends EventEmitter {
             // If no transcript yet, use a generic prompt — the LLM will ask a scoping question
             const context = rawContext || '[No transcript available yet. The user just joined the conversation. Generate an opening clarifying question to understand the scope and constraints of the upcoming problem.]';
 
-            const generationId = ++this.currentGenerationId;
+            const generationId = runGeneration;
             let fullClarification = "";
             const stream = this.clarifyLLM.generateStream(context);
             let streamAborted = false;
@@ -512,7 +523,6 @@ export class IntelligenceEngine extends EventEmitter {
             for await (const token of stream) {
                 if (this.currentGenerationId !== generationId) {
                     console.log('[IntelligenceEngine] _clarify stream aborted by new generation');
-                    await stream.return(undefined);
                     streamAborted = true;
                     break;
                 }
@@ -520,10 +530,8 @@ export class IntelligenceEngine extends EventEmitter {
                 fullClarification += token;
             }
 
-            if (streamAborted) {
-                this.setMode('idle');
-                return null;
-            }
+            // The iterator can also end while cancelled without yielding a token, so the id is checked here too.
+            if (streamAborted || this.currentGenerationId !== generationId) return null;
 
             // Only update history and emit final if not aborted
             if (fullClarification && this.currentGenerationId === generationId) {
@@ -537,12 +545,11 @@ export class IntelligenceEngine extends EventEmitter {
                     answer: fullClarification
                 });
             }
-            if (this.currentGenerationId === generationId) {
-                this.setMode('idle');
-            }
+            this.setMode('idle');
             return fullClarification;
 
         } catch (error) {
+            if (this.currentGenerationId !== runGeneration) return null;
             this.emit('error', error as Error, 'clarify');
             this.setMode('idle');
             return null;
@@ -555,6 +562,7 @@ export class IntelligenceEngine extends EventEmitter {
      */
     async runFollowUpQuestions(): Promise<string | null> {
         console.log('[IntelligenceEngine] runFollowUpQuestions called');
+        const runGeneration = ++this.currentGenerationId;
         this.setMode('follow_up_questions');
 
         try {
@@ -571,7 +579,7 @@ export class IntelligenceEngine extends EventEmitter {
                 return null;
             }
 
-            const generationId = ++this.currentGenerationId;
+            const generationId = runGeneration;
             let fullQuestions = "";
             const stream = this.followUpQuestionsLLM.generateStream(context);
 
@@ -584,7 +592,8 @@ export class IntelligenceEngine extends EventEmitter {
                 fullQuestions += token;
             }
 
-            if (fullQuestions && this.currentGenerationId === generationId) {
+            if (this.currentGenerationId !== generationId) return null;
+            if (fullQuestions) {
                 this.emit('follow_up_questions_update', fullQuestions);
                 this.session.pushUsage({
                     type: 'followup_questions',
@@ -593,12 +602,11 @@ export class IntelligenceEngine extends EventEmitter {
                     answer: fullQuestions
                 });
             }
-            if (this.currentGenerationId === generationId) {
-                this.setMode('idle');
-            }
+            this.setMode('idle');
             return fullQuestions;
 
         } catch (error) {
+            if (this.currentGenerationId !== runGeneration) return null;
             this.emit('error', error as Error, 'follow_up_questions');
             this.setMode('idle');
             return null;
@@ -611,6 +619,7 @@ export class IntelligenceEngine extends EventEmitter {
      */
     async runManualAnswer(question: string): Promise<string | null> {
         this.emit('manual_answer_started');
+        const runGeneration = ++this.currentGenerationId;
         this.setMode('manual');
 
         try {
@@ -622,6 +631,8 @@ export class IntelligenceEngine extends EventEmitter {
             const context = this.session.getFormattedContext(120);
             const answer = await this.answerLLM.generate(question, context);
 
+            // A stale run writes nothing: no session row, no usage, no answer, no mode change.
+            if (this.currentGenerationId !== runGeneration) return null;
             if (answer) {
                 this.session.addAssistantMessage(answer);
                 this.emit('manual_answer_result', answer, question);
@@ -638,6 +649,7 @@ export class IntelligenceEngine extends EventEmitter {
             return answer;
 
         } catch (error) {
+            if (this.currentGenerationId !== runGeneration) return null;
             this.emit('error', error as Error, 'manual');
             this.setMode('idle');
             return null;
@@ -658,6 +670,7 @@ export class IntelligenceEngine extends EventEmitter {
             this.assistCancellationToken = null;
         }
 
+        const runGeneration = ++this.currentGenerationId;
         this.setMode('code_hint');
 
         try {
@@ -680,7 +693,7 @@ export class IntelligenceEngine extends EventEmitter {
 
             console.log(`[IntelligenceEngine] Code hint — question source: ${questionContext ? (questionSource ?? 'passed') : 'none'}, transcript lines: ${transcriptContext ? transcriptContext.split('\n').length : 0}, images: ${imagePaths?.length ?? 0}`);
 
-            const generationId = ++this.currentGenerationId;
+            const generationId = runGeneration;
             let fullHint = "";
             const stream = this.codeHintLLM.generateStream(
                 imagePaths,
@@ -698,11 +711,8 @@ export class IntelligenceEngine extends EventEmitter {
                 fullHint += token;
             }
 
-            if (this.currentGenerationId !== generationId) {
-                // Stopped or superseded: keep the half answer out of the session and say nothing more.
-                this.setMode('idle');
-                return null;
-            }
+            // Stopped or superseded, with or without a last token: nothing is written and no mode is changed.
+            if (this.currentGenerationId !== generationId) return null;
 
             if (!fullHint || fullHint.trim().length < 5) {
                 fullHint = "I couldn't detect any code in the screenshot. Try screenshotting your code editor directly.";
@@ -721,6 +731,7 @@ export class IntelligenceEngine extends EventEmitter {
             return fullHint;
 
         } catch (error) {
+            if (this.currentGenerationId !== runGeneration) return null;
             this.emit('error', error as Error, 'code_hint');
             this.setMode('idle');
             return null;
@@ -737,6 +748,7 @@ export class IntelligenceEngine extends EventEmitter {
             this.assistCancellationToken = null;
         }
 
+        const runGeneration = ++this.currentGenerationId;
         this.setMode('brainstorm');
 
         try {
@@ -761,7 +773,7 @@ export class IntelligenceEngine extends EventEmitter {
             if (resolvedProblem) {
                 context = `<problem_statement>\n${resolvedProblem}\n</problem_statement>\n\n${context}`;
             }
-            const generationId = ++this.currentGenerationId;
+            const generationId = runGeneration;
             let fullResult = "";
             const stream = this.brainstormLLM.generateStream(context, imagePaths);
             let streamAborted = false;
@@ -769,7 +781,7 @@ export class IntelligenceEngine extends EventEmitter {
             for await (const token of stream) {
                 if (this.currentGenerationId !== generationId) {
                     console.log('[IntelligenceEngine] brainstorm stream aborted by new generation');
-                    await stream.return(undefined);
+                    // Leaving the loop closes the generator; the newer run owns the mode, the session and the final event.
                     streamAborted = true;
                     break;
                 }
@@ -777,10 +789,8 @@ export class IntelligenceEngine extends EventEmitter {
                 fullResult += token;
             }
 
-            if (streamAborted) {
-                this.setMode('idle');
-                return null;
-            }
+            // The iterator can also end while cancelled without yielding a token, so the id is checked here too.
+            if (streamAborted || this.currentGenerationId !== generationId) return null;
 
             if (!fullResult || fullResult.trim().length < 5) {
                 fullResult = "I couldn't generate brainstorm approaches. Make sure your question is visible and try again.";
@@ -799,6 +809,7 @@ export class IntelligenceEngine extends EventEmitter {
             return fullResult;
 
         } catch (error) {
+            if (this.currentGenerationId !== runGeneration) return null;
             this.emit('error', error as Error, 'brainstorm');
             this.setMode('idle');
             return null;

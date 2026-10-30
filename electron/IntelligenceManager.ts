@@ -207,6 +207,9 @@ export class IntelligenceManager extends EventEmitter {
     }
 
     async stopMeeting(stoppedAtMs: number = Date.now()): Promise<string | null> {
+        // An answer still streaming belongs to the meeting that just ended: its tokens reach whichever
+        // overlay is listening, which after a restart is the empty one of the next meeting.
+        this.engine.cancelGeneration();
         return this.persistence.stopMeeting(stoppedAtMs);
     }
 

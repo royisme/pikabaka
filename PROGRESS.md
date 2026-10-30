@@ -2,9 +2,22 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: the suggestion card keeps its dismiss button in reach
+
+- `src/components/agent/ProactiveCard.tsx`: the card is a flex column capped at 40% of its column, with its own scroll area around the text and Ask more. The kind label and the dismiss button sit in a header above that scroll area, so scrolling a long suggestion no longer moves the button off screen, and the button is 28px square (the overlay floor) instead of 24px. Layout and geometry only: no state, props, dependency, animation or copy change. This is what the owner reported after clicking `Dismiss` was hard to hit on a long card.
+- Owner check: with a long suggestion in the overlay, scroll the text and confirm the header stays put and `Dismiss` closes the card in one click; confirm a short card stays compact and the card still occupies at most 40% of the column.
+
 ## 2026-10-30: proportional verification (owner decision, uncommitted)
 
 - Focus implementation and review on core product behaviour, with small tests for meaningful regressions and real integration boundaries. Mutation testing is optional; a surviving mutant does not automatically justify more tests or defensive code. Updated `RULES.md`, `TASKS.md` and `docs/development.md` to remove the default mutation requirement. Existing production code and tests are unchanged by this policy update.
+
+## 2026-10-30: an answer from one meeting can no longer land in another (uncommitted)
+
+- `electron/core/IntelligenceEngine.ts`: all nine `run*` paths claim `++currentGenerationId` before their first await, re-check it after every await, after each stream loop and in `catch`, and a stale run emits no token or final answer, writes no session row or usage, and never sets the mode the newer run owns. `runWhatShouldISay` no longer bumps the id after `classifyIntent`, so a slow classification cannot overwrite a newer answer. Leaving a `for await` loop is what closes the generator now (the explicit `stream.return(undefined)` calls are gone; a cancelled iterator can end without yielding, so the loop exit is checked too).
+- `electron/main.ts` (`finishMeeting`): the engine is cancelled immediately after `isMeetingActive = false`, before the agent stop and the indexer drain that the end-of-meeting path awaits; `intelligenceManager.stopMeeting` still cancels as before.
+- `electron/ipc/core.ts`: `gemini-chat` and `gemini-chat-stream` capture the current meeting id before their await and write tokens, done, error, session rows and usage only while that id is still current and the meeting is active; a request made outside a meeting keeps working while the id stays null. `_chatStreamId` still handles same-session supersession. The non-stream handler still returns its text to the caller but writes nothing.
+- Tests, all synthetic: `test/unit/answer-generation-race.test.ts` (late classification; late fallback, manual and assist answers that fail *and* that succeed; an old stream ending with no token; a late completion that must not idle a newer mode; a cancelled iterator whose terminal `next()` resolves after the new run started), `test/unit/meeting-end-cancels-answers.test.ts` (engine cancel precedes the agent await and the manager stop still runs) and `test/unit/chat-generation-race.test.ts` (a stream whose meeting ended sends no further token or done; a non-stream answer that arrives late writes nothing). Each was run against the unpatched files first: 7 of 7 engine tests and 5 of 7 IPC/main assertions failed there, and all pass on the patch. Two existing hosts needed the stubbed manager to provide `cancelGeneration`.
+- Checks on this tree: `tsc --noEmit` 0, `tsc -p electron/tsconfig.json --noEmit` 0, `oxlint src electron test --max-warnings 814` 0 (814 warnings, 0 errors), `vite build` 0, full tap **5252 of 5252 in 92 files**. Not verified: the running app, a real provider, a real meeting, screenshots, Windows. Owner: start a meeting, ask for an answer, end the meeting mid-stream and confirm nothing of the answer appears in the next meeting or in the summary; the same for the quick answer and follow-up buttons.
 
 ## 2026-10-30: dependencies on latest stable, gates green, one documented advisory (uncommitted)
 

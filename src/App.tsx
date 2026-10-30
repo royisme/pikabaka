@@ -106,6 +106,12 @@ const MainApp: React.FC = () => {
       setOverlayOpacity(getDefaultOverlayOpacity());
     }
   });
+  // The overlay window is only hidden between meetings, so its React state would otherwise draw the
+  // last meeting again. Remounting it on the session reset that starts a meeting is what clears it.
+  const [meetingSession, setMeetingSession] = useState(0);
+  // onSessionReset takes a 0-arg callback, so useMainEvent's type does not fit; kept as effect.
+  const overlaySessionReset = isOverlayWindow ? window.electronAPI?.onSessionReset : undefined;
+  useEffect(() => overlaySessionReset?.(() => setMeetingSession((session) => session + 1)), [overlaySessionReset]);
 
 
   // Handlers
@@ -220,6 +226,7 @@ const MainApp: React.FC = () => {
                 } as React.CSSProperties}
               >
                 <PikaInterface
+                  key={meetingSession}
                   onEndMeeting={handleEndMeeting}
                   overlayOpacity={overlayOpacity}
                 />
