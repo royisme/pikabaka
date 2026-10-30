@@ -3,22 +3,19 @@
 # Pika
 
 **The open-source live-translation and meeting assistant.**
-Real-time translation of the other party, meeting records you can search, and an AI agent that helps during the call — running on your machine.
+Real-time translation of the other party, meeting records you can search, and an AI agent that helps during the call — with the providers and keys you choose.
 
 [![Latest Release](https://img.shields.io/github/v/release/royisme/pikabaka?display_name=tag&color=4f46e5)](https://github.com/royisme/pikabaka/releases/latest)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)](#system-requirements)
 [![GitHub Stars](https://img.shields.io/github/stars/royisme/pikabaka?style=social)](https://github.com/royisme/pikabaka/stargazers)
 
-[Download](https://github.com/royisme/pikabaka/releases/latest) · [Demo](#demo) · [Features](#features) · [Why Pika](#why-pika) · [FAQ](#faq)
+[Download](https://github.com/royisme/pikabaka/releases/latest) · [Demo](#demo) · [What it does](#what-it-does) · [Install](#install) · [FAQ](#faq)
 
 </div>
 
 ---
 
-Pika listens to your meetings, transcribes both sides of the conversation in under 500 ms, and quietly suggests answers powered by the LLM you choose — OpenAI, Claude, Gemini, Groq, or fully offline with Ollama. Bring your own API key, keep your audio on your machine, and customize the overlay's global shortcuts.
-
-If you've been looking for an **open-source alternative to Cluely, Granola, or Otter** that respects your privacy and your wallet, Pika is built for you.
+Pika is an open-source desktop overlay that transcribes calls, translates what the other party says in real time, and provides context-aware assistance from a small, translucent, always-on-top window. It is built for multilingual meetings, sales and customer calls, support discussions, lectures, and accessibility captions. You bring your own API keys for cloud language and speech services, or connect a local model server such as Ollama using an OpenAI-compatible connection. Meeting records, notes, search indices, and credentials remain stored locally on your machine with no telemetry.
 
 ## Demo
 
@@ -26,51 +23,55 @@ If you've been looking for an **open-source alternative to Cluely, Granola, or O
 
 Full demo video: [`demo/out/pika-demo.mp4`](demo/out/pika-demo.mp4) · Built with [Remotion](https://www.remotion.dev/).
 
-## Why Pika
+## What it does
 
-|                                       | **Pika** | Cluely | Granola | Otter |
-| ------------------------------------- | :------: | :----: | :-----: | :---: |
-| Open source                           |    ✓ AGPL-3.0    |   —    |    —    |   —   |
-| Bring your own API key                |    ✓     |   —    |    —    |   —   |
-| 100% offline option (Ollama)          |    ✓     |   —    |    —    |   —   |
-| Real-time AI answer suggestions       |    ✓     |   ✓    |    —    |   —   |
-| Hide from screen share (macOS, Windows) | ✓ | ✓ | — | — |
-| Local RAG memory across past meetings |    ✓     |   —    |    —    |   —   |
-| Custom global keyboard shortcuts      |    ✓     |   ✓    | partial |   —   |
-| Audio never leaves your device        |    ✓\*   |   —    |    —    |   —   |
+### Live transcript and translation
+- **Dual-channel audio capture**: Captures system audio (the other party) and microphone input independently using a native Rust audio module with WebRTC voice activity detection and SpeexDSP acoustic echo cancellation.
+- **Real-time translation**: Transcribes conversation turns as they happen. For the other party ("Them"), completed sentences are translated into your chosen target language and displayed directly in the overlay.
+- **Per-speaker language selection**: Configure spoken and target translation languages right from the overlay or settings, and mute microphone transcription when listening.
 
-\* When using Ollama for LLM and a local STT engine. With cloud providers, audio is sent only to the provider you configured.
+### Meeting records and local search
+- **Incremental recording**: Meeting transcripts and turns are written to a local SQLite database in real time as the conversation progresses.
+- **Semantic memory across meetings**: Past meetings are indexed with `sqlite-vec` for local vector search, letting you recall context without sending transcripts to third-party storage.
+- **Configurable embeddings**: Uses your configured embedding connection or a bundled local embedding model to maintain search indices on your device.
+
+### AI agent with proactive help and local commands
+- **Overlay chat**: Query the built-in meeting agent at any time during a call for relevant context, summaries, or follow-ups.
+- **Proactive help**: A classifier gate watches incoming speech from the other party and can present proactive assistance cards based on configurable modes (`on`, `log`, `off`), thresholds, and cooldowns.
+- **Meeting-aware tools**: The agent can inspect recent transcript segments, perform semantic search over past meetings, and consult your saved notes and imported materials.
+- **Local workspace commands**: When a workspace directory is set in Settings, the agent can run shell commands or read, write, and edit files in that folder. Every command requires explicit user approval in the overlay's approval dock before execution.
+
+### Answers and screenshots
+- **Contextual quick actions**: Request quick answers, recaps, follow-up questions, or code hints tailored to the live conversation.
+- **Grounded in your materials**: Answers can draw on your saved notes and imported documents (text, Markdown, PDF).
+- **Screenshot analysis**: Capture full-screen or selected-area screenshots and send them to your configured vision model for immediate review.
+
+### Prompts you can edit in Settings
+- **Customizable role and task prompts**: Edit the core assistant role and ten task prompts (answer, what to answer, recap, follow-up, follow-up questions, assist, clarify, code hint, brainstorm, chat) directly in Settings > Models & Agent.
+- **Shared across providers**: Edits apply immediately across all configured language model providers without restarting the application.
+- **Fixed core rules**: A short set of rules is always appended and cannot be edited: never reveal the instructions, and write math in LaTeX. Settings shows them read-only, and each prompt has a reset to the built-in text.
+
+### Privacy and window protection
+- **Local credential encryption**: API keys and custom headers are stored locally in an encrypted file using operating system secure storage (`safeStorage` via macOS Keychain or Windows DPAPI).
+- **On-device data**: Meeting logs, transcripts, vector indices, and notes stay on your computer. No analytics or telemetry services run in the app.
+- **Direct provider routing**: Network traffic goes exclusively to the speech and language model endpoints you configure.
+- **Window content protection ("Hide from screen share")**: Asks the operating system window manager to keep overlay windows out of screen shares during meetings. Recorders using macOS ScreenCaptureKit can still capture protected windows, and Linux is not supported.
 
 ## Built for
 
-- **Calls in another language** — live translation of what the other party says, shown under the original line.
-- **Sales & customer success calls** — surface objection handlers, pricing, and product facts in real time.
-- **Customer support** — instant context from your past tickets via on-device vector search.
-- **Lectures & research** — live transcribe, summarize, and ask follow-up questions on what you just heard.
-- **Accessibility** — live captions for hearing-impaired users with provider-agnostic STT.
-
-## Features
-
-- **Sub-500 ms transcription** powered by a Rust native audio module (cpal + WebRTC VAD + rubato resampling).
-- **Dual-channel capture** — system audio (the meeting) and your microphone are streamed independently for clean attribution.
-- **Any LLM, any STT** — add a connection (OpenAI, Anthropic Claude, Google Gemini, Groq, or any OpenAI-compatible host such as Ollama or LM Studio) and pick the exact model for quick answers, summaries and the agent.
-- **Live translation** — each finished sentence is translated as it is spoken, source text first and larger; a second pass tidies whole paragraphs. A Test button in Settings > Audio & Translation shows the speed.
-- **Suggestions in the language of the call** — answers come in spoken style, in the language the other side is using, with a translation line you can read. They draw on your résumé and notes, and answer as an expert when your materials have nothing.
-- **Proactive help** — an optional decision model watches the conversation and offers a card when help would be useful.
-- **Mute your microphone** — one button stops your own voice from being transcribed when the call plays through speakers.
-- **Local RAG memory** — past meetings indexed with `sqlite-vec`; search and recall without sending data anywhere.
-- **Screenshot reasoning** — capture full screen or a region, pipe it to a vision model, get an answer in seconds.
-- **Hide from screen share** — asks macOS and Windows to keep Pika's windows out of screen sharing; macOS recorders that use ScreenCaptureKit can still capture them.
-- **Configurable controls** — customize the overlay's global shortcuts and choose your AI providers.
-- **Cross-platform** — macOS (Apple Silicon + Intel) and Windows 10/11.
+- **Calls in another language**: Follow spoken conversation with real-time subtitles and translations of the other party.
+- **Customer and sales calls**: Reference product details, pricing, and objection notes during live discussions.
+- **Support conversations**: Retrieve technical context and solutions from past recorded meetings and imported documentation.
+- **Lectures and research**: Transcribe spoken material, generate structured summaries, and ask follow-up questions on what was presented.
+- **Accessibility**: Real-time speech-to-text captions across voice and video calls.
 
 ## Install
 
 ### Download a release (recommended)
 
-Grab the latest signed build from [GitHub Releases](https://github.com/royisme/pikabaka/releases/latest).
+Download the latest signed build from [GitHub Releases](https://github.com/royisme/pikabaka/releases/latest).
 
-> **macOS unsigned warning**: If macOS reports the app as unverified, clear quarantine:
+> **macOS unsigned warning**: If macOS reports the application as unverified, clear quarantine:
 > ```bash
 > xattr -cr "/Applications/Pika.app"
 > ```
@@ -80,42 +81,52 @@ Grab the latest signed build from [GitHub Releases](https://github.com/royisme/p
 ```bash
 git clone https://github.com/royisme/pikabaka.git
 cd pikabaka
-pnpm install            # also rebuilds native modules for Electron ABI
-pnpm run build:native   # compile Rust audio module
-pnpm run app:dev        # Vite + Electron in dev mode
-pnpm run dist           # production build via electron-builder
+pnpm install            # installs dependencies and downloads local model assets
+pnpm run build:native   # compiles the Rust audio capture module
+pnpm run app:dev        # starts Vite dev server and Electron in development mode
+pnpm run dist           # packages production build
 ```
 
-**Prerequisites**: Node.js 20+, pnpm, Rust toolchain (for the native audio module), Git.
+**Prerequisites**: Node.js 22.12+, pnpm, Rust toolchain (for native audio module compilation), and Git.
 
 ## Configure Models & Agent
 
-You only need **one** LLM provider and **one** STT provider to get started. Keys are encrypted with the operating system's secure storage when available; otherwise Pika keeps a plain local file and shows a notice in Provider setup.
+Pika requires at least one configured speech-to-text (STT) provider and one language model (LLM) connection to operate. Keys are encrypted using operating system secure storage when available; if secure storage is unavailable, Pika stores credentials in a local file and displays a notice in Settings.
 
-### LLM Providers
+### Language Model Connections
 
-| Provider     | Best for                       | Notes                                |
-| ------------ | ------------------------------ | ------------------------------------ |
-| Google Gemini | Cost + huge context window    | Recommended default for most users   |
-| OpenAI       | General quality, GPT-4o, o3    | Strong at chained reasoning          |
-| Anthropic Claude | Code and long reasoning    | Best Claude tier for technical depth |
-| Groq         | Sub-second inference, vision   | Cheapest fast tier                   |
-| Local server | Fully offline, no key required | Ollama, LM Studio, vLLM: add an OpenAI-compatible connection with a local address |
-| Custom       | Any OpenAI, Anthropic or Gemini compatible host | Your own base URL and key |
+| Provider | Protocol / Connection Type | Configuration |
+| --- | --- | --- |
+| Google Gemini | Built-in Gemini protocol | API key in Settings > Provider setup |
+| OpenAI | Built-in OpenAI protocol | API key in Settings > Provider setup |
+| Anthropic Claude | Built-in Anthropic protocol | API key in Settings > Provider setup |
+| Groq | Built-in OpenAI-compatible | API key in Settings > Provider setup |
+| Local servers (Ollama, LM Studio) | OpenAI-compatible | Custom endpoint URL (e.g. `http://localhost:11434/v1`); no cloud key required |
+| Custom endpoints | OpenAI, Anthropic, or Gemini compatible | Custom base URL, optional API key, and custom request headers |
 
-Add LLM connections and their API keys in Settings > Provider setup. Choose the connection and model id for each job (quick answers, summaries, agent) in Settings > Models & Agent; Pika never switches to another model on its own. The search index (embeddings) has its own model setting under Knowledge.
+Configure connections and credentials in **Settings > Provider setup**. In **Settings > Models & Agent**, choose the specific connection and model ID for Quick answers, Summaries, and the Agent. The embedding model for meeting search is configured separately under **Settings > Knowledge > Index**.
 
-### STT Providers
+### Speech-to-Text Providers
 
-Google Cloud Speech (default), Deepgram Nova-3, Soniox, OpenAI Whisper, Groq Whisper, ElevenLabs Scribe, Azure Speech, IBM Watson. Auto-fallback to Google on failure.
+The following speech recognition services are supported:
+- **Google Cloud Speech** (default; requires service account JSON file path)
+- **Deepgram** (WebSocket streaming)
+- **Soniox** (streaming)
+- **OpenAI Whisper** (WebSocket with REST fallback)
+- **Groq Whisper** (REST)
+- **ElevenLabs** (streaming)
+- **Azure Speech**
+- **IBM Watson**
+
+Configure credentials in **Settings > Provider setup**. Speech services and per-speaker recognition languages are selected in **Settings > Audio & Translation**. Pika does not substitute another speech provider if a chosen service is unconfigured.
 
 ## Architecture
 
-Three-process Electron app:
+Pika runs as a three-process desktop application:
 
-1. **Main process** (`electron/`) — window orchestration, IPC, credential storage, provider routing.
-2. **Renderer** (`src/`) — React 18 + TypeScript + Tailwind CSS + React Query.
-3. **Native module** (`native-module/`) — Rust (NAPI-RS) for low-latency audio capture; CoreAudio/ScreenCaptureKit on macOS, WASAPI on Windows.
+1. **Main process** (`electron/`): Window management, IPC orchestration, credential encryption, provider routing, meeting persistence, and local RAG indexing.
+2. **Renderer process** (`src/`): React 18, TypeScript, Tailwind CSS, and React Query for the overlay, chat, and settings interfaces.
+3. **Native module** (`native-module/`): Rust audio module using NAPI-RS for dual-channel audio capture (CoreAudio and ScreenCaptureKit on macOS; WASAPI on Windows), WebRTC VAD, and SpeexDSP acoustic echo cancellation.
 
 ```
             ┌─────────────────────────────────────┐
@@ -129,61 +140,49 @@ Three-process Electron app:
             └────────────────────────┘    └──────────────────┘
 ```
 
-Local data lives in `~/Library/Application Support/Pika` (macOS) or `%APPDATA%\Pika` (Windows). API keys and custom header values use the credential storage described below. No telemetry runs by default.
+Local application data is stored in `~/Library/Application Support/Pika` (macOS) or `%APPDATA%\Pika` (Windows). Credentials and custom headers are stored in `~/.config/pika/credentials.enc` (macOS/Linux) or `%APPDATA%\pika\credentials.enc` (Windows). No analytics or telemetry data is collected.
 
 ## System Requirements
 
-- macOS 13+ (Apple Silicon or Intel) **or** Windows 10/11.
-- 4 GB RAM minimum, 8 GB recommended.
-- 16 GB+ if running Ollama locally.
+- **macOS**: macOS 13 or newer (Apple Silicon verified; Intel build targets supported).
+- **Windows**: Windows 10/11 (audio capture and window protection code is present in the repository; binary releases are currently tracking issue #15).
+- **Node.js**: Node.js 22.12 or newer and pnpm (when building from source).
+- **Rust**: Required only when compiling the native audio module from source.
 
 ## Roadmap
 
-- [ ] Linux build (Wayland audio capture)
-- [ ] Plugin / extension API
-- [ ] iOS companion for cross-device handoff
-- [ ] More languages in the bundled embedding model
-- [ ] Hosted cloud sync (opt-in, end-to-end encrypted)
+- [ ] Standalone Windows release package (issue #15)
+- [ ] Linux build and Wayland audio capture
+- [ ] Chunked meeting summarizer with citations
+- [ ] Entity masking in the live translation request pipeline
+- [ ] Multilingual expansion for the bundled embedding model
 
-Track progress in [GitHub Issues](https://github.com/royisme/pikabaka/issues).
+Track issues and progress in [GitHub Issues](https://github.com/royisme/pikabaka/issues).
 
 ## FAQ
 
 **Is Pika free?**
-Yes — AGPL-3.0. Free for personal use, study, and open-source projects. Commercial / proprietary integrations should review the AGPL terms or reach out about a commercial license.
+Yes — AGPL-3.0. Free for personal use, study, and open-source projects. Commercial or proprietary integrations should review the AGPL terms or inquire about a commercial license.
 
 **Does my audio leave my machine?**
-Only if you choose a cloud STT/LLM provider. Pair Ollama with a local STT engine (or system-only transcription) for a fully offline pipeline.
+Audio and text requests are sent only to the speech-to-text and language model providers you explicitly configure. When using a local model server (such as Ollama for LLM inference) or local embedding models, model prompts and vector search stay on your machine. Speech recognition uses the STT service you configure.
 
 **Where are my API keys stored?**
-In a local `credentials.enc` file encrypted by Electron's `safeStorage`, using the operating system's secure storage when available (macOS Keychain, Windows DPAPI, Linux libsecret/KWallet). Credentials live under `~/.config/pika/` on macOS/Linux or `%APPDATA%\pika\` on Windows. If secure storage is unavailable, Pika keeps `credentials.json` in plaintext and shows a notice in Settings > Provider setup. On upgrade, existing plaintext is encrypted and verified before it is deleted. A decryption failure locks saves and shows a notice instead of overwriting the file. Custom header values are protected along with API keys.
-
-**How is Pika different from Cluely?**
-Open source under AGPL-3.0, no subscription, you bring your own API key, and you can run completely offline with Ollama. The overlay's global shortcuts and AI providers are configurable.
+In a local `credentials.enc` file encrypted by Electron's `safeStorage`, using operating system secure storage (macOS Keychain, Windows DPAPI). If secure storage is unavailable, Pika stores `credentials.json` in plaintext and displays a notice in Settings > Provider setup. Custom header values are protected alongside API keys.
 
 **Why "Hide from screen share"?**
-So private notes don't appear on a screen you share. It is not a guarantee (ScreenCaptureKit recorders on macOS; no Linux support). Use Pika ethically and respect the rules of your conversations.
+It asks the operating system window manager to exclude Pika's overlay windows from screen sharing during meetings. It relies on standard OS window protection flags and is not a total guarantee: macOS screen recorders that use ScreenCaptureKit can still capture protected windows, and Linux is not supported.
 
 **Can I use Pika in a call that has rules about outside assistance?**
 Check the rules first and follow them. Exams, assessments and some interviews forbid outside help; Pika does not change that.
 
 **Does it work on Linux?**
-Not yet. Tracking on the [roadmap](#roadmap).
+Not yet. Track progress on the [roadmap](#roadmap).
 
 ## Contributing
 
-Pull requests welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). For security issues, see [SECURITY.md](SECURITY.md).
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). For security disclosures, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-[AGPL-3.0](LICENSE) — see file for details.
-
----
-
-<div align="center">
-
-If Pika is useful to you, [give it a star](https://github.com/royisme/pikabaka) — it helps others discover the project.
-
-**Keywords**: live translation, AI meeting assistant, meeting transcription, real-time transcription, open source Cluely alternative, local AI assistant, Electron AI app, BYO API key meeting tool, privacy-first AI copilot, screenshot AI assistant, RAG meeting memory.
-
-</div>
+[AGPL-3.0](LICENSE) — see the LICENSE file for details.
