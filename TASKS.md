@@ -6,6 +6,30 @@ The work queue in small steps, one at a time. GitHub issues hold the evidence an
 
 Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR that says `Fixes #N` for its issue.
 
+## Suggestion card dismissal (implemented, owner visual check pending)
+
+The header and 28px dismiss button stay outside the scrollable body. Owner: scroll a long suggestion and dismiss it, then check a short suggestion in the overlay. Implementation details are in the 2026-10-30 suggestion-card entry in `PROGRESS.md`.
+
+## Step: the meeting cancellation race (implemented, uncommitted)
+
+Dependency work above is implemented but uncommitted, first by owner order; its evidence is the 2026-10-30 entry in `PROGRESS.md`. This race is implemented on the same uncommitted tree with the synthetic tests below; its evidence is the second 2026-10-30 entry in `PROGRESS.md`.
+
+- `main.finishMeeting` sets `isMeetingActive = false`, then awaits `agent.stop`/drained promises, then `manager.stopMeeting`: the engine must be cancelled before the first await, while the manager stop still cancels too.
+- All nine engine `run*` paths (Assist and Manual included) capture the current `generationId` before their first await and compare it after the await and in `catch` before emitting, writing the session, using usage or setting the mode. A stale classification must not start its stream; a stale completion or error must not idle a newer mode; Assist owns its local `AbortController`.
+- `electron/ipc/core.ts` `gemini-chat` and `gemini-chat-stream` capture `meetingId` before the await and write tokens, done, error or session rows only while it is still current and (`null` or the meeting is active). `_chatStreamId` keeps handling same-session supersession. A null id keeps no-meeting chat working; it must not become `!inMeeting || ...`, which would let a pre-meeting chat write into the next meeting.
+- Tests: deferred classification, fallback/manual/assist success plus late rejection, an old generator completing with no token, the end-of-meeting window ordering, and IPC with the same id but `active = false`.
+- Explicitly out of scope until the owner plans it: the state-governance refactor (complex local workflows to `useReducer` + `dispatch`, scalar `useState` allowed, effect-by-purpose rules with the oxlint hooks plugin). No bulk refactor was authorized.
+
+## Next after meeting cancellation: unify the chat transport (planned, not started)
+
+Owner request 2026-10-30, queued behind the meeting cancellation race. It is a plan, not work in progress: no chat code changes yet.
+
+- Goal: one path for conversational messages, their stream, errors, cancellation and per-request isolation — AI SDK `useChat` with `DefaultChatTransport` + `src/lib/electronChatFetch.ts` in the renderer, and one main-process transport behind it — instead of the current split between `gemini-chat`/`gemini-chat-stream` and the RAG chat handlers.
+- Before any retirement, inventory and migrate every reader and writer: `useMeetingChat` with its screenshot, manual and RAG branches; `GlobalChatOverlay`; `MeetingChatOverlay`; and all `gemini-chat`/`gemini-chat-stream` callers. IPC channel, preload, `src/types/electron.d.ts` and listener registrations move in the same change as their users, never before them.
+- Preserve behaviour: the main process still chooses the provider (including selected-provider routing), `CredentialsManager` stays the only key holder, screenshots and attachments, retrieval, meeting context and history, the quick-answer task prompts, and the answer-source behaviour.
+- Constraints: no persisted shape or schema change, no new dependency, no secret or SDK handle in the renderer, and no general engine rewrite. The released IPC keeps working until every reader, writer, preload entry and type has moved in that same change.
+- Acceptance: real `DefaultChatTransport` + synthetic IPC tests for the plain, screenshot, context, RAG and global paths; exact error text; abort and request-id isolation; stale results after a meeting ends; both typechecks, lint, the full tap run and the build. The owner accepts real providers, screenshots and both themes by hand.
+
 ## Execution order (owner, 2026-10-28)
 
 The owner's order of work: finish and merge every open step below, sync `main` to the private repository `royisme/meetingCopa` (remote `private`), and only then start the removal of the interview framing from the public product (track X). Each wave is at most two steps that touch different files; every step is one branch and one PR, GPT implements at `max` thinking, the agent reviews (reads the diff and re-runs the required checks; mutation testing is optional under the owner decision of 2026-10-30) and Haiku merges. Waves are limited by GPT's five-hour quota window, not by the plan.

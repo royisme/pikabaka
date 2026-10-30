@@ -44,6 +44,8 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const audio = useMeetingAudio();
     const replyContextRef = useRef<() => string | undefined>(() => undefined);
     const chat = useMeetingChat({ getReplyContext: () => replyContextRef.current() });
+    // The SDK keeps a running stream past unmount, so the next meeting would inherit the last answer.
+    useEffect(() => () => { void chat.stop(); }, [chat.stop]);
     const [proactiveCard, setProactiveCard] = useState<AgentProactiveCard | null>(null);
     useMainEvent(window.electronAPI?.onAgentProactive, setProactiveCard);
     const askAboutCard = useCallback((card: AgentProactiveCard) => {

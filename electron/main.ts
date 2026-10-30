@@ -863,6 +863,10 @@ export class AppState {
     this.isMeetingActive = false; // Block new data immediately
     this.broadcastMeetingState();
 
+    // Cancel the engine before the first await: stopping the agent and draining the indexer take time, and an
+    // answer still streaming in that window must not reach the session of the meeting the user just ended.
+    this.intelligenceManager.cancelGeneration();
+
     // Reset Mouse Passthrough so the next meeting overlay starts fresh and focusable
     if (this.overlayMousePassthrough) {
       this.setOverlayMousePassthrough(false);
