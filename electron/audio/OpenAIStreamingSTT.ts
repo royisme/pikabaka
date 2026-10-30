@@ -411,7 +411,7 @@ export class OpenAIStreamingSTT extends EventEmitter {
 
             case 'transcript.text.done':
                 if (msg.text) {
-                    console.log(`[OpenAIStreaming] Final: "${msg.text.substring(0, 60)}"`);
+                    console.log(`[OpenAIStreaming] Final: ${msg.text.length} chars`);
                     this.emit('transcript', {
                         text:       msg.text,
                         isFinal:    true,
@@ -659,7 +659,7 @@ export class OpenAIStreamingSTT extends EventEmitter {
         try {
             const { transcript, detectedLanguage } = await this._restUpload(wavBuffer);
             if (transcript && transcript.trim().length > 0) {
-                console.log(`[OpenAIStreaming][REST] Transcript: "${transcript.substring(0, 60)}"${detectedLanguage ? ` [lang=${detectedLanguage}]` : ''}`);
+                console.log(`[OpenAIStreaming][REST] Transcript: ${transcript.length} chars${detectedLanguage ? ` [lang=${detectedLanguage}]` : ''}`);
                 this.emit('transcript', {
                     text:       transcript.trim(),
                     isFinal:    true,

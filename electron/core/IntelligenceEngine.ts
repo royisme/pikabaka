@@ -271,7 +271,7 @@ export class IntelligenceEngine extends EventEmitter {
                     (lastItem.text === lastInterim.text || Math.abs(lastItem.timestamp - lastInterim.timestamp) < 1000);
 
                 if (!isDuplicate) {
-                    console.log(`[IntelligenceEngine] Injecting interim transcript: "${lastInterim.text.substring(0, 50)}..."`);
+                    console.log(`[IntelligenceEngine] Injecting interim transcript (${lastInterim.text.length} chars)`);
                     contextItems.push({
                         role: 'them',
                         text: lastInterim.text,
