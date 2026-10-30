@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: the microphone gate sends the start of each word (uncommitted)
+
+- `native-module/src/silence_suppression.rs`: the gate needed a frame or two to hear speech, so the quiet start of a word (s, f, t) was dropped; the owner saw words cut ("soft develop"). It now keeps the last 300ms of unsent microphone audio and sends it with the first speech frame (`preroll`, microphone only; system audio is unchanged). The microphone hangover goes from 150ms to 250ms. A unit test covers the pre-roll.
+- Not changed: the Deepgram endpointing (800ms) and the transcript flush timers; the owner also reported the Me line as slow, and that is not yet investigated.
+- Checks: `cargo test --locked` below. Not verified: a real call (owner). The app's `.node` must be rebuilt (`build-native`) to take effect.
+
 ## 2026-10-30: a meeting prints how much each speech stream delivered (uncommitted)
 
 - `electron/lib/audio-stats.ts` (new): counts final lines and words per stream (Me, other party) and what the echo filter dropped (final and interim lines). Numbers only, no text. `audio-pipeline.ts` records them, `startMeeting` resets and `finishMeeting` logs one line: `[Main] Meeting audio stats: ...`. It replaces the old `echoLinesDropped` counter and its every-25th-line log.
