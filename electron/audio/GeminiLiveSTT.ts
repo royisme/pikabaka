@@ -43,6 +43,11 @@ export class GeminiLiveSTT extends EventEmitter {
     /** Speech was sent since the turn was last closed, and when its last piece was. */
     private speechPending = false;
     private lastSpeechAt = 0;
+    /** Numbers for one turn, logged when its final text arrives. */
+    private turnStartAt = 0;
+    private firstInterimAt = 0;
+    private interimBehind: number[] = [];
+    private streamEnds = 0;
 
     constructor(apiKey: string) {
         super();
@@ -120,7 +125,11 @@ export class GeminiLiveSTT extends EventEmitter {
         const now = Date.now();
         const out = silent && this.lastSentAt ? this.silenceFor(Math.min(now - this.lastSentAt, MAX_FILL_MS)) : this.toTargetRate(samples);
         this.lastSentAt = now;
-        if (!silent) { this.speechPending = true; this.lastSpeechAt = now; }
+        if (!silent) {
+            if (!this.speechPending && !this.turnStartAt) this.turnStartAt = now;
+            this.speechPending = true;
+            this.lastSpeechAt = now;
+        }
         this.acc.push(out);
         this.accLen += out.length;
         if (this.accLen >= SEND_SAMPLES) this.flush();
@@ -149,12 +158,18 @@ export class GeminiLiveSTT extends EventEmitter {
     public notifySpeechEnded(): void {
         if (!this.session || !this.speechPending) return;
         this.speechPending = false;
+        this.streamEnds += 1;
         this.flush();
         try {
             this.session.sendRealtimeInput({ audioStreamEnd: true });
         } catch (error) {
             console.warn('[GeminiLive] audioStreamEnd failed:', (error as Error).message);
         }
+    }
+
+    private median(values: number[]): number {
+        if (!values.length) return 0;
+        return [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
     }
 
     private silenceFor(ms: number): Int16Array {
@@ -236,11 +251,19 @@ export class GeminiLiveSTT extends EventEmitter {
         if (!content) return;
         const interim = content.interimInputTranscription?.text;
         if (interim?.trim()) {
+            const now = Date.now();
+            if (this.turnStartAt && !this.firstInterimAt) this.firstInterimAt = now;
+            this.interimBehind.push(now - this.lastSpeechAt);
             this.emit('transcript', { text: interim, isFinal: false, confidence: 1.0 });
         }
         const final = content.inputTranscription?.text;
         if (final?.trim()) {
             if (this.lastSpeechAt) console.log(`[GeminiLive] final line ${Date.now() - this.lastSpeechAt} ms after the last speech audio (${final.length} chars)`);
+            console.log(`[GeminiLive] turn: ${this.turnStartAt ? this.firstInterimAt - this.turnStartAt : -1} ms from first speech to first interim, ${this.interimBehind.length} interims, behind the newest audio by median ${this.median(this.interimBehind)} ms and max ${Math.max(0, ...this.interimBehind)} ms, ${this.streamEnds} stream ends sent`);
+            this.turnStartAt = 0;
+            this.firstInterimAt = 0;
+            this.interimBehind = [];
+            this.streamEnds = 0;
             this.emit('transcript', { text: final, isFinal: true, confidence: 1.0, boundary: true });
         }
     }
