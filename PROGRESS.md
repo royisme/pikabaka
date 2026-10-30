@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: startup no longer flips the embedding provider and no longer shows "Provider Changed" (uncommitted)
+
+- `electron/helpers/ProcessingHelper.ts`: `loadStoredCredentials` re-initialized the embeddings with only the OpenAI and Gemini keys, which dropped the connection chosen in Settings. The pipeline treated "selected connection removed" as a config change, fell back to Gemini and saved it as `last_embedding_provider`; a later full init switched back. The Gemini step was compared with the saved name and fired the "Provider Changed" warning on every start. It now passes `buildEmbeddingConfig(credManager)`, the same config the RAG manager was built with, so the call is skipped.
+- `test/unit/rag-embedding-init.test.ts`: a second init with the same config resolves once and keeps the saved provider.
+- Not verified: the running app. Owner: restart twice with an embedding connection selected; the warning should not appear.
+
 ## 2026-10-30: the settings overlay is split by tab, no behaviour change (uncommitted)
 
 - `src/components/SettingsOverlay.tsx` 1324 → 170 lines: it keeps the shell (motion panel, sidebar order and ids, close and Quit buttons) and the shared tab state (`activeTab`, `providerEditorId`, the `initialTab`/`providers:<id>` sync and `ProviderNavigation`). Each tab's JSX moved out with its own state, effects and handlers: `src/components/settings/GeneralSettings.tsx` (queries, main-event subscriptions, theme dropdown, overlay opacity, live-transcript and login/logging toggles), `AudioSettings.tsx` (device list, mic test, speech provider/model/language draft and Save, `TranslationSettings`), `ShortcutsSettings.tsx` (the two shortcut lists), and `AudioSelects.tsx` for the two dropdown helpers the audio tab already had (now exported). The tab hooks are called unconditionally by the shell in a fixed order, the same as the flat component did, so a visit still loads the same state whatever tab it opens on. Rendered JSX, class names, copy and child prop contracts are untouched.

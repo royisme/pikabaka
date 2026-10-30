@@ -3,6 +3,7 @@
 import { AppState } from "../main"
 import { LLMHelper } from "../core/LLMHelper"
 import { CredentialsManager } from "../services/CredentialsManager"
+import { buildEmbeddingConfig } from "../rag/embeddingConfig"
 import { app } from "electron"
 // import dotenv from "dotenv" // Removed static import
 
@@ -33,8 +34,6 @@ export class ProcessingHelper {
   public loadStoredCredentials(): void {
     const credManager = CredentialsManager.getInstance();
 
-    const geminiKey = credManager.getGeminiApiKey();
-    const openaiKey = credManager.getOpenaiApiKey();
     // CRITICAL: Re-initialize IntelligenceManager now that keys are loaded
     // This fixes the issue where buttons don't work in production because of late key loading
     this.appState.getIntelligenceManager().initializeLLMs();
@@ -44,11 +43,7 @@ export class ProcessingHelper {
     const ragManager = this.appState.getRAGManager();
     if (ragManager) {
       console.log("[ProcessingHelper] Initializing RAGManager embeddings with available keys");
-      ragManager.initializeEmbeddings({
-          openaiKey: openaiKey || undefined,
-          geminiKey: geminiKey || undefined,
-          // ollamaUrl is not fetched in CredentialsManager yet by default, but we pass these keys
-      });
+      ragManager.initializeEmbeddings(buildEmbeddingConfig(credManager));
 
       // CRITICAL: Retry pending embeddings now that we have a key
       // This ensures any meetings that failed or were queued during startup get processed
