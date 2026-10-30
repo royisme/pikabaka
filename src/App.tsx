@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react" // forcing refresh
-import { QueryClient, QueryClientProvider } from "react-query"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ToastProvider, ToastViewport } from "./components/ui/toast"
 import PikaInterface from "./components/PikaInterface"
 import SettingsPopup from "./components/SettingsPopup" // Keeping for legacy/specific window support if needed
@@ -15,6 +15,8 @@ import { ErrorBoundary } from "./components/ErrorBoundary"
 import { useMainEvent } from "./hooks/useMainEvent"
 
 const queryClient = new QueryClient()
+// Only the cropper window needs this bundle; defined once here so the wrapper stays hook-free.
+const Cropper = React.lazy(() => import('./components/Cropper'))
 
 // Clean up old local storage once on module evaluation
 try {
@@ -23,23 +25,13 @@ try {
   // Local storage unavailable
 }
 
-const App: React.FC = () => {
+const MainApp: React.FC = () => {
   const isSettingsWindow = new URLSearchParams(window.location.search).get('window') === 'settings';
   const isOverlayWindow = new URLSearchParams(window.location.search).get('window') === 'overlay';
   const isModelSelectorWindow = new URLSearchParams(window.location.search).get('window') === 'model-selector';
-  const isCropperWindow = new URLSearchParams(window.location.search).get('window') === 'cropper';
-
-  // Default to launcher if not specified (dev mode safety)
-  const isDefault = !isSettingsWindow && !isOverlayWindow && !isModelSelectorWindow && !isCropperWindow;
-
-  if (isCropperWindow) {
-    const Cropper = React.lazy(() => import('./components/Cropper'));
-    return (
-      <React.Suspense fallback={<div className="w-screen h-screen bg-transparent" />}>
-        <Cropper />
-      </React.Suspense>
-    );
-  }
+  // Default to launcher if not specified (dev mode safety). The cropper window is routed below, in
+  // a wrapper without hooks, so this component always runs the same hooks in the same order.
+  const isDefault = !isSettingsWindow && !isOverlayWindow && !isModelSelectorWindow;
 
   // Initialize Analytics
   useEffect(() => {
@@ -336,6 +328,17 @@ const App: React.FC = () => {
     </div>
     </ErrorBoundary>
   )
+}
+
+const App: React.FC = () => {
+  if (new URLSearchParams(window.location.search).get('window') === 'cropper') {
+    return (
+      <React.Suspense fallback={<div className="w-screen h-screen bg-transparent" />}>
+        <Cropper />
+      </React.Suspense>
+    )
+  }
+  return <MainApp />
 }
 
 export default App

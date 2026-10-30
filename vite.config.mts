@@ -22,9 +22,12 @@ export default defineConfig({
         chunkSizeWarningLimit: 1000,
         rollupOptions: {
             output: {
-                manualChunks: {
-                    vendor: ['react', 'react-dom', 'framer-motion'],
-                    ui: ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-toast']
+                // Vite 8 (rolldown) only accepts the function form of manualChunks.
+                manualChunks(id: string) {
+                    if (!id.includes('node_modules')) return undefined
+                    if (/[\\/]node_modules[\\/](react|react-dom|framer-motion)[\\/]/.test(id)) return 'vendor'
+                    if (/[\\/]node_modules[\\/](lucide-react|@radix-ui[\\/]react-(dialog|toast))[\\/]/.test(id)) return 'ui'
+                    return undefined
                 }
             }
         }

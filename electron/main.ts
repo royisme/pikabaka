@@ -719,8 +719,10 @@ export class AppState {
     if (this.isMeetingActive) {
       this.systemAudioCapture?.start();
       this.microphoneCapture?.start();
-      this.googleSTT?.start();
-      this.googleSTT_User?.start();
+      // setupSystemAudioPipeline() recreates these instances from another module, which TS cannot
+      // see through; widen back to the declared type before starting the new ones.
+      (this.googleSTT as STTProvider | null)?.start();
+      (this.googleSTT_User as STTProvider | null)?.start();
     }
 
     console.log('[Main] STT Provider reconfigured');
@@ -1312,7 +1314,7 @@ export class AppState {
       let captureArea: Electron.Rectangle | undefined;
 
       if (process.platform === 'win32' || process.platform === 'darwin') {
-        captureArea = await this.cropperWindowHelper.showCropper();
+        captureArea = await this.cropperWindowHelper.showCropper() ?? undefined;
 
         if (!captureArea) {
           throw new Error("Selection cancelled");

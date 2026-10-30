@@ -2,8 +2,8 @@ import t from 'tap';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { QueryClient, QueryClientProvider, MutationObserver } from 'react-query';
-import * as ReactQuery from 'react-query';
+import { QueryClient, QueryClientProvider, MutationObserver } from '@tanstack/react-query';
+import * as ReactQuery from '@tanstack/react-query';
 import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 import type { AiConnectionView } from '../../src/types/electron';
 import type { AppState } from '../../electron/main';
@@ -11,11 +11,11 @@ import { CredentialsManager } from '../../electron/services/CredentialsManager';
 import { BUILTIN_CONNECTIONS } from '../../electron/services/aiConnections';
 
 const pickerModule = mockRequire(path.resolve('src/components/settings/ConnectionModelPicker.tsx'), {
-    react: React, 'react-query': ReactQuery,
+    react: React, '@tanstack/react-query': ReactQuery,
 }) as typeof import('../../src/components/settings/ConnectionModelPicker');
 const { default: Picker, ProviderNavigation } = pickerModule;
 const { default: ConnectionsSettings, ProviderList, ProviderEditor } = mockRequire(path.resolve('src/components/settings/ConnectionsSettings.tsx'), {
-    react: React, 'react-query': ReactQuery,
+    react: React, '@tanstack/react-query': ReactQuery,
     [path.resolve('src/components/settings/ConnectionModelPicker.tsx')]: pickerModule,
 }) as typeof import('../../src/components/settings/ConnectionsSettings');
 
@@ -30,7 +30,7 @@ const list = (connections: AiConnectionView[], extra = {}) => renderToStaticMark
     connections, uses: [], results: {}, onEdit: noop, onRemove: noop, onConfirm: noop, ...extra,
 }));
 function render(element: React.ReactElement, connections: AiConnectionView[] = []) {
-    const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity, staleTime: Infinity, retry: false } } });
     client.setQueryData(['ai-connections'], connections);
     const html = renderToStaticMarkup(React.createElement(QueryClientProvider, { client }, element));
     client.clear();
@@ -109,8 +109,8 @@ t.test('builtin editor exposes read-only name and interface, editable URL and wr
     const html = render(React.createElement(ProviderEditor, {
         connection: { ...builtins[1], hasApiKey: true }, onClose: noop, onSaved: noop, onTest: noop, onBusy: noop,
     }));
-    t.match(html, /Interface<input readonly=""[^>]*value="OpenAI compatible"/);
-    t.match(html, /Name<input readonly=""[^>]*value="OpenAI"/);
+    t.match(html, /Interface<input readonly=""[^>]*value="OpenAI compatible"/i);
+    t.match(html, /Name<input readonly=""[^>]*value="OpenAI"/i);
     t.notMatch(html, '<select');
     t.match(html, 'Saved. Leave empty to keep it.');
     t.notMatch(html, '>Delete</button>');
@@ -143,7 +143,7 @@ t.test('floating picker repair sends the provider id through the existing sectio
     } } });
     const { default: FloatingPicker } = mockRequire(path.resolve('src/components/settings/ConnectionModelPicker.tsx'), {
         react: { ...React, useContext: () => null },
-        'react-query': { ...ReactQuery, useQuery: (key: string[]) => key[0] === 'ai-connections' ? { data: builtins } : {} },
+        '@tanstack/react-query': { ...ReactQuery, useQuery: ({ queryKey: key }: { queryKey: readonly unknown[] }) => key[0] === 'ai-connections' ? { data: builtins } : {} },
     }) as typeof import('../../src/components/settings/ConnectionModelPicker');
     const tree = FloatingPicker({ id: 'quick-answers', connectionId: 'openai', model: 'kept-model', onChange: noop });
     if (!React.isValidElement<{ children: React.ReactNode }>(tree)) throw new Error('Picker did not render');
@@ -161,8 +161,8 @@ t.test('repair navigation opens an unconfigured built-in editor without adding i
     ), builtins);
     t.match(html, 'No providers yet. Add one to use a model.');
     t.match(html, '>Edit OpenAI</h4>');
-    t.match(html, /Interface<input readonly=""/);
-    t.match(html, /Name<input readonly=""/);
+    t.match(html, /Interface<input readonly=""/i);
+    t.match(html, /Name<input readonly=""/i);
     t.equal((html.match(/>Add provider<\/button>/g) ?? []).length, 1);
     t.end();
 });
@@ -199,8 +199,8 @@ function editorHost(connection?: AiConnectionView, settings = false) {
     const queryHooks = {
         ...ReactQuery,
         useQueryClient: () => client,
-        useQuery: (key: string[]) => ({ data: key[0] === 'ai-connections' ? [connection] : [], isSuccess: true }),
-        useMutation: (mutationFn: () => Promise<unknown>, options: object = {}) => {
+        useQuery: ({ queryKey: key }: { queryKey: readonly unknown[] }) => ({ data: key[0] === 'ai-connections' ? [connection] : [], isSuccess: true }),
+        useMutation: ({ mutationFn, ...options }: { mutationFn: () => Promise<unknown> } & object) => {
             const index = mutationIndex++;
             if (!observers[index]) {
                 observers[index] = new MutationObserver(client, { ...options, mutationFn });
@@ -211,7 +211,7 @@ function editorHost(connection?: AiConnectionView, settings = false) {
         },
     };
     const { default: Settings, ProviderList: List, ProviderEditor: Editor } = mockRequire(path.resolve('src/components/settings/ConnectionsSettings.tsx'), {
-        react: hooks, 'react-query': queryHooks,
+        react: hooks, '@tanstack/react-query': queryHooks,
     }) as typeof import('../../src/components/settings/ConnectionsSettings');
     let saved = 0;
     const results: unknown[] = [];

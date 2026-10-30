@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
 
+/* Tailwind 4 imports the framework in CSS; @config keeps the existing JS theme file authoritative. */
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
 @font-face {
   font-family: 'CelebMF';
   src: url('./font/Masterfont - Celeb MF Medium.otf') format('opentype');
@@ -15,10 +19,6 @@
   font-style: normal;
   font-display: swap;
 }
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 :root {
   --font-system: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";

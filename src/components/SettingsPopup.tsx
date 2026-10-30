@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import { MessageSquare, Link, Camera, Heart } from 'lucide-react';
-import { useQuery, useQueryClient } from 'react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useShortcuts } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { useMainEvent } from '../hooks/useMainEvent';
@@ -12,10 +12,7 @@ const SettingsPopup = () => {
     const isLightTheme = useResolvedTheme() === 'light';
 
     // Undetectable state: read via query, stream via useMainEvent
-    const { data: undetectableData } = useQuery<boolean>(
-        ['undetectable'],
-        () => window.electronAPI?.getUndetectable?.() ?? Promise.resolve(false)
-    );
+    const { data: undetectableData } = useQuery<boolean>({ queryKey: ['undetectable'], queryFn: () => window.electronAPI?.getUndetectable?.() ?? Promise.resolve(false) });
     const isUndetectable = undetectableData ?? false;
     useMainEvent(window.electronAPI?.onUndetectableChanged, (newState: boolean) => {
         queryClient.setQueryData(['undetectable'], newState);
@@ -27,13 +24,10 @@ const SettingsPopup = () => {
     const showTranscript = storedTranscript !== 'false';
 
     // Action button mode: read via query, stream via useMainEvent
-    const actionButtonModeQuery = useQuery<'recap' | 'brainstorm'>(
-        ['action-button-mode'],
-        async () => {
+    const actionButtonModeQuery = useQuery<'recap' | 'brainstorm'>({ queryKey: ['action-button-mode'], queryFn: async () => {
             const mode = await window.electronAPI?.getActionButtonMode?.();
             return mode ?? 'recap';
-        }
-    );
+        } });
     const actionButtonMode = actionButtonModeQuery.data ?? 'recap';
     useMainEvent(window.electronAPI?.onActionButtonModeChanged, (mode: 'recap' | 'brainstorm') => {
         queryClient.setQueryData(['action-button-mode'], mode);

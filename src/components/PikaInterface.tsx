@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import ChatColumn from './meeting/ChatColumn';
 import SplitterShell from './meeting/SplitterShell';
@@ -31,8 +31,8 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     const isLightTheme = useResolvedTheme() === 'light';
     const [isExpanded, setIsExpanded] = useState(true);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const { data: chatModel } = useQuery(['chat-model'], () => window.electronAPI.chatModelGet());
-    const { data: connections = [] } = useQuery(['ai-connections'], () => window.electronAPI.aiConnectionsList());
+    const { data: chatModel } = useQuery({ queryKey: ['chat-model'], queryFn: () => window.electronAPI.chatModelGet() });
+    const { data: connections = [] } = useQuery({ queryKey: ['ai-connections'], queryFn: () => window.electronAPI.aiConnectionsList() });
     const connection = connections.find((c) => c.id === chatModel?.connectionId);
     const modelName = connection && chatModel?.model ? `${connection.name}: ${chatModel.model}` : 'Choose a model';
     const isStealthRef = useRef(false);
@@ -71,42 +71,41 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     }, [setStoredSplitter]);
 
     useMainEvent(window.electronAPI?.onModelChanged, () => {
-        void queryClient.invalidateQueries(['chat-model']);
-        void queryClient.invalidateQueries(['ai-connections']);
+        void queryClient.invalidateQueries({ queryKey: ['chat-model'] });
+        void queryClient.invalidateQueries({ queryKey: ['ai-connections'] });
     });
 
     // Undetectable state: read via query, stream via useMainEvent
-    useQuery<boolean>(
-        ['undetectable'],
-        async () => {
+    useQuery<boolean>({ queryKey: ['undetectable'], queryFn: async () => {
             const val = (await window.electronAPI?.getUndetectable?.()) ?? false;
             localStorage.setItem('pika_undetectable', String(val));
             return val;
-        }
-    );
+        } });
     useMainEvent(window.electronAPI?.onUndetectableChanged, (newState: boolean) => {
         queryClient.setQueryData(['undetectable'], newState);
         localStorage.setItem('pika_undetectable', String(newState));
     });
 
     // Microphone mute: read via query, stream via useMainEvent, change via mutation
-    const { data: microphoneMuted = false } = useQuery<boolean>(['microphone-muted'], async () => (await window.electronAPI?.getMicrophoneMuted?.()) ?? false);
+    const { data: microphoneMuted = false } = useQuery<boolean>({ queryKey: ['microphone-muted'], queryFn: async () => (await window.electronAPI?.getMicrophoneMuted?.()) ?? false });
     useMainEvent(window.electronAPI?.onMicrophoneMutedChanged, (muted: boolean) => {
         queryClient.setQueryData(['microphone-muted'], muted);
     });
-    const toggleMicrophoneMute = useMutation((muted: boolean) => window.electronAPI.setMicrophoneMuted(muted));
+    const toggleMicrophoneMute = useMutation({ mutationFn: (muted: boolean) => window.electronAPI.setMicrophoneMuted(muted) });
 
     // Mouse passthrough: read via query, stream via useMainEvent
-    const { data: isMousePassthrough = false } = useQuery<boolean>(
-        ['overlay-mouse-passthrough'],
-        () => window.electronAPI?.getOverlayMousePassthrough?.() ?? Promise.resolve(false)
-    );
+    const { data: isMousePassthrough = false } = useQuery<boolean>({ queryKey: ['overlay-mouse-passthrough'], queryFn: () => window.electronAPI?.getOverlayMousePassthrough?.() ?? Promise.resolve(false) });
     useMainEvent(window.electronAPI?.onOverlayMousePassthroughChanged, (val: boolean) => {
         queryClient.setQueryData(['overlay-mouse-passthrough'], val);
     });
 
     useMainEvent(window.electronAPI?.onSettingsVisibilityChange, setIsSettingsOpen);
+    // Showing or hiding the window is the user's toggle, not this mount: a remount for a new meeting
+    // would otherwise show the launcher again or re-center the overlay.
+    const previousExpandedRef = useRef(isExpanded);
     useEffect(() => {
+        if (previousExpandedRef.current === isExpanded) return;
+        previousExpandedRef.current = isExpanded;
         if (isExpanded) {
             window.electronAPI.showWindow(isStealthRef.current);
             isStealthRef.current = false;
@@ -117,15 +116,6 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     }, [isExpanded]);
     useEffect(() => window.electronAPI?.onToggleExpand?.(() => setIsExpanded((prev) => !prev)), []);
     useEffect(() => window.electronAPI?.onEnsureExpanded?.(() => { isStealthRef.current = true; setIsExpanded(true); }), []);
-    useEffect(() => window.electronAPI?.onSessionReset?.(() => {
-        console.log('[PikaInterface] Resetting session state...');
-        chat.setSystemMessages([]);
-        chat.setInputValue('');
-        chat.setAttachedContext([]);
-        audio.setManualTranscript('');
-        audio.setVoiceInput('');
-        chat.setIsProcessing(false);
-    }), [chat.setSystemMessages, chat.setInputValue, chat.setAttachedContext, audio.setManualTranscript, audio.setVoiceInput, chat.setIsProcessing]);
 
     const handleScreenshotAttach = useCallback((data: ScreenshotAttachment) => { setIsExpanded(true); chat.setAttachedContext((prev) => (prev.some((s) => s.path === data.path) ? prev : [...prev, data].slice(-5))); }, [chat.setAttachedContext]);
     const shownMessageIdRef = useRef<string | undefined>(undefined);

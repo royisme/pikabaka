@@ -6,9 +6,19 @@ allowBuilds:
   core-js: true
   electron-winstaller: true
   esbuild: true
+  # Its install script provisions the native ONNX binary the bundled models run on; failing loudly beats
+  # silently falling back to the slower wasm backend.
+  onnxruntime-node: true
   protobufjs: true
   sharp: true
 
 # The pins that used to sit in package.json's "pnpm" field, which pnpm 11 ignores.
 overrides:
-  caniuse-lite: 1.0.30001781
+  caniuse-lite: 1.0.30001820
+  # zod <4.6.6 can exhaust memory; every consumer declares ^4.x, so 4.6.7 fits every range.
+  # katex <0.18.2 is advisory-affected, but rehype-katex 7.0.1 and micromark-extension-math 3.1.0 both pin
+  # ^0.16.0 and no release declares the patched range, so that low advisory stays until upstream moves.
+  'zod@<4.6.6': 4.6.7
+
+minimumReleaseAgeExclude:
+  - caniuse-lite@1.0.30001820

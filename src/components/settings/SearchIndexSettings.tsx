@@ -1,26 +1,23 @@
 import React, { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ConnectionModelPicker from './ConnectionModelPicker';
 
 type EmbeddingUse = { connectionId: string; model: string };
 
 const SearchIndexSettings: React.FC = () => {
     const queryClient = useQueryClient();
-    const { data: saved, error } = useQuery(['embedding-use'], () => window.electronAPI.embeddingUseGet());
-    const status = useQuery(['embedding-status'], () => window.electronAPI.embeddingStatus(), { refetchInterval: 2000 });
-    const queue = useQuery(['embedding-queue'], () => window.electronAPI.ragGetQueueStatus(), { refetchInterval: 2000 });
+    const { data: saved, error } = useQuery({ queryKey: ['embedding-use'], queryFn: () => window.electronAPI.embeddingUseGet() });
+    const status = useQuery({ queryKey: ['embedding-status'], queryFn: () => window.electronAPI.embeddingStatus(), refetchInterval: 2000 });
+    const queue = useQuery({ queryKey: ['embedding-queue'], queryFn: () => window.electronAPI.ragGetQueueStatus(), refetchInterval: 2000 });
     const [confirmCount, setConfirmCount] = useState<number | null>(null);
     const [draft, setDraft] = useState<EmbeddingUse | null>(null);
     const value = draft ?? saved ?? { connectionId: '', model: '' };
 
-    const save = useMutation(
-        async (use: EmbeddingUse) => {
+    const save = useMutation({ mutationFn: async (use: EmbeddingUse) => {
             const result = await window.electronAPI.embeddingUseSet(use);
             if (!result.success) throw new Error(result.error || 'Could not save');
-        },
-        {
-            onSuccess: async () => {
-                await queryClient.invalidateQueries(['embedding-use']);
+        }, onSuccess: async () => {
+                await queryClient.invalidateQueries({ queryKey: ['embedding-use'] });
                 setDraft(null);
                 rebuild.reset();
                 retry.reset();
@@ -28,38 +25,27 @@ const SearchIndexSettings: React.FC = () => {
                 setConfirmCount(null);
             },
             onSettled: () => Promise.all([
-                queryClient.invalidateQueries(['embedding-status']),
-                queryClient.invalidateQueries(['knowledge-documents']),
-            ]),
-        }
-    );
-    const rebuild = useMutation(
-        async () => {
+                queryClient.invalidateQueries({ queryKey: ['embedding-status'] }),
+                queryClient.invalidateQueries({ queryKey: ['knowledge-documents'] }),
+            ]) });
+    const rebuild = useMutation({ mutationFn: async () => {
             const result = await window.electronAPI.reindexIncompatibleMeetings();
             if (!result.success) throw new Error(result.error || 'Could not rebuild the index');
-        },
-        { onSettled: () => queryClient.invalidateQueries(['embedding-status']) }
-    );
+        }, onSettled: () => queryClient.invalidateQueries({ queryKey: ['embedding-status'] }) });
     const refresh = () => Promise.all([
-        queryClient.invalidateQueries(['embedding-status']),
-        queryClient.invalidateQueries(['embedding-queue']),
+        queryClient.invalidateQueries({ queryKey: ['embedding-status'] }),
+        queryClient.invalidateQueries({ queryKey: ['embedding-queue'] }),
     ]);
-    const retry = useMutation(
-        async () => {
+    const retry = useMutation({ mutationFn: async () => {
             const result = await window.electronAPI.ragRetryEmbeddings();
             if (!result.success) throw new Error(result.error || 'Could not retry failed meetings');
-        },
-        { onSettled: refresh }
-    );
-    const reindex = useMutation(
-        async () => {
+        }, onSettled: refresh });
+    const reindex = useMutation({ mutationFn: async () => {
             const result = await window.electronAPI.reindexAllMeetings();
             if (!result.success) throw new Error(result.error || 'Could not re-index all meetings');
-        },
-        { onSettled: refresh }
-    );
+        }, onSettled: refresh });
     const current = status.data;
-    const busy = save.isLoading || rebuild.isLoading || retry.isLoading || reindex.isLoading;
+    const busy = save.isPending || rebuild.isPending || retry.isPending || reindex.isPending;
     const failure = save.error || rebuild.error || retry.error || reindex.error || error || status.error || queue.error;
 
     return (
@@ -82,7 +68,7 @@ const SearchIndexSettings: React.FC = () => {
                         disabled={!saved}
                         className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${save.isSuccess && !draft ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
                     >
-                        {save.isLoading ? 'Saving…' : save.isSuccess && !draft ? 'Saved!' : 'Save'}
+                        {save.isPending ? 'Saving…' : save.isSuccess && !draft ? 'Saved!' : 'Save'}
                     </button>
                 </fieldset>
                 <div className="space-y-2 text-xs text-text-secondary min-w-0 break-words" aria-live="polite">
@@ -98,7 +84,7 @@ const SearchIndexSettings: React.FC = () => {
                                 disabled={busy}
                                 className="px-4 py-2 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-40 transition-colors"
                             >
-                                {rebuild.isLoading ? 'Rebuilding…' : 'Rebuild index'}
+                                {rebuild.isPending ? 'Rebuilding…' : 'Rebuild index'}
                             </button>
                         </div>
                     )}
@@ -114,7 +100,7 @@ const SearchIndexSettings: React.FC = () => {
                                 disabled={busy}
                                 className="px-4 py-2 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-40 transition-colors"
                             >
-                                {retry.isLoading ? 'Retrying…' : 'Retry failed'}
+                                {retry.isPending ? 'Retrying…' : 'Retry failed'}
                             </button>
                         </div>
                     )}
@@ -127,7 +113,7 @@ const SearchIndexSettings: React.FC = () => {
                             disabled={busy || !current}
                             className="px-4 py-2 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-40 transition-colors"
                         >
-                            {reindex.isLoading ? 'Re-indexing…' : confirmCount === null ? 'Re-index all' : `Re-index ${confirmCount} meetings?`}
+                            {reindex.isPending ? 'Re-indexing…' : confirmCount === null ? 'Re-index all' : `Re-index ${confirmCount} meetings?`}
                         </button>
                         <p className="min-w-0">Re-embeds saved meetings and notes with the model in use.</p>
                     </div>

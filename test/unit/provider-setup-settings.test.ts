@@ -2,8 +2,8 @@ import t from 'tap';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { QueryClient, QueryClientProvider } from 'react-query';
-import * as ReactQuery from 'react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import * as ReactQuery from '@tanstack/react-query';
 import * as FramerMotion from 'framer-motion';
 import type { AiConnectionView } from '../../src/types/electron';
 import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
@@ -21,7 +21,7 @@ Object.defineProperty(globalThis, 'document', {
 });
 const { default: SettingsOverlay } = mockRequire(path.resolve('src/components/SettingsOverlay.tsx'), {
     react: React,
-    'react-query': ReactQuery,
+    '@tanstack/react-query': ReactQuery,
     'framer-motion': FramerMotion,
     [path.resolve('src/hooks/useResolvedTheme.ts')]: { useResolvedTheme: () => 'dark' },
     [path.resolve('src/hooks/useLocalStorageValue.ts')]: { useLocalStorageValue: () => [null, () => {}] },
@@ -29,7 +29,7 @@ const { default: SettingsOverlay } = mockRequire(path.resolve('src/components/Se
 }) as typeof import('../../src/components/SettingsOverlay');
 
 function renderSettings(initialTab: string, connections: AiConnectionView[] = [], speechCredentials = {}) {
-    const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity, staleTime: Infinity, retry: false } } });
     client.setQueryData(['ai-connections'], connections);
     client.setQueryData(['speech-credentials'], speechCredentials);
     const html = renderToStaticMarkup(React.createElement(
@@ -158,7 +158,7 @@ t.test('Audio offers every configured service, uses saved keys for model Fetch, 
             },
             useEffect: noop, useRef: (value: unknown) => ({ current: value }), useMemo: (fn: () => unknown) => fn(),
         },
-        'react-query': { ...ReactQuery, useQueryClient: () => client, useQuery: (key: string[]) => key[0] === 'speech-credentials' ? { data: {
+        '@tanstack/react-query': { ...ReactQuery, useQueryClient: () => client, useQuery: ({ queryKey: key }: { queryKey: readonly unknown[] }) => key[0] === 'speech-credentials' ? { data: {
             googleServiceAccountPath: '/synthetic/account.json', hasSttGroqKey: true, hasSttOpenaiKey: true,
             hasDeepgramKey: true, hasElevenLabsKey: true, hasAzureKey: true, hasIbmWatsonKey: true, hasSonioxKey: true,
         } } : {} },

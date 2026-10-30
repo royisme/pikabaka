@@ -2,20 +2,18 @@ import t from 'tap';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { QueryClient, QueryObserver, MutationObserver } from 'react-query';
-import type { UseMutationOptions } from 'react-query';
-import * as ReactQuery from 'react-query';
+import { QueryClient, QueryObserver, MutationObserver } from '@tanstack/react-query';
+import type { UseMutationOptions } from '@tanstack/react-query';
+import * as ReactQuery from '@tanstack/react-query';
 import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 
 const noop = () => {};
-ReactQuery.setLogger({ log: noop, warn: noop, error: noop });
-t.teardown(() => ReactQuery.setLogger(console));
 
 // Windowless rendering, with real query/mutation observers and only React's local state hosted here.
 function componentHost(file: string, api: object) {
     Object.defineProperty(globalThis, 'window', { configurable: true, value: { electronAPI: api } });
     const client = new QueryClient({
-        defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } },
+        defaultOptions: { queries: { gcTime: Infinity, staleTime: Infinity, retry: false } },
     });
     const state: unknown[] = [];
     const queries: QueryObserver<unknown, Error>[] = [];
@@ -33,10 +31,10 @@ function componentHost(file: string, api: object) {
                 return [state[index], (next: unknown) => { state[index] = typeof next === 'function' ? next(state[index]) : next; }];
             },
         },
-        'react-query': {
+        '@tanstack/react-query': {
             ...ReactQuery,
             useQueryClient: () => client,
-            useQuery: (queryKey: string[], queryFn: () => Promise<unknown>) => {
+            useQuery: ({ queryKey, queryFn }: { queryKey: readonly unknown[]; queryFn?: () => Promise<unknown> }) => {
                 const index = queryIndex++;
                 if (!queries[index]) {
                     queries[index] = new QueryObserver(client, { queryKey, queryFn });
@@ -44,7 +42,7 @@ function componentHost(file: string, api: object) {
                 } else queries[index].setOptions({ queryKey, queryFn });
                 return queries[index].getCurrentResult();
             },
-            useMutation: (mutationFn: (value: string) => Promise<unknown>, options: UseMutationOptions<unknown, Error, string> = {}) => {
+            useMutation: ({ mutationFn, ...options }: { mutationFn: (value: string) => Promise<unknown> } & UseMutationOptions<unknown, Error, string>) => {
                 const index = mutationIndex++;
                 if (!mutations[index]) {
                     mutations[index] = new MutationObserver(client, { ...options, mutationFn });

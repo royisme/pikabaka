@@ -1,9 +1,9 @@
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { QueryClient, QueryObserver, MutationObserver } from 'react-query';
-import type { UseMutationOptions } from 'react-query';
-import * as ReactQuery from 'react-query';
+import { QueryClient, QueryObserver, MutationObserver } from '@tanstack/react-query';
+import type { UseMutationOptions } from '@tanstack/react-query';
+import * as ReactQuery from '@tanstack/react-query';
 import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 
 export const gateSettings = {
@@ -18,7 +18,7 @@ export function gateHost(page: 'DecisionServiceSettings' | 'ProactiveHelpSetting
         agentGateStatus: async () => ({ state: 'ok' }), agentGateLog: async () => [],
         ...api,
     };
-    const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity, staleTime: Infinity, retry: false } } });
     client.setQueryData(['agent-gate-settings'], { ...settings });
     client.setQueryData(['agent-gate-status'], { state: 'ok' });
     client.setQueryData(['agent-gate-log'], []);
@@ -36,9 +36,9 @@ export function gateHost(page: 'DecisionServiceSettings' | 'ProactiveHelpSetting
             if (!(index in state)) state[index] = initial;
             return [state[index], (next: unknown) => { state[index] = typeof next === 'function' ? next(state[index]) : next; }];
         } },
-        'react-query': {
+        '@tanstack/react-query': {
             ...ReactQuery, useQueryClient: () => client,
-            useQuery: (queryKey: string[], queryFn: () => Promise<unknown>) => {
+            useQuery: ({ queryKey, queryFn }: { queryKey: readonly unknown[]; queryFn?: () => Promise<unknown> }) => {
                 const index = queryIndex++;
                 if (!queries[index]) {
                     queries[index] = new QueryObserver(client, { queryKey, queryFn });
@@ -46,7 +46,7 @@ export function gateHost(page: 'DecisionServiceSettings' | 'ProactiveHelpSetting
                 } else queries[index].setOptions({ queryKey, queryFn });
                 return queries[index].getCurrentResult();
             },
-            useMutation: (mutationFn: () => Promise<unknown>, options: UseMutationOptions<unknown, Error, void> = {}) => {
+            useMutation: ({ mutationFn, ...options }: { mutationFn: () => Promise<unknown> } & UseMutationOptions<unknown, Error, void>) => {
                 const index = mutationIndex++;
                 if (!mutations[index]) {
                     mutations[index] = new MutationObserver(client, { ...options, mutationFn });

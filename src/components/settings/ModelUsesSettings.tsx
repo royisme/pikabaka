@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ConnectionModelPicker from './ConnectionModelPicker';
 import AnswerLanguageSetting from './AnswerLanguageSetting';
 import AnswerStyleSettings from './AnswerStyleSettings';
@@ -25,9 +25,9 @@ const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
     const queryClient = useQueryClient();
     // All three saved rows are read so a row can name the jobs that also run on its connection and model.
     const uses = {
-        chat: useQuery<ModelUse>(['chat-model'], () => readUse('chat')),
-        summary: useQuery<ModelUse>(['summary-model'], () => readUse('summary')),
-        agent: useQuery<ModelUse>(['agent-model'], () => readUse('agent')),
+        chat: useQuery<ModelUse>({ queryKey: ['chat-model'], queryFn: () => readUse('chat') }),
+        summary: useQuery<ModelUse>({ queryKey: ['summary-model'], queryFn: () => readUse('summary') }),
+        agent: useQuery<ModelUse>({ queryKey: ['agent-model'], queryFn: () => readUse('agent') }),
     };
     const { data: saved, error } = uses[job];
     // Summaries and the agent inherit quick answers only when their own connection is empty, as resolveModelUse does.
@@ -40,29 +40,23 @@ const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
     const [draft, setDraft] = useState<ModelUse | null>(null);
     const value = draft ?? saved ?? { connectionId: '', model: '', supportsImages: false };
 
-    const save = useMutation(
-        async (use: ModelUse) => {
+    const save = useMutation({ mutationFn: async (use: ModelUse) => {
             const result = await (job === 'chat' ? window.electronAPI.chatModelSet(use)
                 : job === 'summary' ? window.electronAPI.summaryModelSet(use)
                 : window.electronAPI.agentModelSet(use));
             if (!result.success) throw new Error(result.error || 'Could not save');
-        },
-        {
-            onSuccess: async () => {
-                await queryClient.invalidateQueries([`${job}-model`]);
+        }, onSuccess: async () => {
+                await queryClient.invalidateQueries({ queryKey: [`${job}-model`] });
                 setDraft(null);
-            },
-        }
-    );
+            } });
 
     // Tests run the model as shown (saved or not) through the job's own path; nothing is stored.
     // The test and its result sit under a collapsed Test disclosure that opens itself when a result arrives.
     const [showTest, setShowTest] = useState(false);
-    const test = useMutation<{ success: boolean; reply?: string; firstTokenMs?: number; totalMs?: number; error?: string; toolCalls?: boolean | null }, Error>(() =>
+    const test = useMutation<{ success: boolean; reply?: string; firstTokenMs?: number; totalMs?: number; error?: string; toolCalls?: boolean | null }, Error>({ mutationFn: () =>
         job === 'agent'
             ? window.electronAPI.agentTest({ connectionId: value.connectionId, model: value.model, supportsImages: value.supportsImages })
-            : window.electronAPI.modelTest({ job, connectionId: value.connectionId, model: value.model }),
-        { onSuccess: () => setShowTest(true), onError: () => setShowTest(true) });
+            : window.electronAPI.modelTest({ job, connectionId: value.connectionId, model: value.model }), onSuccess: () => setShowTest(true), onError: () => setShowTest(true) });
     const tested = test.data;
 
     return (
@@ -74,7 +68,7 @@ const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
                     <p className="text-[11px] text-text-secondary mt-1">Also used by: {sharedWith.map(other => labels[other]).join(', ')}</p>
                 )}
             </div>
-            <fieldset disabled={save.isLoading || test.isLoading} className="space-y-3 min-w-0">
+            <fieldset disabled={save.isPending || test.isPending} className="space-y-3 min-w-0">
                 <ConnectionModelPicker
                     id={job}
                     connectionId={value.connectionId}
@@ -94,7 +88,7 @@ const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
                         disabled={!saved}
                         className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${save.isSuccess && !draft ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
                     >
-                        {save.isLoading ? 'Saving…' : save.isSuccess && !draft ? 'Saved!' : 'Save'}
+                        {save.isPending ? 'Saving…' : save.isSuccess && !draft ? 'Saved!' : 'Save'}
                     </button>
                     <button
                         type="button"
@@ -110,10 +104,10 @@ const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
                 <div id={`${job}-model-test`} hidden={!showTest} className="space-y-2">
                     <button
                         onClick={() => test.mutate()}
-                        disabled={test.isLoading || !saved}
+                        disabled={test.isPending || !saved}
                         className="px-3 py-2 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary transition-colors disabled:opacity-50"
                     >
-                        {test.isLoading ? 'Testing…' : job === 'agent' ? 'Test agent model' : job === 'chat' ? 'Test quick answers model' : 'Test summaries model'}
+                        {test.isPending ? 'Testing…' : job === 'agent' ? 'Test agent model' : job === 'chat' ? 'Test quick answers model' : 'Test summaries model'}
                     </button>
                     {(test.isError || tested) && (
                         <div role="status" className="rounded-lg border border-border-subtle bg-bg-input/50 px-3 py-2 space-y-1 break-words">

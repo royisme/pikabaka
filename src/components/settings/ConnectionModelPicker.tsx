@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { AiConnectionType, AiConnectionView } from '../../types/electron';
 import ModelCombobox from './ModelCombobox';
 
@@ -33,19 +33,15 @@ interface ConnectionModelPickerProps {
  */
 const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, connectionId, model, emptyLabel, modelPlaceholder = 'Model id', types, onChange, onModelSelect }) => {
     const navigation = useContext(ProviderNavigation);
-    const { data: connections = [], error: listError } = useQuery<AiConnectionView[]>(['ai-connections'], () => window.electronAPI.aiConnectionsList());
+    const { data: connections = [], error: listError } = useQuery<AiConnectionView[]>({ queryKey: ['ai-connections'], queryFn: () => window.electronAPI.aiConnectionsList() });
     const selected = connections.find(c => c.id === connectionId);
 
     // Fetched on demand (the button), never on its own: the host is asked only when the user asks.
-    const models = useQuery(
-        ['connection-models', connectionId],
-        async () => {
+    const models = useQuery({ queryKey: ['connection-models', connectionId], queryFn: async () => {
             const result = await window.electronAPI.aiConnectionModels({ id: connectionId });
             if (!result.success) throw new Error(result.error || 'Could not fetch models');
             return (result.models ?? []).map((m) => m.id);
-        },
-        { enabled: false, retry: false, cacheTime: 5 * 60_000 }
-    );
+        }, enabled: false, retry: false, gcTime: 5 * 60_000 });
     const options = models.data ?? [];
 
     const note = models.isFetching

@@ -1,0 +1,66 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript", "unicorn", "oxc"],
+  "categories": {
+    // Every finding counts against the `--max-warnings` cap in the lint script, so the gate can only
+    // get stricter. Correctness rules fail; the debt rules listed below warn instead.
+    "correctness": "error"
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "dist-electron/**",
+    "release/**",
+    "node_modules/**",
+    "native-module/**",
+    "resources/**",
+    "premium/**",
+    "demo/**"
+  ],
+  "rules": {
+    // The previous gate ran @typescript-eslint's recommended set as errors. These are its rules with
+    // no findings in this code base, kept explicit so a category change cannot silently drop them.
+    "typescript/no-namespace": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-wrapper-object-types": "error",
+    "typescript/prefer-namespace-keyword": "error",
+    "typescript/triple-slash-reference": "error",
+    "typescript/no-duplicate-enum-values": "error",
+    "typescript/no-extra-non-null-assertion": "error",
+    "typescript/no-misused-new": "error",
+    "typescript/no-non-null-asserted-optional-chain": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-declaration-merging": "error",
+    "no-array-constructor": "error",
+
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-unused-vars": "warn",
+    "typescript/no-require-imports": "warn",
+    "typescript/ban-ts-comment": "warn",
+    "typescript/no-unused-expressions": "warn",
+    "typescript/no-this-alias": "warn",
+    "typescript/prefer-as-const": "warn",
+    "typescript/no-empty-object-type": "warn",
+    "prefer-const": "warn",
+    "prefer-rest-params": "warn",
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
+    "react/set-state-in-effect": "warn",
+
+    // Rules no previous gate ever ran (the old gate was @typescript-eslint's recommended set plus
+    // prefer-const/prefer-rest-params). They surface real debt found on the upgrade to oxlint; they
+    // warn, with the count inside the --max-warnings cap, until each is paid down.
+    "eslint/no-useless-catch": "warn",
+    "react/refs": "warn",
+    "react/immutability": "warn",
+    "react/purity": "warn",
+    "react/preserve-manual-memoization": "warn",
+    "unicorn/no-useless-fallback-in-spread": "warn",
+    "unicorn/no-useless-spread": "warn",
+    "unicorn/no-new-array": "warn",
+    "unicorn/no-empty-file": "warn",
+    "eslint/require-yield": "warn",
+    "eslint/no-control-regex": "warn",
+    "eslint/no-setter-return": "warn",
+    "eslint/no-extra-boolean-cast": "warn"
+  }
+}

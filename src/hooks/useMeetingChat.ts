@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { useQuery, useQueryClient } from 'react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { electronChatFetch } from '../lib/electronChatFetch';
 import { userEchoMessage } from '../lib/userEcho';
 import { useMainEvent } from './useMainEvent';
@@ -78,9 +78,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     if (!cancelledRef.current) setSystemMessages(update);
   }, []);
 
-  const agentStatusQuery = useQuery<boolean>(
-    ['agent-status'],
-    async () => {
+  const agentStatusQuery = useQuery<boolean>({ queryKey: ['agent-status'], queryFn: async () => {
       if (!window.electronAPI?.agentStatus) return false;
       try {
         const res = await window.electronAPI.agentStatus();
@@ -88,13 +86,12 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
       } catch {
         return false;
       }
-    }
-  );
+    } });
   const isAgentAvailable = agentStatusQuery.data ?? false;
 
   useMainEvent(window.electronAPI?.onMeetingStateChanged, ({ isActive }) => {
     if (isActive) {
-      void queryClient.invalidateQueries(['agent-status']);
+      void queryClient.invalidateQueries({ queryKey: ['agent-status'] });
     } else {
       queryClient.setQueryData(['agent-status'], false);
     }
@@ -112,13 +109,10 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
 
   const isChatLoading = status === 'submitted' || status === 'streaming';
 
-  const actionButtonModeQuery = useQuery<'recap' | 'brainstorm'>(
-    ['action-button-mode'],
-    async () => {
+  const actionButtonModeQuery = useQuery<'recap' | 'brainstorm'>({ queryKey: ['action-button-mode'], queryFn: async () => {
       const mode = await window.electronAPI?.getActionButtonMode?.();
       return mode ?? 'recap';
-    }
-  );
+    } });
   const actionButtonMode = actionButtonModeQuery.data ?? 'recap';
 
   useMainEvent(window.electronAPI?.onActionButtonModeChanged, (mode: 'recap' | 'brainstorm') => {

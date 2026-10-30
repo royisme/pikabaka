@@ -1,4 +1,4 @@
-// @xenova/transformers is ESM-only — must use dynamic import()
+// @huggingface/transformers is ESM-only — must use dynamic import()
 import path from 'path';
 import { app } from 'electron';
 import { IEmbeddingProvider } from './IEmbeddingProvider';
@@ -46,16 +46,18 @@ export class LocalEmbeddingProvider implements IEmbeddingProvider {
       // Use new Function() to force a true ESM dynamic import at runtime.
       // TypeScript with module:commonjs rewrites `await import(...)` to
       // `Promise.resolve().then(() => require(...))`, which fails for ESM-only
-      // packages like @xenova/transformers. The new Function() trick is opaque
+      // packages like @huggingface/transformers. The new Function() trick is opaque
       // to the TypeScript compiler so it is left as a real import() call.
-      const { pipeline, env } = await (new Function('return import("@xenova/transformers")')()) as typeof import('@xenova/transformers');
+      const { pipeline, env } = await (new Function('return import("@huggingface/transformers")')()) as typeof import('@huggingface/transformers');
 
       // Tell transformers.js to use the local path, never download in production
       env.allowRemoteModels = false;
       env.localModelPath = this.modelPath;
 
+      // q8 keeps the bundled model at its previous quantized size and speed.
       this.pipe = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
         local_files_only: true,
+        dtype: 'q8',
       });
     })();
 

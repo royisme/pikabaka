@@ -87,7 +87,7 @@ pnpm run app:dev        # starts Vite dev server and Electron in development mod
 pnpm run dist           # packages production build
 ```
 
-**Prerequisites**: Node.js 22.12+, pnpm, Rust toolchain (for native audio module compilation), and Git.
+**Prerequisites**: Node.js 22.19+, pnpm, Rust toolchain (for native audio module compilation), and Git.
 
 ## Configure Models & Agent
 
@@ -146,7 +146,7 @@ Local application data is stored in `~/Library/Application Support/Pika` (macOS)
 
 - **macOS**: macOS 13 or newer (Apple Silicon verified; Intel build targets supported).
 - **Windows**: Windows 10/11 (audio capture and window protection code is present in the repository; binary releases are currently tracking issue #15).
-- **Node.js**: Node.js 22.12 or newer and pnpm (when building from source).
+- **Node.js**: Node.js 22.19 or newer and pnpm (when building from source).
 - **Rust**: Required only when compiling the native audio module from source.
 
 ## Roadmap

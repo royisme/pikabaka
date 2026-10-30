@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import NotesSettings from './NotesSettings';
 import ImportedDocuments from './ImportedDocuments';
 import AnswerSourcesSettings from './AnswerSourcesSettings';
@@ -12,25 +12,20 @@ const KnowledgeSettings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const [page, setPage] = useState('Sources');
     const [editingNotes, setEditingNotes] = useState(false);
     const queryClient = useQueryClient();
-    const meetings = useQuery(['recent-meetings'], () => window.electronAPI.getRecentMeetings());
-    const notes = useQuery(['profile-notes'], () => window.electronAPI.profileGetNotes());
-    const profileStatus = useQuery(['profile', 'status'], () => window.electronAPI.profileGetStatus(), { staleTime: 30_000 });
+    const meetings = useQuery({ queryKey: ['recent-meetings'], queryFn: () => window.electronAPI.getRecentMeetings() });
+    const notes = useQuery({ queryKey: ['profile-notes'], queryFn: () => window.electronAPI.profileGetNotes() });
+    const profileStatus = useQuery({ queryKey: ['profile', 'status'], queryFn: () => window.electronAPI.profileGetStatus(), staleTime: 30_000 });
     const notesIndex = profileStatus.data?.notesIndex;
-    const removeNotes = useMutation(
-        async () => {
+    const removeNotes = useMutation({ mutationFn: async () => {
             const result = await window.electronAPI.profileSetNotes('');
             if (!result.success) throw new Error(result.error || 'Could not remove notes');
-        },
-        {
-            onSuccess: async () => {
+        }, onSuccess: async () => {
                 await Promise.all([
-                    queryClient.invalidateQueries(['profile-notes']),
-                    queryClient.invalidateQueries(['profile', 'status']),
+                    queryClient.invalidateQueries({ queryKey: ['profile-notes'] }),
+                    queryClient.invalidateQueries({ queryKey: ['profile', 'status'] }),
                 ]);
                 setEditingNotes(false);
-            },
-        }
-    );
+            } });
 
     return (
         <div className="space-y-5 pb-10">
@@ -91,13 +86,13 @@ const KnowledgeSettings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                         <button type="button" aria-expanded={editingNotes} onClick={() => setEditingNotes(!editingNotes)} className={quietButton}>Edit</button>
                                         <button
                                             type="button"
-                                            disabled={removeNotes.isLoading}
+                                            disabled={removeNotes.isPending}
                                             onClick={() => {
                                                 if (confirm('Remove your saved notes?')) removeNotes.mutate();
                                             }}
                                             className={quietButton}
                                         >
-                                            {removeNotes.isLoading ? 'Removing…' : 'Remove'}
+                                            {removeNotes.isPending ? 'Removing…' : 'Remove'}
                                         </button>
                                     </div>
                                 )}

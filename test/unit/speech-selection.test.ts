@@ -2,8 +2,8 @@ import t from 'tap';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { QueryClient } from 'react-query';
-import * as ReactQuery from 'react-query';
+import { QueryClient } from '@tanstack/react-query';
+import * as ReactQuery from '@tanstack/react-query';
 import * as FramerMotion from 'framer-motion';
 import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 
@@ -36,7 +36,7 @@ async function settings(credentials: Record<string, unknown>, api = {}) {
             useEffect: (effect: () => void | (() => void)) => { if (!mounted) effects.push(effect); },
             useRef: (value: unknown) => ({ current: value }), useMemo: (fn: () => unknown) => fn(),
         },
-        'react-query': { ...ReactQuery, useQueryClient: () => client, useQuery: (key: string[]) => key[0] === 'speech-credentials' ? { data: credentials } : {} },
+        '@tanstack/react-query': { ...ReactQuery, useQueryClient: () => client, useQuery: ({ queryKey: key }: { queryKey: readonly unknown[] }) => key[0] === 'speech-credentials' ? { data: credentials } : {} },
         'framer-motion': FramerMotion,
         [path.resolve('src/hooks/useShortcuts.ts')]: { useShortcuts: () => ({ shortcuts: {}, updateShortcut: noop, resetShortcuts: noop }) },
         [path.resolve('src/hooks/useMainEvent.ts')]: { useMainEvent: noop },

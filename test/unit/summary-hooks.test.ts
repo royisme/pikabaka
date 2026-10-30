@@ -84,7 +84,7 @@ async function setup(t: Test) {
     const mocks = {
         electron, [file('db/DatabaseManager')]: dbMock,
         [file('core/LLMHelper')]: { LLMHelper: class {} },
-        [file('core/IntelligenceEngine')]: { IntelligenceEngine: EventEmitter },
+        [file('core/IntelligenceEngine')]: { IntelligenceEngine: class extends EventEmitter { cancelGeneration() {} } },
         [file('agent/workspace')]: { renameMeetingFolder: async () => {} },
     };
     const { IntelligenceManager } = mockRequire(file('IntelligenceManager'), mocks) as { IntelligenceManager: typeof Intelligence };
@@ -144,7 +144,7 @@ async function setup(t: Test) {
         }));
         const state = Object.create(StateClass.prototype) as AppState;
         Reflect.set(state, 'ragManager', manager);
-        Reflect.set(state, 'intelligenceManager', { stopMeeting: async () => id });
+        Reflect.set(state, 'intelligenceManager', { stopMeeting: async () => id, cancelGeneration: () => {} });
         for (const name of ['broadcastMeetingState', 'resetBufferedTranscriptTurns']) Reflect.set(state, name, () => {});
         return state;
     };

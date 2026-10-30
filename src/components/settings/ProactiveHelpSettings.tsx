@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AgentGateDecision } from '../../types/electron';
 
 type Mode = 'log' | 'on' | 'off';
@@ -23,9 +23,9 @@ function percent(value?: number): string {
  */
 const ProactiveHelpSettings = ({ onOpenProviders }: { onOpenProviders: () => void }) => {
     const queryClient = useQueryClient();
-    const settings = useQuery(['agent-gate-settings'], () => window.electronAPI.agentGateGetSettings());
-    const status = useQuery<Status>(['agent-gate-status'], () => window.electronAPI.agentGateStatus());
-    const log = useQuery<AgentGateDecision[]>(['agent-gate-log'], () => window.electronAPI.agentGateLog());
+    const settings = useQuery({ queryKey: ['agent-gate-settings'], queryFn: () => window.electronAPI.agentGateGetSettings() });
+    const status = useQuery<Status>({ queryKey: ['agent-gate-status'], queryFn: () => window.electronAPI.agentGateStatus() });
+    const log = useQuery<AgentGateDecision[]>({ queryKey: ['agent-gate-log'], queryFn: () => window.electronAPI.agentGateLog() });
 
     // What is typed is a draft over the saved settings.
     const [draft, setDraft] = useState<{ mode?: Mode; model?: string; threshold?: number; cooldownSeconds?: number }>({});
@@ -39,14 +39,13 @@ const ProactiveHelpSettings = ({ onOpenProviders }: { onOpenProviders: () => voi
 
     const refreshAll = async () => {
         await Promise.all([
-            queryClient.invalidateQueries(['agent-gate-settings']),
-            queryClient.invalidateQueries(['agent-gate-status']),
-            queryClient.invalidateQueries(['agent-gate-log']),
+            queryClient.invalidateQueries({ queryKey: ['agent-gate-settings'] }),
+            queryClient.invalidateQueries({ queryKey: ['agent-gate-status'] }),
+            queryClient.invalidateQueries({ queryKey: ['agent-gate-log'] }),
         ]);
     };
 
-    const save = useMutation(
-        async () => {
+    const save = useMutation({ mutationFn: async () => {
             const result = await window.electronAPI.agentGateSetSettings({
                 mode,
                 model,
@@ -54,17 +53,13 @@ const ProactiveHelpSettings = ({ onOpenProviders }: { onOpenProviders: () => voi
                 cooldownSeconds,
             });
             if (!result.success) throw new Error(result.error || 'Could not save');
-        },
-        {
-            onSuccess: async () => {
+        }, onSuccess: async () => {
                 await refreshAll();
                 setDraft({});
-            },
-        }
-    );
+            } });
 
     // The test uses the draft model with the saved service URL and key.
-    const test = useMutation(() => window.electronAPI.agentGateTest({ model, baseUrl }));
+    const test = useMutation({ mutationFn: () => window.electronAPI.agentGateTest({ model, baseUrl }) });
 
     // "Saved!" shows while the draft is empty after a successful save, so it clears itself when you edit again.
     const showSaved = save.isSuccess && Object.keys(draft).length === 0;
@@ -135,17 +130,17 @@ const ProactiveHelpSettings = ({ onOpenProviders }: { onOpenProviders: () => voi
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <button
                         onClick={() => save.mutate()}
-                        disabled={save.isLoading}
+                        disabled={save.isPending}
                         className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${showSaved ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
                     >
                         {showSaved ? 'Saved!' : 'Save proactive help settings'}
                     </button>
                     <button
                         onClick={() => test.mutate()}
-                        disabled={test.isLoading}
+                        disabled={test.isPending}
                         className="px-4 py-2 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary transition-colors disabled:opacity-50"
                     >
-                        {test.isLoading ? 'Testing…' : 'Test decision model'}
+                        {test.isPending ? 'Testing…' : 'Test decision model'}
                     </button>
                     {statusLine && (
                         <p className={`text-[11px] sm:pl-1 ${status.data?.state === 'unavailable' ? 'text-state-danger' : 'text-text-tertiary'}`}>{statusLine}</p>

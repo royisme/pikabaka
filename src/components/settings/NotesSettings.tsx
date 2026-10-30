@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 /**
  * Facts about the user or their work, one per line. They are searched like an imported document when a
@@ -7,25 +7,20 @@ import { useMutation, useQuery, useQueryClient } from 'react-query';
  */
 const NotesSettings: React.FC = () => {
     const queryClient = useQueryClient();
-    const { data: saved } = useQuery(['profile-notes'], () => window.electronAPI.profileGetNotes());
+    const { data: saved } = useQuery({ queryKey: ['profile-notes'], queryFn: () => window.electronAPI.profileGetNotes() });
     const [draft, setDraft] = useState<string | null>(null);
     const value = draft ?? saved ?? '';
 
-    const save = useMutation(
-        async (text: string) => {
+    const save = useMutation({ mutationFn: async (text: string) => {
             const result = await window.electronAPI.profileSetNotes(text);
             if (!result.success) throw new Error(result.error || 'Could not save');
-        },
-        {
-            onSuccess: async () => {
+        }, onSuccess: async () => {
                 await Promise.all([
-                    queryClient.invalidateQueries(['profile-notes']),
-                    queryClient.invalidateQueries(['profile', 'status']),
+                    queryClient.invalidateQueries({ queryKey: ['profile-notes'] }),
+                    queryClient.invalidateQueries({ queryKey: ['profile', 'status'] }),
                 ]);
                 setDraft(null);
-            },
-        }
-    );
+            } });
 
     return (
         <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-3">
@@ -46,10 +41,10 @@ const NotesSettings: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2">
                 <button
                     onClick={() => save.mutate(value)}
-                    disabled={save.isLoading || draft === null}
+                    disabled={save.isPending || draft === null}
                     className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${save.isSuccess && draft === null ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
                 >
-                    {save.isLoading ? 'Saving…' : save.isSuccess && draft === null ? 'Saved!' : 'Save notes'}
+                    {save.isPending ? 'Saving…' : save.isSuccess && draft === null ? 'Saved!' : 'Save notes'}
                 </button>
                 {save.error ? <p className="text-[11px] text-state-danger">{(save.error as Error).message}</p> : null}
             </div>

@@ -742,7 +742,7 @@ export class ScreenshotHelper {
       return { success: true }
     } catch (error) {
       // console.error("Error deleting file:", error)
-      return { success: false, error: error.message }
+      return { success: false, error: (error as Error).message }
     }
   }
 }

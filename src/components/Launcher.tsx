@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from 'react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, CheckCircle, DownloadCloud, Ghost, RefreshCw } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import MeetingDetails from './MeetingDetails';
@@ -35,20 +35,11 @@ const Launcher: React.FC<LauncherProps> = ({
     ollamaPullMessage = '',
 }) => {
     const queryClient = useQueryClient();
-    const { data: meetings = [], refetch: refetchMeetings } = useQuery<Meeting[]>(
-        ['recent-meetings'],
-        () => window.electronAPI?.getRecentMeetings?.() ?? []
-    );
-    const { data: undetectable = false } = useQuery<boolean>(
-        ['undetectable'],
-        async () => (await window.electronAPI?.getUndetectable?.()) ?? false
-    );
+    const { data: meetings = [], refetch: refetchMeetings } = useQuery<Meeting[]>({ queryKey: ['recent-meetings'], queryFn: () => window.electronAPI?.getRecentMeetings?.() ?? [] });
+    const { data: undetectable = false } = useQuery<boolean>({ queryKey: ['undetectable'], queryFn: async () => (await window.electronAPI?.getUndetectable?.()) ?? false });
     const isDetectable = !undetectable;
 
-    const { data: isMeetingActive = false } = useQuery<boolean>(
-        ['meeting-active'],
-        async () => (await window.electronAPI?.getMeetingActive?.()) ?? false
-    );
+    const { data: isMeetingActive = false } = useQuery<boolean>({ queryKey: ['meeting-active'], queryFn: async () => (await window.electronAPI?.getMeetingActive?.()) ?? false });
 
     const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
     const [forwardMeeting, setForwardMeeting] = useState<Meeting | null>(null);

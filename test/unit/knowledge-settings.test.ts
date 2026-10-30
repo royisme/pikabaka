@@ -2,17 +2,15 @@ import t from 'tap';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { MutationObserver, QueryClient, QueryClientProvider, QueryObserver, setLogger } from 'react-query';
-import * as ReactQuery from 'react-query';
-import type { UseMutationOptions } from 'react-query';
+import { MutationObserver, QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
+import * as ReactQuery from '@tanstack/react-query';
+import type { UseMutationOptions } from '@tanstack/react-query';
 import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 import KnowledgeSettings from '../../src/components/settings/KnowledgeSettings';
 import ImportedDocuments from '../../src/components/settings/ImportedDocuments';
 import type { ImportedDocument, NotesIndexStatus } from '../../electron/knowledge/types';
 
 const noop = () => {};
-setLogger({ log: noop, warn: noop, error: noop });
-t.teardown(() => setLogger(console));
 
 function renderSources(client: QueryClient) {
     const html = renderToStaticMarkup(React.createElement(
@@ -40,10 +38,10 @@ for (const [status, expected] of [
         } } as unknown as Window & typeof globalThis;
         t.teardown(() => { globalThis.window = previous; });
         const client = sourcesClient();
-        client.removeQueries(['profile', 'status']);
-        await client.fetchQuery(['profile', 'status'], () => window.electronAPI.profileGetStatus());
-        await client.fetchQuery(['profile-notes'], () => window.electronAPI.profileGetNotes());
-        await client.fetchQuery(['recent-meetings'], () => window.electronAPI.getRecentMeetings());
+        client.removeQueries({ queryKey: ['profile', 'status'] });
+        await client.fetchQuery({ queryKey: ['profile', 'status'], queryFn: () => window.electronAPI.profileGetStatus() });
+        await client.fetchQuery({ queryKey: ['profile-notes'], queryFn: () => window.electronAPI.profileGetNotes() });
+        await client.fetchQuery({ queryKey: ['recent-meetings'], queryFn: () => window.electronAPI.getRecentMeetings() });
         const html = renderSources(client);
         t.match(html, expected);
         if (status.provider) {
@@ -59,7 +57,9 @@ for (const [status, expected] of [
 }
 
 function sourcesClient() {
-    const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
+    // The host seeds the cache and then draws once; v5 would otherwise start a mount fetch and draw
+    // the loading state instead of the seeded one.
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity, staleTime: Infinity, retry: false } } });
     client.setQueryData(['profile', 'status'], {});
     return client;
 }
@@ -95,11 +95,13 @@ t.test('Sources labels the capped history and counts the saved notes, not index 
 
 t.test('Sources shows real query errors instead of invented empty counts', t => {
     const client = sourcesClient();
+    // A v5 query with no data is always stale, so a mount refetch would replace the error with a
+    // loading state. `data: null` marks the failed attempt as settled, which is what this page shows.
     client.getQueryCache().build(client, { queryKey: ['recent-meetings'] }).setState({
-        status: 'error', error: new Error('History storage unavailable'),
+        status: 'error', error: new Error('History storage unavailable'), data: null, dataUpdatedAt: Date.now(),
     });
     client.getQueryCache().build(client, { queryKey: ['profile-notes'] }).setState({
-        status: 'error', error: new Error('Notes storage unavailable'),
+        status: 'error', error: new Error('Notes storage unavailable'), data: null, dataUpdatedAt: Date.now(),
     });
     const html = renderSources(client);
     t.match(html, '✕ History storage unavailable');
@@ -151,7 +153,7 @@ function importedDocument(overrides: Partial<ImportedDocument> = {}): ImportedDo
 }
 
 function documentsClient(documents: ImportedDocument[], materials = false) {
-    const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity, staleTime: Infinity, retry: false } } });
     client.setQueryData(['knowledge-documents'], documents);
     client.setQueryData(['answer-sources'], { meetings: true, materials });
     return client;
@@ -259,10 +261,16 @@ t.test('the Materials-off line appears only when documents exist and the switch 
 });
 
 t.test('a failed list shows its real error instead of the empty line', t => {
-    const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity, staleTime: Infinity, retry: false } } });
     client.setQueryData(['answer-sources'], { meetings: true, materials: true });
-    client.getQueryCache().build(client, { queryKey: ['knowledge-documents'] }).setState({
+    const documentsQuery = client.getQueryCache().build(client, { queryKey: ['knowledge-documents'] });
+    // v5 refetches an errored query that has no data as soon as it mounts, which would replace the
+    // seeded error with a loading state. A failed refetch keeps its previous rows, so seed both.
+    documentsQuery.setState({
+        ...documentsQuery.state,
         status: 'error', error: new Error('Synthetic document listing unavailable'),
+        data: [importedDocument()], fetchStatus: 'idle',
+        errorUpdatedAt: Date.now(), dataUpdatedAt: Date.now(),
     });
     const html = renderDocuments(client);
     t.match(html, '✕ Synthetic document listing unavailable');
@@ -280,33 +288,36 @@ function documentsHost(api: Record<string, unknown>) {
     sharedWindow.electronAPI = api;
     sharedWindow.platform = 'darwin';
     Object.defineProperty(globalThis, 'window', { configurable: true, value: sharedWindow });
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, cacheTime: Infinity } } });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, gcTime: Infinity } } });
     const states: unknown[] = [];
     const queries: QueryObserver<unknown, Error>[] = [];
     const mutations: MutationObserver<unknown, Error, unknown>[] = [];
     const unsubscribes: Array<() => void> = [];
     const options = new Map<string, Record<string, unknown>>();
     let stateIndex = 0, queryIndex = 0, mutationIndex = 0;
-    const { default: Component } = mockRequire(path.resolve('src/components/settings/ImportedDocuments.tsx') + '?' + Math.random(), {
+    const { default: Component } = mockRequire(path.resolve('src/components/settings/ImportedDocuments.tsx'), {
         react: { ...React, useState: (initial: unknown) => {
             const index = stateIndex++;
             if (!(index in states)) states[index] = initial;
             return [states[index], (next: unknown) => { states[index] = typeof next === 'function' ? (next as (current: unknown) => unknown)(states[index]) : next; }];
         } },
-        'react-query': {
+        '@tanstack/react-query': {
             ...ReactQuery, useQueryClient: () => client,
-            useQuery: (queryKey: string[], queryFn: () => Promise<unknown>, queryOptions: Record<string, unknown> = {}) => {
+            useQuery: ({ queryKey, queryFn, ...queryOptions }: { queryKey: readonly unknown[]; queryFn?: () => Promise<unknown> } & Record<string, unknown>) => {
                 const index = queryIndex++;
                 if (!queries[index]) {
+                    // The seeded cache is fresh (staleTime: Infinity), so mounting renders it as is.
                     queries[index] = new QueryObserver(client, { queryKey, queryFn });
                     unsubscribes.push(queries[index].subscribe(noop));
                 } else queries[index].setOptions({ queryKey, queryFn });
                 options.set(JSON.stringify(queryKey), queryOptions);
                 return queries[index].getCurrentResult();
             },
-            useMutation: (mutationFn: (value: unknown) => Promise<unknown>, mutationOptions: UseMutationOptions<unknown, Error, unknown> = {}) => {
+            // v5 takes one options object; the v4 `(mutationFn, options)` shape would put the whole
+            // object where the function belongs.
+            useMutation: (mutationOptions: UseMutationOptions<unknown, Error, unknown> = {}) => {
                 const index = mutationIndex++;
-                const fresh = { ...mutationOptions, mutationFn };
+                const fresh = { ...mutationOptions };
                 if (!mutations[index]) {
                     mutations[index] = new MutationObserver(client, fresh);
                     unsubscribes.push(mutations[index].subscribe(noop));
@@ -426,10 +437,12 @@ t.test('the list polls every two seconds only while a document is indexing', asy
     });
     t.teardown(page.close);
     page.draw(); await page.settle();
-    const interval = page.queryOptions(['knowledge-documents']).refetchInterval as (data?: ImportedDocument[]) => number | false;
+    // v5 hands the rule the query, v4 handed it the data.
+    const interval = page.queryOptions(['knowledge-documents']).refetchInterval as (query: { state: { data?: ImportedDocument[] } }) => number | false;
+    const at = (data: ImportedDocument[]) => interval({ state: { data } });
     t.equal(typeof interval, 'function', 'the polling rule is given to react-query');
-    t.equal(interval([importedDocument({ state: 'indexing', provider: null, dimensions: null, indexedAt: null })]), 2000);
-    t.equal(interval([importedDocument({ state: 'indexed' }), importedDocument({ id: 5, state: 'failed', error: 'Synthetic quota refused' })]), false, 'polling stops when nothing is indexing');
+    t.equal(at([importedDocument({ state: 'indexing', provider: null, dimensions: null, indexedAt: null })]), 2000);
+    t.equal(at([importedDocument({ state: 'indexed' }), importedDocument({ id: 5, state: 'failed', error: 'Synthetic quota refused' })]), false, 'polling stops when nothing is indexing');
 });
 
 t.test('preload forwards the four document channels and their ids', async t => {

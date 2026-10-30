@@ -1,10 +1,10 @@
-import { useQuery } from 'react-query';
+import { useQuery } from '@tanstack/react-query';
 import ConnectionsSettings from './ConnectionsSettings';
 import SpeechProvidersSettings from './SpeechProvidersSettings';
 import DecisionServiceSettings from './DecisionServiceSettings';
 
 const ProviderSetupSettings = ({ onOpenModels }: { onOpenModels: () => void }) => {
-    const { data: credentials } = useQuery(['speech-credentials'], () => window.electronAPI.getStoredCredentials());
+    const { data: credentials } = useQuery({ queryKey: ['speech-credentials'], queryFn: () => window.electronAPI.getStoredCredentials() });
     const storage = credentials?.storage;
     return <div className="space-y-5 animated fadeIn pb-10">
         <div className="space-y-1">

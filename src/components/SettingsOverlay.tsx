@@ -5,7 +5,7 @@ import TranslationSettings from './settings/TranslationSettings';
 import KnowledgeSettings from './settings/KnowledgeSettings';
 import ProviderSetupSettings from './settings/ProviderSetupSettings';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useQuery, useQueryClient } from 'react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWindowEvent } from '../hooks/useWindowEvent';
 import { useMainEvent } from '../hooks/useMainEvent';
 import { useLocalStorageValue } from '../hooks/useLocalStorageValue';
@@ -231,50 +231,26 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const queryClient = useQueryClient();
 
     // General Settings (queries + main event subscriptions)
-    const { data: isUndetectable = false } = useQuery<boolean>(
-        ['undetectable'],
-        () => window.electronAPI?.getUndetectable?.() ?? Promise.resolve(false),
-        { enabled: isOpen && !!window.electronAPI?.getUndetectable }
-    );
+    const { data: isUndetectable = false } = useQuery<boolean>({ queryKey: ['undetectable'], queryFn: () => window.electronAPI?.getUndetectable?.() ?? Promise.resolve(false), enabled: isOpen && !!window.electronAPI?.getUndetectable });
     useMainEvent(window.electronAPI?.onUndetectableChanged, (newState: boolean) => {
         queryClient.setQueryData(['undetectable'], newState);
     });
 
-    const { data: isMousePassthrough = false } = useQuery<boolean>(
-        ['overlay-mouse-passthrough'],
-        () => window.electronAPI?.getOverlayMousePassthrough?.() ?? Promise.resolve(false),
-        { enabled: isOpen && !!window.electronAPI?.getOverlayMousePassthrough }
-    );
+    const { data: isMousePassthrough = false } = useQuery<boolean>({ queryKey: ['overlay-mouse-passthrough'], queryFn: () => window.electronAPI?.getOverlayMousePassthrough?.() ?? Promise.resolve(false), enabled: isOpen && !!window.electronAPI?.getOverlayMousePassthrough });
     useMainEvent(window.electronAPI?.onOverlayMousePassthroughChanged, (enabled: boolean) => {
         queryClient.setQueryData(['overlay-mouse-passthrough'], enabled);
     });
 
-    const { data: openOnLogin = false } = useQuery<boolean>(
-        ['settings', 'open-at-login'],
-        () => window.electronAPI?.getOpenAtLogin?.() ?? Promise.resolve(false),
-        { enabled: isOpen && !!window.electronAPI?.getOpenAtLogin }
-    );
+    const { data: openOnLogin = false } = useQuery<boolean>({ queryKey: ['settings', 'open-at-login'], queryFn: () => window.electronAPI?.getOpenAtLogin?.() ?? Promise.resolve(false), enabled: isOpen && !!window.electronAPI?.getOpenAtLogin });
 
-    const { data: themeMode = 'system' } = useQuery<'system' | 'light' | 'dark'>(
-        ['settings', 'theme-mode'],
-        async () => {
+    const { data: themeMode = 'system' } = useQuery<'system' | 'light' | 'dark'>({ queryKey: ['settings', 'theme-mode'], queryFn: async () => {
             const res = await window.electronAPI?.getThemeMode?.();
             return (res?.mode as 'system' | 'light' | 'dark') ?? 'system';
-        },
-        { enabled: isOpen && !!window.electronAPI?.getThemeMode }
-    );
+        }, enabled: isOpen && !!window.electronAPI?.getThemeMode });
 
-    const { data: verboseLogging = false } = useQuery<boolean>(
-        ['settings', 'verbose-logging'],
-        () => window.electronAPI?.getVerboseLogging?.() ?? Promise.resolve(false),
-        { enabled: isOpen && !!window.electronAPI?.getVerboseLogging }
-    );
+    const { data: verboseLogging = false } = useQuery<boolean>({ queryKey: ['settings', 'verbose-logging'], queryFn: () => window.electronAPI?.getVerboseLogging?.() ?? Promise.resolve(false), enabled: isOpen && !!window.electronAPI?.getVerboseLogging });
 
-    const { data: permissionStatus = null } = useQuery<{ microphone: string; screen: string } | null>(
-        ['settings', 'permission-status'],
-        () => window.electronAPI?.getPermissionStatus?.() ?? Promise.resolve(null),
-        { enabled: isOpen && !!window.electronAPI?.getPermissionStatus }
-    );
+    const { data: permissionStatus = null } = useQuery<{ microphone: string; screen: string } | null>({ queryKey: ['settings', 'permission-status'], queryFn: () => window.electronAPI?.getPermissionStatus?.() ?? Promise.resolve(null), enabled: isOpen && !!window.electronAPI?.getPermissionStatus });
 
     const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
     const themeDropdownRef = useRef<HTMLDivElement>(null);
@@ -446,9 +422,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     };
 
     // Audio Settings
-    const { data: devices } = useQuery(
-        ['settings', 'devices'],
-        async () => {
+    const { data: devices } = useQuery({ queryKey: ['settings', 'devices'], queryFn: async () => {
             const [inputs, outputs] = await Promise.all([
                 // @ts-ignore
                 window.electronAPI?.getInputDevices() || Promise.resolve([]),
@@ -467,9 +441,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                 inputs: formatDevices(inputs),
                 outputs: formatDevices(outputs),
             };
-        },
-        { enabled: isOpen && !!window.electronAPI?.getInputDevices }
-    );
+        }, enabled: isOpen && !!window.electronAPI?.getInputDevices });
     const inputDevices = devices?.inputs ?? [];
     const outputDevices = devices?.outputs ?? [];
     const [preferredInputId, setPreferredInputId] = useLocalStorageValue('preferredInputDeviceId');
@@ -487,11 +459,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
     // STT Provider settings
     const [sttProvider, setSttProvider] = useState<'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'>('google');
-    const { data: speechCredentials, error: speechCredentialsError } = useQuery(
-        ['speech-credentials'],
-        () => window.electronAPI.getStoredCredentials(),
-        { enabled: isOpen && !!window.electronAPI?.getStoredCredentials }
-    );
+    const { data: speechCredentials, error: speechCredentialsError } = useQuery({ queryKey: ['speech-credentials'], queryFn: () => window.electronAPI.getStoredCredentials(), enabled: isOpen && !!window.electronAPI?.getStoredCredentials });
     const configuredSpeechServices = speechServices.filter(service => speechCredentials && service.configured(speechCredentials));
     const speechServiceConfigured = configuredSpeechServices.some(service => service.id === sttProvider);
     const selectedSpeechService = speechServices.find(service => service.id === sttProvider);

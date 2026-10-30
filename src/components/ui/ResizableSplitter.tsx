@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from 'react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMainEvent } from '../../hooks/useMainEvent';
 
 interface ResizableSplitterProps {
@@ -25,10 +25,7 @@ const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
   const priorPassthroughRef = useRef<boolean>(false);
   const queryClient = useQueryClient();
 
-  const { data: passthrough = false } = useQuery<boolean>(
-    ['overlay-mouse-passthrough'],
-    () => window.electronAPI?.getOverlayMousePassthrough?.() ?? Promise.resolve(false)
-  );
+  const { data: passthrough = false } = useQuery<boolean>({ queryKey: ['overlay-mouse-passthrough'], queryFn: () => window.electronAPI?.getOverlayMousePassthrough?.() ?? Promise.resolve(false) });
 
   useMainEvent(
     window.electronAPI?.onOverlayMousePassthroughChanged,

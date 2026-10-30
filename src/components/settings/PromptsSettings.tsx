@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { PromptPart, TaskName } from '../../../electron/llm/prompts';
 
 const TASK_LABELS: Array<[TaskName, string]> = [
@@ -26,34 +26,29 @@ type SaveRequest = { key: 'role' | TaskName; text: string | null };
  */
 const PromptsSettings: React.FC = () => {
     const queryClient = useQueryClient();
-    const { data, error } = useQuery(['prompts'], () => window.electronAPI.getPrompts());
+    const { data, error } = useQuery({ queryKey: ['prompts'], queryFn: () => window.electronAPI.getPrompts() });
     const [expanded, setExpanded] = useState(false);
     const [openTask, setOpenTask] = useState<TaskName | null>(null);
     const [drafts, setDrafts] = useState<Partial<Record<string, string>>>({});
     const [activeKey, setActiveKey] = useState<string | null>(null);
     const [failedKey, setFailedKey] = useState<string | null>(null);
 
-    const save = useMutation(
-        async ({ key, text }: SaveRequest) => {
+    const save = useMutation({ mutationFn: async ({ key, text }: SaveRequest) => {
             const result = await window.electronAPI.setPrompts(key === 'role' ? { role: text } : { tasks: { [key]: text } });
             if (!result.success) throw new Error(result.error || 'Could not save');
-        },
-        {
-            onSuccess: async (_, { key }) => {
+        }, onSuccess: async (_, { key }) => {
                 setActiveKey(null);
                 setDrafts((current) => {
                     const next = { ...current };
                     delete next[key];
                     return next;
                 });
-                await queryClient.invalidateQueries(['prompts']);
+                await queryClient.invalidateQueries({ queryKey: ['prompts'] });
             },
             onError: (_, { key }) => {
                 setActiveKey(null);
                 setFailedKey(key);
-            },
-        }
-    );
+            } });
 
     // Save is explicit, one prompt at a time; `null` is Reset, which goes back to the built-in text.
     const request = (key: 'role' | TaskName, text: string | null) => {

@@ -15,12 +15,12 @@ The scripts without `:raw` run `verify` (lint plus test) first.
 
 ## Node version
 
-Node 22.12 or newer; Electron is 44.9.3; CI runs the oldest (22) and the newest (26), and `.node-version` is 26. `pnpm install` was verified on Node 26.10 and 22.22 (macOS arm64 only).
+Node 22.19 or newer; Electron is 45.1.0; CI runs the oldest (22) and the newest (26), and `.node-version` is 26. `pnpm install` was verified on Node 26.10 and 22.22 (macOS arm64 only).
 
-The system Node is not the app's Node: the app runs on the Node inside Electron (Electron 44 embeds Node 24.22, ABI 149, N-API 10). The system Node runs the toolchain (pnpm, vite, tsc, tap). Electron 42 and newer download their binary the first time `electron` runs, not at install: the first `pnpm start` fetches about 300M.
+The system Node is not the app's Node: the app runs on the Node inside Electron (Electron 45.1.0 embeds Node 24.22.1, ABI 150, N-API 10). The system Node runs the toolchain (pnpm, vite, tsc, tap). Electron 42 and newer download their binary the first time `electron` runs, not at install: the first `pnpm start` fetches about 300M.
 
 What made Node 26 work, and what to keep in mind:
-- `better-sqlite3` is pinned to 13.0.3. Its N-API 10 binary ships in the package and loads in Electron 44 without a rebuild, so `postinstall` has no `electron-rebuild` step. Version 12.11.1 does not compile against Electron 45 (V8 API change); 13 needs Electron 40 or newer.
+- `better-sqlite3` is pinned to 13.0.3. Its N-API 10 binary ships in the package and loads in Electron 45 without a rebuild, so `postinstall` has no `electron-rebuild` step. Version 12.11.1 does not compile against Electron 45 (V8 API change); 13 needs Electron 40 or newer.
 - `pnpm-workspace.yaml` carries `nodeLinker: hoisted` and the overrides; pnpm 11 ignores `.npmrc`'s `node-linker` and the `pnpm` field of `package.json`. With the default isolated linker the packaged app lacked sharp's platform package and `onnxruntime-node`.
 - `keytar`, `sqlite3`, `tesseract.js`, `@electron/rebuild`, `electron-is-dev` and `@types/electron` were removed: nothing imports them, and `sqlite3` was the package that pulled in `node-gyp@8.4.1`, which needs Python's `distutils` (gone in Python 3.12 and newer).
 - Not verified: Windows, Linux, a signed and notarized build.
@@ -30,8 +30,8 @@ What made Node 26 work, and what to keep in mind:
 pnpm 11 checks that `node_modules` matches the lockfile before running any `pnpm run` or `pnpm exec` script, and if it does not (here `node_modules/.modules.yaml` is missing) it runs a full `pnpm install` first, including every dependency's install scripts. That is why `pnpm run dev` printed only "Lockfile is up to date, resolution step is skipped" and then compiled `better-sqlite3` instead of starting Vite. An agent must not trigger that unasked: it rewrites `node_modules` and rebuilds native modules (it happened on 2026-10-26 while diagnosing, see `PROGRESS.md`). Run the tools through the local binaries instead:
 
 ```sh
-node node_modules/typescript/bin/tsc --noEmit
-node node_modules/typescript/bin/tsc -p electron/tsconfig.json --noEmit
+./node_modules/.bin/tsc --noEmit
+./node_modules/.bin/tsc -p electron/tsconfig.json --noEmit
 node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.ts"
 ```
 
@@ -40,29 +40,30 @@ node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.t
 ## Credential storage and downgrades
 
 Pika migrates `credentials.json` to OS-encrypted `credentials.enc` only after a verified round trip. An older Pika cannot read `credentials.enc`: downgrading after migration makes saved credentials and the settings in that file unavailable to the old version. Keep the encrypted file and use the newer version to regain access; do not delete it to fix a locked-store notice. When OS secure storage is unavailable, plaintext remains and Provider setup shows a notice. Tests substitute `safeStorage` and synthetic temporary stores; never exercise the real keychain in tests.
+The donation record is a separate file (`electron-store`). The installed store 12 / `conf` 16 reads and writes what store 8.2 / `conf` 10.2 wrote, so no migration exists; the reverse is not true — a file written by the new version is encrypted with a derivation the old `conf` cannot read, and an older Pika shows the record as missing. Downgrading therefore loses that one record, not credentials or settings.
 
 ## Checks
 
 | Check | Command | Notes |
 | --- | --- | --- |
 | Typecheck | `pnpm run typecheck` (renderer, then Electron) | both exit 0 |
-| Lint | `pnpm run lint` | ESLint 9 with the plugin's recommended TypeScript set; 1265 existing findings are warnings and the script caps them with `--max-warnings 1265`, so the number may go down and never up. Lower the cap in `package.json` when you fix some. Every other recommended rule is an error |
-| Unit and integration tests | `pnpm run test` (tap over `test/**/*.test.ts`) | 755 passed on 2026-10-26 |
+| Lint | `pnpm run lint` | oxlint (`.oxlintrc.json`) with the TypeScript, unicorn, oxc and React plugins. It needs no TypeScript compiler API, so TypeScript 7 is supported. The 814 existing findings are warnings and the script caps them with `--max-warnings 814`, so the number may go down and never up; lower the cap in `package.json` when you fix some |
+| Unit and integration tests | `pnpm run test` (tap over `test/**/*.test.ts`) | tap needs `--node-arg=--import=tsx` and `--node-arg=--disable-warning=DEP0205` on the current toolchain (`.taprc` disables the `@tapjs/typescript` plugin so TypeScript 7 works); 5252 assertions passed in 92 files on 2026-10-30 |
 | Everything | `pnpm run verify` | typecheck, lint, test; the build scripts without `:raw` run it first |
 | Build smoke | `pnpm run build:web:raw` and `build:electron:raw` | what `build-smoke.yml` runs |
 
 CI runs two workflows on pull requests: `verify.yml` (typecheck, lint, tests) and `build-smoke.yml` (the two builds). Neither was exercised on GitHub from this checkout: the files are checked in, and a first run will show whether the macOS runner can run the tests.
 
-Under an agent's shell, run the tools without pnpm when `node_modules` may be out of step (see "pnpm caveat"): `node node_modules/typescript/bin/tsc --noEmit`, `node node_modules/eslint/bin/eslint.js src electron test --no-inline-config --max-warnings 1265`, `node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.ts"`.
+Under an agent's shell, run the tools without pnpm when `node_modules` may be out of step (see "pnpm caveat"): `./node_modules/.bin/tsc --noEmit`, `./node_modules/.bin/oxlint src electron test --max-warnings 814`, `node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.ts"`.
 
 ### Mutation check
 
-A passing test run does not show that the tests would catch a wrong change. When a change adds or changes tests for production logic (`electron/`, `src/lib/`; not copy, styling, pure moves or docs), run a mutation pass over the production files it changed and read the survivors. It is a review aid on the changed functions, not a CI gate and not a repository-wide score.
+Mutation testing is optional, reserved for a specific unresolved risk in important business logic. It is not a default development step or a delivery requirement (owner decision, 2026-10-30). Prefer a small regression test for the actual bug and checks at real integration boundaries.
 
 - Tool: [unclebob/mutator](https://github.com/unclebob/mutator) (BSD-0, Python, tree-sitter only). It lives outside the repository and is not a dependency in `package.json`. Run it from a scratch worktree (`git worktree add --detach ../pika-wt/<name> main`, `node_modules` symlinked), never from the main checkout: it writes `.metrics/` and `target/`.
 - Command: `mutator --no-coverage --max-workers 4 --test-command "node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx --node-arg=--disable-warning=DEP0205 --disable-coverage test/unit/<the test>.test.ts" electron/<changed file>.ts`. `--no-coverage` is needed because tap with tsx writes no usable line coverage. A file of about 130 sites takes about two minutes.
 - Read only the functions the change touches. Functions that the single test file does not exercise report 0% and mean nothing.
-- A survivor is either a missing assertion (add it) or an equivalent mutant (it changes only a log line or reaches an unreachable branch; say so in the report). Never weaken a test to make a mutant die.
+- A surviving mutant does not automatically require another assertion. Add a test only when the behaviour matters to the product and existing coverage does not protect it; stop once the identified risk is resolved.
 
 ## UI changes
 
@@ -74,7 +75,7 @@ A passing test run does not show that the tests would catch a wrong change. When
 
 1. Re-read your diff: no unrelated edits, debug output, screenshots or scratch files.
 2. Run the checks above and read each exit code. Report which ran and which did not.
-3. If the change adds or changes tests for production logic, run the mutation check on the changed files and report the survivors ("Mutation check" above).
+3. Keep verification proportional to the business risk. Do not expand tests or add defensive code solely for coverage or mutation scores.
 4. Update `TASKS.md` (the step leaves the queue, the next is named) and `PROGRESS.md`. Do not touch `CHANGELOG.md`.
 5. Commit on a branch (`type(scope): summary`; no issue number in the title; `Fixes #N` in the body). End the message with the attribution lines the session requires.
 6. Push and open a PR only when the owner asks. The PR template needs a type and a manual-test line naming the OS.

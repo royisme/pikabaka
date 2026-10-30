@@ -1,9 +1,9 @@
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { QueryClient, QueryObserver, MutationObserver } from 'react-query';
-import type { UseMutationOptions } from 'react-query';
-import * as ReactQuery from 'react-query';
+import { QueryClient, QueryObserver, MutationObserver } from '@tanstack/react-query';
+import type { UseMutationOptions } from '@tanstack/react-query';
+import * as ReactQuery from '@tanstack/react-query';
 import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 
 type Element = React.ReactElement<Record<string, unknown> & { children?: React.ReactNode }>;
@@ -13,7 +13,7 @@ type Element = React.ReactElement<Record<string, unknown> & { children?: React.R
  * (`window.electronAPI`) and React's local state are substituted, as in speechSettingsHost.
  */
 export function settingsModuleHost(file: string, electronAPI: object, seed: Array<[unknown[], unknown]> = []) {
-    const client = new QueryClient({ defaultOptions: { queries: { cacheTime: Infinity, staleTime: Infinity, retry: false } } });
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity, staleTime: Infinity, retry: false } } });
     for (const [queryKey, data] of seed) client.setQueryData(queryKey, data);
     const noop = () => {};
     const state: unknown[] = [];
@@ -29,10 +29,10 @@ export function settingsModuleHost(file: string, electronAPI: object, seed: Arra
             if (!(index in state)) state[index] = initial;
             return [state[index], (next: unknown) => { state[index] = typeof next === 'function' ? next(state[index]) : next; }];
         } },
-        'react-query': {
+        '@tanstack/react-query': {
             ...ReactQuery,
             useQueryClient: () => client,
-            useQuery: (queryKey: unknown[], queryFn: () => Promise<unknown>, options: Record<string, unknown> = {}) => {
+            useQuery: ({ queryKey, queryFn, ...options }: { queryKey: readonly unknown[]; queryFn?: () => Promise<unknown> } & Record<string, unknown>) => {
                 const index = queryIndex++;
                 if (!queries[index]) {
                     queries[index] = new QueryObserver(client, { queryKey, queryFn, ...options });
@@ -40,7 +40,7 @@ export function settingsModuleHost(file: string, electronAPI: object, seed: Arra
                 } else queries[index].setOptions({ queryKey, queryFn, ...options });
                 return queries[index].getCurrentResult();
             },
-            useMutation: (mutationFn: (value: unknown) => Promise<unknown>, options: UseMutationOptions<unknown, Error, unknown> = {}) => {
+            useMutation: ({ mutationFn, ...options }: { mutationFn: (value: unknown) => Promise<unknown> } & UseMutationOptions<unknown, Error, unknown>) => {
                 const index = mutationIndex++;
                 if (!mutations[index]) {
                     mutations[index] = new MutationObserver(client, { ...options, mutationFn });

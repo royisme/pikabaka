@@ -1,12 +1,9 @@
 import t from 'tap';
 import { isDeepStrictEqual } from 'node:util';
-import * as ReactQuery from 'react-query';
+import * as ReactQuery from '@tanstack/react-query';
 import { gateHost, gateSettings } from '../helpers/gateSettingsHost';
 
 type Payload = Parameters<Window['electronAPI']['agentGateSetSettings']>[0];
-const noop = () => {};
-ReactQuery.setLogger({ log: noop, warn: noop, error: noop });
-t.teardown(() => ReactQuery.setLogger(console));
 
 t.test('Proactive help has a plain setup link, keeps its Test, and saves exactly its behaviour fields', async t => {
     const writes: Payload[] = [];
