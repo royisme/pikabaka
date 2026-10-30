@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: one generation guard for every answer path (uncommitted)
+
+- `electron/core/IntelligenceEngine.ts`: the nine `run*` paths no longer hand-write `++this.currentGenerationId` and its comparisons. One private `beginRun()` claims the id and returns an `isCurrent()` closure; every post-await check, stream-loop check and `catch` calls it. `cancelGeneration` and `reset` are unchanged and no `run*` increments the id itself. Behaviour is the same events, returns and mode changes.
+- Proof: `answer-generation-race`, `chat-generation-race`, `meeting-end-cancels-answers` and `meeting-state-reset` pass unchanged; the full tap run is 5252 of 5252 in 92 files. No test was added because every path already has coverage.
+- Checks: root `tsc --noEmit` 0, electron `tsc --noEmit` 0, `oxlint src electron test --max-warnings 814` 0 (814 warnings, 0 errors), tap build 0, full tap 0. Not verified: the running app and any real provider; no owner-manual check is needed for this internal refactor beyond the existing meeting cancellation acceptance.
+
 ## 2026-10-30: the suggestion card keeps its dismiss button in reach
 
 - `src/components/agent/ProactiveCard.tsx`: the card is a flex column capped at 40% of its column, with its own scroll area around the text and Ask more. The kind label and the dismiss button sit in a header above that scroll area, so scrolling a long suggestion no longer moves the button off screen, and the button is 28px square (the overlay floor) instead of 24px. Layout and geometry only: no state, props, dependency, animation or copy change. This is what the owner reported after clicking `Dismiss` was hard to hit on a long card.
