@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type SetStateAction } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { isTranscriptArrival, type TranscriptDisplayMode, type TranscriptSegment } from '../lib/transcriptSegments';
-import { initialMeetingTranscriptState, meetingTranscriptReducer, type TranscriptSettingsPatch } from './meetingTranscriptReducer';
+import { initialMeetingTranscriptState, livePartialOf, meetingTranscriptReducer, type TranscriptSettingsPatch } from './meetingTranscriptReducer';
 import { useLocalStorageValue } from './useLocalStorageValue';
 import { useMainEvent } from './useMainEvent';
 
@@ -116,32 +116,32 @@ export function useMeetingTranscript() {
 
   useMainEvent(window.electronAPI?.onNativeAudioTranscript, (transcript) => {
     if (transcript.speaker === 'user') {
-      if (transcript.final) {
-        const normalizedSegmentId =
-          transcript.segmentId ||
-          `user_${transcript.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-        dispatch({
-          type: 'segmentUpserted',
-          now: Date.now(),
-          event: {
-            final: true,
-            text: transcript.text,
-            sourceText: transcript.sourceText,
-            translatedText: transcript.translatedText,
-            segmentId: normalizedSegmentId,
-            speaker: 'user',
-            speakerLabel: 'Me',
-            timestamp: transcript.timestamp,
-            translationState: transcript.translationState,
-            translationError: transcript.translationError,
-            detectedLanguage: transcript.detectedLanguage,
-            revision: transcript.revision,
-          },
-        });
-
-        // Own speech is never translated, so its `skipped` says nothing about whether translation is on.
+      if (!transcript.final) {
+        dispatch({ type: 'mePartial', text: transcript.text });
+        return;
       }
+      const normalizedSegmentId =
+        transcript.segmentId ||
+        `user_${transcript.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+      dispatch({
+        type: 'meArrival',
+        now: Date.now(),
+        event: {
+          final: true,
+          text: transcript.text,
+          sourceText: transcript.sourceText,
+          translatedText: transcript.translatedText,
+          segmentId: normalizedSegmentId,
+          speaker: 'user',
+          speakerLabel: 'Me',
+          timestamp: transcript.timestamp,
+          translationState: transcript.translationState,
+          translationError: transcript.translationError,
+          detectedLanguage: transcript.detectedLanguage,
+          revision: transcript.revision,
+        },
+      });
       return;
     }
 
@@ -247,6 +247,7 @@ export function useMeetingTranscript() {
     transcriptSegments,
     isThemSpeaking,
     currentThemPartial,
+    livePartial: livePartialOf(state),
     transcriptDisplayMode,
     translationEnabled,
     translationConfigured,

@@ -19,7 +19,7 @@ The overlay is read for one to three seconds mid-call. These rules come from the
 **Hierarchy**
 - The answer is the most prominent thing on the surface. The transcript supports it; chrome (buttons, chips, footer) is quieter than both. Translation never outranks the words that were said (owner, 2026-10-26, replacing the earlier exception): in a transcript row the source text comes first and is larger, and its translation sits under it, smaller, so turning translation off changes nothing about how the source is shown.
 - One primary action, labelled for what it does, with its shortcut shown. Secondary actions are visibly secondary and collapse at narrow widths.
-- The live line (the current partial transcript) is never dimmer than finished lines.
+- The live line (the current partial transcript) is never dimmer than finished lines. There is one live line and it belongs to whoever spoke last, labelled Me or Them; the user's own speech shows live like the other party's.
 - Do not show text the user did not write as if they had. System prompts and quick-action text are not chat bubbles.
 
 **Scrolling and streaming**

@@ -16,6 +16,9 @@ export interface MeetingTranscriptState {
   transcriptSegments: TranscriptSegment[];
   isThemSpeaking: boolean;
   currentThemPartial: string;
+  /** What the user is saying now; the live line shows whoever spoke last. */
+  myPartial: string;
+  liveSpeaker: 'them' | 'user';
   transcriptDisplayMode: TranscriptDisplayMode;
   translationEnabled: boolean;
   targetLanguage: string;
@@ -28,6 +31,8 @@ export const initialMeetingTranscriptState: MeetingTranscriptState = {
   transcriptSegments: [],
   isThemSpeaking: false,
   currentThemPartial: '',
+  myPartial: '',
+  liveSpeaker: 'them',
   transcriptDisplayMode: 'original',
   translationEnabled: false,
   targetLanguage: 'chinese',
@@ -47,11 +52,19 @@ export interface TranscriptSettingsPatch {
 export type MeetingTranscriptAction =
   | { type: 'segmentUpserted'; event: TranscriptEventForSegment; now: number }
   | { type: 'themPartial'; text: string }
+  | { type: 'mePartial'; text: string }
+  | { type: 'meArrival'; event: TranscriptEventForSegment; now: number }
   | { type: 'themArrival'; event: TranscriptEventForSegment; now: number; displayMode?: TranscriptDisplayMode }
   | { type: 'themSpeakingEnded' }
   | { type: 'settingsChanged'; patch: TranscriptSettingsPatch }
   | { type: 'sttLanguageLoaded'; speaker: 'them' | 'user'; language: string }
   | { type: 'displayModeChanged'; mode: SetStateAction<TranscriptDisplayMode> };
+
+/** The one live line: the partial of whoever spoke last, with the label the row will get. */
+export function livePartialOf(state: MeetingTranscriptState): { label: 'Me' | 'Them'; text: string } | null {
+  if (state.liveSpeaker === 'user') return state.myPartial ? { label: 'Me', text: state.myPartial } : null;
+  return state.isThemSpeaking ? { label: 'Them', text: state.currentThemPartial } : null;
+}
 
 function resolve<T>(current: T, next: SetStateAction<T>): T {
   return typeof next === 'function' ? (next as (previous: T) => T)(current) : next;
@@ -65,7 +78,17 @@ export function meetingTranscriptReducer(
     case 'segmentUpserted':
       return { ...state, transcriptSegments: upsertTranscriptSegment(state.transcriptSegments, action.event, action.now) };
     case 'themPartial':
-      return { ...state, isThemSpeaking: true, currentThemPartial: action.text };
+      return { ...state, isThemSpeaking: true, currentThemPartial: action.text, liveSpeaker: 'them' };
+    case 'mePartial':
+      return { ...state, myPartial: action.text, liveSpeaker: 'user' };
+    case 'meArrival':
+      // Own speech is never translated, so its `skipped` says nothing about whether translation is on.
+      return {
+        ...state,
+        transcriptSegments: upsertTranscriptSegment(state.transcriptSegments, action.event, action.now),
+        myPartial: '',
+        liveSpeaker: 'them',
+      };
     case 'themArrival':
       return {
         ...state,

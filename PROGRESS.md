@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: the user's own speech shows on the live line (uncommitted)
+
+- Evidence: `useMeetingTranscript` dispatched a partial only for `them`; the `user` branch returned on every non-final event, so "Me" appeared as a row only after its final. The speech service's partial text was in the main process and the overlay dropped it.
+- `src/hooks/meetingTranscriptReducer.ts`: `mePartial` and `meArrival` actions, `myPartial` and `liveSpeaker` in the state, and `livePartialOf`, which returns the one live line (the label and text of whoever spoke last). A final row from the user clears the user's live line and gives the line back to the other party.
+- `useMeetingTranscript`, `TranscriptPanel`, `TranscriptColumn`, `PikaInterface`: the two props `isThemSpeaking` and `currentThemPartial` become one `livePartial`; `RollingTranscript` already had `partialSpeakerLabel`. The reply context still reads the other party's partial only.
+- `docs/conventions.md`, "Overlay UI": one live line, whoever spoke last.
+- Checks: root `tsc --noEmit` 0, electron `tsc --noEmit` 0, `oxlint` 0, smell-ratchet 0, tap build 0, full tap 5310 of 5310. Not verified: the running app. Owner: speak a sentence with a provider that sends partials and look for the grey "Me" line while talking; then let the other party speak.
+
 ## 2026-10-30: startup no longer flips the embedding provider and no longer shows "Provider Changed" (uncommitted)
 
 - `electron/helpers/ProcessingHelper.ts`: `loadStoredCredentials` re-initialized the embeddings with only the OpenAI and Gemini keys, which dropped the connection chosen in Settings. The pipeline treated "selected connection removed" as a config change, fell back to Gemini and saved it as `last_embedding_provider`; a later full init switched back. The Gemini step was compared with the saved name and fired the "Provider Changed" warning on every start. It now passes `buildEmbeddingConfig(credManager)`, the same config the RAG manager was built with, so the call is skipped.
