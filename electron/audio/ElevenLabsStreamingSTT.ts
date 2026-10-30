@@ -179,7 +179,6 @@ export class ElevenLabsStreamingSTT extends EventEmitter {
         this.isConnecting = true;
         this.isSessionReady = false;
         
-        console.log(`[ElevenLabsStreaming] Connecting... key=${this.apiKey?.slice(0, 8)}...`);
 
         // raw WebSocket URL with parameters
         let url = `${ELEVENLABS_WS_URL}?model_id=${encodeURIComponent(this.model)}&include_timestamps=true&sample_rate=${this.targetSampleRate}` +
