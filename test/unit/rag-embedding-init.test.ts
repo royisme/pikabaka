@@ -43,3 +43,26 @@ t.test('a rejected constructor embedding init is handled and a later init still 
     t.equal(manager.getEmbeddingPipeline().getStatus().providerName, 'invented-embedding');
     t.same(unhandled, [], 'the later init is not rejected unhandled');
 });
+
+t.test('a second init with the same config keeps the provider and never rewrites the saved one', async t => {
+    const db = new Database(':memory:');
+    db.exec('CREATE TABLE app_state (key TEXT PRIMARY KEY, value TEXT)');
+    t.teardown(() => db.close());
+    let resolutions = 0;
+    const { EmbeddingPipeline } = mockRequire(file('rag/EmbeddingPipeline'), {
+        [file('rag/providers/LocalEmbeddingProvider')]: { LocalEmbeddingProvider: class { dimensions = 768; async isAvailable() { return false; } } },
+        [file('rag/EmbeddingProviderResolver')]: { EmbeddingProviderResolver: { resolve: async () => {
+            resolutions += 1;
+            return { name: 'invented-conn:invented-model', dimensions: 768, embed: async () => [1, 2, 3] };
+        } } },
+        electron: { BrowserWindow: { getAllWindows: () => [] } },
+    }) as { EmbeddingPipeline: typeof import('../../electron/rag/EmbeddingPipeline').EmbeddingPipeline };
+    const pipeline = new EmbeddingPipeline(db, { getIncompatibleMeetingsCount: () => 0 } as never);
+    const selected = { connection: { id: 'invented-conn' } as never, model: 'invented-model' };
+    await pipeline.initialize({ geminiKey: 'invented-key', selected });
+    await pipeline.initialize({ geminiKey: 'invented-key', selected });
+    t.equal(resolutions, 1, 'the same config is not resolved twice');
+    t.equal(pipeline.getStatus().providerName, 'invented-conn:invented-model');
+    const saved = db.prepare("SELECT value FROM app_state WHERE key = 'last_embedding_provider'").get() as { value: string };
+    t.equal(saved.value, 'invented-conn:invented-model');
+});
