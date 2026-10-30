@@ -87,7 +87,7 @@ Applies to TypeScript in `src`, `electron` and `test`. Where existing code diffe
 - The `any`, suppression and 800-line counts are ratcheted by `scripts/smell-ratchet.js` (`pnpm run lint`): a change lowers `scripts/smell-ledger.json` or leaves it unchanged.
 - Rely on type inference; annotate exports and unclear spots.
 - Prefer `const`, early returns and `map`/`filter`/`flatMap` over reassignment, `else` and manual loops.
-- New files stay under about 500 lines. This is a guideline, not enforced; `SettingsOverlay.tsx`, `LLMHelper.ts` and a few others already exceed it and are not split as a side effect of another change.
+- New files stay under about 500 lines. This is a guideline, not enforced; `LLMHelper.ts` and a few others already exceed it and are not split as a side effect of another change.
 - Name a file for what it holds; avoid `utils`, `helpers`, `common`, `misc`.
 
 ## React effects
