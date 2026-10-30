@@ -40,6 +40,9 @@ export class GeminiLiveSTT extends EventEmitter {
     private accLen = 0;
     /** When the last audio reached the server; silence chunks are stretched to the time that really passed. */
     private lastSentAt = 0;
+    /** Speech was sent since the turn was last closed, and when its last piece was. */
+    private speechPending = false;
+    private lastSpeechAt = 0;
 
     constructor(apiKey: string) {
         super();
@@ -93,6 +96,7 @@ export class GeminiLiveSTT extends EventEmitter {
         this.pending = [];
         this.acc = [];
         this.accLen = 0;
+        this.speechPending = false;
         console.log('[GeminiLive] Stopped');
     }
 
@@ -116,9 +120,14 @@ export class GeminiLiveSTT extends EventEmitter {
         const now = Date.now();
         const out = silent && this.lastSentAt ? this.silenceFor(Math.min(now - this.lastSentAt, MAX_FILL_MS)) : this.toTargetRate(samples);
         this.lastSentAt = now;
+        if (!silent) { this.speechPending = true; this.lastSpeechAt = now; }
         this.acc.push(out);
         this.accLen += out.length;
-        if (this.accLen < SEND_SAMPLES) return;
+        if (this.accLen >= SEND_SAMPLES) this.flush();
+    }
+
+    private flush(): void {
+        if (this.accLen === 0) return;
         const all = new Int16Array(this.accLen);
         let offset = 0;
         for (const part of this.acc) { all.set(part, offset); offset += part.length; }
@@ -130,6 +139,21 @@ export class GeminiLiveSTT extends EventEmitter {
             });
         } catch (error) {
             console.warn('[GeminiLive] write failed:', (error as Error).message);
+        }
+    }
+
+    /**
+     * The microphone gate heard the speech stop. Telling the server so closes the turn at once; waiting for its own
+     * silence detection took between 1.3 and 5 s in the probes, this took about 0.4 s. The session stays open.
+     */
+    public notifySpeechEnded(): void {
+        if (!this.session || !this.speechPending) return;
+        this.speechPending = false;
+        this.flush();
+        try {
+            this.session.sendRealtimeInput({ audioStreamEnd: true });
+        } catch (error) {
+            console.warn('[GeminiLive] audioStreamEnd failed:', (error as Error).message);
         }
     }
 
@@ -216,6 +240,7 @@ export class GeminiLiveSTT extends EventEmitter {
         }
         const final = content.inputTranscription?.text;
         if (final?.trim()) {
+            if (this.lastSpeechAt) console.log(`[GeminiLive] final line ${Date.now() - this.lastSpeechAt} ms after the last speech audio (${final.length} chars)`);
             this.emit('transcript', { text: final, isFinal: true, confidence: 1.0, boundary: true });
         }
     }

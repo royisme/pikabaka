@@ -3,7 +3,7 @@ import path from 'node:path';
 import { mockRequire } from '../../node_modules/@tapjs/mock/dist/esm/mock-require.js';
 
 interface Callbacks { onmessage(message: unknown): void }
-type Adapter = { setSampleRate(rate: number): void; setRecognitionLanguage(key: string): void; start(): void; write(chunk: Buffer): void; stop(): void; on(event: string, fn: (value: never) => void): void };
+type Adapter = { notifySpeechEnded(): void; setSampleRate(rate: number): void; setRecognitionLanguage(key: string): void; start(): void; write(chunk: Buffer): void; stop(): void; on(event: string, fn: (value: never) => void): void };
 
 function load() {
     const connects: Array<{ model: string; config: { inputAudioTranscription: { languageCodes: string[] } }; callbacks: Callbacks }> = [];
@@ -52,4 +52,21 @@ t.test('48 kHz audio is sent as 16 kHz in 100 ms pieces and the language is a hi
 
 t.test('the Gemini model list is its one live transcription model, without asking another service', async t => {
     t.same(await fetchSttModels('gemini', 'invented-key'), [{ id: 'gemini-3.5-transcribe-live', label: 'gemini-3.5-transcribe-live' }]);
+});
+
+t.test('the end of speech closes the turn once, and only when speech was sent', async t => {
+    const { stt, sent } = load();
+    const streamEnds = () => (sent as unknown as Array<{ audioStreamEnd?: boolean }>).filter(input => input.audioStreamEnd).length;
+    stt.start();
+    await ready();
+    stt.notifySpeechEnded();
+    t.equal(streamEnds(), 0, 'nothing was said yet');
+    const tone = Buffer.alloc(320 * 2);
+    for (let i = 0; i < 320; i++) tone.writeInt16LE(Math.round(Math.sin(i / 8) * 8000), i * 2);
+    stt.write(tone);
+    stt.notifySpeechEnded();
+    stt.notifySpeechEnded();
+    t.equal(streamEnds(), 1, 'one signal per stretch of speech');
+    t.equal(sent.filter(input => (input as { audio?: unknown }).audio).length, 1, 'the unsent audio goes out first');
+    stt.stop();
 });
