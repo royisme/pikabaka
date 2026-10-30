@@ -6,6 +6,10 @@ The work queue in small steps, one at a time. GitHub issues hold the evidence an
 
 Each step is one branch (`RULES.md`: at most three hyphenated words) and one PR that says `Fixes #N` for its issue.
 
+## Step: H1 `smell-ratchet` (implemented, uncommitted)
+
+`scripts/smell-ratchet.js` counts `: any`/`as any`/`<any>`, `@ts-ignore`/`@ts-expect-error` and files over 800 lines in the tracked `.ts`/`.tsx` files under `electron/` and `src/` (`*.d.ts` excluded), lists the large files, and compares each number with `scripts/smell-ledger.json`. A number above the ledger exits 1 with the size of the rise; a lower number says the ledger can be lowered, and `--update` rewrites it. `pnpm run lint` runs it after oxlint. Acceptance: the ledger holds today's numbers (498 `any`, 7 suppressions, 8 files over 800 lines), the synthetic test proves a rise fails and a drop passes, and `docs/development.md` plus `docs/conventions.md` ("Code style") name the ratchet. Next code step: H2 `generation-guard`, from `docs/design-code-health.md`.
+
 ## Suggestion card dismissal (implemented, owner visual check pending)
 
 The header and 28px dismiss button stay outside the scrollable body. Owner: scroll a long suggestion and dismiss it, then check a short suggestion in the overlay. Implementation details are in the 2026-10-30 suggestion-card entry in `PROGRESS.md`.
