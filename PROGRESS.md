@@ -2,6 +2,13 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: the speech service is told the microphone's real sample rate (uncommitted)
+
+- `electron/audio/MicrophoneCapture.ts`: `getSampleRate` looked for `get_sample_rate`, but napi-rs exposes `getSampleRate`, so the check never passed and the method always returned 48000. A microphone that opens at another rate (a Bluetooth headset opens at 16000Hz) was sent to the speech service labelled 48000Hz: the audio plays 3x too fast for it and words are lost or garbled. It now calls `getSampleRate`. `SystemAudioCapture` has the same wrong name, but its rate is only published after a background start and nothing reads it back, so it is left alone.
+- `test/unit/microphone-sample-rate.test.ts`: the wrapper reports what the native class reports.
+- Found in the dev log: `Rate: 16000Hz` from the native side, then `MicrophoneCapture rate: 48000Hz` from the app.
+- Checks: both tsc 0, oxlint 0, tap 5302/5302. Not verified: a real call with a 16000Hz or 44100Hz microphone (owner).
+
 ## 2026-10-30: the microphone gate sends the start of each word (uncommitted)
 
 - `native-module/src/silence_suppression.rs`: the gate needed a frame or two to hear speech, so the quiet start of a word (s, f, t) was dropped; the owner saw words cut ("soft develop"). It now keeps the last 300ms of unsent microphone audio and sends it with the first speech frame (`preroll`, microphone only; system audio is unchanged). The microphone hangover goes from 150ms to 250ms. A unit test covers the pre-roll.
