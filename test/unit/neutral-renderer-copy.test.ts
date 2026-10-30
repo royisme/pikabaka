@@ -10,7 +10,7 @@ const ALLOWED: { file: string; line: RegExp; why: string }[] = [
   // The old persisted localStorage keys: only their legacy entries may name them.
   { file: 'src/lib/legacyLocalStorage.ts', line: /interviewer_transcript/, why: 'legacy localStorage keys' },
   // An AbortController method, not the removed feature.
-  { file: 'src/components/SettingsOverlay.tsx', line: /ctx\.resume\(\)/, why: 'AbortController.resume()' },
+  { file: 'src/components/settings/AudioSettings.tsx', line: /ctx\.resume\(\)/, why: 'AbortController.resume()' },
   // The scroll-follow comment: text scrolling again, not the removed resume.
   { file: 'src/components/ui/RollingTranscript.tsx', line: /resumes following/, why: 'scroll-follow comment' },
 ];

@@ -1,15 +1,11 @@
 {
   "any": 470,
   "tsSuppress": 7,
-  "filesOver800Lines": 8,
+  "filesOver800Lines": 7,
   "largeFiles": [
     {
       "file": "electron/main.ts",
       "lines": 1424
-    },
-    {
-      "file": "src/components/SettingsOverlay.tsx",
-      "lines": 1324
     },
     {
       "file": "electron/preload.ts",
