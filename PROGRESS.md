@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: ElevenLabs lines become final, and its debug audio file and raw log are gone (uncommitted)
+
+- `electron/audio/ElevenLabsStreamingSTT.ts`: the connection did not ask for a commit strategy, the server answered `vad_commit_strategy: false` (manual commit) and nothing here sends a commit, so a whole meeting produced only partial text and no final line (stats: Me 0 final lines). The URL now has `commit_strategy=vad&vad_silence_threshold_secs=0.8`.
+- Removed the development-only `~/elevenlabs_debug.raw` stream (raw meeting audio, one file shared by both streams) and the log of the first ten raw server messages (they carried transcript text).
+- `electron/utils/sttModels.ts`: `GET /v1/models` lists text-to-speech models, so the filtered list was empty; the model list for ElevenLabs is now the one realtime model id, without a request.
+- `test/unit/elevenlabs-stt.test.ts`: the model list and the commit parameters in the URL.
+- Checks: both tsc 0, oxlint 0, ratchet 0, tap 5305/5305. Not verified: a real ElevenLabs call (owner): final lines should appear about 0.8 s after a pause.
+
 ## 2026-10-30: the speech service is told the microphone's real sample rate (uncommitted)
 
 - `electron/audio/MicrophoneCapture.ts`: `getSampleRate` looked for `get_sample_rate`, but napi-rs exposes `getSampleRate`, so the check never passed and the method always returned 48000. A microphone that opens at another rate (a Bluetooth headset opens at 16000Hz) was sent to the speech service labelled 48000Hz: the audio plays 3x too fast for it and words are lost or garbled. It now calls `getSampleRate`. `SystemAudioCapture` has the same wrong name, but its rate is only published after a background start and nothing reads it back, so it is left alone.
