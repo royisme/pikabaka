@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 type Credentials = Awaited<ReturnType<typeof window.electronAPI.getStoredCredentials>>;
-// Gemini Live uses the Gemini key saved under AI providers, so it has no entry here.
-type Service = Exclude<Credentials['sttProvider'], 'gemini'>;
+type Service = Credentials['sttProvider'];
 export const speechServices: Array<{ id: Service; name: string; configured: (credentials: Credentials) => boolean }> = [
     { id: 'google', name: 'Google Cloud', configured: c => !!c.googleServiceAccountPath },
     { id: 'groq', name: 'Groq Whisper', configured: c => c.hasSttGroqKey },
@@ -13,12 +12,14 @@ export const speechServices: Array<{ id: Service; name: string; configured: (cre
     { id: 'azure', name: 'Azure Speech', configured: c => c.hasAzureKey },
     { id: 'ibmwatson', name: 'IBM Watson', configured: c => c.hasIbmWatsonKey },
     { id: 'soniox', name: 'Soniox', configured: c => !!c.hasSonioxKey },
+    { id: 'gemini', name: 'Gemini Live', configured: c => !!c.hasGeminiKey },
 ];
 
 const keyUrls: Partial<Record<Service, string>> = {
     groq: 'https://console.groq.com/keys', openai: 'https://platform.openai.com/api-keys',
     deepgram: 'https://console.deepgram.com', elevenlabs: 'https://elevenlabs.io/app/settings/api-keys',
     azure: 'https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeech', ibmwatson: 'https://cloud.ibm.com/catalog/services/speech-to-text',
+    gemini: 'https://aistudio.google.com/apikey',
 };
 const field = 'w-full min-w-0 h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary';
 const smallButton = 'min-h-9 px-3 py-2 rounded-lg text-xs font-medium border border-border-subtle bg-bg-component text-text-secondary hover:text-text-primary disabled:opacity-50';
@@ -27,7 +28,7 @@ function setSpeechKey(provider: Exclude<Service, 'google'>, key: string) {
     const api = window.electronAPI;
     const setters = {
         groq: api.setGroqSttApiKey, openai: api.setOpenAiSttApiKey, deepgram: api.setDeepgramApiKey,
-        elevenlabs: api.setElevenLabsApiKey, azure: api.setAzureApiKey, ibmwatson: api.setIbmWatsonApiKey, soniox: api.setSonioxApiKey,
+        elevenlabs: api.setElevenLabsApiKey, azure: api.setAzureApiKey, ibmwatson: api.setIbmWatsonApiKey, soniox: api.setSonioxApiKey, gemini: api.setGeminiApiKey,
     };
     return setters[provider](key);
 }
@@ -114,6 +115,7 @@ const SpeechProvidersSettings = () => {
                     {results[service.id] && <span className="block text-xs text-text-primary break-words [overflow-wrap:anywhere]">{results[service.id]!.success ? '●' : '✕ Test failed:'} {results[service.id]!.message}</span>}
                 </button>
                 {service.id === 'google' ? <p className="text-[11px] text-text-secondary">Account removal is not available.</p>
+                    : service.id === 'gemini' ? <p className="text-[11px] text-text-secondary">This key is shared with AI providers; remove it there.</p>
                     : confirmService === service.id ? <div className="flex flex-wrap items-center gap-2 text-xs text-text-primary min-w-0">
                         <span className="break-words [overflow-wrap:anywhere]">Remove {service.name}?</span>
                         <button type="button" disabled={busy} onClick={() => { if (service.id !== 'google') remove.mutate(service.id); }} className={smallButton}>{remove.isPending ? 'Removing…' : 'Remove'}</button>

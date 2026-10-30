@@ -406,6 +406,12 @@ export class CredentialsManager {
         console.log(`[CredentialsManager] IBM Watson Region set to: ${region}`);
     }
 
+    public setGeminiApiKey(key: string): void {
+        this.credentials.geminiApiKey = key.trim() || undefined;
+        this.saveCredentials();
+        console.log('[CredentialsManager] Gemini API Key updated');
+    }
+
     public setSonioxApiKey(key: string): void {
         this.credentials.sonioxApiKey = key;
         this.saveCredentials();
