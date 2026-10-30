@@ -15,6 +15,7 @@
 // - Speech onset: 0ms delay (immediate)
 // - Hangover: Only affects AFTER speech ends (no latency impact)
 
+use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 use webrtc_vad::{SampleRate as VadSampleRate, Vad, VadMode};
 
@@ -44,6 +45,10 @@ pub struct SilenceSuppressionConfig {
     /// Native sample rate of the audio being processed (e.g. 48000)
     /// Used to calculate decimation ratio for 16kHz VAD input.
     pub native_sample_rate: u32,
+
+    /// How much audio from just before speech is sent with the first speech frame. The gate needs a
+    /// frame or two to see speech, so without this the quiet start of a word (s, f, t) is lost.
+    pub preroll: Duration,
 }
 
 impl Default for SilenceSuppressionConfig {
@@ -56,6 +61,7 @@ impl Default for SilenceSuppressionConfig {
             adaptive_min_floor: 20.0,
             ema_alpha: 0.02,
             native_sample_rate: 48000,
+            preroll: Duration::from_millis(0),
         }
     }
 }
@@ -71,6 +77,7 @@ impl SilenceSuppressionConfig {
             adaptive_min_floor: 10.0,
             ema_alpha: 0.02,
             native_sample_rate: 48000,
+            preroll: Duration::from_millis(0),
         }
     }
 
@@ -78,12 +85,13 @@ impl SilenceSuppressionConfig {
     pub fn for_microphone() -> Self {
         Self {
             speech_threshold_rms: 100.0,
-            speech_hangover: Duration::from_millis(150),
+            speech_hangover: Duration::from_millis(250),
             silence_keepalive_interval: Duration::from_millis(100),
             adaptive_multiplier: 3.0,
             adaptive_min_floor: 20.0,
             ema_alpha: 0.02,
             native_sample_rate: 48000,
+            preroll: Duration::from_millis(300),
         }
     }
 }
@@ -108,6 +116,8 @@ pub struct SilenceSuppressor {
     decimation_factor: f64,
     /// Reusable buffer for decimated 16kHz samples (avoids allocation per frame)
     vad_buf: Vec<i16>,
+    /// The most recent audio that was not sent (config.preroll long)
+    preroll: VecDeque<i16>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -159,6 +169,7 @@ impl SilenceSuppressor {
             frames_sent: 0,
             frames_suppressed: 0,
             was_speaking: true,
+            preroll: VecDeque::new(),
         }
     }
 
@@ -185,11 +196,17 @@ impl SilenceSuppressor {
 
         // ALWAYS check for speech first - immediate response
         if has_speech {
+            let from_silence = self.state == SuppressionState::Suppressed;
             self.state = SuppressionState::Active;
             self.last_speech_time = now;
             self.frames_sent += 1;
             self.was_speaking = true;
-            return (FrameAction::Send(frame.to_vec()), false);
+            let mut out = Vec::with_capacity(self.preroll.len() + frame.len());
+            if from_silence {
+                out.extend(self.preroll.drain(..));
+            }
+            out.extend_from_slice(frame);
+            return (FrameAction::Send(out), false);
         }
 
         // No speech detected - check state
@@ -223,6 +240,15 @@ impl SilenceSuppressor {
         self.noise_floor_ema = self.noise_floor_ema * (1.0 - alpha) + rms * alpha;
         self.adaptive_threshold = (self.noise_floor_ema * self.config.adaptive_multiplier)
             .max(self.config.adaptive_min_floor);
+
+        // Keep the latest unsent audio so the start of the next word can be sent with it
+        let keep = (self.config.native_sample_rate as u64 * self.config.preroll.as_millis() as u64 / 1000) as usize;
+        if keep > 0 {
+            self.preroll.extend(frame.iter().copied());
+            while self.preroll.len() > keep {
+                self.preroll.pop_front();
+            }
+        }
 
         // Check if time for keepalive
         if now.duration_since(self.last_keepalive_time) >= self.config.silence_keepalive_interval {
@@ -363,6 +389,7 @@ mod tests {
             adaptive_min_floor: 20.0,
             ema_alpha: 0.02,
             native_sample_rate: 16000,
+            preroll: Duration::from_millis(0),
         });
 
         let silent_frame: Vec<i16> = vec![0; 320];
@@ -383,6 +410,7 @@ mod tests {
             adaptive_min_floor: 20.0,
             ema_alpha: 0.02,
             native_sample_rate: 16000,
+            preroll: Duration::from_millis(0),
         });
 
         // Send a loud speech-like frame
@@ -400,5 +428,27 @@ mod tests {
         // Another silent frame should NOT trigger speech_ended again
         let (_, ended) = suppressor.process(&silent_frame);
         assert!(!ended, "Speech_ended should only fire once per transition");
+    }
+
+    #[test]
+    fn test_preroll_is_sent_with_the_first_speech_frame() {
+        let mut suppressor = SilenceSuppressor::new(SilenceSuppressionConfig {
+            speech_hangover: Duration::from_millis(0),
+            silence_keepalive_interval: Duration::from_millis(1000),
+            native_sample_rate: 16000,
+            preroll: Duration::from_millis(40),
+            ..SilenceSuppressionConfig::default()
+        });
+        let loud: Vec<i16> = (0..320).map(|i| ((i as f32 * 0.1).sin() * 10000.0) as i16).collect();
+        let quiet: Vec<i16> = vec![0; 320];
+        suppressor.process(&loud);
+        std::thread::sleep(Duration::from_millis(5));
+        for _ in 0..4 {
+            suppressor.process(&quiet);
+        }
+        match suppressor.process(&loud).0 {
+            FrameAction::Send(data) => assert_eq!(data.len(), 320 + 640, "40ms of unsent audio goes first"),
+            _ => panic!("speech must be sent"),
+        }
     }
 }

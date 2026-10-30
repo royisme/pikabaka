@@ -1,4 +1,5 @@
-import { EchoFilter } from './echo-filter';
+import { EchoFilter, wordsOf } from './echo-filter';
+import { audioStats } from './audio-stats';
 import { BrowserWindow, systemPreferences } from "electron"
 import type { AppState } from "../main"
 import { SystemAudioCapture } from "../audio/SystemAudioCapture"
@@ -142,12 +143,10 @@ export function createSTTProvider(appState: AppState, speaker: 'them' | 'user'):
       if (speaker === 'them') {
         echoFilter.noteOther(trimmed, timestamp);
       } else if (echoFilter.isEcho(trimmed, timestamp)) {
-        state.echoLinesDropped = (state.echoLinesDropped ?? 0) + 1;
-        if (state.echoLinesDropped % 25 === 1) {
-          console.log(`[Main] Dropped ${state.echoLinesDropped} microphone lines that repeat the other party's audio (the microphone hears the speakers)`);
-        }
+        audioStats.noteEchoDropped(segment.isFinal, wordsOf(trimmed).length);
         return;
       }
+      if (segment.isFinal) audioStats.noteFinal(speaker, wordsOf(trimmed).length);
     }
 
     // Boundary-only events (empty text) must not reach intelligence handling
