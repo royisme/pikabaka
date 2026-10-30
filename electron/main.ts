@@ -101,6 +101,7 @@ import {
 } from "./helpers/stealth"
 import { initializeApp } from "./lib/lifecycle"
 import type { EchoFilter } from "./lib/echo-filter"
+import { audioStats } from "./lib/audio-stats"
 
 /** Unified type for all STT providers with optional extended capabilities */
 type ScreenshotWindowMode = 'launcher' | 'overlay';
@@ -488,7 +489,6 @@ export class AppState {
   public lastAudioPipelineError: string | null = null;
   // The microphone hears the speakers: lines that repeat the other party's stream are dropped. Created on first use.
   public echoFilter: EchoFilter | null = null;
-  public echoLinesDropped: number = 0;
   public transcriptAssemblerProfile: TranscriptAssemblerProfile = 'sentence_bias';
   public transcriptTurnBuffers: Record<TranscriptSpeaker, BufferedTranscriptTurn | null> = {
     them: null,
@@ -782,6 +782,7 @@ export class AppState {
     }
 
     this.isMeetingActive = true;
+    audioStats.reset();
     this.setMicrophoneMuted(false);
     this.resetBufferedTranscriptTurns();
     this.lastSystemAudioChunkAt = null;
@@ -865,6 +866,7 @@ export class AppState {
     console.log('[Main] Ending Meeting...');
     const stoppedAtMs = Date.now();
     this.isMeetingActive = false; // Block new data immediately
+    console.log(audioStats.summary());
     this.broadcastMeetingState();
 
     // Cancel the engine before the first await: stopping the agent and draining the indexer take time, and an
