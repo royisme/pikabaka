@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: the next release is 3.0.0 (branch `release-three`)
+
+- The owner decided the next version is **3.0.0**: Pika changes direction (live translation, meeting records and an AI agent) and drops the interview feature, the resume and the profile. This commit carries `Release-As: 3.0.0` and a `BREAKING CHANGE` footer, so release-please retitles its open release PR (#47, 2.5.0) to 3.0.0 and lists the breaking change in the changelog. Nothing in `CHANGELOG.md`, `package.json` or the manifest was edited by hand.
+- The last version with the interview feature: release `v2.4.0` is the last published one; tag `pre-interview-removal` (`c8b838f`) is the newest code that still has it, including the work merged after 2.4.0. The private repository `royisme/meetingCopa` also keeps it.
+- Issue #19 (a new speech key needing a provider switch) is closed: fixed by #74, covered by `test/unit/speech-routing.test.ts`; not checked on Windows with a real key.
+
 ## 2026-10-29: the interview positioning is gone from the docs, step X5-4 (branch `interview-notes`)
 
 - Tag `pre-interview-removal` marks main before X5-1 (`c8b838f`, pushed); the full-feature code is also in that tag and in the private repository.
