@@ -18,7 +18,7 @@ export function registerSttHandlers(appState: AppState): void {
     return { success: true };
   });
 
-  safeHandle("set-stt-provider", async (_, provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => {
+  safeHandle("set-stt-provider", async (_, provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini') => {
     try {
       const { CredentialsManager } = require('../services/CredentialsManager');
       CredentialsManager.getInstance().setSttProvider(provider);
@@ -52,7 +52,7 @@ export function registerSttHandlers(appState: AppState): void {
       const cm = CredentialsManager.getInstance();
       const saved: Record<string, string | undefined> = {
         groq: cm.getGroqSttApiKey(), openai: cm.getOpenAiSttApiKey(), deepgram: cm.getDeepgramApiKey(),
-        elevenlabs: cm.getElevenLabsApiKey(), soniox: cm.getSonioxApiKey(),
+        elevenlabs: cm.getElevenLabsApiKey(), soniox: cm.getSonioxApiKey(), gemini: cm.getGeminiApiKey(),
       };
       const models = await fetchSttModels(provider as SttModelProvider, (typeof apiKey === 'string' && apiKey.trim()) || saved[provider] || '');
       return { success: true, models };

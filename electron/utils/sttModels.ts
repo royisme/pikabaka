@@ -2,9 +2,9 @@ import axios from 'axios';
 
 export interface SttModel { id: string; label: string }
 
-export type SttModelProvider = 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'soniox';
+export type SttModelProvider = 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'soniox' | 'gemini';
 
-export const STT_MODEL_PROVIDERS: SttModelProvider[] = ['deepgram', 'groq', 'openai', 'elevenlabs', 'soniox'];
+export const STT_MODEL_PROVIDERS: SttModelProvider[] = ['deepgram', 'groq', 'openai', 'elevenlabs', 'soniox', 'gemini'];
 
 // "Fetch models" for speech recognition: what the service itself says it offers. Lists are for
 // choosing from; a model can also be typed. Errors carry a short reason only, never a body or key.

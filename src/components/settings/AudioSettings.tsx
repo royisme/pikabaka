@@ -159,11 +159,13 @@ export function useAudioSettings({ isOpen, isActive }: { isOpen: boolean; isActi
     const useExperimentalSck = storedSck === 'true';
 
     // STT Provider settings
-    const [sttProvider, setSttProvider] = useState<'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'>('google');
+    const [sttProvider, setSttProvider] = useState<'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini'>('google');
     const { data: speechCredentials, error: speechCredentialsError } = useQuery({ queryKey: ['speech-credentials'], queryFn: () => window.electronAPI.getStoredCredentials(), enabled: isOpen && !!window.electronAPI?.getStoredCredentials });
     const configuredSpeechServices = speechServices.filter(service => speechCredentials && service.configured(speechCredentials));
-    const speechServiceConfigured = configuredSpeechServices.some(service => service.id === sttProvider);
-    const selectedSpeechService = speechServices.find(service => service.id === sttProvider);
+    // Gemini uses the key saved under AI providers, so it is not in the speech key list.
+    const geminiReady = !!speechCredentials?.hasGeminiKey;
+    const speechServiceConfigured = configuredSpeechServices.some(service => service.id === sttProvider) || (sttProvider === 'gemini' && geminiReady);
+    const selectedSpeechService = sttProvider === 'gemini' ? { name: 'Gemini Live' } : speechServices.find(service => service.id === sttProvider);
     const [isSttDropdownOpen, setIsSttDropdownOpen] = useState(false);
     const sttDropdownRef = React.useRef<HTMLDivElement>(null);
 
@@ -247,7 +249,7 @@ export function useAudioSettings({ isOpen, isActive }: { isOpen: boolean; isActi
         }
     };
 
-    const handleSttProviderChange = async (provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => {
+    const handleSttProviderChange = async (provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini') => {
         setSttProvider(provider);
         setIsSttDropdownOpen(false);
         setSpeechResult(null);
@@ -304,6 +306,7 @@ export function useAudioSettings({ isOpen, isActive }: { isOpen: boolean; isActi
         speechCredentials,
         speechCredentialsError,
         configuredSpeechServices,
+        geminiReady,
         speechServiceConfigured,
         selectedSpeechService,
         sttModelDraft,
@@ -345,6 +348,7 @@ export function renderAudioSettings(
         speechCredentials,
         speechCredentialsError,
         configuredSpeechServices,
+        geminiReady,
         speechServiceConfigured,
         selectedSpeechService,
         sttModelDraft,
@@ -500,7 +504,7 @@ export function renderAudioSettings(
                     <div className="bg-bg-card rounded-xl border border-border-subtle p-4 space-y-3">
                         <label className="text-xs font-medium text-text-secondary block">Speech Provider</label>
                         <div className="relative">
-                            {configuredSpeechServices.length > 0 && <ProviderSelect
+                            {(configuredSpeechServices.length > 0 || geminiReady) && <ProviderSelect
                                 value={sttProvider}
                                 onChange={(val) => handleSttProviderChange(val as any)}
                                 options={[
@@ -512,13 +516,14 @@ export function renderAudioSettings(
                                     { id: 'azure', label: 'Azure Speech', badge: speechCredentials?.hasAzureKey ? 'Saved' : null, desc: 'Microsoft Cognitive Services STT', icon: <Mic size={14} /> },
                                     { id: 'ibmwatson', label: 'IBM Watson', badge: speechCredentials?.hasIbmWatsonKey ? 'Saved' : null, desc: 'IBM Watson cloud STT service', icon: <Mic size={14} /> },
                                     { id: 'soniox', label: 'Soniox', badge: speechCredentials?.hasSonioxKey ? 'Saved' : null, recommended: true, desc: '60+ languages, multilingual, domain context', icon: <Mic size={14} /> },
-                                ].filter(option => configuredSpeechServices.some(service => service.id === option.id))}
+                                    { id: 'gemini', label: 'Gemini Live', badge: geminiReady ? 'Saved' : null, recommended: true, desc: 'Streaming transcription with your Gemini API key', icon: <Mic size={14} /> },
+                                ].filter(option => option.id === 'gemini' ? geminiReady : configuredSpeechServices.some(service => service.id === option.id))}
                             />}
                             {!!speechCredentialsError ? <p role="alert" className="text-xs text-text-primary break-words">✕ {(speechCredentialsError as Error).message}</p>
                                 : !speechCredentials ? <p className="text-xs text-text-secondary">Loading speech providers…</p>
                                 : <>
                                     {!speechServiceConfigured && <p className="text-xs text-text-primary">✕ {selectedSpeechService?.name}: not configured</p>}
-                                    {!configuredSpeechServices.length && <p className="text-xs text-text-secondary">No speech services configured.</p>}
+                                    {!configuredSpeechServices.length && !geminiReady && <p className="text-xs text-text-secondary">No speech services configured.</p>}
                                 </>}
                         </div>
                     </div>

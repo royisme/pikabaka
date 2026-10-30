@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 type Credentials = Awaited<ReturnType<typeof window.electronAPI.getStoredCredentials>>;
-type Service = Credentials['sttProvider'];
+// Gemini Live uses the Gemini key saved under AI providers, so it has no entry here.
+type Service = Exclude<Credentials['sttProvider'], 'gemini'>;
 export const speechServices: Array<{ id: Service; name: string; configured: (credentials: Credentials) => boolean }> = [
     { id: 'google', name: 'Google Cloud', configured: c => !!c.googleServiceAccountPath },
     { id: 'groq', name: 'Groq Whisper', configured: c => c.hasSttGroqKey },

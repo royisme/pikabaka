@@ -7,6 +7,7 @@ import { GoogleSTT } from "../audio/GoogleSTT"
 import { RestSTT } from "../audio/RestSTT"
 import { DeepgramStreamingSTT } from "../audio/DeepgramStreamingSTT"
 import { SonioxStreamingSTT } from "../audio/SonioxStreamingSTT"
+import { GeminiLiveSTT } from "../audio/GeminiLiveSTT"
 import { ElevenLabsStreamingSTT } from "../audio/ElevenLabsStreamingSTT"
 import { OpenAIStreamingSTT } from "../audio/OpenAIStreamingSTT"
 import {
@@ -21,7 +22,7 @@ import {
   normalizeTranscriptText,
 } from "./transcript-assembler"
 
-export type STTProvider = (GoogleSTT | RestSTT | DeepgramStreamingSTT | SonioxStreamingSTT | ElevenLabsStreamingSTT | OpenAIStreamingSTT) & {
+export type STTProvider = (GoogleSTT | RestSTT | DeepgramStreamingSTT | SonioxStreamingSTT | GeminiLiveSTT | ElevenLabsStreamingSTT | OpenAIStreamingSTT) & {
   finalize?: () => void;
   setAudioChannelCount?: (count: number) => void;
   notifySpeechEnded?: () => void;
@@ -66,6 +67,14 @@ export function createSTTProvider(appState: AppState, speaker: 'them' | 'user'):
       stt = new DeepgramStreamingSTT(apiKey);
     } else {
       throw new Error('Deepgram is not configured: add its key in Provider setup.');
+    }
+  } else if (sttProvider === 'gemini') {
+    const apiKey = CredentialsManager.getInstance().getGeminiApiKey();
+    if (apiKey?.trim()) {
+      console.log(`[Main] Using GeminiLiveSTT for ${speaker}`);
+      stt = new GeminiLiveSTT(apiKey);
+    } else {
+      throw new Error('Gemini is not configured: add its key in AI providers.');
     }
   } else if (sttProvider === 'soniox') {
     const apiKey = CredentialsManager.getInstance().getSonioxApiKey();

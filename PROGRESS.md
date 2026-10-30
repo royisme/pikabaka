@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: Gemini Live is a speech service, with the Gemini API key (uncommitted)
+
+- `electron/audio/GeminiLiveSTT.ts` (new): streaming transcription through the Gemini Live API model `gemini-3.5-transcribe-live`, using the key already saved under AI providers, so no Google Cloud service account is needed. `interimInputTranscription` (the whole turn so far) becomes an interim line, `inputTranscription` the final line with a boundary. Audio is sent as 16 kHz PCM in 100 ms pieces; 48 kHz input is averaged down. The gate's pauses (one short silent chunk now and then) are stretched to the time that really passed, because the server ends a turn by the length of the silence it hears. Reconnects with a backoff.
+- New provider id `gemini` in the credential, IPC, preload and settings types, the speech-service picker (shown when a Gemini key exists; it has no entry in the speech key list), the model list (one model, an id can also be typed) and the model default. The stored `sttProvider` values that exist today are unchanged; no migration.
+- Probed with invented synthetic speech and the owner's key: the text was complete at 16 kHz and at 48 kHz, also when the gate's pauses were simulated. The final line came 1.3 to 5.1 s after the last word in five runs; the spread was the same with and without the gate, and its cause is not known.
+- Not done: Gemini live translation (`gemini-3.5-live-translate-preview`) and Soniox translation; the Soniox account had no balance, so it was not probed.
+- Checks: both tsc 0, oxlint 0, ratchet 0, tap 5307/5307. Not verified: a real call with the app (owner).
+
 ## 2026-10-30: startup no longer flips the embedding provider and no longer shows "Provider Changed" (uncommitted)
 
 - `electron/helpers/ProcessingHelper.ts`: `loadStoredCredentials` re-initialized the embeddings with only the OpenAI and Gemini keys, which dropped the connection chosen in Settings. The pipeline treated "selected connection removed" as a config change, fell back to Gemini and saved it as `last_embedding_provider`; a later full init switched back. The Gemini step was compared with the saved name and fired the "Provider Changed" warning on every start. It now passes `buildEmbeddingConfig(credManager)`, the same config the RAG manager was built with, so the call is skipped.
