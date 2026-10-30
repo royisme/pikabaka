@@ -2,6 +2,12 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: the code-smell ledger can only go down (uncommitted)
+
+- `scripts/smell-ratchet.js` (plain Node, no dependency) counts `: any`/`as any`/`<any>`, `@ts-ignore`/`@ts-expect-error` and files over 800 lines across the tracked `.ts`/`.tsx` files in `electron/` and `src/` (`*.d.ts` excluded), lists the large files and compares each number with the committed `scripts/smell-ledger.json`; a rise exits 1 with its size, a drop prints that the ledger can be lowered, and `--update` rewrites the ledger. Seeded with today's numbers: 498 `any`, 7 suppressions, 8 files over 800 lines.
+- `package.json` `lint` runs the ratchet after oxlint; `docs/development.md` ("Checks") and `docs/conventions.md` ("Code style") describe it.
+- `test/unit/smell-ratchet.test.ts` counts a synthetic temporary tree, including a `.d.ts` that must be ignored, and proves a rise is a failure while a drop is only reported. Checks on this tree: `tsc --noEmit` 0, `tsc -p electron/tsconfig.json --noEmit` 0, `oxlint src electron test --max-warnings 814` 0, `node scripts/smell-ratchet.js` 0, full tap 0 (5273 assertions in 93 files).
+
 ## 2026-10-30: the suggestion card keeps its dismiss button in reach
 
 - `src/components/agent/ProactiveCard.tsx`: the card is a flex column capped at 40% of its column, with its own scroll area around the text and Ask more. The kind label and the dismiss button sit in a header above that scroll area, so scrolling a long suggestion no longer moves the button off screen, and the button is 28px square (the overlay floor) instead of 24px. Layout and geometry only: no state, props, dependency, animation or copy change. This is what the owner reported after clicking `Dismiss` was hard to hit on a long card.

@@ -21,7 +21,7 @@
     "clean": "rimraf dist dist-electron",
     "dev": "vite",
     "typecheck": "tsc --noEmit && tsc -p electron/tsconfig.json --noEmit",
-    "lint": "oxlint src electron test --max-warnings 814",
+    "lint": "oxlint src electron test --max-warnings 814 && node scripts/smell-ratchet.js",
     "test": "tap build && tap --node-arg=--import=tsx --node-arg=--disable-warning=DEP0205 \"test/**/*.test.ts\"",
     "verify": "pnpm run typecheck && pnpm run lint && pnpm run test",
     "build:web:raw": "pnpm run clean && tsc && vite build",

@@ -48,11 +48,13 @@ The donation record is a separate file (`electron-store`). The installed store 1
 | --- | --- | --- |
 | Typecheck | `pnpm run typecheck` (renderer, then Electron) | both exit 0 |
 | Lint | `pnpm run lint` | oxlint (`.oxlintrc.json`) with the TypeScript, unicorn, oxc and React plugins. It needs no TypeScript compiler API, so TypeScript 7 is supported. The 814 existing findings are warnings and the script caps them with `--max-warnings 814`, so the number may go down and never up; lower the cap in `package.json` when you fix some |
-| Unit and integration tests | `pnpm run test` (tap over `test/**/*.test.ts`) | tap needs `--node-arg=--import=tsx` and `--node-arg=--disable-warning=DEP0205` on the current toolchain (`.taprc` disables the `@tapjs/typescript` plugin so TypeScript 7 works); 5252 assertions passed in 92 files on 2026-10-30 |
+| Unit and integration tests | `pnpm run test` (tap over `test/**/*.test.ts`) | tap needs `--node-arg=--import=tsx` and `--node-arg=--disable-warning=DEP0205` on the current toolchain (`.taprc` disables the `@tapjs/typescript` plugin so TypeScript 7 works); 5252 assertions passed in 92 files on 2026-10-30; 5273 in 93 files after the smell ratchet |
 | Everything | `pnpm run verify` | typecheck, lint, test; the build scripts without `:raw` run it first |
 | Build smoke | `pnpm run build:web:raw` and `build:electron:raw` | what `build-smoke.yml` runs |
 
 CI runs two workflows on pull requests: `verify.yml` (typecheck, lint, tests) and `build-smoke.yml` (the two builds). Neither was exercised on GitHub from this checkout: the files are checked in, and a first run will show whether the macOS runner can run the tests.
+
+`pnpm run lint` also runs `node scripts/smell-ratchet.js`, which counts `: any`/`as any`/`<any>`, `@ts-ignore`/`@ts-expect-error` and files over 800 lines in the tracked `.ts`/`.tsx` files under `electron/` and `src/` (`*.d.ts` excluded), lists the large files and compares each number with `scripts/smell-ledger.json`. A number above the ledger exits 1 with the size of the rise; a lower number prints that the ledger can be lowered, and `node scripts/smell-ratchet.js --update` rewrites it. Lowering the ledger belongs to the change that removes the smell; raising it is a visible override, not a fix.
 
 Under an agent's shell, run the tools without pnpm when `node_modules` may be out of step (see "pnpm caveat"): `./node_modules/.bin/tsc --noEmit`, `./node_modules/.bin/oxlint src electron test --max-warnings 814`, `node node_modules/tap/dist/esm/run.mjs --node-arg=--import=tsx "test/**/*.test.ts"`.
 

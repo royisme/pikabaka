@@ -84,6 +84,7 @@ Applies to TypeScript in `src`, `electron` and `test`. Where existing code diffe
 - Validate an unknown value once, at the boundary that owns it. Pass typed values inward.
 - Do not extract a single-use helper in advance. Inline it unless it is reused, hides a genuinely complex boundary, or has a clear independent name.
 - Avoid `any` and avoid `try`/`catch` where an error can propagate to the boundary that reports it.
+- The `any`, suppression and 800-line counts are ratcheted by `scripts/smell-ratchet.js` (`pnpm run lint`): a change lowers `scripts/smell-ledger.json` or leaves it unchanged.
 - Rely on type inference; annotate exports and unclear spots.
 - Prefer `const`, early returns and `map`/`filter`/`flatMap` over reassignment, `else` and manual loops.
 - New files stay under about 500 lines. This is a guideline, not enforced; `SettingsOverlay.tsx`, `LLMHelper.ts` and a few others already exceed it and are not split as a side effect of another change.
