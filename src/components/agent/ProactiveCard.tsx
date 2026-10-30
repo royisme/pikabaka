@@ -29,7 +29,7 @@ const ProactiveCard: React.FC<ProactiveCardProps> = ({ card, onDismiss, onAskMor
         transition={{ duration: 0.15 }}
         role="status"
         aria-label="Pika suggestion"
-        className="no-drag mx-2 mt-2 flex max-h-[40%] shrink-0 flex-col overflow-hidden rounded-xl border overlay-hairline overlay-shell-surface px-3 py-2"
+        className="no-drag mx-2 mt-2 flex max-h-[60%] shrink-0 flex-col overflow-hidden rounded-xl border overlay-hairline overlay-shell-surface px-3 py-2"
     >
         <div className="flex shrink-0 items-start gap-2">
             <p className="min-w-0 flex-1 text-[11px] font-medium uppercase tracking-wide overlay-text-secondary">{KIND_LABEL[card.kind] ?? 'Suggestion'}</p>
@@ -43,7 +43,7 @@ const ProactiveCard: React.FC<ProactiveCardProps> = ({ card, onDismiss, onAskMor
                 <X className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
         </div>
-        <div className="min-h-0 overflow-y-auto">
+        <div className="min-h-[5rem] overflow-y-auto">
             <p className="mt-0.5 text-[14px] leading-snug overlay-text-primary break-words">{card.text}</p>
         </div>
         <button
