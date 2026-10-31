@@ -78,7 +78,7 @@ Mutation testing is optional, reserved for a specific unresolved risk in importa
 1. Re-read your diff: no unrelated edits, debug output, screenshots or scratch files.
 2. Run the checks above and read each exit code. Report which ran and which did not.
 3. Keep verification proportional to the business risk. Do not expand tests or add defensive code solely for coverage or mutation scores.
-4. Update `TASKS.md` (the step leaves the queue, the next is named) and `PROGRESS.md`. Do not touch `CHANGELOG.md`.
+4. Do not edit `TASKS.md`, `PROGRESS.md` or `CHANGELOG.md` in a feature branch: parallel branches would all conflict at the top of those files. Put the progress entry (what landed, the evidence, the checks that ran, what is not verified, what the owner checks by hand) in the PR description. After the PRs of a batch merge, one docs PR adds their entries to `PROGRESS.md` and updates `TASKS.md` (the step leaves the queue, the next is named).
 5. Commit on a branch (`type(scope): summary`; no issue number in the title; `Fixes #N` in the body). End the message with the attribution lines the session requires.
 6. Push and open a PR only when the owner asks. The PR template needs a type and a manual-test line naming the OS.
 7. Report: what changed, what was verified and how, what was not run, what the owner must check by hand.
