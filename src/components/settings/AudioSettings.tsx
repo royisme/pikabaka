@@ -159,7 +159,7 @@ export function useAudioSettings({ isOpen, isActive }: { isOpen: boolean; isActi
     const useExperimentalSck = storedSck === 'true';
 
     // STT Provider settings
-    const [sttProvider, setSttProvider] = useState<'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'>('google');
+    const [sttProvider, setSttProvider] = useState<'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini'>('google');
     const { data: speechCredentials, error: speechCredentialsError } = useQuery({ queryKey: ['speech-credentials'], queryFn: () => window.electronAPI.getStoredCredentials(), enabled: isOpen && !!window.electronAPI?.getStoredCredentials });
     const configuredSpeechServices = speechServices.filter(service => speechCredentials && service.configured(speechCredentials));
     const speechServiceConfigured = configuredSpeechServices.some(service => service.id === sttProvider);
@@ -247,7 +247,7 @@ export function useAudioSettings({ isOpen, isActive }: { isOpen: boolean; isActi
         }
     };
 
-    const handleSttProviderChange = async (provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => {
+    const handleSttProviderChange = async (provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini') => {
         setSttProvider(provider);
         setIsSttDropdownOpen(false);
         setSpeechResult(null);
@@ -512,6 +512,7 @@ export function renderAudioSettings(
                                     { id: 'azure', label: 'Azure Speech', badge: speechCredentials?.hasAzureKey ? 'Saved' : null, desc: 'Microsoft Cognitive Services STT', icon: <Mic size={14} /> },
                                     { id: 'ibmwatson', label: 'IBM Watson', badge: speechCredentials?.hasIbmWatsonKey ? 'Saved' : null, desc: 'IBM Watson cloud STT service', icon: <Mic size={14} /> },
                                     { id: 'soniox', label: 'Soniox', badge: speechCredentials?.hasSonioxKey ? 'Saved' : null, recommended: true, desc: '60+ languages, multilingual, domain context', icon: <Mic size={14} /> },
+                                    { id: 'gemini', label: 'Gemini Live', badge: speechCredentials?.hasGeminiKey ? 'Saved' : null, recommended: true, desc: 'Streaming transcription with your Gemini API key', icon: <Mic size={14} /> },
                                 ].filter(option => configuredSpeechServices.some(service => service.id === option.id))}
                             />}
                             {!!speechCredentialsError ? <p role="alert" className="text-xs text-text-primary break-words">✕ {(speechCredentialsError as Error).message}</p>

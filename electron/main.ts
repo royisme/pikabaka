@@ -75,6 +75,8 @@ import {
   type STTProvider,
   createSTTProvider as createSTTProviderFn,
   setupSystemAudioPipeline as setupSystemAudioPipelineFn,
+  wireSystemAudio as wireSystemAudioFn,
+  wireMicrophone as wireMicrophoneFn,
   startAudioTest as startAudioTestFn,
   _startAudioTestImpl as startAudioTestImplFn,
   stopAudioTest as stopAudioTestFn,
@@ -101,6 +103,8 @@ import {
 } from "./helpers/stealth"
 import { initializeApp } from "./lib/lifecycle"
 import type { EchoFilter } from "./lib/echo-filter"
+import { audioStats } from "./lib/audio-stats"
+import { sendLag } from "./lib/send-lag"
 
 /** Unified type for all STT providers with optional extended capabilities */
 type ScreenshotWindowMode = 'launcher' | 'overlay';
@@ -488,7 +492,6 @@ export class AppState {
   public lastAudioPipelineError: string | null = null;
   // The microphone hears the speakers: lines that repeat the other party's stream are dropped. Created on first use.
   public echoFilter: EchoFilter | null = null;
-  public echoLinesDropped: number = 0;
   public transcriptAssemblerProfile: TranscriptAssemblerProfile = 'sentence_bias';
   public transcriptTurnBuffers: Record<TranscriptSpeaker, BufferedTranscriptTurn | null> = {
     them: null,
@@ -601,19 +604,7 @@ export class AppState {
       console.log(`[Main] SystemAudioCapture rate: ${rate}Hz`);
       this.googleSTT?.setSampleRate(rate);
 
-      this.systemAudioCapture.on('data', (chunk: Buffer) => {
-        // console.log('[Main] SysAudio chunk', chunk.length);
-        this.lastSystemAudioChunkAt = Date.now();
-        this.googleSTT?.write(chunk);
-      });
-      this.systemAudioCapture.on('speech_ended', () => {
-        this.googleSTT?.notifySpeechEnded?.();
-        this.handleSpeakerSpeechEnded('them');
-      });
-      this.systemAudioCapture.on('error', (err: Error) => {
-        console.error('[Main] SystemAudioCapture Error:', err);
-        this.lastAudioPipelineError = err.message || 'System audio capture error';
-      });
+      wireSystemAudioFn(this);
       console.log('[Main] SystemAudioCapture initialized.');
     } catch (err) {
       console.warn('[Main] Failed to initialize SystemAudioCapture with preferred ID. Falling back to default.', err);
@@ -623,18 +614,7 @@ export class AppState {
         console.log(`[Main] SystemAudioCapture (Default) rate: ${rate}Hz`);
         this.googleSTT?.setSampleRate(rate);
 
-        this.systemAudioCapture.on('data', (chunk: Buffer) => {
-          this.lastSystemAudioChunkAt = Date.now();
-          this.googleSTT?.write(chunk);
-        });
-        this.systemAudioCapture.on('speech_ended', () => {
-          this.googleSTT?.notifySpeechEnded?.();
-          this.handleSpeakerSpeechEnded('them');
-        });
-        this.systemAudioCapture.on('error', (err: Error) => {
-          console.error('[Main] SystemAudioCapture (Default) Error:', err);
-          this.lastAudioPipelineError = err.message || 'System audio capture error';
-        });
+        wireSystemAudioFn(this);
       } catch (err2) {
         console.error('[Main] Failed to initialize SystemAudioCapture (Default):', err2);
       }
@@ -653,17 +633,7 @@ export class AppState {
       console.log(`[Main] MicrophoneCapture rate: ${rate}Hz`);
       this.googleSTT_User?.setSampleRate(rate);
 
-      this.microphoneCapture.on('data', (chunk: Buffer) => {
-        // console.log('[Main] Mic chunk', chunk.length);
-        this.googleSTT_User?.write(chunk);
-      });
-      this.microphoneCapture.on('speech_ended', () => {
-        this.googleSTT_User?.notifySpeechEnded?.();
-        this.handleSpeakerSpeechEnded('user');
-      });
-      this.microphoneCapture.on('error', (err: Error) => {
-        console.error('[Main] MicrophoneCapture Error:', err);
-      });
+      wireMicrophoneFn(this);
       console.log('[Main] MicrophoneCapture initialized.');
     } catch (err) {
       console.warn('[Main] Failed to initialize MicrophoneCapture with preferred ID. Falling back to default.', err);
@@ -673,16 +643,7 @@ export class AppState {
         console.log(`[Main] MicrophoneCapture (Default) rate: ${rate}Hz`);
         this.googleSTT_User?.setSampleRate(rate);
 
-        this.microphoneCapture.on('data', (chunk: Buffer) => {
-          this.googleSTT_User?.write(chunk);
-        });
-        this.microphoneCapture.on('speech_ended', () => {
-          this.googleSTT_User?.notifySpeechEnded?.();
-          this.handleSpeakerSpeechEnded('user');
-        });
-        this.microphoneCapture.on('error', (err: Error) => {
-          console.error('[Main] MicrophoneCapture (Default) Error:', err);
-        });
+        wireMicrophoneFn(this);
       } catch (err2) {
         console.error('[Main] Failed to initialize MicrophoneCapture (Default):', err2);
       }
@@ -782,6 +743,8 @@ export class AppState {
     }
 
     this.isMeetingActive = true;
+    audioStats.reset();
+    sendLag.start();
     this.setMicrophoneMuted(false);
     this.resetBufferedTranscriptTurns();
     this.lastSystemAudioChunkAt = null;
@@ -865,6 +828,8 @@ export class AppState {
     console.log('[Main] Ending Meeting...');
     const stoppedAtMs = Date.now();
     this.isMeetingActive = false; // Block new data immediately
+    console.log(audioStats.summary());
+    console.log(sendLag.summary());
     this.broadcastMeetingState();
 
     // Cancel the engine before the first await: stopping the agent and draining the indexer take time, and an
