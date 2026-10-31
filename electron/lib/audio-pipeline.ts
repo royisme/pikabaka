@@ -1,5 +1,6 @@
 import { EchoFilter, wordsOf } from './echo-filter';
 import { audioStats } from './audio-stats';
+import { sendLag } from './send-lag';
 import { BrowserWindow, systemPreferences } from "electron"
 import type { AppState } from "../main"
 import { SystemAudioCapture } from "../audio/SystemAudioCapture"
@@ -214,38 +215,50 @@ export function createSTTProvider(appState: AppState, speaker: 'them' | 'user'):
   return stt;
 }
 
+/** The one place the system audio capture is connected to the speech service. */
+export function wireSystemAudio(appState: AppState): void {
+  const state = appState;
+  state.systemAudioCapture.on('data', (chunk: Buffer) => {
+    state.lastSystemAudioChunkAt = Date.now();
+    sendLag.timed('them', () => state.googleSTT?.write(chunk));
+  });
+  state.systemAudioCapture.on('speech_ended', () => {
+    state.googleSTT?.notifySpeechEnded?.();
+    handleSpeakerSpeechEnded(appState, 'them');
+  });
+  state.systemAudioCapture.on('error', (err: Error) => {
+    console.error('[Main] SystemAudioCapture Error:', err);
+    state.lastAudioPipelineError = err.message || 'System audio capture error';
+  });
+}
+
+/** The one place the microphone capture is connected to the speech service. */
+export function wireMicrophone(appState: AppState): void {
+  const state = appState;
+  state.microphoneCapture.on('data', (chunk: Buffer) => {
+    // Muted: silence of the same length goes on, so the speech service keeps its connection.
+    sendLag.timed('user', () => state.googleSTT_User?.write(state.microphoneMuted ? Buffer.alloc(chunk.length) : chunk));
+  });
+  state.microphoneCapture.on('speech_ended', () => {
+    state.googleSTT_User?.notifySpeechEnded?.();
+    handleSpeakerSpeechEnded(appState, 'user');
+  });
+  state.microphoneCapture.on('error', (err: Error) => {
+    console.error('[Main] MicrophoneCapture Error:', err);
+  });
+}
+
 export function setupSystemAudioPipeline(appState: AppState): void {
   const state = appState;
   try {
     if (!state.systemAudioCapture) {
       state.systemAudioCapture = new SystemAudioCapture();
-      state.systemAudioCapture.on('data', (chunk: Buffer) => {
-        state.lastSystemAudioChunkAt = Date.now();
-        state.googleSTT?.write(chunk);
-      });
-      state.systemAudioCapture.on('speech_ended', () => {
-        state.googleSTT?.notifySpeechEnded?.();
-        handleSpeakerSpeechEnded(appState, 'them');
-      });
-      state.systemAudioCapture.on('error', (err: Error) => {
-        console.error('[Main] SystemAudioCapture Error:', err);
-        state.lastAudioPipelineError = err.message || 'System audio capture error';
-      });
+      wireSystemAudio(appState);
     }
 
     if (!state.microphoneCapture) {
       state.microphoneCapture = new MicrophoneCapture();
-      state.microphoneCapture.on('data', (chunk: Buffer) => {
-        // Muted: silence of the same length goes on, so the speech service keeps its connection.
-        state.googleSTT_User?.write(state.microphoneMuted ? Buffer.alloc(chunk.length) : chunk);
-      });
-      state.microphoneCapture.on('speech_ended', () => {
-        state.googleSTT_User?.notifySpeechEnded?.();
-        handleSpeakerSpeechEnded(appState, 'user');
-      });
-      state.microphoneCapture.on('error', (err: Error) => {
-        console.error('[Main] MicrophoneCapture Error:', err);
-      });
+      wireMicrophone(appState);
     }
 
     if (!state.googleSTT) {

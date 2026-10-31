@@ -2,6 +2,17 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: audio capture is wired to the speech service in one place (uncommitted)
+
+- `main.ts` `reconfigureAudio` had its own copy of the `data`, `speech_ended` and `error` wiring (four copies with the fallbacks), and the copy in `audio-pipeline.ts` only ran when no capture existed, which a meeting start never hits. The copies had drifted: the live one did not apply the microphone mute, so muting probably did not silence what was sent. `audio-pipeline.ts` now has `wireSystemAudio` and `wireMicrophone`; `reconfigureAudio` creates the captures and calls them. The send timing lives there only.
+- Checks: both tsc 0, oxlint 0, ratchet 0, tap 5303/5303. No test covers the mute path. Not verified: a real meeting (owner): start, mute the microphone and speak (nothing should be transcribed for Me), unmute, other party speaks, end.
+
+## 2026-10-30: a meeting prints where audio could wait on our side (uncommitted)
+
+- `electron/lib/send-lag.ts` (new): measures the main process event loop delay (p50, p99, max) and, per stream, the chunk count, the longest gap between chunks, gaps over 300 ms and the slowest write. `audio-pipeline.ts` times each write, `startMeeting` resets and `finishMeeting` logs one `[Main] Send lag:` line. Numbers only.
+- Why: the owner saw text appear very late with every speech service and suspects our sending. The probes showed server-side final latency of 1.3 to 5 s, which does not rule out a stall on our side.
+- Checks: both tsc 0, oxlint 0, ratchet 0, tap 5303/5303. Not verified: a real call (owner): read the line at meeting end.
+
 ## 2026-10-30: Gemini Live is a speech service, with the Gemini API key (uncommitted)
 
 - `electron/audio/GeminiLiveSTT.ts` (new): streaming transcription through the Gemini Live API model `gemini-3.5-transcribe-live`, using the key already saved under AI providers, so no Google Cloud service account is needed. `interimInputTranscription` (the whole turn so far) becomes an interim line, `inputTranscription` the final line with a boundary. Audio is sent as 16 kHz PCM in 100 ms pieces; 48 kHz input is averaged down. The gate's pauses (one short silent chunk now and then) are stretched to the time that really passed, because the server ends a turn by the length of the silence it hears. Reconnects with a backoff.
