@@ -5,8 +5,7 @@ import type { AudioStatus } from '../../lib/audioStatus';
 
 interface TranscriptColumnProps {
     transcriptSegments: TranscriptSegment[];
-    isThemSpeaking: boolean;
-    currentThemPartial: string;
+    livePartial: { label: string; text: string } | null;
     transcriptDisplayMode: TranscriptDisplayMode;
     translationEnabled: boolean;
     showTranscript: boolean;
@@ -17,8 +16,7 @@ interface TranscriptColumnProps {
 
 const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
     transcriptSegments,
-    isThemSpeaking,
-    currentThemPartial,
+    livePartial,
     transcriptDisplayMode,
     translationEnabled,
     showTranscript,
@@ -29,8 +27,7 @@ const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
     return (
         <TranscriptPanel
             transcriptSegments={transcriptSegments}
-            isThemSpeaking={isThemSpeaking}
-            currentThemPartial={currentThemPartial}
+            livePartial={livePartial}
             transcriptDisplayMode={transcriptDisplayMode}
             translationEnabled={translationEnabled}
             showTranscript={showTranscript}

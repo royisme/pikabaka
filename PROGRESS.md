@@ -7,6 +7,54 @@ What is done, what is broken, what is unverified. `TASKS.md` is what to do next;
 - `RestSTT`, `OpenAIStreamingSTT` (two lines), `IntentClassifier` and `IntelligenceEngine` printed the first 50 to 60 characters of a transcript. They now print the length, or nothing for the classifier. The rule is in `AGENTS.md`: never log a transcript. A scan of `electron/` for other logs that interpolate transcript, answer, prompt or query text found none; the release-notes summary is the app's own text and stays.
 - Checks: both `tsc --noEmit`, `oxlint`, the tap run. Not verified: the running app.
 
+## 2026-10-30: the user's own speech shows on the live line (uncommitted)
+
+- Evidence: `useMeetingTranscript` dispatched a partial only for `them`; the `user` branch returned on every non-final event, so "Me" appeared as a row only after its final. The speech service's partial text was in the main process and the overlay dropped it.
+- `src/hooks/meetingTranscriptReducer.ts`: `mePartial` and `meArrival` actions, `myPartial` and `liveSpeaker` in the state, and `livePartialOf`, which returns the one live line (the label and text of whoever spoke last). A final row from the user clears the user's live line and gives the line back to the other party.
+- `useMeetingTranscript`, `TranscriptPanel`, `TranscriptColumn`, `PikaInterface`: the two props `isThemSpeaking` and `currentThemPartial` become one `livePartial`; `RollingTranscript` already had `partialSpeakerLabel`. The reply context still reads the other party's partial only.
+- `docs/conventions.md`, "Overlay UI": one live line, whoever spoke last.
+- Review by gpt-6.1-sol, three findings. Fixed: a user partial whose final the echo filter dropped stayed on the line through the silence (it now ends 8 s after its last partial, `meSpeakingEnded`); a translation report for an older own row ended what the user was saying (only an arrival, as for `them`, replaces the live line). Not changed: a row from an earlier sentence clears the line before the next partial arrives (the other party's line does the same; the next partial comes within a few hundred ms).
+- Checks: root `tsc --noEmit` 0, electron `tsc --noEmit` 0, `oxlint` 0, smell-ratchet 0, tap build 0, full tap 5310 of 5310. Not verified: the running app. Owner: speak a sentence with a provider that sends partials and look for the grey "Me" line while talking; then let the other party speak.
+## 2026-10-30: audio capture is wired to the speech service in one place (uncommitted)
+
+- `main.ts` `reconfigureAudio` had its own copy of the `data`, `speech_ended` and `error` wiring (four copies with the fallbacks), and the copy in `audio-pipeline.ts` only ran when no capture existed, which a meeting start never hits. The copies had drifted: the live one did not apply the microphone mute, so muting probably did not silence what was sent. `audio-pipeline.ts` now has `wireSystemAudio` and `wireMicrophone`; `reconfigureAudio` creates the captures and calls them. The send timing lives there only.
+- Checks: both tsc 0, oxlint 0, ratchet 0, tap 5303/5303. No test covers the mute path. Not verified: a real meeting (owner): start, mute the microphone and speak (nothing should be transcribed for Me), unmute, other party speaks, end.
+
+## 2026-10-30: a meeting prints where audio could wait on our side (uncommitted)
+
+- `electron/lib/send-lag.ts` (new): measures the main process event loop delay (p50, p99, max) and, per stream, the chunk count, the longest gap between chunks, gaps over 300 ms and the slowest write. `audio-pipeline.ts` times each write, `startMeeting` resets and `finishMeeting` logs one `[Main] Send lag:` line. Numbers only.
+- Why: the owner saw text appear very late with every speech service and suspects our sending. The probes showed server-side final latency of 1.3 to 5 s, which does not rule out a stall on our side.
+- Checks: both tsc 0, oxlint 0, ratchet 0, tap 5303/5303. Not verified: a real call (owner): read the line at meeting end.
+
+## 2026-10-30: Gemini Live is a speech service, with the Gemini API key (uncommitted)
+
+- `electron/audio/GeminiLiveSTT.ts` (new): streaming transcription through the Gemini Live API model `gemini-3.5-transcribe-live`, using the key already saved under AI providers, so no Google Cloud service account is needed. `interimInputTranscription` (the whole turn so far) becomes an interim line, `inputTranscription` the final line with a boundary. Audio is sent as 16 kHz PCM in 100 ms pieces; 48 kHz input is averaged down. The gate's pauses (one short silent chunk now and then) are stretched to the time that really passed, because the server ends a turn by the length of the silence it hears. Reconnects with a backoff.
+- New provider id `gemini` in the credential, IPC, preload and settings types, the speech-service picker and the Add speech provider list (key entry, accepted-key test through a one-model list request, and a new `set-gemini-api-key` IPC; the key is the one the AI connection uses, so Remove is not offered there and the embedding index is re-initialized when it uses the Gemini connection), the model list (one model, an id can also be typed) and the model default. The stored `sttProvider` values that exist today are unchanged; no migration.
+- Probed with invented synthetic speech and the owner's key: the text was complete at 16 kHz and at 48 kHz, also when the gate's pauses were simulated. The final line came 1.3 to 5.1 s after the last word in five runs; the spread was the same with and without the gate, and its cause is not known.
+- Not done: Gemini live translation (`gemini-3.5-live-translate-preview`) and Soniox translation; the Soniox account had no balance, so it was not probed.
+- Checks: both tsc 0, oxlint 0, ratchet 0, tap 5307/5307. Not verified: a real call with the app (owner).
+
+## 2026-10-30: ElevenLabs lines become final, and its debug audio file and raw log are gone (uncommitted)
+
+- `electron/audio/ElevenLabsStreamingSTT.ts`: the connection did not ask for a commit strategy, the server answered `vad_commit_strategy: false` (manual commit) and nothing here sends a commit, so a whole meeting produced only partial text and no final line (stats: Me 0 final lines). The URL now has `commit_strategy=vad&vad_silence_threshold_secs=0.8`.
+- Removed the development-only `~/elevenlabs_debug.raw` stream (raw meeting audio, one file shared by both streams) and the log of the first ten raw server messages (they carried transcript text).
+- `electron/utils/sttModels.ts`: `GET /v1/models` lists text-to-speech models, so the filtered list was empty; the model list for ElevenLabs is now the one realtime model id, without a request.
+- `test/unit/elevenlabs-stt.test.ts`: the model list and the commit parameters in the URL.
+- Checks: both tsc 0, oxlint 0, ratchet 0, tap 5305/5305. Not verified: a real ElevenLabs call (owner): final lines should appear about 0.8 s after a pause.
+
+## 2026-10-30: the speech service is told the microphone's real sample rate (uncommitted)
+
+- `electron/audio/MicrophoneCapture.ts`: `getSampleRate` looked for `get_sample_rate`, but napi-rs exposes `getSampleRate`, so the check never passed and the method always returned 48000. A microphone that opens at another rate (a Bluetooth headset opens at 16000Hz) was sent to the speech service labelled 48000Hz: the audio plays 3x too fast for it and words are lost or garbled. It now calls `getSampleRate`. `SystemAudioCapture` has the same wrong name, but its rate is only published after a background start and nothing reads it back, so it is left alone.
+- `test/unit/microphone-sample-rate.test.ts`: the wrapper reports what the native class reports.
+- Found in the dev log: `Rate: 16000Hz` from the native side, then `MicrophoneCapture rate: 48000Hz` from the app.
+- Checks: both tsc 0, oxlint 0, tap 5302/5302. Not verified: a real call with a 16000Hz or 44100Hz microphone (owner).
+
+## 2026-10-30: the microphone gate sends the start of each word (uncommitted)
+
+- `native-module/src/silence_suppression.rs`: the gate needed a frame or two to hear speech, so the quiet start of a word (s, f, t) was dropped; the owner saw words cut ("soft develop"). It now keeps the last 300ms of unsent microphone audio and sends it with the first speech frame (`preroll`, microphone only; system audio is unchanged). The microphone hangover goes from 150ms to 250ms. A unit test covers the pre-roll.
+- Not changed: the Deepgram endpointing (800ms) and the transcript flush timers; the owner also reported the Me line as slow, and that is not yet investigated.
+- Checks: `cargo test --locked` below. Not verified: a real call (owner). The app's `.node` must be rebuilt (`build-native`) to take effect.
+
 ## 2026-10-30: a meeting prints how much each speech stream delivered (uncommitted)
 
 - `electron/lib/audio-stats.ts` (new): counts final lines and words per stream (Me, other party) and what the echo filter dropped (final and interim lines). Numbers only, no text. `audio-pipeline.ts` records them, `startMeeting` resets and `finishMeeting` logs one line: `[Main] Meeting audio stats: ...`. It replaces the old `echoLinesDropped` counter and its every-25th-line log.

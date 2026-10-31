@@ -96,7 +96,7 @@ export interface ElectronAPI {
   toggleAdvancedSettings: () => Promise<void>
   closeAdvancedSettings: () => Promise<void>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
-  getStoredCredentials: () => Promise<{ storage: CredentialStorageStatus; connectionHeaders?: Record<string, HeaderState[]>; hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; groqSttModel?: string; sttModels?: Record<string, string>; hasSonioxKey?: boolean; hasTavilyKey?: boolean; transcriptTranslationEnabled?: boolean; transcriptTranslationProvider?: string; transcriptTranslationModel?: string; transcriptTranslationPrompt?: string; transcriptTranslationDisplayMode?: 'original' | 'translated' | 'both'; transcriptTranslationSourceLanguage?: string; transcriptTranslationTargetLanguage?: string; geminiPreferredModel?: string; groqPreferredModel?: string; openaiPreferredModel?: string; claudePreferredModel?: string }>
+  getStoredCredentials: () => Promise<{ storage: CredentialStorageStatus; connectionHeaders?: Record<string, HeaderState[]>; hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini'; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; groqSttModel?: string; sttModels?: Record<string, string>; hasSonioxKey?: boolean; hasTavilyKey?: boolean; transcriptTranslationEnabled?: boolean; transcriptTranslationProvider?: string; transcriptTranslationModel?: string; transcriptTranslationPrompt?: string; transcriptTranslationDisplayMode?: 'original' | 'translated' | 'both'; transcriptTranslationSourceLanguage?: string; transcriptTranslationTargetLanguage?: string; geminiPreferredModel?: string; groqPreferredModel?: string; openaiPreferredModel?: string; claudePreferredModel?: string }>
   testTranscriptTranslation: (draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => Promise<{ success: boolean; sample: string; translatedText?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
   getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both'; sourceLanguage: string; targetLanguage: string }>
   setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both'; sourceLanguage?: string; targetLanguage?: string }) => Promise<{ success: boolean; error?: string }>
@@ -131,7 +131,7 @@ export interface ElectronAPI {
   translateTranscriptSegment: (segment: { segmentId: string; text: string; speaker?: 'them' | 'user'; speakerLabel?: string; timestamp?: number }) => Promise<{ success: boolean; error?: string; translatedText?: string }>
 
   // STT Provider Management
-  setSttProvider: (provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => Promise<{ success: boolean; error?: string }>
+  setSttProvider: (provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini') => Promise<{ success: boolean; error?: string }>
   getSttProvider: () => Promise<string>
   getTranscriptAssemblerProfile: () => Promise<'sentence_bias' | 'low_latency' | 'coherent'>
   setTranscriptAssemblerProfile: (profile: 'sentence_bias' | 'low_latency' | 'coherent') => Promise<{ success: boolean; error?: string }>
@@ -146,7 +146,8 @@ export interface ElectronAPI {
   setSttModel: (provider: string, model: string) => Promise<{ success: boolean; error?: string }>
   fetchSttModels: (provider: string, apiKey?: string) => Promise<{ success: boolean; models?: Array<{ id: string; label: string }>; error?: string }>
   setSonioxApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
-  testSttConnection: (provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox', apiKey: string, region?: string) => Promise<{ success: boolean; error?: string }>
+  setGeminiApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
+  testSttConnection: (provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini', apiKey: string, region?: string) => Promise<{ success: boolean; error?: string }>
 
   // Native Audio Service Events
   onNativeAudioTranscript: (callback: (transcript: { speaker: string; text: string; final: boolean; timestamp?: number; confidence?: number; segmentId?: string; sourceText?: string; translatedText?: string; translationState?: 'pending' | 'streaming' | 'complete' | 'error' | 'skipped'; translationError?: 'timeout' | 'auth' | 'rate-limit' | 'network' | 'other'; displayMode?: 'original' | 'translated' | 'both'; speakerLabel?: string; detectedLanguage?: string; revision?: number; replaces?: string[] }) => void) => () => void
