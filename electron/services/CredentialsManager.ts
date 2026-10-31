@@ -49,7 +49,7 @@ export interface StoredCredentials {
     /** Whether that model reads images (unknown for a model Pika has not been told about). */
     agentModelImages?: boolean;
     // STT Provider settings
-    sttProvider?: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox';
+    sttProvider?: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini';
     groqSttApiKey?: string;
     groqSttModel?: string;
     /** The model chosen for each speech service (deepgram, openai, elevenlabs, soniox); empty means its default. */
@@ -155,7 +155,7 @@ export class CredentialsManager {
         return this.credentials.googleServiceAccountPath;
     }
 
-    public getSttProvider(): 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' {
+    public getSttProvider(): 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini' {
         return this.credentials.sttProvider || 'google';
     }
 
@@ -346,7 +346,7 @@ export class CredentialsManager {
         console.log('[CredentialsManager] Google Service Account path updated');
     }
 
-    public setSttProvider(provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox'): void {
+    public setSttProvider(provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini'): void {
         this.credentials.sttProvider = provider;
         this.saveCredentials();
         console.log(`[CredentialsManager] STT Provider set to: ${provider}`);
@@ -404,6 +404,12 @@ export class CredentialsManager {
         this.credentials.ibmWatsonRegion = region;
         this.saveCredentials();
         console.log(`[CredentialsManager] IBM Watson Region set to: ${region}`);
+    }
+
+    public setGeminiApiKey(key: string): void {
+        this.credentials.geminiApiKey = key.trim() || undefined;
+        this.saveCredentials();
+        console.log('[CredentialsManager] Gemini API Key updated');
     }
 
     public setSonioxApiKey(key: string): void {

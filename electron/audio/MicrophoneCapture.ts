@@ -34,8 +34,8 @@ export class MicrophoneCapture extends EventEmitter {
     }
 
     public getSampleRate(): number {
-        if (this.monitor && typeof this.monitor.get_sample_rate === 'function') {
-            const nativeRate = this.monitor.get_sample_rate();
+        if (this.monitor && typeof this.monitor.getSampleRate === 'function') {
+            const nativeRate = this.monitor.getSampleRate();
             console.log(`[MicrophoneCapture] Real native rate: ${nativeRate}`);
             return nativeRate;
         }

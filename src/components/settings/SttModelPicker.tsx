@@ -8,6 +8,7 @@ export const STT_MODEL_DEFAULTS: Record<string, string> = {
     openai: 'gpt-4o-transcribe',
     elevenlabs: 'scribe_v2_realtime',
     soniox: 'stt-rt-v4',
+    gemini: 'gemini-3.5-transcribe-live',
 };
 
 interface SttModelPickerProps {

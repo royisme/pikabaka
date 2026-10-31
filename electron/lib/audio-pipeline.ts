@@ -1,4 +1,5 @@
-import { EchoFilter } from './echo-filter';
+import { EchoFilter, wordsOf } from './echo-filter';
+import { audioStats } from './audio-stats';
 import { sendLag } from './send-lag';
 import { BrowserWindow, systemPreferences } from "electron"
 import type { AppState } from "../main"
@@ -8,6 +9,7 @@ import { GoogleSTT } from "../audio/GoogleSTT"
 import { RestSTT } from "../audio/RestSTT"
 import { DeepgramStreamingSTT } from "../audio/DeepgramStreamingSTT"
 import { SonioxStreamingSTT } from "../audio/SonioxStreamingSTT"
+import { GeminiLiveSTT } from "../audio/GeminiLiveSTT"
 import { ElevenLabsStreamingSTT } from "../audio/ElevenLabsStreamingSTT"
 import { OpenAIStreamingSTT } from "../audio/OpenAIStreamingSTT"
 import {
@@ -22,7 +24,7 @@ import {
   normalizeTranscriptText,
 } from "./transcript-assembler"
 
-export type STTProvider = (GoogleSTT | RestSTT | DeepgramStreamingSTT | SonioxStreamingSTT | ElevenLabsStreamingSTT | OpenAIStreamingSTT) & {
+export type STTProvider = (GoogleSTT | RestSTT | DeepgramStreamingSTT | SonioxStreamingSTT | GeminiLiveSTT | ElevenLabsStreamingSTT | OpenAIStreamingSTT) & {
   finalize?: () => void;
   setAudioChannelCount?: (count: number) => void;
   notifySpeechEnded?: () => void;
@@ -67,6 +69,14 @@ export function createSTTProvider(appState: AppState, speaker: 'them' | 'user'):
       stt = new DeepgramStreamingSTT(apiKey);
     } else {
       throw new Error('Deepgram is not configured: add its key in Provider setup.');
+    }
+  } else if (sttProvider === 'gemini') {
+    const apiKey = CredentialsManager.getInstance().getGeminiApiKey();
+    if (apiKey?.trim()) {
+      console.log(`[Main] Using GeminiLiveSTT for ${speaker}`);
+      stt = new GeminiLiveSTT(apiKey);
+    } else {
+      throw new Error('Gemini is not configured: add its key in AI providers.');
     }
   } else if (sttProvider === 'soniox') {
     const apiKey = CredentialsManager.getInstance().getSonioxApiKey();
@@ -143,12 +153,10 @@ export function createSTTProvider(appState: AppState, speaker: 'them' | 'user'):
       if (speaker === 'them') {
         echoFilter.noteOther(trimmed, timestamp);
       } else if (echoFilter.isEcho(trimmed, timestamp)) {
-        state.echoLinesDropped = (state.echoLinesDropped ?? 0) + 1;
-        if (state.echoLinesDropped % 25 === 1) {
-          console.log(`[Main] Dropped ${state.echoLinesDropped} microphone lines that repeat the other party's audio (the microphone hears the speakers)`);
-        }
+        audioStats.noteEchoDropped(segment.isFinal, wordsOf(trimmed).length);
         return;
       }
+      if (segment.isFinal) audioStats.noteFinal(speaker, wordsOf(trimmed).length);
     }
 
     // Boundary-only events (empty text) must not reach intelligence handling
