@@ -26,7 +26,7 @@ Full demo video: [`demo/out/pika-demo.mp4`](demo/out/pika-demo.mp4) · Built wit
 ## What it does
 
 ### Live transcript and translation
-- **Dual-channel audio capture**: Captures system audio (the other party) and microphone input independently using a native Rust audio module with WebRTC voice activity detection and SpeexDSP acoustic echo cancellation.
+- **Dual-channel audio capture**: Captures system audio (the other party) and microphone input independently using a native Rust audio module with volume-based silence suppression and SpeexDSP acoustic echo cancellation.
 - **Real-time translation**: Transcribes conversation turns as they happen. For the other party ("Them"), completed sentences are translated into your chosen target language and displayed directly in the overlay.
 - **Per-speaker language selection**: Configure spoken and target translation languages right from the overlay or settings, and mute microphone transcription when listening.
 
@@ -126,7 +126,7 @@ Pika runs as a three-process desktop application:
 
 1. **Main process** (`electron/`): Window management, IPC orchestration, credential encryption, provider routing, meeting persistence, and local RAG indexing.
 2. **Renderer process** (`src/`): React 18, TypeScript, Tailwind CSS, and React Query for the overlay, chat, and settings interfaces.
-3. **Native module** (`native-module/`): Rust audio module using NAPI-RS for dual-channel audio capture (CoreAudio and ScreenCaptureKit on macOS; WASAPI on Windows), WebRTC VAD, and SpeexDSP acoustic echo cancellation.
+3. **Native module** (`native-module/`): Rust audio module using NAPI-RS for dual-channel audio capture (CoreAudio and ScreenCaptureKit on macOS; WASAPI on Windows), silence suppression, and SpeexDSP acoustic echo cancellation.
 
 ```
             ┌─────────────────────────────────────┐

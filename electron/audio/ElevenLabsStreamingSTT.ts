@@ -24,6 +24,8 @@ export class ElevenLabsStreamingSTT extends EventEmitter {
     private pcmAccumulator: Int16Array[] = [];
     private pcmAccumulatorLen = 0;
     private readonly SEND_THRESHOLD_SAMPLES = 4000;
+    private lastWriteAt = 0;
+    private static readonly MAX_FILL_MS = 1000;
     
     constructor(apiKey: string) {
         super();
@@ -127,7 +129,17 @@ export class ElevenLabsStreamingSTT extends EventEmitter {
             
             let outputS16: Int16Array;
 
-            if (this.inputSampleRate === this.targetSampleRate) {
+            // The native gate replaces a pause with one short silent chunk now and then. The server decides that a
+            // phrase is over from the length of the silence it hears, so a pause is stretched back to the time that
+            // really passed.
+            const now = Date.now();
+            const silent = inputS16.every(sample => sample === 0);
+            const elapsedMs = this.lastWriteAt ? Math.min(now - this.lastWriteAt, ElevenLabsStreamingSTT.MAX_FILL_MS) : 0;
+            this.lastWriteAt = now;
+
+            if (silent && elapsedMs > 0) {
+                outputS16 = new Int16Array(Math.round(this.targetSampleRate * elapsedMs / 1000));
+            } else if (this.inputSampleRate === this.targetSampleRate) {
                 // No downsampling needed
                 outputS16 = inputS16;
             } else {

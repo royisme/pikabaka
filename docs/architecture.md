@@ -6,17 +6,21 @@ Stack, folders and the pipelines that matter for the conversation UI and live tr
 
 1. **Electron main** (`electron/main.ts`): window management, IPC orchestration, native module loading and every backend service. `AppState.getInstance()` is the singleton, with helpers in `electron/helpers/` (`WindowHelper`, `SettingsWindowHelper`, `CropperWindowHelper`, `ScreenshotHelper`, `ProcessingHelper`).
 2. **React renderer** (`src/`): Vite, React, TypeScript, Tailwind. React Query and local `useState`; no Redux or Zustand. Entry `src/main.tsx`; `src/App.tsx` switches on window mode (main, settings, cropper).
-3. **Rust native module** (`native-module/`, crate `natively-audio`): low-latency audio capture with cpal, WebRTC VAD, rubato resampling and silence suppression. Speaker capture is CoreAudio/ScreenCaptureKit on macOS and WASAPI on Windows. Built by `scripts/build-native.js`.
+3. **Rust native module** (`native-module/`, crate `natively-audio`): low-latency audio capture with cpal, rubato resampling and silence suppression. Speaker capture is CoreAudio/ScreenCaptureKit on macOS and WASAPI on Windows. Built by `scripts/build-native.js`.
 
 `electron/lib/lifecycle.ts` owns startup identity: the unconditional Pika app name and the default Windows AUMID `com.pika.assistant.none`, plus unconditional startup tray visibility. `stealth.ts` no longer manages process identity or dock/tray visibility; `setUndetectable` keeps window content protection, persistence and broadcasts without changing focus. Dormant `disguiseMode` values remain in `settings.json`, preserved with other unknown keys by `SettingsManager`.
 
 ## Native echo cancellation
 
-`native-module/src/echo_cancellation.rs` owns a process-wide, bounded speaker reference and a per-microphone SpeexDSP echo state. The system DSP thread copies ungated mono PCM into the reference without waiting for the microphone; its existing output signal, frame size and buffering are unchanged. The microphone DSP thread aligns the reference, converts it to the microphone's hardware rate, cancels echo in 20ms frames with a 250ms filter, then runs the existing silence/VAD gate. Hardware-rate PCM and `get_sample_rate()` remain the STT contract; `resampler.rs` is not in this capture path.
+`native-module/src/echo_cancellation.rs` owns a process-wide, bounded speaker reference and a per-microphone SpeexDSP echo state. The system DSP thread copies ungated mono PCM into the reference without waiting for the microphone; its existing output signal, frame size and buffering are unchanged. The microphone DSP thread aligns the reference, converts it to the microphone's hardware rate, cancels echo in 20ms frames with a 250ms filter, then runs the silence gate. Hardware-rate PCM and `get_sample_rate()` remain the STT contract; `resampler.rs` is not in this capture path.
 
 Alignment uses sample-count clocks anchored to DSP arrival times, a fixed 40ms reference lead and 60ms microphone-only lookahead while reference frames are fresh. Missing, incomplete, stopped or 100ms-old reference data bypasses cancellation; a capture restart clears the reference and resets the adaptive filter. A zero reference bypasses too, after allowing the previous echo's 250ms tail to drain. No setting, IPC or NAPI surface is added. The text-level `electron/lib/echo-filter.ts` remains unchanged.
 
 `native-module/vendor/aec-rs-sys` is an echo-only adaptation of aec-rs-sys 1.0.0: unchanged BSD-licensed SpeexDSP/KISS FFT C sources, a portable `cc` build and fixed echo bindings instead of CMake/bindgen. Only a C compiler is needed by the new dependency. Alignment and real-device latency still require owner checks (issue #39).
+
+## Native silence gate
+
+`native-module/src/silence_suppression.rs` owns the gate both capture paths share: one RMS check against an adaptive threshold, with no voice detector. The noise floor is the quietest frame of the last 5 s in 100 ms buckets, so speech never raises it (a speaker pauses between words) and a steady hum does. Speech keeps being sent for a 1.2 s hangover; a separate 1 s `speech_end_after` reports the end once, which the Gemini Live adapter sends as `audioStreamEnd`. Both paths keep a preroll (300 ms on the microphone and on system audio), and a pause becomes one short silent keepalive chunk that `GeminiLiveSTT` and `ElevenLabsStreamingSTT` stretch back to the time that really passed.
 
 ## IPC boundary
 
