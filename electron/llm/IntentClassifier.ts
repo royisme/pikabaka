@@ -157,7 +157,7 @@ class ZeroShotClassifier {
             }
 
             const intent = ZERO_SHOT_LABELS[topLabel] || 'general';
-            console.log(`[IntentClassifier] SLM classified as "${intent}" (${(topScore * 100).toFixed(1)}%): "${text.substring(0, 60)}..."`);
+            console.log(`[IntentClassifier] SLM classified as "${intent}" (${(topScore * 100).toFixed(1)}%)`);
 
             return {
                 intent,

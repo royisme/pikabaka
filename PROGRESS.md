@@ -2,6 +2,11 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: logs no longer print any part of what was said (uncommitted)
+
+- `RestSTT`, `OpenAIStreamingSTT` (two lines), `IntentClassifier` and `IntelligenceEngine` printed the first 50 to 60 characters of a transcript. They now print the length, or nothing for the classifier. The rule is in `AGENTS.md`: never log a transcript. A scan of `electron/` for other logs that interpolate transcript, answer, prompt or query text found none; the release-notes summary is the app's own text and stays.
+- Checks: both `tsc --noEmit`, `oxlint`, the tap run. Not verified: the running app.
+
 ## 2026-10-30: the user's own speech shows on the live line (uncommitted)
 
 - Evidence: `useMeetingTranscript` dispatched a partial only for `them`; the `user` branch returned on every non-final event, so "Me" appeared as a row only after its final. The speech service's partial text was in the main process and the overlay dropped it.
