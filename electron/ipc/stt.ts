@@ -1,3 +1,4 @@
+import { buildEmbeddingConfig } from "../rag/embeddingConfig"
 import { fetchSttModels, STT_MODEL_PROVIDERS, type SttModelProvider } from "../utils/sttModels"
 import { AppState } from "../main"
 import { AudioDevices } from "../audio/AudioDevices"
@@ -18,7 +19,7 @@ export function registerSttHandlers(appState: AppState): void {
     return { success: true };
   });
 
-  safeHandle("set-stt-provider", async (_, provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox') => {
+  safeHandle("set-stt-provider", async (_, provider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini') => {
     try {
       const { CredentialsManager } = require('../services/CredentialsManager');
       CredentialsManager.getInstance().setSttProvider(provider);
@@ -52,7 +53,7 @@ export function registerSttHandlers(appState: AppState): void {
       const cm = CredentialsManager.getInstance();
       const saved: Record<string, string | undefined> = {
         groq: cm.getGroqSttApiKey(), openai: cm.getOpenAiSttApiKey(), deepgram: cm.getDeepgramApiKey(),
-        elevenlabs: cm.getElevenLabsApiKey(), soniox: cm.getSonioxApiKey(),
+        elevenlabs: cm.getElevenLabsApiKey(), soniox: cm.getSonioxApiKey(), gemini: cm.getGeminiApiKey(),
       };
       const models = await fetchSttModels(provider as SttModelProvider, (typeof apiKey === 'string' && apiKey.trim()) || saved[provider] || '');
       return { success: true, models };
@@ -181,6 +182,22 @@ export function registerSttHandlers(appState: AppState): void {
     }
   });
 
+  safeHandle("set-gemini-api-key", async (_, apiKey: string) => {
+    try {
+      const { CredentialsManager } = require('../services/CredentialsManager');
+      const cm = CredentialsManager.getInstance();
+      cm.setGeminiApiKey(apiKey);
+      // The same key serves the AI connection; embeddings that use it must follow it.
+      if (cm.getEmbeddingUse().connectionId === 'gemini') {
+        await appState.getRAGManager()?.initializeEmbeddings(buildEmbeddingConfig(cm), { force: true });
+      }
+      return { success: true };
+    } catch (error) {
+      console.error("Error saving Gemini API key:", error);
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
   safeHandle("set-soniox-api-key", async (_, apiKey: string) => {
     try {
       const { CredentialsManager } = require('../services/CredentialsManager');
@@ -198,7 +215,7 @@ export function registerSttHandlers(appState: AppState): void {
     return msg.replace(/:\s*[a-zA-Z0-9*]+\*+[a-zA-Z0-9*]+\.?$/g, '').trim();
   };
 
-  safeHandle("test-stt-connection", async (_, provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox', apiKey: string, region?: string) => {
+  safeHandle("test-stt-connection", async (_, provider: 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini', apiKey: string, region?: string) => {
     console.log(`[IPC] Received test - stt - connection request for provider: ${provider} `);
 
     // If no key provided, fall back to the stored key
@@ -213,6 +230,7 @@ export function registerSttHandlers(appState: AppState): void {
         azure: () => cm.getAzureApiKey(),
         ibmwatson: () => cm.getIbmWatsonApiKey(),
         soniox: () => cm.getSonioxApiKey(),
+        gemini: () => cm.getGeminiApiKey(),
       };
       apiKey = storedKeyMap[provider]?.() || '';
       if (!region && provider === 'azure') {
@@ -320,7 +338,13 @@ export function registerSttHandlers(appState: AppState): void {
       wavHeader.writeUInt32LE(pcmData.length, 40);
       const testWav = Buffer.concat([wavHeader, pcmData]);
 
-      if (provider === 'elevenlabs') {
+      if (provider === 'gemini') {
+        // Checks key acceptance by listing one model, not speech recognition.
+        await axios.get('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1', {
+          headers: { 'x-goog-api-key': apiKey },
+          timeout: 10000,
+        });
+      } else if (provider === 'elevenlabs') {
         // Checks key acceptance at /v1/voices, not speech recognition.
         await axios.get('https://api.elevenlabs.io/v1/voices', {
           headers: { 'xi-api-key': apiKey },
