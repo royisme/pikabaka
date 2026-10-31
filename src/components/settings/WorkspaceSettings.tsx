@@ -1,5 +1,6 @@
 import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { secondaryButton } from './buttonStyles';
 
 /**
  * The one folder the agent's commands run under. Inside it each day gets a folder and each meeting a
@@ -32,12 +33,12 @@ const WorkspaceSettings: React.FC = () => {
                 </div>
                 <button
                     onClick={() => pick.mutate()}
-                    className="shrink-0 h-11 px-4 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary transition-colors"
+                    className={`${secondaryButton} shrink-0 h-11`}
                 >
                     {root ? 'Change' : 'Choose folder'}
                 </button>
                 {root && (
-                    <button onClick={() => clear.mutate()} className="shrink-0 h-11 px-3 rounded-lg text-xs font-medium border border-border-subtle text-text-secondary hover:text-text-primary transition-colors">
+                    <button onClick={() => clear.mutate()} className={`${secondaryButton} shrink-0 h-11`}>
                         Remove
                     </button>
                 )}

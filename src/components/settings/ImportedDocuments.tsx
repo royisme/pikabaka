@@ -1,8 +1,7 @@
 import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DocumentIndexState, ImportedDocument } from '../../../electron/knowledge/types';
-
-const quietButton = 'px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-component text-xs font-medium text-text-secondary hover:bg-bg-input hover:text-text-primary disabled:opacity-50';
+import { primaryButton, secondaryButton } from './buttonStyles';
 
 const KIND_LABEL: Record<ImportedDocument['kind'], string> = { txt: 'Text', md: 'Markdown', docx: 'Word document' };
 
@@ -59,7 +58,7 @@ const ImportedDocuments: React.FC = () => {
         <div className="border-t border-border-subtle pt-3 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h4 className="text-sm font-semibold text-text-primary">Documents</h4>
-                <button type="button" disabled={importDocument.isPending} onClick={() => { importDocument.reset(); importDocument.mutate(); }} className={quietButton}>
+                <button type="button" disabled={importDocument.isPending} onClick={() => { importDocument.reset(); importDocument.mutate(); }} className={primaryButton}>
                     {importDocument.isPending ? 'Importing…' : 'Import a document'}
                 </button>
             </div>
@@ -80,7 +79,7 @@ const ImportedDocuments: React.FC = () => {
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {(doc.state === 'needs-reindex' || doc.state === 'failed' || doc.state === 'not-indexed') && (
-                            <button type="button" disabled={reindex.isPending} onClick={() => { reindex.reset(); reindex.mutate(doc.id); }} className={quietButton}>
+                            <button type="button" disabled={reindex.isPending} onClick={() => { reindex.reset(); reindex.mutate(doc.id); }} className={secondaryButton}>
                                 {reindex.isPending ? 'Re-indexing…' : 'Re-index'}
                             </button>
                         )}
@@ -88,7 +87,7 @@ const ImportedDocuments: React.FC = () => {
                             type="button"
                             disabled={remove.isPending}
                             onClick={() => { if (confirm(`Remove ${doc.name}?`)) { remove.reset(); remove.mutate(doc.id); } }}
-                            className={quietButton}
+                            className={secondaryButton}
                         >
                             {remove.isPending ? 'Removing…' : 'Remove'}
                         </button>

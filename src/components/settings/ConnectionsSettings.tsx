@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AiConnectionType, AiConnectionView, HeaderEdit } from '../../types/electron';
 import { connectionNeedsKey } from '../../../electron/services/aiConnections';
 import { configuredProvider, interfaceLabel, ProviderNavigation } from './ConnectionModelPicker';
+import { primaryButton, secondaryButton } from './buttonStyles';
 
 const TYPE_HINT: Record<AiConnectionType, string> = {
     openai: 'OpenAI, Groq, OpenRouter, DeepSeek, a gateway of your own, Ollama and LM Studio speak this interface.',
@@ -15,7 +16,6 @@ const DEFAULT_HOST: Record<AiConnectionType, string> = {
     gemini: 'https://generativelanguage.googleapis.com',
 };
 const field = 'w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary';
-const smallButton = 'min-h-9 px-3 py-2 rounded-lg text-xs font-medium border border-border-subtle bg-bg-component text-text-secondary hover:text-text-primary disabled:opacity-50';
 type TestResult = { success: boolean; message: string };
 type Uses = Array<{ name: string; connectionId: string }>;
 // One row of the custom-header draft: a saved row keeps its name and only sends a value the user typed.
@@ -68,12 +68,12 @@ export function ProviderList({ connections, uses, results, busyId, confirmId, ca
                     {result && <span className="block text-xs text-text-primary break-words [overflow-wrap:anywhere]">{result.success ? '●' : '✕ Test failed:'} {result.message}</span>}
                     {!c.builtin && usedBy.length > 0 && <span className="block text-[11px] text-text-secondary">Used by {usedBy.join(', ')}</span>}
                 </button>
-                {c.builtin ? <button type="button" disabled={!!busyId} onClick={() => onRemove(c)} className={smallButton}>{busyId === c.id ? 'Saving…' : 'Remove key and reset host'}</button>
+                {c.builtin ? <button type="button" disabled={!!busyId} onClick={() => onRemove(c)} className={secondaryButton}>{busyId === c.id ? 'Saving…' : 'Remove key and reset host'}</button>
                     : confirmId === c.id ? <div className="flex flex-wrap items-center gap-2 text-xs text-text-primary min-w-0">
                         <span className="break-words [overflow-wrap:anywhere]">Delete {c.name}?</span>
-                        <button type="button" disabled={!!busyId || !canDelete || !!usedBy.length} onClick={() => onRemove(c)} className={smallButton}>{busyId === c.id ? 'Deleting…' : 'Delete'}</button>
-                        <button type="button" disabled={!!busyId} onClick={() => onConfirm()} className={smallButton}>Keep</button>
-                    </div> : <button type="button" aria-label={`Delete ${c.name}`} disabled={!!busyId || !canDelete || !!usedBy.length} onClick={() => onConfirm(c.id)} className={smallButton}>Delete</button>}
+                        <button type="button" disabled={!!busyId || !canDelete || !!usedBy.length} onClick={() => onRemove(c)} className={secondaryButton}>{busyId === c.id ? 'Deleting…' : 'Delete'}</button>
+                        <button type="button" disabled={!!busyId} onClick={() => onConfirm()} className={secondaryButton}>Keep</button>
+                    </div> : <button type="button" aria-label={`Delete ${c.name}`} disabled={!!busyId || !canDelete || !!usedBy.length} onClick={() => onConfirm(c.id)} className={secondaryButton}>Delete</button>}
             </div>;
         })}
     </div>;
@@ -138,25 +138,25 @@ export function ProviderEditor({ connection, onClose, onSaved, onTest, onBusy, d
                                 <input type="password" aria-label={`Header ${index + 1} value`} autoComplete="off" value={row.value} onChange={e => changeHeader(index, { value: e.target.value })} placeholder={row.saved ? 'Saved. Type to replace.' : undefined} className={field} />
                             </label>}
                         {row.removed
-                            ? <button type="button" aria-label={`Keep ${row.name}`} onClick={() => changeHeader(index, { removed: false })} className={smallButton}>Keep</button>
-                            : <button type="button" aria-label={row.saved ? `Remove ${row.name}` : 'Remove header'} onClick={() => row.saved ? changeHeader(index, { removed: true, value: '' }) : changeHeaders(headers.filter((_, i) => i !== index))} className={smallButton}>Remove</button>}
+                            ? <button type="button" aria-label={`Keep ${row.name}`} onClick={() => changeHeader(index, { removed: false })} className={secondaryButton}>Keep</button>
+                            : <button type="button" aria-label={row.saved ? `Remove ${row.name}` : 'Remove header'} onClick={() => row.saved ? changeHeader(index, { removed: true, value: '' }) : changeHeaders(headers.filter((_, i) => i !== index))} className={secondaryButton}>Remove</button>}
                     </div>
                     {headerErrors[index] && <p className="text-[11px] text-state-danger">{headerErrors[index]}</p>}
                 </div>)}
-                <button type="button" onClick={() => changeHeaders([...headers, { name: '', value: '', saved: false, removed: false }])} className={smallButton}>Add header</button>
+                <button type="button" onClick={() => changeHeaders([...headers, { name: '', value: '', saved: false, removed: false }])} className={secondaryButton}>Add header</button>
             </div>}
         </fieldset>
         <p className="text-[11px] text-text-secondary">Asks the host for its model list. It does not check a model, images or tools.</p>
         <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy || headerErrors.some(Boolean)} className={smallButton} onClick={() => test.mutate(undefined, {
+            <button type="button" disabled={busy || headerErrors.some(Boolean)} className={secondaryButton} onClick={() => test.mutate(undefined, {
                 onSuccess: message => onTest({ success: true, message }),
                 onError: error => onTest({ success: false, message: (error as Error).message }),
             })}>{test.isPending ? 'Testing…' : 'Test'}</button>
-            <button type="button" disabled={busy || headerErrors.some(Boolean)} className="min-h-9 px-4 py-2 rounded-lg text-xs bg-primary text-on-primary disabled:opacity-50" onClick={() => {
+            <button type="button" disabled={busy || headerErrors.some(Boolean)} className={primaryButton} onClick={() => {
                 onBusy(true);
                 save.mutate(undefined, { onSuccess: onSaved, onSettled: () => onBusy(false) });
             }}>{save.isPending ? 'Saving…' : 'Save'}</button>
-            <button type="button" disabled={disabled || save.isPending} onClick={onClose} className={smallButton}>Cancel</button>
+            <button type="button" disabled={disabled || save.isPending} onClick={onClose} className={secondaryButton}>Cancel</button>
         </div>
         <div aria-live="polite" className="text-xs text-text-primary break-words [overflow-wrap:anywhere]">
             {test.isError ? <p>✕ Test failed: {(test.error as Error).message}</p> : test.data ? <p>● {test.data}</p> : null}
@@ -206,7 +206,7 @@ const ConnectionsSettings: React.FC<{ onChanged?: () => void }> = ({ onChanged }
         <section className="bg-bg-item-surface rounded-xl border border-border-subtle">
             <div className="p-4 flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-sm font-bold text-text-primary">Language model providers</h3>
-                <button type="button" disabled={busy} onClick={() => { remove.reset(); setEditor('add'); }} className={smallButton}>Add provider</button>
+                <button type="button" disabled={busy} onClick={() => { remove.reset(); setEditor('add'); }} className={primaryButton}>Add provider</button>
             </div>
             {connections.isLoading ? <p className="p-4 text-xs text-text-secondary">Loading providers…</p> : connections.isError ? <p role="alert" className="p-4 text-xs text-text-primary">✕ {(connections.error as Error).message}</p> : <ProviderList
                 connections={connections.data ?? []} uses={uses.data ?? []} results={results} busyId={busy ? remove.variables?.id ?? 'saving' : undefined}

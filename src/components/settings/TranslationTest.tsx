@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { secondaryButton } from './buttonStyles';
 
 interface TranslationTestProps {
     provider: string;
@@ -29,7 +30,7 @@ const TranslationTest: React.FC<TranslationTestProps> = ({ provider, model, prom
                 aria-expanded={showTest}
                 aria-controls="translation-test"
                 onClick={() => setShowTest(!showTest)}
-                className="bg-bg-component hover:bg-bg-elevated border border-border-subtle rounded-lg px-3 py-1.5 text-xs font-medium text-text-primary transition-colors"
+                className={secondaryButton}
             >
                 Test
             </button>
@@ -38,7 +39,7 @@ const TranslationTest: React.FC<TranslationTestProps> = ({ provider, model, prom
                     <button
                         onClick={() => test.mutate()}
                         disabled={test.isPending || !model.trim()}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary transition-colors disabled:opacity-50"
+                        className={secondaryButton}
                     >
                         {test.isPending ? '● Translating…' : 'Test translation'}
                     </button>

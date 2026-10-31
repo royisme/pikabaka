@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import ModelCombobox from './ModelCombobox';
+import { secondaryButton } from './buttonStyles';
 
 export const STT_MODEL_DEFAULTS: Record<string, string> = {
     deepgram: 'nova-3',
@@ -48,7 +49,7 @@ const SttModelPicker: React.FC<SttModelPickerProps> = ({ provider, model, apiKey
                 <button
                     onClick={() => void models.refetch()}
                     disabled={models.isFetching}
-                    className="h-11 px-3 shrink-0 rounded-lg text-xs font-medium border border-border-subtle text-text-secondary hover:text-text-primary disabled:opacity-40 transition-colors"
+                    className={`${secondaryButton} h-11 shrink-0`}
                 >
                     Fetch
                 </button>

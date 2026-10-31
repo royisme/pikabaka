@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { primaryButton } from './buttonStyles';
 
 /**
  * Facts about the user or their work, one per line. They are searched like an imported document when a
@@ -42,7 +43,7 @@ const NotesSettings: React.FC = () => {
                 <button
                     onClick={() => save.mutate(value)}
                     disabled={save.isPending || draft === null}
-                    className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${save.isSuccess && draft === null ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
+                    className={primaryButton}
                 >
                     {save.isPending ? 'Saving…' : save.isSuccess && draft === null ? 'Saved!' : 'Save notes'}
                 </button>

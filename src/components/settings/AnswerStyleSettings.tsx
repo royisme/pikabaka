@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { primaryButton, secondaryButton } from './buttonStyles';
 
 const PRESETS = [
     'Direct and first-principles, short blunt sentences, like Elon Musk',
@@ -33,7 +34,7 @@ const AnswerStyleSettings: React.FC = () => {
                 aria-expanded={expanded}
                 aria-controls="answer-style-settings"
                 onClick={() => setExpanded(!expanded)}
-                className="bg-bg-component hover:bg-bg-elevated border border-border-subtle rounded-lg px-3 py-1.5 text-xs font-medium text-text-primary"
+                className={secondaryButton}
             >
                 How answers sound
             </button>
@@ -54,7 +55,7 @@ const AnswerStyleSettings: React.FC = () => {
                     <button
                         onClick={() => save.mutate(value)}
                         disabled={save.isPending || draft === null}
-                        className={`shrink-0 h-11 px-4 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${save.isSuccess && draft === null ? 'bg-state-success-soft text-state-success' : 'bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary'}`}
+                        className={`${primaryButton} shrink-0 h-11`}
                     >
                         {save.isPending ? 'Saving…' : save.isSuccess && draft === null ? 'Saved!' : 'Save'}
                     </button>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { PromptPart, TaskName } from '../../../electron/llm/prompts';
+import { primaryButton, secondaryButton } from './buttonStyles';
 
 const TASK_LABELS: Array<[TaskName, string]> = [
     ['answer', 'Answer'],
@@ -15,7 +16,6 @@ const TASK_LABELS: Array<[TaskName, string]> = [
     ['chat', 'Chat'],
 ];
 
-const quietButton = 'px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-component text-xs font-medium text-text-secondary hover:bg-bg-input hover:text-text-primary disabled:opacity-50 transition-colors';
 const fieldClass = 'w-full min-w-0 bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors';
 
 type SaveRequest = { key: 'role' | TaskName; text: string | null };
@@ -87,7 +87,7 @@ const PromptsSettings: React.FC = () => {
                             aria-label={`Reset ${label}`}
                             onClick={() => request(key, null)}
                             disabled={!part.edited || activeKey === key}
-                            className={quietButton}
+                            className={secondaryButton}
                         >
                             Reset to default
                         </button>
@@ -96,7 +96,7 @@ const PromptsSettings: React.FC = () => {
                             aria-label={`Save ${label}`}
                             onClick={() => request(key, drafts[key] ?? part.text)}
                             disabled={drafts[key] === undefined || activeKey === key || overLimit}
-                            className={quietButton}
+                            className={primaryButton}
                         >
                             {activeKey === key ? 'Saving…' : 'Save'}
                         </button>
@@ -116,7 +116,7 @@ const PromptsSettings: React.FC = () => {
                 aria-expanded={expanded}
                 aria-controls="prompts-settings"
                 onClick={() => setExpanded(!expanded)}
-                className="bg-bg-component hover:bg-bg-elevated border border-border-subtle rounded-lg px-3 py-1.5 text-xs font-medium text-text-primary transition-colors"
+                className={secondaryButton}
             >
                 Prompts
             </button>

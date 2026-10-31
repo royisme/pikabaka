@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import packageJson from '../../package.json';
 import { useMainEvent } from '../hooks/useMainEvent';
 import { describeUpdateError } from '../lib/updateError';
+import { primaryButton, secondaryButton } from './settings/buttonStyles';
 
 type UpdateStatus =
     | { kind: 'idle' | 'checking' | 'uptodate' }
@@ -139,7 +140,7 @@ export const UpdatesCard: React.FC = () => {
                     type="button"
                     onClick={handleAction}
                     disabled={busy}
-                    className={`shrink-0 px-3 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-wait ${ready ? 'bg-accent-primary text-on-primary hover:bg-accent-secondary' : 'bg-bg-component text-text-primary hover:bg-bg-input'}`}
+                    className={`${ready ? primaryButton : secondaryButton} shrink-0`}
                 >
                     {actionLabel}
                 </button>

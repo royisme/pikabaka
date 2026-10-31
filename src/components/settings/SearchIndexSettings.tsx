@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ConnectionModelPicker from './ConnectionModelPicker';
+import { primaryButton, secondaryButton } from './buttonStyles';
 
 type EmbeddingUse = { connectionId: string; model: string };
 
@@ -66,7 +67,7 @@ const SearchIndexSettings: React.FC = () => {
                     <button
                         onClick={() => save.mutate(value)}
                         disabled={!saved}
-                        className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${save.isSuccess && !draft ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
+                        className={primaryButton}
                     >
                         {save.isPending ? 'Saving…' : save.isSuccess && !draft ? 'Saved!' : 'Save'}
                     </button>
@@ -82,7 +83,7 @@ const SearchIndexSettings: React.FC = () => {
                             <button
                                 onClick={() => rebuild.mutate()}
                                 disabled={busy}
-                                className="px-4 py-2 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-40 transition-colors"
+                                className={secondaryButton}
                             >
                                 {rebuild.isPending ? 'Rebuilding…' : 'Rebuild index'}
                             </button>
@@ -98,7 +99,7 @@ const SearchIndexSettings: React.FC = () => {
                             <button
                                 onClick={() => { reindex.reset(); retry.mutate(); }}
                                 disabled={busy}
-                                className="px-4 py-2 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-40 transition-colors"
+                                className={secondaryButton}
                             >
                                 {retry.isPending ? 'Retrying…' : 'Retry failed'}
                             </button>
@@ -111,7 +112,7 @@ const SearchIndexSettings: React.FC = () => {
                                 else { setConfirmCount(null); retry.reset(); reindex.mutate(); }
                             }}
                             disabled={busy || !current}
-                            className="px-4 py-2 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-40 transition-colors"
+                            className={secondaryButton}
                         >
                             {reindex.isPending ? 'Re-indexing…' : confirmCount === null ? 'Re-index all' : `Re-index ${confirmCount} meetings?`}
                         </button>

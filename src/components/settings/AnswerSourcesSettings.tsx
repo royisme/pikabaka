@@ -1,7 +1,6 @@
 import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-
-const quietButton = 'px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-component text-xs font-medium text-text-secondary hover:bg-bg-input hover:text-text-primary disabled:opacity-50';
+import { secondaryButton } from './buttonStyles';
 
 type AnswerSources = { meetings: boolean; materials: boolean };
 
@@ -46,7 +45,7 @@ const AnswerSourcesSettings: React.FC = () => {
                                 save.reset();
                                 save.mutate({ key, value: !on });
                             }}
-                            className={quietButton}
+                            className={secondaryButton}
                         >
                             {sources.data === undefined ? stateText : on ? '● On' : '○ Off'}
                         </button>

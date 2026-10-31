@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AgentGateDecision } from '../../types/electron';
+import { primaryButton, secondaryButton } from './buttonStyles';
 
 type Mode = 'log' | 'on' | 'off';
 type Status = Awaited<ReturnType<Window['electronAPI']['agentGateStatus']>>;
@@ -131,14 +132,14 @@ const ProactiveHelpSettings = ({ onOpenProviders }: { onOpenProviders: () => voi
                     <button
                         onClick={() => save.mutate()}
                         disabled={save.isPending}
-                        className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${showSaved ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
+                        className={primaryButton}
                     >
                         {showSaved ? 'Saved!' : 'Save proactive help settings'}
                     </button>
                     <button
                         onClick={() => test.mutate()}
                         disabled={test.isPending}
-                        className="px-4 py-2 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary transition-colors disabled:opacity-50"
+                        className={secondaryButton}
                     >
                         {test.isPending ? 'Testing…' : 'Test decision model'}
                     </button>
@@ -166,7 +167,7 @@ const ProactiveHelpSettings = ({ onOpenProviders }: { onOpenProviders: () => voi
                 <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                         <label className="text-xs font-medium text-text-secondary block">Latest decisions</label>
-                        <button onClick={() => void refreshAll()} className="text-[11px] text-text-tertiary hover:text-text-primary transition-colors">
+                        <button onClick={() => void refreshAll()} className={secondaryButton}>
                             Refresh
                         </button>
                     </div>
