@@ -2,6 +2,7 @@ import React, { createContext, useContext } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { AiConnectionType, AiConnectionView } from '../../types/electron';
 import ModelCombobox from './ModelCombobox';
+import { secondaryButton } from './buttonStyles';
 
 export const ProviderNavigation = createContext<{ editorId?: string; open: (id?: string) => void } | null>(null);
 export const configuredProvider = (c: AiConnectionView) => !c.builtin || c.hasApiKey || c.customBaseUrl;
@@ -10,7 +11,6 @@ export const interfaceLabel: Record<AiConnectionType, string> = {
 };
 
 const field = 'w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors';
-const smallButton = 'h-11 px-3 shrink-0 rounded-lg text-xs font-medium border border-border-subtle text-text-secondary hover:text-text-primary disabled:opacity-40 transition-colors';
 
 interface ConnectionModelPickerProps {
     /** Distinguishes the fields' ids when more than one picker is on a page. */
@@ -82,7 +82,7 @@ const ConnectionModelPicker: React.FC<ConnectionModelPickerProps> = ({ id, conne
                             placeholder={modelPlaceholder}
                             disabled={connectionId === '' && emptyLabel !== undefined}
                         />
-                        <button onClick={() => void models.refetch()} disabled={!connectionId || models.isFetching} className={smallButton}>Fetch</button>
+                        <button onClick={() => void models.refetch()} disabled={!connectionId || models.isFetching} className={`${secondaryButton} h-11 shrink-0`}>Fetch</button>
                     </div>
                 </div>
             </div>

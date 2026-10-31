@@ -4,8 +4,8 @@ import NotesSettings from './NotesSettings';
 import ImportedDocuments from './ImportedDocuments';
 import AnswerSourcesSettings from './AnswerSourcesSettings';
 import SearchIndexSettings from './SearchIndexSettings';
+import { primaryButton, secondaryButton } from './buttonStyles';
 
-const quietButton = 'px-3 py-1.5 rounded-lg border border-border-subtle bg-bg-component text-xs font-medium text-text-secondary hover:bg-bg-input hover:text-text-primary disabled:opacity-50';
 const card = 'bg-bg-item-surface rounded-xl border border-border-subtle p-5 space-y-3';
 
 const KnowledgeSettings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
@@ -58,7 +58,7 @@ const KnowledgeSettings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                     {meetings.error ? `✕ ${String(meetings.error instanceof Error ? meetings.error.message : meetings.error)}` : meetings.data ? `● ${meetings.data.length === 50 ? 'The latest ' : ''}${meetings.data.length} recorded meetings` : '● Loading meeting history…'}
                                 </p>
                             </div>
-                            <button type="button" onClick={onClose} className={quietButton}>Open meeting history</button>
+                            <button type="button" onClick={onClose} className={secondaryButton}>Open meeting history</button>
                         </div>
                         <div className="border-t border-border-subtle pt-3 space-y-3">
                             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -83,14 +83,14 @@ const KnowledgeSettings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                 </div>
                                 {notes.data && (
                                     <div className="flex flex-wrap gap-2">
-                                        <button type="button" aria-expanded={editingNotes} onClick={() => setEditingNotes(!editingNotes)} className={quietButton}>Edit</button>
+                                        <button type="button" aria-expanded={editingNotes} onClick={() => setEditingNotes(!editingNotes)} className={secondaryButton}>Edit</button>
                                         <button
                                             type="button"
                                             disabled={removeNotes.isPending}
                                             onClick={() => {
                                                 if (confirm('Remove your saved notes?')) removeNotes.mutate();
                                             }}
-                                            className={quietButton}
+                                            className={secondaryButton}
                                         >
                                             {removeNotes.isPending ? 'Removing…' : 'Remove'}
                                         </button>
@@ -100,7 +100,7 @@ const KnowledgeSettings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                             {notes.data === '' && !editingNotes && (
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                     <p className="text-xs text-text-secondary">Add a note for Pika to search.</p>
-                                    <button type="button" onClick={() => setEditingNotes(true)} className="px-3 py-1.5 rounded-lg bg-accent-primary text-on-primary text-xs font-medium">Write a note</button>
+                                    <button type="button" onClick={() => setEditingNotes(true)} className={primaryButton}>Write a note</button>
                                 </div>
                             )}
                             {removeNotes.error ? <p role="alert" className="text-xs text-text-primary">✕ {String(removeNotes.error instanceof Error ? removeNotes.error.message : removeNotes.error)}</p> : null}

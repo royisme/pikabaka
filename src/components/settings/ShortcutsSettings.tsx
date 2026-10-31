@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronRight, RotateCcw } from 'lucide-react';
 import { useShortcuts } from '../../hooks/useShortcuts';
 import { KeyRecorder } from '../ui/KeyRecorder';
+import { secondaryButton } from './buttonStyles';
 
 /**
  * The "Shortcuts" tab: its state and handlers run in the settings overlay's own render
@@ -27,7 +28,7 @@ export function renderShortcutsSettings(state: ReturnType<typeof useShortcutsSet
                 </div>
                 <button
                     onClick={resetShortcuts}
-                    className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-border-subtle bg-bg-subtle/30 hover:bg-bg-subtle hover:border-state-success-border transition-all duration-200 text-xs font-medium text-text-secondary hover:text-state-success active:scale-95 mt-1 whitespace-nowrap"
+                    className={`${secondaryButton} flex items-center gap-2 whitespace-nowrap mt-1`}
                 >
                     <RotateCcw size={13} strokeWidth={2.5} />
                     Restore defaults

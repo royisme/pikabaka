@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { primaryButton, secondaryButton } from './buttonStyles';
 
 const field = 'w-full min-w-0 h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary';
-const smallButton = 'min-h-9 px-3 py-2 rounded-lg text-xs font-medium border border-border-subtle bg-bg-component text-text-secondary hover:text-text-primary disabled:opacity-50';
 
 const DecisionServiceSettings = () => {
     const queryClient = useQueryClient();
@@ -50,13 +50,13 @@ const DecisionServiceSettings = () => {
                 <label className="block text-xs text-text-secondary space-y-1">API key<input aria-label="API key" type="password" autoComplete="off" value={apiKey} onChange={e => setDraft({ ...draft, apiKey: e.target.value })} placeholder={settings.data?.hasApiKey ? 'Saved. Leave empty to keep it.' : 'Optional for a local address'} className={field} /></label>
             </fieldset>
             <div className="flex flex-wrap items-center gap-2">
-                <button type="button" disabled={busy} onClick={() => save.mutate()} className={smallButton}>{save.isPending ? 'Saving…' : 'Save'}</button>
-                <button type="button" disabled={busy} onClick={() => test.mutate()} className={smallButton}>{test.isPending ? 'Testing…' : 'Test'}</button>
+                <button type="button" disabled={busy} onClick={() => save.mutate()} className={primaryButton}>{save.isPending ? 'Saving…' : 'Save'}</button>
+                <button type="button" disabled={busy} onClick={() => test.mutate()} className={secondaryButton}>{test.isPending ? 'Testing…' : 'Test'}</button>
                 {settings.data?.hasApiKey && (confirmRemove ? <div className="flex flex-wrap items-center gap-2 text-xs text-text-primary min-w-0">
                     <span>Remove decision service key?</span>
-                    <button type="button" disabled={busy} onClick={() => remove.mutate()} className={smallButton}>{remove.isPending ? 'Removing…' : 'Remove'}</button>
-                    <button type="button" disabled={busy} onClick={() => setConfirmRemove(false)} className={smallButton}>Keep</button>
-                </div> : <button type="button" disabled={busy} onClick={() => { remove.reset(); setConfirmRemove(true); }} className={smallButton}>Remove key</button>)}
+                    <button type="button" disabled={busy} onClick={() => remove.mutate()} className={secondaryButton}>{remove.isPending ? 'Removing…' : 'Remove'}</button>
+                    <button type="button" disabled={busy} onClick={() => setConfirmRemove(false)} className={secondaryButton}>Keep</button>
+                </div> : <button type="button" disabled={busy} onClick={() => { remove.reset(); setConfirmRemove(true); }} className={secondaryButton}>Remove key</button>)}
                 <span aria-live="polite" className="text-xs text-text-secondary">{showSaved ? '● Saved' : ''}</span>
             </div>
             <p className="text-[11px] text-text-tertiary">Uses the saved decision model from Proactive help and an invented question, not an endpoint-only check.</p>

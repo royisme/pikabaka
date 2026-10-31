@@ -8,6 +8,7 @@ import SttModelPicker, { STT_MODEL_DEFAULTS } from './SttModelPicker';
 import { speechServices } from './SpeechProvidersSettings';
 import TranslationSettings from './TranslationSettings';
 import { CustomSelect, ProviderSelect } from './AudioSelects';
+import { primaryButton, secondaryButton } from './buttonStyles';
 
 // Providers that don't support multi-language / auto-detect in a single request.
 const STT_PROVIDERS_WITHOUT_AUTO = new Set(['azure', 'ibmwatson']);
@@ -464,7 +465,7 @@ export function renderAudioSettings(
                                     console.error("Error playing test sound", e);
                                 }
                             }}
-                            className="text-xs bg-bg-input hover:bg-bg-elevated text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-2"
+                            className={`${secondaryButton} flex items-center gap-2`}
                         >
                             <Speaker size={12} /> Test Sound
                         </button>
@@ -604,7 +605,7 @@ export function renderAudioSettings(
                             <button
                                 onClick={handleSaveSpeechSettings}
                                 disabled={speechSaving || !speechServiceConfigured}
-                                className="px-5 py-2.5 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-50 transition-colors"
+                                className={primaryButton}
                             >
                                 {speechSaving ? '● Saving...' : 'Save speech settings'}
                             </button>

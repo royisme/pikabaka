@@ -4,6 +4,7 @@ import ConnectionModelPicker from './ConnectionModelPicker';
 import AnswerLanguageSetting from './AnswerLanguageSetting';
 import AnswerStyleSettings from './AnswerStyleSettings';
 import PromptsSettings from './PromptsSettings';
+import { primaryButton, secondaryButton } from './buttonStyles';
 
 type ModelUse = { connectionId: string; model: string; supportsImages?: boolean };
 type Job = 'chat' | 'summary' | 'agent';
@@ -86,7 +87,7 @@ const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
                     <button
                         onClick={() => save.mutate(value)}
                         disabled={!saved}
-                        className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${save.isSuccess && !draft ? 'bg-state-success-soft text-state-success' : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary'}`}
+                        className={primaryButton}
                     >
                         {save.isPending ? 'Saving…' : save.isSuccess && !draft ? 'Saved!' : 'Save'}
                     </button>
@@ -95,7 +96,7 @@ const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
                         aria-expanded={showTest}
                         aria-controls={`${job}-model-test`}
                         onClick={() => setShowTest(!showTest)}
-                        className="bg-bg-component hover:bg-bg-elevated border border-border-subtle rounded-lg px-3 py-1.5 text-xs font-medium text-text-primary transition-colors"
+                        className={secondaryButton}
                     >
                         Test
                     </button>
@@ -105,7 +106,7 @@ const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
                     <button
                         onClick={() => test.mutate()}
                         disabled={test.isPending || !saved}
-                        className="px-3 py-2 rounded-lg text-xs font-medium bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary transition-colors disabled:opacity-50"
+                        className={secondaryButton}
                     >
                         {test.isPending ? 'Testing…' : job === 'agent' ? 'Test agent model' : job === 'chat' ? 'Test quick answers model' : 'Test summaries model'}
                     </button>

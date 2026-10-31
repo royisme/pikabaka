@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { primaryButton, secondaryButton } from './buttonStyles';
 
 type Credentials = Awaited<ReturnType<typeof window.electronAPI.getStoredCredentials>>;
 type Service = Credentials['sttProvider'];
@@ -22,7 +23,6 @@ const keyUrls: Partial<Record<Service, string>> = {
     gemini: 'https://aistudio.google.com/apikey',
 };
 const field = 'w-full min-w-0 h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary';
-const smallButton = 'min-h-9 px-3 py-2 rounded-lg text-xs font-medium border border-border-subtle bg-bg-component text-text-secondary hover:text-text-primary disabled:opacity-50';
 
 function setSpeechKey(provider: Exclude<Service, 'google'>, key: string) {
     const api = window.electronAPI;
@@ -100,7 +100,7 @@ const SpeechProvidersSettings = () => {
     <section className="bg-bg-item-surface rounded-xl border border-border-subtle min-w-0">
         <div className="p-4 flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-sm font-bold text-text-primary">Speech-to-text providers</h3>
-            <button type="button" disabled={busy} onClick={() => open('add')} className={smallButton}>Add provider</button>
+            <button type="button" disabled={busy} onClick={() => open('add')} className={primaryButton}>Add provider</button>
         </div>
         {credentials.isLoading ? <p className="p-4 text-xs text-text-secondary">Loading speech providers…</p>
             : credentials.isError ? <p role="alert" className="p-4 text-xs text-text-primary">✕ {(credentials.error as Error).message}</p>
@@ -118,9 +118,9 @@ const SpeechProvidersSettings = () => {
                     : service.id === 'gemini' ? <p className="text-[11px] text-text-secondary">This key is shared with AI providers; remove it there.</p>
                     : confirmService === service.id ? <div className="flex flex-wrap items-center gap-2 text-xs text-text-primary min-w-0">
                         <span className="break-words [overflow-wrap:anywhere]">Remove {service.name}?</span>
-                        <button type="button" disabled={busy} onClick={() => { if (service.id !== 'google') remove.mutate(service.id); }} className={smallButton}>{remove.isPending ? 'Removing…' : 'Remove'}</button>
-                        <button type="button" disabled={busy} onClick={() => setConfirmService(undefined)} className={smallButton}>Keep</button>
-                    </div> : <button type="button" aria-label={`Remove ${service.name}`} disabled={busy} onClick={() => { remove.reset(); setConfirmService(service.id); }} className={smallButton}>Remove</button>}
+                        <button type="button" disabled={busy} onClick={() => { if (service.id !== 'google') remove.mutate(service.id); }} className={secondaryButton}>{remove.isPending ? 'Removing…' : 'Remove'}</button>
+                        <button type="button" disabled={busy} onClick={() => setConfirmService(undefined)} className={secondaryButton}>Keep</button>
+                    </div> : <button type="button" aria-label={`Remove ${service.name}`} disabled={busy} onClick={() => { remove.reset(); setConfirmService(service.id); }} className={secondaryButton}>Remove</button>}
             </div>)}
         {remove.isError && <p role="alert" className="p-4 text-xs text-text-primary break-words [overflow-wrap:anywhere]">✕ {(remove.error as Error).message}</p>}
     </section>
@@ -136,7 +136,7 @@ const SpeechProvidersSettings = () => {
         {sttProvider === 'google' ? <div className="space-y-2">
             <p className="text-xs text-text-secondary">Service account file</p>
             <p className="text-xs text-text-primary break-words [overflow-wrap:anywhere]">{credentials.data?.googleServiceAccountPath?.split(/[\\/]/).pop() || 'No file selected'}</p>
-            <button type="button" disabled={busy} onClick={() => chooseFile.mutate()} className={smallButton}>{chooseFile.isPending ? 'Choosing file…' : 'Choose file'}</button>
+            <button type="button" disabled={busy} onClick={() => chooseFile.mutate()} className={secondaryButton}>{chooseFile.isPending ? 'Choosing file…' : 'Choose file'}</button>
             <p className="text-[11px] text-text-secondary">Choosing a file saves it immediately. Account Test and removal are not available.</p>
         </div> : <div className="space-y-3">
             <p className="text-xs text-text-secondary">{configured ? '● Key saved' : '○ No key'}</p>
@@ -147,10 +147,10 @@ const SpeechProvidersSettings = () => {
         </div>}
         </fieldset>
         <div className="flex flex-wrap gap-2">
-            {sttProvider !== 'google' && <button type="button" disabled={busy} onClick={() => test.mutate()} className={smallButton}>{test.isPending ? 'Testing…' : 'Test'}</button>}
-            {sttProvider !== 'google' && <button type="button" disabled={busy || (!sttKey.trim() && !(sttProvider === 'azure' && configured)) || (sttProvider === 'azure' && !region.trim())} onClick={() => save.mutate()} className={smallButton}>{save.isPending ? 'Saving…' : 'Save'}</button>}
-            <button type="button" disabled={busy} onClick={() => setEditor(null)} className={smallButton}>Cancel</button>
-            {keyUrls[sttProvider] && <button type="button" disabled={busy} onClick={() => void window.electronAPI.openExternal(keyUrls[sttProvider]!)} className={smallButton}>Get API key</button>}
+            {sttProvider !== 'google' && <button type="button" disabled={busy} onClick={() => test.mutate()} className={secondaryButton}>{test.isPending ? 'Testing…' : 'Test'}</button>}
+            {sttProvider !== 'google' && <button type="button" disabled={busy || (!sttKey.trim() && !(sttProvider === 'azure' && configured)) || (sttProvider === 'azure' && !region.trim())} onClick={() => save.mutate()} className={primaryButton}>{save.isPending ? 'Saving…' : 'Save'}</button>}
+            <button type="button" disabled={busy} onClick={() => setEditor(null)} className={secondaryButton}>Cancel</button>
+            {keyUrls[sttProvider] && <button type="button" disabled={busy} onClick={() => void window.electronAPI.openExternal(keyUrls[sttProvider]!)} className={secondaryButton}>Get API key</button>}
         </div>
         {sttProvider !== 'google' && <p className="text-[11px] text-text-tertiary">Checks the key, not the selected model or languages.</p>}
         <div aria-live="polite" className="text-xs text-text-primary break-words [overflow-wrap:anywhere]">

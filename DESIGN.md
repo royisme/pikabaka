@@ -72,6 +72,11 @@ The audio status is shown once (`src/lib/audioStatus.ts`): the top-bar chip carr
 
 ## Controls
 
+Application buttons (the settings pages; not the overlay):
+- The commit action of a section is `primaryButton`: the filled `bg-primary` / `text-on-primary` pair, 12px, 36px high.
+- Every other action button is `secondaryButton`: the same size, with a border that is visible against the panel.
+- Both are shared from `src/components/settings/buttonStyles.ts`; a page does not define its own button classes.
+
 - 28px high in the bar and the composer; icon-only buttons are 28px square, with an accessible name.
 - From 560px up Translate and Original are buttons in the bar and secondary actions show their words; below 560px they move into the menu or become icon-only, so nothing is ever cut off.
 - Hide and Stop sit at the right of the bar; Stop needs a second press within three seconds.

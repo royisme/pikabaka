@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
 import ConnectionModelPicker from './ConnectionModelPicker';
 import TranslationTest from './TranslationTest';
+import { primaryButton, secondaryButton } from './buttonStyles';
 
 const DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT =
     'You are a realtime subtitle translator. Preserve meaning, tone, technical terms, product names, numbers, and code tokens exactly when appropriate. Do not summarize, do not add explanations, and do not omit information. Return only the translated sentence(s), with no prefix/suffix and no markdown.';
@@ -29,8 +30,6 @@ type TranslationValues = {
 
 const fieldLabel = 'text-xs font-medium text-text-secondary block';
 const field = 'w-full h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors';
-const quietButton = 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary transition-colors';
-const disclosureButton = 'bg-bg-component hover:bg-bg-elevated border border-border-subtle rounded-lg px-3 py-1.5 text-xs font-medium text-text-primary transition-colors';
 
 /**
  * Recorded speech is translated after the fact. What is shown is a draft over the saved settings; Save
@@ -137,7 +136,7 @@ const TranslationSettings = ({ languages }: { languages: Array<{ value: string; 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <button
                         onClick={() => void save()}
-                        className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${savedShown ? 'bg-state-success-soft text-state-success' : quietButton}`}
+                        className={primaryButton}
                     >
                         {savedShown ? '✓ Saved' : 'Save Translation Settings'}
                     </button>
@@ -151,7 +150,7 @@ const TranslationSettings = ({ languages }: { languages: Array<{ value: string; 
                         aria-expanded={showAdvanced}
                         aria-controls="translation-advanced"
                         onClick={() => setShowAdvanced(!showAdvanced)}
-                        className={disclosureButton}
+                        className={secondaryButton}
                     >
                         Advanced
                     </button>
@@ -194,7 +193,7 @@ const TranslationSettings = ({ languages }: { languages: Array<{ value: string; 
                                 <button
                                     type="button"
                                     onClick={() => change({ prompt: DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT })}
-                                    className="text-[11px] text-text-tertiary hover:text-text-primary transition-colors"
+                                    className={secondaryButton}
                                 >
                                     Reset to Default
                                 </button>
