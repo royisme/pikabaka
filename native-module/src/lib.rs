@@ -148,7 +148,7 @@ impl SystemAudioCapture {
                 native_rate
             );
 
-            // 2. DSP loop with silence suppression + WebRTC VAD
+            // 2. DSP loop with silence suppression
             let mut suppressor = SilenceSuppressor::new(SilenceSuppressionConfig {
                 native_sample_rate: native_rate,
                 ..SilenceSuppressionConfig::for_system_audio()
@@ -209,7 +209,7 @@ impl SystemAudioCapture {
                         }
                     }
 
-                    // Fire speech_ended callback on the exact transition frame
+                    // Fire speech_ended callback once, speech_end_after the last loud frame
                     if speech_ended {
                         if let Some(ref se_tsfn) = speech_ended_tsfn {
                             se_tsfn.call(Ok(true), ThreadsafeFunctionCallMode::NonBlocking);
@@ -335,7 +335,7 @@ impl MicrophoneCapture {
             .take_consumer()
             .ok_or_else(|| napi::Error::from_reason("Failed to get consumer"))?;
 
-        // DSP thread with silence suppression + WebRTC VAD
+        // DSP thread with silence suppression
         self.capture_thread = Some(thread::spawn(move || {
             let mut suppressor = SilenceSuppressor::new(SilenceSuppressionConfig {
                 native_sample_rate: native_rate,
@@ -349,7 +349,7 @@ impl MicrophoneCapture {
             let mut frame_buffer: Vec<i16> = Vec::with_capacity(chunk_size * 4);
             let mut raw_batch: Vec<f32> = Vec::with_capacity(4096);
 
-            println!("[MicrophoneCapture] DSP thread started (VAD + suppression active, rate={}Hz, chunk={})", native_rate, chunk_size);
+            println!("[MicrophoneCapture] DSP thread started (suppression active, rate={}Hz, chunk={})", native_rate, chunk_size);
 
             loop {
                 if stop_signal.load(Ordering::Relaxed) {
