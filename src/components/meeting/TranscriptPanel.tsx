@@ -5,8 +5,7 @@ import type { AudioStatus } from '../../lib/audioStatus';
 
 interface TranscriptPanelProps {
     transcriptSegments: TranscriptSegment[];
-    isThemSpeaking: boolean;
-    currentThemPartial: string;
+    livePartial: { label: string; text: string } | null;
     transcriptDisplayMode: TranscriptDisplayMode;
     translationEnabled: boolean;
     showTranscript: boolean;
@@ -17,8 +16,7 @@ interface TranscriptPanelProps {
 
 const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
     transcriptSegments,
-    isThemSpeaking,
-    currentThemPartial,
+    livePartial,
     transcriptDisplayMode,
     translationEnabled,
     showTranscript,
@@ -26,7 +24,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
     status,
     onFixAudio,
 }) => {
-    const hasTranscriptContent = transcriptSegments.length > 0 || isThemSpeaking;
+    const hasTranscriptContent = transcriptSegments.length > 0 || livePartial !== null;
     const zone = status.zone;
 
     return (
@@ -35,7 +33,8 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                 {showTranscript && hasTranscriptContent ? (
                     <RollingTranscript
                         segments={transcriptSegments}
-                        partialText={isThemSpeaking ? currentThemPartial : undefined}
+                        partialText={livePartial?.text}
+                        partialSpeakerLabel={livePartial?.label}
                         displayMode={transcriptDisplayMode}
                         translationOn={translationEnabled}
                         onTranslateSegment={handleTranslateTranscriptSegment}

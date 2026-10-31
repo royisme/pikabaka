@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type SetStateAction } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { isTranscriptArrival, type TranscriptDisplayMode, type TranscriptSegment } from '../lib/transcriptSegments';
-import { initialMeetingTranscriptState, meetingTranscriptReducer, type TranscriptSettingsPatch } from './meetingTranscriptReducer';
+import { initialMeetingTranscriptState, livePartialOf, meetingTranscriptReducer, type TranscriptSettingsPatch } from './meetingTranscriptReducer';
 import { useLocalStorageValue } from './useLocalStorageValue';
 import { useMainEvent } from './useMainEvent';
+
+/** How long the user's live line stays without a new partial or a row; a row follows a final within a few seconds. */
+const MY_LIVE_LINE_STALE_MS = 8000;
 
 export function useMeetingTranscript() {
   const [state, dispatch] = useReducer(meetingTranscriptReducer, initialMeetingTranscriptState);
@@ -33,6 +36,7 @@ export function useMeetingTranscript() {
     [storedShowTranscript, setStoredShowTranscript]
   );
   const speakingTimeoutRef = useRef<number | null>(null);
+  const mySpeakingTimeoutRef = useRef<number | null>(null);
 
   const { data: languageOptions = [] } = useQuery({ queryKey: ['recognition-languages'], queryFn: async () => {
       const languages = await window.electronAPI?.getRecognitionLanguages?.();
@@ -116,32 +120,45 @@ export function useMeetingTranscript() {
 
   useMainEvent(window.electronAPI?.onNativeAudioTranscript, (transcript) => {
     if (transcript.speaker === 'user') {
-      if (transcript.final) {
-        const normalizedSegmentId =
-          transcript.segmentId ||
-          `user_${transcript.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-        dispatch({
-          type: 'segmentUpserted',
-          now: Date.now(),
-          event: {
-            final: true,
-            text: transcript.text,
-            sourceText: transcript.sourceText,
-            translatedText: transcript.translatedText,
-            segmentId: normalizedSegmentId,
-            speaker: 'user',
-            speakerLabel: 'Me',
-            timestamp: transcript.timestamp,
-            translationState: transcript.translationState,
-            translationError: transcript.translationError,
-            detectedLanguage: transcript.detectedLanguage,
-            revision: transcript.revision,
-          },
-        });
-
-        // Own speech is never translated, so its `skipped` says nothing about whether translation is on.
+      if (!transcript.final) {
+        dispatch({ type: 'mePartial', text: transcript.text });
+        // A partial whose final was dropped (the echo filter) must not stay on the live line through the silence.
+        if (mySpeakingTimeoutRef.current) window.clearTimeout(mySpeakingTimeoutRef.current);
+        mySpeakingTimeoutRef.current = window.setTimeout(() => {
+          dispatch({ type: 'meSpeakingEnded' });
+          mySpeakingTimeoutRef.current = null;
+        }, MY_LIVE_LINE_STALE_MS);
+        return;
       }
+      const normalizedSegmentId =
+        transcript.segmentId ||
+        `user_${transcript.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+      const event = {
+        final: true as const,
+        text: transcript.text,
+        sourceText: transcript.sourceText,
+        translatedText: transcript.translatedText,
+        segmentId: normalizedSegmentId,
+        speaker: 'user' as const,
+        speakerLabel: 'Me',
+        timestamp: transcript.timestamp,
+        translationState: transcript.translationState,
+        translationError: transcript.translationError,
+        detectedLanguage: transcript.detectedLanguage,
+        revision: transcript.revision,
+      };
+
+      // A translation report for an older row of the user's must not end what the user is saying now.
+      if (!isTranscriptArrival(transcript.translationState)) {
+        dispatch({ type: 'segmentUpserted', event, now: Date.now() });
+        return;
+      }
+      if (mySpeakingTimeoutRef.current) {
+        window.clearTimeout(mySpeakingTimeoutRef.current);
+        mySpeakingTimeoutRef.current = null;
+      }
+      dispatch({ type: 'meArrival', event, now: Date.now() });
       return;
     }
 
@@ -198,6 +215,9 @@ export function useMeetingTranscript() {
       if (speakingTimeoutRef.current) {
         window.clearTimeout(speakingTimeoutRef.current);
       }
+      if (mySpeakingTimeoutRef.current) {
+        window.clearTimeout(mySpeakingTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -247,6 +267,7 @@ export function useMeetingTranscript() {
     transcriptSegments,
     isThemSpeaking,
     currentThemPartial,
+    livePartial: livePartialOf(state),
     transcriptDisplayMode,
     translationEnabled,
     translationConfigured,

@@ -1,6 +1,6 @@
 import t from 'tap';
 import { initialMeetingChatFlags, meetingChatFlagsReducer } from '../../src/hooks/meetingChatFlagsReducer';
-import { initialMeetingTranscriptState, meetingTranscriptReducer } from '../../src/hooks/meetingTranscriptReducer';
+import { initialMeetingTranscriptState, livePartialOf, meetingTranscriptReducer } from '../../src/hooks/meetingTranscriptReducer';
 
 /**
  * The reducers are the only writers of the overlay's live state, so their transitions are checked
@@ -73,4 +73,39 @@ t.test('the chat flags reducer tracks one answer request', async (t) => {
 
   state = meetingChatFlagsReducer(state, { type: 'processingChanged', value: false });
   t.same(state, { isProcessing: false, canRetry: true }, 'the finished request keeps its retry');
+});
+
+t.test('the live line shows whoever spoke last, and the user has one too', async (t) => {
+  let state = meetingTranscriptReducer(initialMeetingTranscriptState, { type: 'mePartial', text: partial });
+  t.same(livePartialOf(state), { label: 'Me', text: partial }, 'the user\'s partial is shown with the Me label');
+  t.equal(state.transcriptSegments.length, 0, 'a partial line is not a row');
+
+  state = meetingTranscriptReducer(state, { type: 'themPartial', text: 'Invented reply.' });
+  t.same(livePartialOf(state), { label: 'Them', text: 'Invented reply.' }, 'the latest speaker wins');
+
+  state = meetingTranscriptReducer(state, { type: 'mePartial', text: 'Invented question?' });
+  t.same(livePartialOf(state), { label: 'Me', text: 'Invented question?' });
+
+  state = meetingTranscriptReducer(state, {
+    type: 'meArrival',
+    now: 1000,
+    event: { final: true, text: final, segmentId: 'invented-me-1', speaker: 'user', speakerLabel: 'Me', timestamp: 1, translationState: 'skipped' },
+  });
+  t.equal(state.myPartial, '', 'the row replaces the user\'s live line');
+  t.equal(state.transcriptSegments.length, 1);
+  t.equal(state.transcriptSegments[0].speakerLabel, 'Me');
+  t.same(livePartialOf(state), { label: 'Them', text: 'Invented reply.' }, 'the other party\'s line shows again');
+  t.equal(state.translationEnabled, false, 'own speech does not turn translation on');
+});
+
+t.test('a stale user line can be ended without a row', async (t) => {
+  let state = meetingTranscriptReducer(initialMeetingTranscriptState, { type: 'mePartial', text: partial });
+  state = meetingTranscriptReducer(state, { type: 'themPartial', text: 'Invented reply.' });
+  state = meetingTranscriptReducer(state, { type: 'mePartial', text: 'Invented question?' });
+  state = meetingTranscriptReducer(state, { type: 'meSpeakingEnded' });
+  t.equal(state.myPartial, '');
+  t.same(livePartialOf(state), { label: 'Them', text: 'Invented reply.' });
+  state = meetingTranscriptReducer(initialMeetingTranscriptState, { type: 'mePartial', text: partial });
+  state = meetingTranscriptReducer(state, { type: 'meSpeakingEnded' });
+  t.equal(livePartialOf(state), null, 'nothing is left on the live line');
 });

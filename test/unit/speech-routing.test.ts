@@ -200,7 +200,7 @@ t.test('the meeting overlay polls the retained setup error and shows its real me
     t.equal(polls, 1, 'the existing status IPC is read, not a fabricated UI error');
     t.equal(status.detail, state.lastAudioPipelineError);
     const html = renderToStaticMarkup(React.createElement(TranscriptPanel, {
-        transcriptSegments: [], isThemSpeaking: false, currentThemPartial: '',
+        transcriptSegments: [], livePartial: null,
         transcriptDisplayMode: 'original', translationEnabled: false, showTranscript: true,
         handleTranslateTranscriptSegment: () => {}, status, onFixAudio: () => {},
     }));

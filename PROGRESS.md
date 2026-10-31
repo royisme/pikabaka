@@ -2,6 +2,14 @@
 
 What is done, what is broken, what is unverified. `TASKS.md` is what to do next; GitHub issues hold the evidence. Add to the top when a step lands or something breaks.
 
+## 2026-10-30: the user's own speech shows on the live line (uncommitted)
+
+- Evidence: `useMeetingTranscript` dispatched a partial only for `them`; the `user` branch returned on every non-final event, so "Me" appeared as a row only after its final. The speech service's partial text was in the main process and the overlay dropped it.
+- `src/hooks/meetingTranscriptReducer.ts`: `mePartial` and `meArrival` actions, `myPartial` and `liveSpeaker` in the state, and `livePartialOf`, which returns the one live line (the label and text of whoever spoke last). A final row from the user clears the user's live line and gives the line back to the other party.
+- `useMeetingTranscript`, `TranscriptPanel`, `TranscriptColumn`, `PikaInterface`: the two props `isThemSpeaking` and `currentThemPartial` become one `livePartial`; `RollingTranscript` already had `partialSpeakerLabel`. The reply context still reads the other party's partial only.
+- `docs/conventions.md`, "Overlay UI": one live line, whoever spoke last.
+- Review by gpt-6.1-sol, three findings. Fixed: a user partial whose final the echo filter dropped stayed on the line through the silence (it now ends 8 s after its last partial, `meSpeakingEnded`); a translation report for an older own row ended what the user was saying (only an arrival, as for `them`, replaces the live line). Not changed: a row from an earlier sentence clears the line before the next partial arrives (the other party's line does the same; the next partial comes within a few hundred ms).
+- Checks: root `tsc --noEmit` 0, electron `tsc --noEmit` 0, `oxlint` 0, smell-ratchet 0, tap build 0, full tap 5310 of 5310. Not verified: the running app. Owner: speak a sentence with a provider that sends partials and look for the grey "Me" line while talking; then let the other party speak.
 ## 2026-10-30: audio capture is wired to the speech service in one place (uncommitted)
 
 - `main.ts` `reconfigureAudio` had its own copy of the `data`, `speech_ended` and `error` wiring (four copies with the fallbacks), and the copy in `audio-pipeline.ts` only ran when no capture existed, which a meeting start never hits. The copies had drifted: the live one did not apply the microphone mute, so muting probably did not silence what was sent. `audio-pipeline.ts` now has `wireSystemAudio` and `wireMicrophone`; `reconfigureAudio` creates the captures and calls them. The send timing lives there only.

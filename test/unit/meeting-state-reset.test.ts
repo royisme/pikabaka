@@ -179,7 +179,7 @@ const interfaceStubs = {
         handleFollowUpQuestions: () => {}, handleRecap: () => {}, handleBrainstorm: () => {}, handleManualSubmit: () => {},
     }) },
     [at('src/hooks/useMeetingTranscript.ts')]: { useMeetingTranscript: () => ({
-        transcriptSegments: [], isThemSpeaking: false, currentThemPartial: '', showTranscript: true, transcriptDisplayMode: 'original',
+        transcriptSegments: [], isThemSpeaking: false, currentThemPartial: '', livePartial: null, showTranscript: true, transcriptDisplayMode: 'original',
         translationEnabled: false, translationConfigured: false, theirLanguage: 'english-us', myLanguage: 'english-us',
         targetLanguage: 'chinese', languageOptions: [], saveTranslationSettings: () => {}, changeSpokenLanguage: () => {},
     }) },
