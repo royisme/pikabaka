@@ -1,5 +1,54 @@
 # Changelog
 
+## [3.1.0](https://github.com/royisme/pikabaka/compare/v3.0.0...v3.1.0) (2026-10-31)
+
+
+### Features
+
+* **audio:** add Gemini Live as a speech service that uses the Gemini API key ([8f4c4df](https://github.com/royisme/pikabaka/commit/8f4c4df5d42aac469d4fbd0c5a4f2b01875169f4))
+* **audio:** add Gemini Live as a speech service that uses the Gemini API key ([884d4db](https://github.com/royisme/pikabaka/commit/884d4db0be2972b3be0168184c5f6399f99b26c9))
+* **audio:** add Gemini Live to the speech provider list with its key entry and test ([5db70f9](https://github.com/royisme/pikabaka/commit/5db70f9ea1742ddd6e9ac59e655110fc5e2be8c4))
+* **audio:** close the Gemini turn when the microphone gate hears the speech stop ([5f33e47](https://github.com/royisme/pikabaka/commit/5f33e47ef05fc4f34969828fb9401312f45b17a3))
+* **audio:** log event loop delay and chunk gaps while audio is sent ([acda581](https://github.com/royisme/pikabaka/commit/acda581791f89652bfa9f11f0e39b5b88c9ee916))
+* **audio:** log event loop delay and chunk gaps while audio is sent ([3b77763](https://github.com/royisme/pikabaka/commit/3b7776306c4a357a12812094744d9b1c8b3df3ee))
+* **audio:** log how much each speech stream delivered and what the echo filter dropped ([b1b7060](https://github.com/royisme/pikabaka/commit/b1b706077313e20ac4b022bbabee8295f39d9657))
+* **audio:** log how much each speech stream delivered and what the echo filter dropped ([39b8856](https://github.com/royisme/pikabaka/commit/39b8856d245205c5cfbcf849f5cf6ab589043046))
+* **overlay:** show the user's own speech on the live line ([14e5737](https://github.com/royisme/pikabaka/commit/14e57372cefdf31370885d0eba213c05326887f0))
+* **overlay:** show the user's own speech on the live line ([46e9e91](https://github.com/royisme/pikabaka/commit/46e9e91b80e7dddedec7ff12c5839da2c2d450e3))
+
+
+### Bug Fixes
+
+* **audio:** ask ElevenLabs to commit lines by silence and drop its raw audio and message logging ([19e7d52](https://github.com/royisme/pikabaka/commit/19e7d52ef1c487d973a774d5b6402c2f76e34aed))
+* **audio:** ask ElevenLabs to commit lines by silence and drop its raw audio and message logging ([da8136c](https://github.com/royisme/pikabaka/commit/da8136c793160bab9e65ad02149a1a440bc2df91))
+* **audio:** do not log any part of the ElevenLabs key ([72c089d](https://github.com/royisme/pikabaka/commit/72c089d12cdc1b9455052f5579d8b357bb9ecf96))
+* **audio:** list Gemini's own model instead of asking another service ([23eb665](https://github.com/royisme/pikabaka/commit/23eb6656db3bfbe1c54cbb71b437657a515cd122))
+* **audio:** measure the audio callbacks that are actually used ([4a410a5](https://github.com/royisme/pikabaka/commit/4a410a5ad5788f0b884aa4dcebb3f0041e6ef6b8))
+* **audio:** replace the silence gate with one volume stage so speech is no longer dropped ([c9facdb](https://github.com/royisme/pikabaka/commit/c9facdb6967300fbd294d6c183efbaee96ae9b74))
+* **audio:** replace the silence gate with one volume stage so speech is no longer dropped ([2474a60](https://github.com/royisme/pikabaka/commit/2474a602f5e3407189677dce2998f4bdfa39eab8))
+* **audio:** send the start of each word from the microphone gate ([0b05570](https://github.com/royisme/pikabaka/commit/0b055709e5287bbbb07d7b184a7cdd5a0dfd7ac3))
+* **audio:** send the start of each word from the microphone gate ([293b97e](https://github.com/royisme/pikabaka/commit/293b97e40f938f3422319468d3876cb33dffdcc6))
+* **audio:** tell the speech service the microphone's real sample rate ([8b8fc58](https://github.com/royisme/pikabaka/commit/8b8fc58f3aef1be1e285e6c623ba10ee9db1fdbd))
+* **audio:** tell the speech service the microphone's real sample rate ([b60c87d](https://github.com/royisme/pikabaka/commit/b60c87d34881aab76b5b45e5d65ea40dbfb7f95d))
+* **logging:** do not print any part of a transcript ([3f05c2c](https://github.com/royisme/pikabaka/commit/3f05c2c81128fb167db5b0022baf04c08f401ad8))
+* **logging:** do not print any part of a transcript ([7850b0a](https://github.com/royisme/pikabaka/commit/7850b0aecc4bc2a86b73d567f795c1fae614f24b))
+* **overlay:** end a stale own-speech live line and keep translation reports off it ([119ef0e](https://github.com/royisme/pikabaka/commit/119ef0ebd4bfa5236e73613f6950b70be11313d5))
+* **overlay:** give the question card room for four lines of text ([52a598b](https://github.com/royisme/pikabaka/commit/52a598b07c665a34e56b12de9368096792852b0f))
+* **overlay:** give the question card room for four lines of text ([52cda0f](https://github.com/royisme/pikabaka/commit/52cda0fa26be893f027cd5d1f2c9ba35af38ced8))
+* **rag:** keep the selected embedding connection when credentials load at startup ([f72cd07](https://github.com/royisme/pikabaka/commit/f72cd0799f495739ed51aad3c0be1e2aa9e4fa49))
+* **rag:** keep the selected embedding connection when credentials load at startup ([d8356c8](https://github.com/royisme/pikabaka/commit/d8356c8efa2f69ca83f39aa6c69d28686b867738))
+* **settings:** make the main action of each section a filled button with one shared style ([47f771e](https://github.com/royisme/pikabaka/commit/47f771efdabe4b93e9dea4c7e8bbab615d0cc3d4))
+* **settings:** make the main action of each section a filled button with one shared style ([af3131c](https://github.com/royisme/pikabaka/commit/af3131c861b6f7878a97083a3d11f8df39377c95))
+
+
+### Refactoring
+
+* **audio:** connect the captures to the speech service in one place ([4287e11](https://github.com/royisme/pikabaka/commit/4287e113b36dd66d2e431bf0456071f37f633fc6))
+* **settings:** split the settings overlay by tab ([a99b3ad](https://github.com/royisme/pikabaka/commit/a99b3adf37e4998d111b2be7ddacea410a1c36d5))
+* **settings:** split the settings overlay by tab ([fc6da4b](https://github.com/royisme/pikabaka/commit/fc6da4b299768e5c88b257634a049843244fdd31))
+* **transcript:** move the transcript and chat flag state to reducers ([5bea403](https://github.com/royisme/pikabaka/commit/5bea4036d269301b1adf3d85f6d495ea0e1022b7))
+* **transcript:** move the transcript and chat flag state to reducers ([01a9615](https://github.com/royisme/pikabaka/commit/01a961585cd466a43892e82fcf7ec472d370fb39))
+
 ## [3.0.0](https://github.com/royisme/pikabaka/compare/v2.4.0...v3.0.0) (2026-10-30)
 
 

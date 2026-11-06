@@ -1,6 +1,6 @@
 {
   "name": "pika",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "main": "dist-electron/electron/main.js",
   "description": "Open-source live-translation and meeting assistant. Real-time translation, searchable meeting records and an AI agent that helps during the call — bring your own LLM key or run fully offline with Ollama.",
   "homepage": "https://github.com/royisme/pikabaka#readme",
