@@ -2,7 +2,7 @@ import { app } from 'electron';
 import { readFile } from 'node:fs/promises';
 import { AppState } from '../main';
 import { CredentialsManager } from '../services/CredentialsManager';
-import { getAnswerSources, MATERIALS_SEARCH_OFF, PAST_MEETING_SEARCH_OFF } from '../services/SettingsManager';
+import { getAnswerSources, getScenario, MATERIALS_SEARCH_OFF, PAST_MEETING_SEARCH_OFF } from '../services/SettingsManager';
 import { DatabaseManager } from '../db/DatabaseManager';
 import { VectorStore } from '../rag/VectorStore';
 import { MeetingAgent } from './MeetingAgent';
@@ -96,6 +96,7 @@ export function getGate(): Gate {
     getLines: meetingId => manager().getRecentSegments(meetingId, Date.now() - 3 * 60_000).slice(-6)
       .map(segment => ({ speaker: segment.speaker === 'user' ? 'You' as const : 'Them' as const, text: segment.text })),
     getUserLanguage: () => cm.getSttLanguageUser(),
+    getScenario: () => getScenario()?.brief?.trim() || undefined,
     log: decision => appendGateDecision(app.getPath('userData'), decision),
   });
   return gate;
@@ -111,7 +112,7 @@ export async function draftCard(decision: GateDecision): Promise<AssistCard | un
     if (!resolved.ok) return undefined;
     const lines = DatabaseManager.getInstance().getRecentSegments(decision.meetingId, Date.now() - 3 * 60_000).slice(-6)
       .map(segment => ({ speaker: segment.speaker === 'user' ? 'You' as const : 'Them' as const, text: segment.text }));
-    const text = await runAssist(resolved.model, { kind: decision.kind, lines, language: cm.getAiResponseLanguage(), spokenLanguageKey: cm.getSttLanguageUser(), style: cm.getAnswerStyle() }, AbortSignal.timeout(15_000));
+    const text = await runAssist(resolved.model, { kind: decision.kind, lines, language: cm.getAiResponseLanguage(), spokenLanguageKey: cm.getSttLanguageUser(), style: cm.getAnswerStyle(), scenario: getScenario() }, AbortSignal.timeout(15_000));
     if (!text || state.getCurrentMeetingId() !== decision.meetingId) return undefined;
     return { id: randomUUID(), meetingId: decision.meetingId, segmentId: decision.segmentId, kind: decision.kind, text, time: Date.now() };
   } catch (error) {

@@ -1,5 +1,6 @@
 import { answerLanguageInstruction } from '../llm/answerLanguage';
 import { speakingStyleInstruction } from '../llm/speakingStyle';
+import { scenarioInstruction, type Scenario } from '../llm/scenario';
 import type { AgentModel } from './models';
 import type { GateKind, GateLine } from './gate';
 
@@ -33,7 +34,7 @@ const SYSTEM = [
 
 export async function runAssist(
   model: AgentModel,
-  input: { kind: GateKind; lines: GateLine[]; language: string; spokenLanguageKey: string; style: string },
+  input: { kind: GateKind; lines: GateLine[]; language: string; spokenLanguageKey: string; style: string; scenario?: Scenario },
   signal: AbortSignal,
 ): Promise<string | undefined> {
   const goal = GOALS[input.kind];
@@ -41,11 +42,12 @@ export async function runAssist(
   const catalogModel = model.models.getModel(model.ref.provider as never, model.ref.modelId as never);
   if (!catalogModel) return undefined;
   const transcript = input.lines.map(line => `${line.speaker}: ${line.text.replace(/\s+/g, ' ').trim()}`).join('\n');
+  const scenario = scenarioInstruction(input.scenario);
   const response = await model.models.completeSimple(catalogModel, {
     systemPrompt: SYSTEM,
     messages: [{
       role: 'user',
-      content: `${goal}\n${answerLanguageInstruction(input.language, input.spokenLanguageKey)?.header ?? `Answer in ${input.language}.`}\n${speakingStyleInstruction(input.style).header}\nTranscript (newest last):\n${transcript}`,
+      content: `${goal}\n${answerLanguageInstruction(input.language, input.spokenLanguageKey, scenario.answerLanguage)?.header ?? `Answer in ${input.language}.`}\n${scenario.header}${speakingStyleInstruction(input.style).header}\nTranscript (newest last):\n${transcript}`,
       timestamp: Date.now(),
     }],
   }, { signal, timeoutMs: 15_000, maxRetries: 0, maxTokens: 320 });

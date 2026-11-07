@@ -4,6 +4,7 @@ import type { KeybindStatus, KeybindResult } from '../services/KeybindManager'
 import type { ImportedDocument } from '../knowledge/types'
 import type { CredentialStorageStatus } from '../services/CredentialsManager'
 import type { PromptsEdit, PromptsReply } from '../llm/prompts'
+import type { Scenario, ScenarioReply } from '../llm/scenario'
 
 export interface ElectronAPI {
   embeddingStatus: () => Promise<{ providerName: string | null; dimensions: number | null; usingSelected: boolean; selectedLabel: string | null; incompatible: number; meetingCount: number; failedMeetings: number; firstError: string | null }>
@@ -93,6 +94,8 @@ export interface ElectronAPI {
   getAiResponseLanguage: () => Promise<string>
   getPrompts: () => Promise<PromptsReply>
   setPrompts: (edit: PromptsEdit) => Promise<{ success: boolean; error?: string }>
+  getScenario: () => Promise<ScenarioReply>
+  setScenario: (edit: Scenario) => Promise<{ success: boolean; error?: string }>
   getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean }>
   setAnswerSources: (sources: { meetings?: boolean; materials?: boolean }) => Promise<{ success: boolean; error?: string }>
   getNativeAudioStatus: () => Promise<{
