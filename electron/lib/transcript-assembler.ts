@@ -8,6 +8,8 @@ import { SpeculativeTranslations } from "../transcript/speculativeTranslation";
 import type { AppState } from "../main"
 import { CredentialsManager } from "../services/CredentialsManager"
 import { isTranscriptTranslationConfigured, isSameLanguage } from "../transcript/translationExecutor"
+import { getScenario } from "../services/SettingsManager"
+import { correctTurn, resolveCorrectionTarget, CORRECTION_MAX_EARLIER_LINES, type CorrectionLine } from "./transcript-correction"
 
 export type TranscriptSpeaker = 'them' | 'user';
 
@@ -103,7 +105,12 @@ export function isSupersededRevision(
   return revision !== undefined && latest.get(segmentId) !== revision;
 }
 
+/** Text a model corrected, as the recognizer heard it, by segment. Shown on hover, never stored. */
+const correctedOriginals = new Map<string, { revision: number; text: string }>();
+
 export function emitNativeAudioTranscript(appState: AppState, payload: any): void {
+  const original = correctedOriginals.get(payload?.segmentId);
+  if (original && payload.revision === original.revision) payload = { ...payload, originalText: original.text };
   const helper = appState.getWindowHelper();
   helper.getLauncherWindow()?.webContents.send('native-audio-transcript', payload);
   helper.getOverlayWindow()?.webContents.send('native-audio-transcript', payload);
@@ -354,6 +361,9 @@ export function resetBufferedTranscriptTurns(appState: AppState): void {
   }
   state.transcriptSegmentRevisions.clear();
   state.recentTranslatedTurns.length = 0;
+  correctedOriginals.clear();
+  correctionLines.length = 0;
+  correctionTried.clear();
   speculativeTranslations.clear();
   speculatedTurns.clear();
   paragraphQueue.clear();
@@ -434,6 +444,9 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
     state.lastFlushedTranscriptTurns[speaker] = flushed;
   }
 
+  // Beside the translation and the proactive gate, never in front of them.
+  startCorrection(appState, speaker, { segmentId: buffer.segmentId, revision: buffer.revision, text, timestamp, confidence, detectedLanguage: buffer.detectedLanguage });
+
   if (speaker === 'them') {
     noteParagraphRow(appState, buffer.segmentId, buffer.revision, text);
     await emitTranscriptWithTranslation(appState, {
@@ -449,21 +462,88 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
     return;
   }
 
+  emitOwnTurn(appState, { text, timestamp, confidence, segmentId: buffer.segmentId, revision: buffer.revision });
+}
+
+/** The user's own speech is shown as it was heard; it is never translated. */
+function emitOwnTurn(appState: AppState, turn: { text: string; timestamp: number; confidence: number; segmentId: string; revision: number }): void {
   const displayMode = CredentialsManager.getInstance().getTranscriptTranslationDisplayMode();
   emitNativeAudioTranscript(appState, {
-    speaker,
-    text,
-    sourceText: text,
+    speaker: 'user' as const,
+    text: turn.text,
+    sourceText: turn.text,
     translatedText: undefined,
-    segmentId: buffer.segmentId,
-    timestamp,
+    segmentId: turn.segmentId,
+    timestamp: turn.timestamp,
     final: true,
-    confidence,
+    confidence: turn.confidence,
     displayMode,
     translationState: 'skipped' as const,
     speakerLabel: 'Me',
-    revision: buffer.revision,
+    revision: turn.revision,
   });
+}
+
+type CorrectionTurn = { segmentId: string; revision: number; text: string; timestamp: number; confidence: number; detectedLanguage?: string };
+
+/** The final lines so far (both speakers), the context a correction gets. */
+const correctionLines: Array<CorrectionLine & { segmentId: string }> = [];
+/** Turns (segment and revision) that were already sent for correction: a turn gets at most one. */
+const correctionTried = new Set<string>();
+
+function noteCorrectionLine(segmentId: string, speaker: TranscriptSpeaker, text: string): void {
+  const existing = correctionLines.find((line) => line.segmentId === segmentId);
+  if (existing) existing.text = text;
+  else correctionLines.push({ segmentId, speaker, text });
+  while (correctionLines.length > 2 * CORRECTION_MAX_EARLIER_LINES) correctionLines.shift();
+}
+
+/**
+ * When the setting is on, asks a model to fix clearly misheard words in a flushed turn. The turn is
+ * already shown and recorded; a fix arrives later as the next revision of the same segment.
+ */
+function startCorrection(appState: AppState, speaker: TranscriptSpeaker, turn: CorrectionTurn): void {
+  const earlier = correctionLines.filter((line) => line.segmentId !== turn.segmentId).slice(-CORRECTION_MAX_EARLIER_LINES);
+  noteCorrectionLine(turn.segmentId, speaker, turn.text);
+  const key = `${turn.segmentId}:${turn.revision}`;
+  const target = resolveCorrectionTarget(CredentialsManager.getInstance());
+  if (!target || correctionTried.has(key)) return;
+  correctionTried.add(key);
+  if (correctionTried.size > 64) correctionTried.delete(correctionTried.values().next().value as string);
+  void correctTurn({
+    line: { speaker, text: turn.text },
+    earlier,
+    scenario: getScenario()?.brief,
+    complete: (system, user, signal) => appState.processingHelper.getLLMHelper().completeViaConnection(target.connection, target.model, system, user, signal),
+    isLatest: () => !isSupersededRevision(appState.transcriptSegmentRevisions, turn.segmentId, turn.revision),
+  })
+    .then((corrected) => { if (corrected) applyCorrection(appState, speaker, turn, corrected); })
+    .catch(() => console.warn('[Main] Transcript correction could not be applied'));
+}
+
+/** Shows and records the corrected text as the next revision of the segment, and asks for its translation again. */
+function applyCorrection(appState: AppState, speaker: TranscriptSpeaker, turn: CorrectionTurn, corrected: string): void {
+  const state = appState;
+  const { segmentId, timestamp, confidence } = turn;
+  const revision = turn.revision + 1;
+  correctionTried.add(`${segmentId}:${revision}`);
+  correctedOriginals.set(segmentId, { revision, text: turn.text });
+  if (correctedOriginals.size > 64) correctedOriginals.delete(correctedOriginals.keys().next().value as string);
+  // From here the old revision is superseded: its translation must not be shown, and a reopen builds on the fixed text.
+  state.transcriptSegmentRevisions.set(segmentId, revision);
+  const flushed = state.lastFlushedTranscriptTurns[speaker] as FlushedTranscriptTurn | null;
+  if (flushed?.segmentId === segmentId) {
+    flushed.text = corrected;
+    flushed.revision = revision;
+  }
+  noteCorrectionLine(segmentId, speaker, corrected);
+  recordTranscriptTurn(appState, speaker, { segmentId, revision, startedAt: timestamp }, corrected);
+  if (speaker === 'them') {
+    noteParagraphRow(appState, segmentId, revision, corrected);
+    void emitTranscriptWithTranslation(appState, { speaker, text: corrected, timestamp, confidence, segmentId, detectedLanguage: turn.detectedLanguage, revision });
+    return;
+  }
+  emitOwnTurn(appState, { text: corrected, timestamp, confidence, segmentId, revision });
 }
 
 /**

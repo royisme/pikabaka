@@ -75,6 +75,8 @@ Knowledge documents use a separate store (`electron/knowledge/`). Main injects e
 3. After a flush, `emitTranscriptWithTranslation` (`transcript-assembler.ts`) emits the turn, then, if translation is enabled and the source language differs from the target, calls `LLMHelper.translateTranscriptText` once for the whole turn (non-streaming, with the two previous translated turns as context). The prompt is built in `electron/transcript/translationExecutor.ts`.
 4. The renderer receives `translationState` of `pending`, `complete`, `skipped` or `error` through `emitNativeAudioTranscript`.
 
+Fix misheard words (off by default; credentials keys `transcriptCorrectionEnabled`, `transcriptCorrectionProvider`, `transcriptCorrectionModel`, set in the speech settings): at the same flush, `startCorrection` (`transcript-assembler.ts`) sends the turn, with the scenario brief and up to 6 earlier final lines, to the chosen model (`electron/lib/transcript-correction.ts`, 4 s timeout, temperature 0, JSON `{"text": "..."}`). It runs beside the translation and the proactive gate and never delays them. A changed result is emitted and recorded as the next `revision` of the same `segmentId`, and translated again; a result for a revision that is no longer the latest is dropped. Any failure keeps the original silently (log: error class only). The original text travels on the event as `originalText` for a hover marker in the row; it is not stored in the meeting record.
+
 Consequence: a translated line appears after the flush delay plus one full LLM round trip, with no partial text. This is read from code; latency has not been measured (issue #29).
 
 ## Meeting record

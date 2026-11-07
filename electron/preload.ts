@@ -74,6 +74,7 @@ interface ElectronAPI {
   getStoredCredentials: () => Promise<{ storage: CredentialStorageStatus; connectionHeaders?: Record<string, HeaderState[]>; hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: string; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; hasSonioxKey: boolean }>
   testTranscriptTranslation: (draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => Promise<{ success: boolean; sample: string; translatedText?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
   getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both' }>
+  setTranscriptCorrectionSettings: (settings: { enabled?: boolean; provider?: string; model?: string }) => Promise<{ success: boolean; error?: string }>
   setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) => Promise<{ success: boolean; error?: string }>
   agentGateGetSettings: () => Promise<{ mode: 'log' | 'on' | 'off'; model: string; baseUrl: string; hasApiKey: boolean; threshold: number; cooldownSeconds: number }>
   agentGateSetSettings: (settings: { mode?: 'log' | 'on' | 'off'; model?: string; baseUrl?: string; apiKey?: string; threshold?: number; cooldownSeconds?: number }) => Promise<{ success: boolean; error?: string }>
@@ -542,6 +543,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getStoredCredentials: () => ipcRenderer.invoke("get-stored-credentials"),
   testTranscriptTranslation: (draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => ipcRenderer.invoke("test-transcript-translation", draft),
   getTranscriptTranslationSettings: () => ipcRenderer.invoke("get-transcript-translation-settings"),
+  setTranscriptCorrectionSettings: (settings: { enabled?: boolean; provider?: string; model?: string }) => ipcRenderer.invoke("set-transcript-correction-settings", settings),
   setTranscriptTranslationSettings: (settings: { enabled?: boolean; provider?: string; model?: string; prompt?: string; displayMode?: 'original' | 'translated' | 'both' }) =>
     ipcRenderer.invoke("set-transcript-translation-settings", settings),
   agentGateGetSettings: () => ipcRenderer.invoke("agent-gate-get-settings"),

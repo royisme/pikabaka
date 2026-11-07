@@ -227,11 +227,25 @@ t.test('real IPC handlers return disk errors for speech, provider and translatio
         () => connections('ai-connection-save', { id: 'openai', apiKey: invented.openaiApiKey }),
         () => connections('chat-model-set', { connectionId: 'openai', model: 'invented-model' }),
         () => translation('set-transcript-translation-settings', { enabled: true }),
+        () => translation('set-transcript-correction-settings', { enabled: true }),
     ]) {
         const result = await call();
         t.ok(isDeepStrictEqual(result, { success: false, error: 'ENOSPC: invented disk full' }), 'IPC returns the real disk error');
         t.notOk(containsSecret(JSON.stringify(result)), 'IPC does not expose credentials');
     }
+});
+
+t.test('transcript correction settings are off by default and round-trip through the real IPC handler', async t => {
+    const f = fixture(t);
+    const manager = f.start();
+    t.same([manager.getTranscriptCorrectionEnabled(), manager.getTranscriptCorrectionModel()], [false, '']);
+    const translation = ipc(f, manager, 'translation', 'registerTranslationHandlers');
+    t.same(await translation('set-transcript-correction-settings', { enabled: true, provider: 'gateway', model: ' invented-fix-model ' }), { success: true });
+    const restarted = f.start();
+    t.same(
+        [restarted.getTranscriptCorrectionEnabled(), restarted.getTranscriptCorrectionProvider(), restarted.getTranscriptCorrectionModel()],
+        [true, 'gateway', 'invented-fix-model'],
+    );
 });
 
 t.test('a speech Save reports a real setter/IPC disk failure in the renderer, never Saved', async t => {

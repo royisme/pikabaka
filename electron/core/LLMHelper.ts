@@ -131,7 +131,8 @@ export class LLMHelper {
     userContent: string | undefined,
     imagePaths?: string[],
     history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    temperature?: number
   ): AsyncGenerator<string, void, unknown> {
     try {
       signal?.throwIfAborted();
@@ -158,7 +159,7 @@ export class LLMHelper {
       if (c.type === 'gemini') {
         const stream = await clients.gemini().models.generateContentStream({
           model,
-          config: { systemInstruction: systemPrompt, abortSignal: signal },
+          config: { systemInstruction: systemPrompt, abortSignal: signal, ...(temperature === undefined ? {} : { temperature }) },
           contents: [
             ...history.map(message => ({ role: message.role === 'assistant' ? 'model' : 'user', parts: [{ text: message.content }] })),
             ...(userContent === undefined ? [] : [{ role: "user", parts: [{ text: userContent }, ...images.map(data => ({ inlineData: { mimeType: "image/png", data } }))] }]),
@@ -172,6 +173,7 @@ export class LLMHelper {
       const stream = await clients.openai().chat.completions.create({
         model,
         stream: true,
+        ...(temperature === undefined ? {} : { temperature }),
         messages: [
           { role: "system", content: systemPrompt },
           ...history,
@@ -195,6 +197,13 @@ export class LLMHelper {
 
   public testModel(connection: Connection, model: string): Promise<ModelTestResult> {
     return runModelTest(this.streamViaConnectionChat(connection, model, 'You are a connection test.', 'Reply with the single word: ready'), connection.apiKey, connection.headers);
+  }
+
+  /** One short answer from a chosen connection and model (the transcript correction). Temperature 0 is sent to Gemini and OpenAI-style connections; Anthropic models may refuse the parameter. */
+  public async completeViaConnection(connection: Connection, model: string, systemPrompt: string, userContent: string, signal: AbortSignal): Promise<string> {
+    let text = '';
+    for await (const part of this.streamViaConnectionChat(connection, model, systemPrompt, userContent, undefined, [], signal, 0)) text += part;
+    return text;
   }
 
   private async generateViaConnectionChat({ systemPrompt, userContent, imagePaths }: {

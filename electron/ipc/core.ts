@@ -629,6 +629,9 @@ export function registerCoreHandlers(appState: AppState): void {
         transcriptTranslationDisplayMode: creds.transcriptTranslationDisplayMode || 'original',
         transcriptTranslationSourceLanguage: creds.transcriptTranslationSourceLanguage ?? 'auto',
         transcriptTranslationTargetLanguage: creds.transcriptTranslationTargetLanguage ?? 'chinese',
+        transcriptCorrectionEnabled: !!creds.transcriptCorrectionEnabled,
+        transcriptCorrectionProvider: creds.transcriptCorrectionProvider || 'ollama',
+        transcriptCorrectionModel: creds.transcriptCorrectionModel || '',
         // Dynamic Model Discovery - preferred models
         geminiPreferredModel: creds.geminiPreferredModel || undefined,
         groqPreferredModel: creds.groqPreferredModel || undefined,

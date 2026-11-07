@@ -195,6 +195,12 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                 >
                                     <span className={`block whitespace-pre-wrap break-words ${leadClass}${parts.updating && parts.translationBelow === null ? ' opacity-70' : ''}`}>
                                         {parts.lead}
+                                        {seg.originalText && (
+                                            <span className="ml-1 text-[11px] overlay-text-muted" title={`Heard as: ${seg.originalText}`} data-corrected="true">
+                                                <span aria-hidden="true">✎</span>
+                                                <span className="sr-only">Corrected. Heard as: {seg.originalText}</span>
+                                            </span>
+                                        )}
                                         {parts.updating && parts.translationBelow === null && <span className="ml-1 text-[11px] overlay-text-muted"> · updating</span>}
                                     </span>
                                     {parts.translationBelow !== null && (
