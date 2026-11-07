@@ -10,6 +10,7 @@ interface TranscriptPanelProps {
     translationEnabled: boolean;
     showTranscript: boolean;
     handleTranslateTranscriptSegment: (segment: TranscriptSegment) => void;
+    onAskSegment?: (segment: TranscriptSegment) => void;
     status: AudioStatus;
     onFixAudio: () => void;
 }
@@ -21,6 +22,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
     translationEnabled,
     showTranscript,
     handleTranslateTranscriptSegment,
+    onAskSegment,
     status,
     onFixAudio,
 }) => {
@@ -38,6 +40,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                         displayMode={transcriptDisplayMode}
                         translationOn={translationEnabled}
                         onTranslateSegment={handleTranslateTranscriptSegment}
+                        onAskSegment={onAskSegment}
                     />
                 ) : (
                     // The one place the audio status is spelled out when there are no rows to show (the header chip then shows only its dot).

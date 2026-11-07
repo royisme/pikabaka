@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Languages, TriangleAlert } from 'lucide-react';
+import { Languages, MessageSquarePlus, TriangleAlert } from 'lucide-react';
 import type { TranscriptDisplayMode, TranscriptSegment } from '../../lib/transcriptSegments';
 import { failureReasonText, rowSlot, transcriptRowParts, type RowSlot } from '../../lib/transcriptRow';
 import { countNewRows, isNearBottom, nextTranscriptScroll } from '../../lib/answerScroll';
@@ -12,6 +12,7 @@ interface TranscriptNotesProps {
     translationOn?: boolean;
     partialSpeakerLabel?: string;
     onTranslateSegment?: (segment: TranscriptSegment) => void;
+    onAskSegment?: (segment: TranscriptSegment) => void;
 }
 
 function isOwnSpeech(segment: TranscriptSegment): boolean {
@@ -62,6 +63,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
     translationOn = false,
     partialSpeakerLabel = 'Them',
     onTranslateSegment,
+    onAskSegment,
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     // Following is read from scroll events, not measured after a render: by then new content has
@@ -181,17 +183,18 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                         return (
                             <div
                                 key={seg.segmentId}
-                                className={`border-l-2 pl-2 ${newest ? 'border-[var(--overlay-action)]' : 'border-transparent'}`}
+                                className={`group border-l-2 pl-2 ${newest ? 'border-[var(--overlay-action)]' : 'border-transparent'}`}
                             >
                                 {showSpeaker && (
                                     <div className="text-[11px] font-medium overlay-text-muted">{seg.speakerLabel}</div>
                                 )}
                                 <SlotLine slot={slot} onRetry={onTranslateSegment ? () => onTranslateSegment(seg) : undefined} />
+                                <div className="flex items-start gap-1">
                                 <button
                                     type="button"
                                     aria-expanded={expanded}
                                     onClick={() => setExpandedId(expanded ? null : seg.segmentId)}
-                                    className="block w-full text-left"
+                                    className="block min-w-0 flex-1 text-left"
                                 >
                                     <span className={`block whitespace-pre-wrap break-words ${leadClass}${parts.updating && parts.translationBelow === null ? ' opacity-70' : ''}`}>
                                         {parts.lead}
@@ -215,6 +218,19 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                         </span>
                                     )}
                                 </button>
+                                {onAskSegment && !own && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onAskSegment(seg)}
+                                        aria-label="Ask the agent about this line"
+                                        title="Ask the agent about this line"
+                                        data-ask-line="true"
+                                        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full overlay-text-muted opacity-0 hover:text-[var(--overlay-text-primary)] focus-visible:opacity-100 group-hover:opacity-100"
+                                    >
+                                        <MessageSquarePlus className="h-3 w-3" aria-hidden="true" />
+                                    </button>
+                                )}
+                                </div>
                                 {expanded && hasMeta && (
                                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] overlay-text-muted">
                                         {seg.detectedLanguage && (

@@ -10,6 +10,7 @@ interface TranscriptColumnProps {
     translationEnabled: boolean;
     showTranscript: boolean;
     handleTranslateTranscriptSegment: (segment: TranscriptSegment) => void;
+    onAskSegment?: (segment: TranscriptSegment) => void;
     status: AudioStatus;
     onFixAudio: () => void;
 }
@@ -21,6 +22,7 @@ const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
     translationEnabled,
     showTranscript,
     handleTranslateTranscriptSegment,
+    onAskSegment,
     status,
     onFixAudio,
 }) => {
@@ -32,6 +34,7 @@ const TranscriptColumn: React.FC<TranscriptColumnProps> = ({
             translationEnabled={translationEnabled}
             showTranscript={showTranscript}
             handleTranslateTranscriptSegment={handleTranslateTranscriptSegment}
+            onAskSegment={onAskSegment}
             status={status}
             onFixAudio={onFixAudio}
         />
