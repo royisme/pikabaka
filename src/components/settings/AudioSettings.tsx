@@ -7,6 +7,7 @@ import { isMac } from '../../utils/platformUtils';
 import SttModelPicker, { STT_MODEL_DEFAULTS } from './SttModelPicker';
 import { speechServices } from './SpeechProvidersSettings';
 import TranslationSettings from './TranslationSettings';
+import CorrectionSettings from './CorrectionSettings';
 import { CustomSelect, ProviderSelect } from './AudioSelects';
 import { primaryButton, secondaryButton } from './buttonStyles';
 
@@ -619,6 +620,8 @@ export function renderAudioSettings(
             </div>
 
             <TranslationSettings languages={translationLanguageOptions} />
+
+            <CorrectionSettings />
 
         </div>
     );

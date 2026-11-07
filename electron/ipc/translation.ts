@@ -52,6 +52,15 @@ export function registerTranslationHandlers(appState: AppState): void {
     return { success: true };
   });
 
+  safeHandle("set-transcript-correction-settings", async (_, settings: { enabled?: boolean; provider?: string; model?: string }) => {
+    const { CredentialsManager } = require('../services/CredentialsManager');
+    const cm = CredentialsManager.getInstance();
+    if (typeof settings?.enabled === 'boolean') cm.setTranscriptCorrectionEnabled(settings.enabled);
+    if (settings?.provider) cm.setTranscriptCorrectionProvider(settings.provider);
+    if (typeof settings?.model === 'string') cm.setTranscriptCorrectionModel(settings.model.trim());
+    return { success: true };
+  });
+
   safeHandle("translate-transcript-segment", async (_, segment: {
     segmentId: string;
     text: string;

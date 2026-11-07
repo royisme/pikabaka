@@ -76,6 +76,11 @@ export interface StoredCredentials {
     /** Recognition language key (RECOGNITION_LANGUAGES) or 'auto' */
     transcriptTranslationSourceLanguage?: string;
     transcriptTranslationTargetLanguage?: string;
+    /** Fix misheard words in a final line with a model, from the lines before it. Off by default. */
+    transcriptCorrectionEnabled?: boolean;
+    /** Connection id from Models & Agent, like the translation provider. */
+    transcriptCorrectionProvider?: string;
+    transcriptCorrectionModel?: string;
     /** The one folder the agent's commands run under (a folder per day and per meeting inside it). */
     agentWorkspaceRoot?: string;
     // Proactive help: the decision model (a System One classifier) behind the gate
@@ -458,6 +463,36 @@ export class CredentialsManager {
         this.credentials.transcriptTranslationPrompt = prompt;
         this.saveCredentials();
         console.log('[CredentialsManager] Transcript Translation Prompt updated');
+    }
+
+    public getTranscriptCorrectionEnabled(): boolean {
+        return this.credentials.transcriptCorrectionEnabled || false;
+    }
+
+    public getTranscriptCorrectionProvider(): string {
+        return this.credentials.transcriptCorrectionProvider || 'ollama';
+    }
+
+    public getTranscriptCorrectionModel(): string {
+        return this.credentials.transcriptCorrectionModel || '';
+    }
+
+    public setTranscriptCorrectionEnabled(enabled: boolean): void {
+        this.credentials.transcriptCorrectionEnabled = enabled;
+        this.saveCredentials();
+        console.log(`[CredentialsManager] Transcript Correction Enabled set to: ${enabled}`);
+    }
+
+    public setTranscriptCorrectionProvider(provider: string): void {
+        this.credentials.transcriptCorrectionProvider = provider;
+        this.saveCredentials();
+        console.log(`[CredentialsManager] Transcript Correction Provider set to: ${provider}`);
+    }
+
+    public setTranscriptCorrectionModel(model: string): void {
+        this.credentials.transcriptCorrectionModel = model;
+        this.saveCredentials();
+        console.log(`[CredentialsManager] Transcript Correction Model set to: ${model}`);
     }
 
     public setTranscriptTranslationDisplayMode(mode: 'original' | 'translated' | 'both'): void {

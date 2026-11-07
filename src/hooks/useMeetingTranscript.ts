@@ -147,6 +147,7 @@ export function useMeetingTranscript() {
         translationError: transcript.translationError,
         detectedLanguage: transcript.detectedLanguage,
         revision: transcript.revision,
+        originalText: transcript.originalText,
       };
 
       // A translation report for an older row of the user's must not end what the user is saying now.
@@ -189,6 +190,7 @@ export function useMeetingTranscript() {
       translationError: transcript.translationError,
       detectedLanguage: transcript.detectedLanguage,
       revision: transcript.revision,
+      originalText: transcript.originalText,
       replaces: transcript.replaces,
     };
 

@@ -14,6 +14,8 @@ export interface TranscriptSegment {
   translationError?: 'timeout' | 'auth' | 'rate-limit' | 'network' | 'other';
   /** The `revision` of the source text that `translatedText` translates. */
   translatedRevision?: number;
+  /** What the speech recognizer heard, when a model corrected the text; shown on hover. Not stored. */
+  originalText?: string;
   /** Renderer clock time at which the latest `pending` event arrived; drives the elapsed time of a slow translation. */
   receivedAt?: number;
 }
@@ -32,6 +34,7 @@ export interface TranscriptEventForSegment {
   detectedLanguage?: string;
   revision?: number;
   translationError?: TranscriptSegment['translationError'];
+  originalText?: string;
   /** A paragraph that takes the place of these rows: they leave the transcript and it appears where the first of them was. */
   replaces?: string[];
 }
@@ -101,6 +104,7 @@ export function upsertTranscriptSegment(
       speaker: event.speaker,
       translationError: translationState === 'error' ? event.translationError : undefined,
       translatedRevision: event.translatedText?.trim() ? event.revision : undefined,
+      originalText: event.originalText,
       receivedAt: translationState === 'pending' ? now : undefined,
     };
     if (replaced.length === 0) return [...segments, paragraph];
@@ -143,6 +147,8 @@ export function upsertTranscriptSegment(
       : event.translationState === 'error' && existing.translationState === 'streaming'
         ? undefined
         : existing.translatedRevision,
+    // A later revision with no original is text that was heard again, not a correction.
+    originalText: event.originalText ?? (event.revision === existing.revision || event.revision === undefined ? existing.originalText : undefined),
     receivedAt: event.translationState === 'pending' ? now : existing.receivedAt,
   };
   return updated;
