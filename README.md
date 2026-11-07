@@ -115,6 +115,7 @@ The following speech recognition services are supported:
 - **OpenAI Whisper** (WebSocket with REST fallback)
 - **Groq Whisper** (REST)
 - **ElevenLabs** (streaming)
+- **Gemini Live** (streaming; uses a Gemini API key, no Google Cloud project)
 - **Azure Speech**
 - **IBM Watson**
 
