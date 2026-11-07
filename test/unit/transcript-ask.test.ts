@@ -1,7 +1,7 @@
 import t from 'tap';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { askAboutLineText } from '../../src/lib/transcriptAsk';
+import { askAboutLineText, challengeCardText } from '../../src/lib/transcriptAsk';
 import TranscriptNotes from '../../src/components/ui/RollingTranscript';
 import type { TranscriptSegment } from '../../src/lib/transcriptSegments';
 
@@ -20,4 +20,13 @@ t.test('the ask button shows on other-party rows only, and only when a handler i
   const without = renderToStaticMarkup(React.createElement(TranscriptNotes, { segments, displayMode: 'original' }));
   t.equal(without.split('data-ask-line').length - 1, 0);
   t.match(withHandler, /opacity-0[^"]*group-hover:opacity-100/, 'hidden until hover or focus');
+});
+
+t.test('challengeCardText carries the card and its trigger line, or the card alone', async (t) => {
+  const card = { text: 'Invented suggestion', segmentId: 'a' };
+  t.equal(
+    challengeCardText(card, [row('a', 'them')]),
+    'Pika suggested "Invented suggestion" for what they said "Invented a", but that is not right: ',
+  );
+  t.equal(challengeCardText(card, [row('z', 'them')]), 'Pika suggested "Invented suggestion", but that is not right: ');
 });

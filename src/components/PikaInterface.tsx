@@ -18,7 +18,7 @@ import { isNearBottom, nextScrollAction } from '../lib/answerScroll';
 import { toggleOriginal } from '../lib/transcriptDisplay';
 import { audioStatus } from '../lib/audioStatus';
 import { latestOtherPartyText } from '../lib/answerLead';
-import { askAboutLineText } from '../lib/transcriptAsk';
+import { askAboutLineText, challengeCardText } from '../lib/transcriptAsk';
 import type { TranscriptSegment } from '../lib/transcriptSegments';
 import { useMainEvent } from '../hooks/useMainEvent';
 import { useWindowEvent } from '../hooks/useWindowEvent';
@@ -56,6 +56,11 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         setProactiveCard(null);
         textInputRef.current?.focus();
     }, [chat.setInputValue]);
+    const challengeCard = useCallback((card: AgentProactiveCard) => {
+        // The card stays: the user reads it while typing why it is wrong.
+        chat.setInputValue(challengeCardText(card, transcript.transcriptSegments));
+        textInputRef.current?.focus();
+    }, [chat.setInputValue, transcript.transcriptSegments]);
     const askAboutLine = useCallback((segment: TranscriptSegment) => {
         // Only fills the input: the user edits it and sends it.
         chat.setInputValue(askAboutLineText(segment));
@@ -234,7 +239,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
                         <SplitterShell
                             topBar={<OverlayTopBar status={audioState} hasRows={statusInBar} onFixAudio={fixAudio} microphoneMuted={microphoneMuted} onToggleMicrophoneMute={() => toggleMicrophoneMute.mutate(!microphoneMuted)} displayMode={transcript.transcriptDisplayMode} translationEnabled={transcript.translationEnabled} translationConfigured={transcript.translationConfigured} theirLanguage={transcript.theirLanguage} myLanguage={transcript.myLanguage} targetLanguage={transcript.targetLanguage} languageOptions={transcript.languageOptions} onToggleTranslation={() => transcript.saveTranslationSettings({ enabled: !transcript.translationEnabled })} onChangeSpokenLanguage={transcript.changeSpokenLanguage} onChangeTargetLanguage={(targetLanguage) => transcript.saveTranslationSettings({ targetLanguage })} onToggleOriginal={() => transcript.saveTranslationSettings({ displayMode: toggleOriginal(transcript.transcriptDisplayMode) })} onSetUpTranslation={() => { void window.electronAPI.toggleSettingsWindow(); }} modelName={modelName} isMousePassthrough={isMousePassthrough} toggleOriginalKeys={shortcuts.toggleOriginal} toggleTranslationKeys={shortcuts.toggleTranslation} onHide={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} onOpenModelSelector={openModelSelector} onOpenSettings={openSettings} onToggleMousePassthrough={() => generalHandlersRef.current.toggleMousePassthrough()} onOpenLauncher={() => window.electronAPI?.setWindowMode?.('launcher')} />}
                             left={<TranscriptColumn {...transcriptProps} onAskSegment={askAboutLine} status={audioState} onFixAudio={fixAudio} />}
-                            right={<div className="relative flex-1 min-h-0 min-w-0 flex flex-col"><ApprovalDock />{proactiveCard && <ProactiveCard card={proactiveCard} onDismiss={() => setProactiveCard(null)} onAskMore={() => askAboutCard(proactiveCard)} />}<div className="flex-1 min-h-0 min-w-0 flex flex-col"><ChatColumn {...chatProps} /></div></div>}
+                            right={<div className="relative flex-1 min-h-0 min-w-0 flex flex-col"><ApprovalDock />{proactiveCard && <ProactiveCard card={proactiveCard} onDismiss={() => setProactiveCard(null)} onAskMore={() => askAboutCard(proactiveCard)} onNotRight={() => challengeCard(proactiveCard)} />}<div className="flex-1 min-h-0 min-w-0 flex flex-col"><ChatColumn {...chatProps} /></div></div>}
                             splitterPosition={splitterPosition}
                             onSplitterChange={changeSplitter}
                             onSplitterReset={resetSplitter}
