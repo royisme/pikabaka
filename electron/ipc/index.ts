@@ -14,6 +14,7 @@ import { registerConnectionHandlers } from "./connections"
 import { registerAnswerStyleHandlers } from "./answerStyle"
 import { registerAgentHandlers } from "./agent"
 import { registerPromptHandlers } from "./prompts"
+import { registerScenarioHandlers } from "./scenario"
 
 export function initializeIpcHandlers(appState: AppState): void {
   registerCoreHandlers(appState)
@@ -31,4 +32,5 @@ export function initializeIpcHandlers(appState: AppState): void {
   registerAnswerStyleHandlers()
   registerAgentHandlers(appState)
   registerPromptHandlers()
+  registerScenarioHandlers()
 }

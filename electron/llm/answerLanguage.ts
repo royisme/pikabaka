@@ -8,17 +8,21 @@ import { ENGLISH_VARIANTS, RECOGNITION_LANGUAGES } from '../config/languages';
  * the language they read is another one, a last line gives them a translation to understand, not to say.
  * Returns null when no instruction is needed (everything is English), and `{ strict }` when the language
  * they speak and the language they read are the same and not English (the old rule: all of it in that language).
+ * `answerLanguage` is the language the user chose in their scenario: it replaces the transcript decision, and
+ * when it is the reading language the one-language rule applies.
  */
 export function answerLanguageInstruction(
   readingLanguage: string,
-  spokenLanguageKey: string
+  spokenLanguageKey: string,
+  answerLanguage?: string
 ): { header: string; footer: string } | null {
   const reading = readingLanguage.trim() || 'English';
   // The language family of the recognition key: 'english-us' is English, 'chinese' is Chinese.
   const spoken = (ENGLISH_VARIANTS[spokenLanguageKey] ?? RECOGNITION_LANGUAGES[spokenLanguageKey])?.group ?? 'English';
-  const same = reading.toLowerCase() === spoken.toLowerCase();
+  const fixed = answerLanguage?.trim();
+  const same = reading.toLowerCase() === (fixed || spoken).toLowerCase();
 
-  if (same && spoken === 'English') return null;
+  if (same && !fixed && spoken === 'English') return null;
 
   if (same) {
     return {
@@ -26,6 +30,16 @@ export function answerLanguageInstruction(
 You MUST write every single word of your response in ${reading}. Do not mix languages. This rule overrides all other instructions including formatting and brevity.
 [END LANGUAGE OVERRIDE]\n\n`,
       footer: `\n\n[REMINDER] Your entire response MUST be in ${reading} only.`,
+    };
+  }
+
+  if (fixed) {
+    return {
+      header: `[ANSWER LANGUAGE — HIGHEST PRIORITY]
+The user reads your answer out loud in a live conversation, so write every word of the answer in ${fixed}, whatever language the transcript is in. Do not decide the language from the transcript.
+After the answer, add one last separate line that starts with "${reading}:" and gives a faithful translation of what you wrote into ${reading}, so the user can understand it. That line is for reading, not for saying. Keep the structure the other rules ask for; this rule decides only the language.
+[END ANSWER LANGUAGE]\n\n`,
+      footer: `\n\n[REMINDER] The answer is in ${fixed}, to be said out loud; the last line starts with "${reading}:" and translates it.`,
     };
   }
 

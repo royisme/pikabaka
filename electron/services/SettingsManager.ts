@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { getSettingsJsonPath } from './configPaths';
 import type { PromptOverrides } from '../llm/prompts';
+import type { Scenario } from '../llm/scenario';
 
 export interface AppSettings {
     // Only boot-critical or non-encrypted settings should live here.
@@ -16,10 +17,16 @@ export interface AppSettings {
     answerUsesProfile?: boolean;
     /** The prompt text written in Settings; a missing key or field means the built-in text. */
     prompts?: PromptOverrides;
+    /** The one active scenario set in Settings; a missing key means none. */
+    scenario?: Scenario;
 }
 
 export function getPromptOverrides(): PromptOverrides {
     return SettingsManager.getInstance().get('prompts') ?? {};
+}
+
+export function getScenario(): Scenario | undefined {
+    return SettingsManager.getInstance().get('scenario');
 }
 
 // The stored answerUsesProfile value is left in settings.json and deliberately not read: the interview profile is gone.

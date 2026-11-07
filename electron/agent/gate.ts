@@ -15,7 +15,7 @@ export class GateError extends Error {
 }
 
 export interface GateLine { speaker: 'Them' | 'You'; text: string }
-export interface GateInput { lines: GateLine[]; userLanguage: string; secondsSinceCard: number }
+export interface GateInput { lines: GateLine[]; userLanguage: string; secondsSinceCard: number; scenario?: string }
 export interface GateAnswer { help: number; kind: GateKind; kindProbability: number }
 export type GateClassify = (input: GateInput, options: { signal: AbortSignal; timeoutMs: number }) => Promise<GateAnswer>;
 
@@ -52,6 +52,8 @@ export interface GateDeps {
   isMeetingActive(meetingId: string): boolean;
   getLines(meetingId: string): GateLine[];
   getUserLanguage(): string;
+  /** The trimmed scenario brief, or undefined when there is none. */
+  getScenario(): string | undefined;
   log(decision: GateDecision): void;
 }
 
@@ -152,6 +154,7 @@ export class Gate {
       const input: GateInput = {
         lines: this.deps.getLines(ref.meetingId),
         userLanguage: this.deps.getUserLanguage(),
+        scenario: this.deps.getScenario(),
         secondsSinceCard: this.lastShownAt === null ? 0 : Math.round((started - this.lastShownAt) / 1000),
       };
       let answer: GateAnswer;
