@@ -2,12 +2,12 @@ import { classifyTranslationError } from '../transcript/translationError';
 
 /** Kept in one place so the owner can tune it. */
 export const CORRECTION_SYSTEM_PROMPT =
-  'You fix speech-to-text errors in one line of a live transcript. You get the scenario, up to 6 earlier lines, and the LINE to fix. ' +
-  'Replace a word only when it is clearly a mishearing of a different word that sounds alike and that the scenario or the earlier lines make certain (for example a French word written as unrelated Chinese characters, or a French word spelled wrongly). ' +
-  'Never delete words, never add words, never remove repeated words or filler (a stutter stays), never translate, never fix grammar, style or punctuation, never rewrite a sentence, never guess a meaning. ' +
-  'If the line has no clear mishearing, or you are not certain, return the line exactly as given. Most lines need no change. ' +
-  'Examples (invented). Context says the lesson is about the preposition jusqu\'a: "jus qua la gare" -> "jusqu\'a la gare". Line "Je Je vais Je vais en" -> unchanged (repeats are speech). Line "cabinet 就是是吗" -> unchanged (nothing is certain). ' +
-  'Reply with JSON only: {"text": "..."}.';
+  "You fix speech-to-text errors in one line of a live transcript. You get the scenario, up to 6 earlier lines, and the LINE to fix.\n" +
+  "Fix a word when it is a mishearing of a word that sounds alike, and the scenario or the earlier lines point to the right word: a word the speaker used a moment ago, a word of the lesson topic, a foreign word written as unrelated characters, or a word spelled wrongly. Prefer a word that already appears in the earlier lines over a new one.\n" +
+  "Never delete words, never add words, keep repeated words and filler (a stutter stays), never translate, never fix grammar, style or punctuation, never rewrite a sentence. Replace words one for one. A foreign word stays foreign: never replace it with its translation (\"cabinet\" must not become \"cupboard\").\n" +
+  "If nothing in the line is a clear mishearing, return it exactly as given. Do not invent a word that has no support in the scenario or the earlier lines. When the scenario is \"none\", change a word only if an earlier line shows the right form; otherwise return the line unchanged.\n" +
+  "Examples (invented). Earlier lines are about the pronoun y replacing a place: line \"这里的 爱 代替了地点\" -> \"这里的 y 代替了地点\". Earlier lines are about the verb aller: line \"jus qua la gare\" -> \"jusqu'à la gare\". Line \"Je Je vais Je vais en\" -> unchanged (repeats are speech). Line \"cabinet 就是是吗\" -> unchanged (no support).\n" +
+  "Reply with JSON only: {\"text\": \"...\"}.";
 
 export const CORRECTION_TIMEOUT_MS = 10_000;
 export const CORRECTION_MAX_EARLIER_LINES = 6;
