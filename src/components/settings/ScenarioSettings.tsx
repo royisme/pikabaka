@@ -13,7 +13,6 @@ const ScenarioSettings: React.FC = () => {
     const { data: saved, error } = useQuery({ queryKey: ['scenario'], queryFn: () => window.electronAPI.getScenario() });
     const [brief, setBrief] = useState<string | null>(null);
     const [language, setLanguage] = useState<string | null>(null);
-    const [expanded, setExpanded] = useState(false);
     const briefValue = brief ?? saved?.brief ?? '';
     const languageValue = language ?? saved?.answerLanguage ?? '';
     const maxLength = saved?.maxLength ?? 600;
@@ -31,16 +30,8 @@ const ScenarioSettings: React.FC = () => {
 
     return (
         <div className="min-w-0 space-y-2">
-            <button
-                type="button"
-                aria-expanded={expanded}
-                aria-controls="scenario-settings"
-                onClick={() => setExpanded(!expanded)}
-                className={secondaryButton}
-            >
-                Scenario
-            </button>
-            <div id="scenario-settings" hidden={!expanded} className="space-y-2">
+            <h3 className="text-sm font-bold normal-case tracking-normal text-text-primary">Scenario</h3>
+            <div id="scenario-settings" className="space-y-2">
                 <p className="text-xs text-text-secondary">
                     Tell Pika what this conversation is, in a sentence or two. The answer language is the language you will say aloud; Pika adds a line in your reading language. Empty means follow the conversation.
                 </p>

@@ -142,8 +142,8 @@ const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
             {job === 'chat' && (
                 <>
                     <AnswerLanguageSetting />
-                    <AnswerStyleSettings />
                     <ScenarioSettings />
+                    <AnswerStyleSettings />
                     <PromptsSettings />
                 </>
             )}
