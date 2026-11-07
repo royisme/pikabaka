@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import ConnectionModelPicker from './ConnectionModelPicker';
 import AnswerLanguageSetting from './AnswerLanguageSetting';
 import AnswerStyleSettings from './AnswerStyleSettings';
+import ScenarioSettings from './ScenarioSettings';
 import PromptsSettings from './PromptsSettings';
 import { primaryButton, secondaryButton } from './buttonStyles';
 
@@ -142,6 +143,7 @@ const ModelUsesSettings: React.FC<{ job: Job }> = ({ job }) => {
                 <>
                     <AnswerLanguageSetting />
                     <AnswerStyleSettings />
+                    <ScenarioSettings />
                     <PromptsSettings />
                 </>
             )}

@@ -6,11 +6,12 @@ import { systemPrompt, taskPrompt } from "../llm/prompts"
 import { openAiRoot, type Connection } from '../services/aiConnections';
 import { redactConnectionError } from '../services/connectionSecrets';
 import { CredentialsManager } from '../services/CredentialsManager';
-import { getAnswerSources } from '../services/SettingsManager';
+import { getAnswerSources, getScenario } from '../services/SettingsManager';
 import { buildTranscriptTranslationPrompt } from '../transcript/translationExecutor';
 import { classifyTranslationError } from '../transcript/translationError';
 import { answerLanguageInstruction } from '../llm/answerLanguage';
 import { speakingStyleInstruction } from '../llm/speakingStyle';
+import { scenarioInstruction } from '../llm/scenario';
 import { runModelTest, type ModelTestResult } from '../llm/modelTest';
 import { anthropicDeltas, geminiDeltas, openAIDeltas, streamText } from '../transcript/translationStream';
 
@@ -542,9 +543,10 @@ ANSWER DIRECTLY:`;
    */
   private injectLanguageInstruction(systemPrompt: string): string {
     const cm = CredentialsManager.getInstance();
-    const language = answerLanguageInstruction(this.aiResponseLanguage, cm.getSttLanguageUser());
+    const scenario = scenarioInstruction(getScenario());
+    const language = answerLanguageInstruction(this.aiResponseLanguage, cm.getSttLanguageUser(), scenario.answerLanguage);
     const style = speakingStyleInstruction(cm.getAnswerStyle());
-    return `${language?.header ?? ''}${style.header}${systemPrompt}${style.footer}${language?.footer ?? ''}`;
+    return `${language?.header ?? ''}${scenario.header}${style.header}${systemPrompt}${style.footer}${language?.footer ?? ''}`;
   }
 
   public async chatWithGemini(message: string, imagePaths?: string[], context?: string, skipSystemPrompt: boolean = false): Promise<string> {

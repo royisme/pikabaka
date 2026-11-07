@@ -3,6 +3,7 @@ import type { KeybindStatus, KeybindResult } from './services/KeybindManager'
 import type { ImportedDocument, NotesIndexStatus } from './knowledge/types'
 import type { CredentialStorageStatus } from './services/CredentialsManager'
 import type { PromptsEdit, PromptsReply } from './llm/prompts'
+import type { Scenario, ScenarioReply } from './llm/scenario'
 
 type PreloadAgentEvent = { meetingId: string } & (
   | { type: 'run_started' | 'run_settled' }
@@ -144,6 +145,8 @@ interface ElectronAPI {
   getAnswerStyle: () => Promise<string>
   getPrompts: () => Promise<PromptsReply>
   setPrompts: (edit: PromptsEdit) => Promise<{ success: boolean; error?: string }>
+  getScenario: () => Promise<ScenarioReply>
+  setScenario: (edit: Scenario) => Promise<{ success: boolean; error?: string }>
   getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean }>
   setAnswerSources: (sources: { meetings?: boolean; materials?: boolean }) => Promise<{ success: boolean; error?: string }>
   profileGetNotes: () => Promise<string>
@@ -663,6 +666,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getAnswerStyle: () => ipcRenderer.invoke("get-answer-style"),
   getPrompts: () => ipcRenderer.invoke("prompts:get"),
   setPrompts: (edit: PromptsEdit) => ipcRenderer.invoke("prompts:set", edit),
+  getScenario: () => ipcRenderer.invoke("scenario:get"),
+  setScenario: (edit: Scenario) => ipcRenderer.invoke("scenario:set", edit),
   getAnswerSources: () => ipcRenderer.invoke("answer-sources:get"),
   setAnswerSources: (sources: { meetings?: boolean; materials?: boolean }) => ipcRenderer.invoke("answer-sources:set", sources),
   profileGetNotes: () => ipcRenderer.invoke("profile:get-notes"),

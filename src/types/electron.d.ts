@@ -1,6 +1,7 @@
 import type { ImportedDocument, NotesIndexStatus } from '../../electron/knowledge/types'
 import type { CredentialStorageStatus } from '../../electron/services/CredentialsManager'
 import type { PromptsEdit, PromptsReply } from '../../electron/llm/prompts'
+import type { Scenario, ScenarioReply } from '../../electron/llm/scenario'
 
 export interface AgentGateDecision {
   time: number; meetingId: string; segmentId: string; revision: number; model: string; threshold: number; cooldownSeconds: number
@@ -168,6 +169,8 @@ export interface ElectronAPI {
   getAnswerStyle: () => Promise<string>
   getPrompts: () => Promise<PromptsReply>
   setPrompts: (edit: PromptsEdit) => Promise<{ success: boolean; error?: string }>
+  getScenario: () => Promise<ScenarioReply>
+  setScenario: (edit: Scenario) => Promise<{ success: boolean; error?: string }>
   getAnswerSources: () => Promise<{ meetings: boolean; materials: boolean }>
   setAnswerSources: (sources: { meetings?: boolean; materials?: boolean }) => Promise<{ success: boolean; error?: string }>
   profileGetNotes: () => Promise<string>
