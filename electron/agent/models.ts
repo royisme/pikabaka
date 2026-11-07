@@ -196,11 +196,12 @@ export async function createGateClassify(credentials: GateCredentials): Promise<
         conversation: input.lines.map(line => ({ speaker: line.speaker, text: line.text })),
         user_language: input.userLanguage,
         seconds_since_last_help: input.secondsSinceCard,
+        ...(input.scenario ? { scenario: input.scenario } : {}),
       },
       questions: {
         help: {
           type: 'bool',
-          instructions: 'The conversation is a live meeting. Would the user, who is "You", benefit from help from an assistant right now? Help means answering a question put to them, explaining a term, checking a fact or number, or noting an action item.',
+          instructions: 'The conversation is a live meeting. Would the user, who is "You", benefit from help from an assistant right now? Help means answering a question put to them, explaining a term, checking a fact or number, or noting an action item. If the state has a scenario, it says what this conversation is, and the user wants help with whatever that scenario implies the user must answer or react to.',
           criteria: { true: 'Help would clearly benefit the user right now', false: 'No help is needed right now' },
         },
         kind: {

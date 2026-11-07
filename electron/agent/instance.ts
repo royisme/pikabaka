@@ -96,6 +96,7 @@ export function getGate(): Gate {
     getLines: meetingId => manager().getRecentSegments(meetingId, Date.now() - 3 * 60_000).slice(-6)
       .map(segment => ({ speaker: segment.speaker === 'user' ? 'You' as const : 'Them' as const, text: segment.text })),
     getUserLanguage: () => cm.getSttLanguageUser(),
+    getScenario: () => getScenario()?.brief?.trim() || undefined,
     log: decision => appendGateDecision(app.getPath('userData'), decision),
   });
   return gate;
