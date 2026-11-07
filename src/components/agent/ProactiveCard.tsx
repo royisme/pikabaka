@@ -14,6 +14,7 @@ interface ProactiveCardProps {
     card: AgentProactiveCard;
     onDismiss: () => void;
     onAskMore: () => void;
+    onNotRight: () => void;
 }
 
 /**
@@ -22,7 +23,7 @@ interface ProactiveCardProps {
  * over 150ms, makes no sound, and goes only when dismissed or replaced. Only the text scrolls, so
  * the dismiss and Ask more buttons never leave the card.
  */
-const ProactiveCard: React.FC<ProactiveCardProps> = ({ card, onDismiss, onAskMore }) => (
+const ProactiveCard: React.FC<ProactiveCardProps> = ({ card, onDismiss, onAskMore, onNotRight }) => (
     <motion.aside
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -46,13 +47,22 @@ const ProactiveCard: React.FC<ProactiveCardProps> = ({ card, onDismiss, onAskMor
         <div className="min-h-[5rem] overflow-y-auto">
             <p className="mt-0.5 text-[14px] leading-snug overlay-text-primary break-words">{card.text}</p>
         </div>
-        <button
-            type="button"
-            onClick={onAskMore}
-            className="no-drag mt-1 shrink-0 self-start text-[11px] font-medium overlay-text-secondary underline-offset-2 hover:underline hover:text-[var(--overlay-text-primary)]"
-        >
-            Ask more
-        </button>
+        <div className="mt-1 flex shrink-0 gap-3">
+            <button
+                type="button"
+                onClick={onAskMore}
+                className="no-drag text-[11px] font-medium overlay-text-secondary underline-offset-2 hover:underline hover:text-[var(--overlay-text-primary)]"
+            >
+                Ask more
+            </button>
+            <button
+                type="button"
+                onClick={onNotRight}
+                className="no-drag text-[11px] font-medium overlay-text-secondary underline-offset-2 hover:underline hover:text-[var(--overlay-text-primary)]"
+            >
+                Not right
+            </button>
+        </div>
     </motion.aside>
 );
 

@@ -94,3 +94,5 @@ The follow-up email modal keeps transcript-based recipient lookup and manual ent
 ## Tests
 
 `test/unit/` and `test/integration/`, run by tap with tsx (`docs/development.md`). There are no UI or end-to-end tests.
+
+Two renderer-only shortcuts fill the chat input without sending it (`src/lib/transcriptAsk.ts`): a hover or focus button on each other-party transcript row quotes that line, and the proactive card's "Not right" link quotes the card and the line that triggered it (found by the card's segment id). The user edits the text and sends it; no IPC or stored shape changes.
