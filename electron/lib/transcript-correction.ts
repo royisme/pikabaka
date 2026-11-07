@@ -2,9 +2,14 @@ import { classifyTranslationError } from '../transcript/translationError';
 
 /** Kept in one place so the owner can tune it. */
 export const CORRECTION_SYSTEM_PROMPT =
-  'You fix speech-to-text errors in one line of a live transcript. You get the scenario, up to 6 earlier lines, and the LINE to fix. Rules: change only words that are clearly misheard given the scenario and the context (for example a French word written as unrelated Chinese characters, or a French word spelled wrongly). Keep the language of each part: do not translate, do not add or drop content, do not fix grammar or style, do not change punctuation. If you are not sure, return the line unchanged. Reply with JSON only: {"text": "..."}.';
+  'You fix speech-to-text errors in one line of a live transcript. You get the scenario, up to 6 earlier lines, and the LINE to fix. ' +
+  'Replace a word only when it is clearly a mishearing of a different word that sounds alike and that the scenario or the earlier lines make certain (for example a French word written as unrelated Chinese characters, or a French word spelled wrongly). ' +
+  'Never delete words, never add words, never remove repeated words or filler (a stutter stays), never translate, never fix grammar, style or punctuation, never rewrite a sentence, never guess a meaning. ' +
+  'If the line has no clear mishearing, or you are not certain, return the line exactly as given. Most lines need no change. ' +
+  'Examples (invented). Context says the lesson is about the preposition jusqu\'a: "jus qua la gare" -> "jusqu\'a la gare". Line "Je Je vais Je vais en" -> unchanged (repeats are speech). Line "cabinet 就是是吗" -> unchanged (nothing is certain). ' +
+  'Reply with JSON only: {"text": "..."}.';
 
-export const CORRECTION_TIMEOUT_MS = 4000;
+export const CORRECTION_TIMEOUT_MS = 10_000;
 export const CORRECTION_MAX_EARLIER_LINES = 6;
 const MIN_CORRECTABLE_CHARS = 2;
 
@@ -51,7 +56,7 @@ export async function correctLine(params: {
     });
     const raw = await Promise.race([complete(CORRECTION_SYSTEM_PROMPT, buildCorrectionUser(scenario, earlier, line), controller.signal), aborted]);
     const text = parseCorrection(raw);
-    if (!text || text.length > original.length * 2 + 20) return line.text;
+    if (!text || text.length > original.length * 2 + 20 || text.length < original.length * 0.7) return line.text;
     return text;
   } catch (error) {
     console.warn('[Main] Transcript correction failed:', error instanceof SyntaxError ? 'bad-json' : classifyTranslationError(error));

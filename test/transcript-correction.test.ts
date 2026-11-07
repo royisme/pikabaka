@@ -36,6 +36,7 @@ t.test('correctLine keeps the original on bad JSON, a missing field, or a runawa
   t.equal(await correctLine({ line, earlier, complete: answer('') }), line.text);
   t.equal(await correctLine({ line, earlier, complete: answer('x'.repeat(line.text.length * 2 + 21)) }), line.text, 'more than 2x plus 20 is invalid');
   t.not(await correctLine({ line, earlier, complete: answer('x'.repeat(line.text.length * 2 + 20)) }), line.text, 'the limit itself is allowed');
+  t.equal(await correctLine({ line, earlier, complete: answer('x'.repeat(Math.floor(line.text.length * 0.7) - 1)) }), line.text, 'an answer much shorter than the line dropped words');
 });
 
 t.test('correctLine keeps the original on a failed request or a timeout, and logs only a class', async (t) => {
