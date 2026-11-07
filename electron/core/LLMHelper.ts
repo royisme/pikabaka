@@ -142,7 +142,6 @@ export class LLMHelper {
         const stream = await clients.anthropic().messages.stream({
           model,
           max_tokens: 8192,
-          ...(temperature === undefined ? {} : { temperature }),
           system: systemPrompt,
           messages: [...history, ...(userContent === undefined ? [] : [{
             role: "user" as const,
@@ -200,7 +199,7 @@ export class LLMHelper {
     return runModelTest(this.streamViaConnectionChat(connection, model, 'You are a connection test.', 'Reply with the single word: ready'), connection.apiKey, connection.headers);
   }
 
-  /** One short answer from a chosen connection and model, at temperature 0 (the transcript correction). */
+  /** One short answer from a chosen connection and model (the transcript correction). Temperature 0 is sent to Gemini and OpenAI-style connections; Anthropic models may refuse the parameter. */
   public async completeViaConnection(connection: Connection, model: string, systemPrompt: string, userContent: string, signal: AbortSignal): Promise<string> {
     let text = '';
     for await (const part of this.streamViaConnectionChat(connection, model, systemPrompt, userContent, undefined, [], signal, 0)) text += part;
