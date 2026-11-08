@@ -79,6 +79,32 @@ Fix misheard words (off by default; credentials keys `transcriptCorrectionEnable
 
 Consequence: a translated line appears after the flush delay plus one full LLM round trip, with no partial text. This is read from code; latency has not been measured (issue #29).
 
+## Interpreting
+
+Optional and off by default (`interpretingEnabled`); the first turn-on needs the notice in Settings > Audio & Translation to be accepted (`interpretingNoticeAcceptedAt`). The user presses Talk (overlay control or the global shortcut `interpreting:toggle-talk`), speaks, and presses Talk again. Pika translates what was said and plays the voiced translation into a virtual microphone (BlackHole on macOS, VB-CABLE on Windows) that the user installed and chose as the microphone in the meeting app. The user's own voice is never routed to it, and Pika never changes the system default input.
+
+Flow of one talk window (`electron/interpreting/InterpretingSession.ts`, no Electron import; everything arrives through `SessionDeps`, wired in `createSession.ts`):
+
+1. First press: `refusal()` checks that Interpreting is on, a meeting is active, the microphone is not muted, a translation model is set, a voice and its provider key exist, a virtual microphone is chosen and Pika's own microphone is not that device. A refusal is a state with its reason (`phase: 'error'`), not a throw. Otherwise the window opens, earlier own speech is flushed and sealed so it cannot merge into this window.
+2. Own-speech turns that `emitOwnTurn` (`transcript-assembler.ts`) emits are reported to `noteOwnTurn` and collected by `TalkWindows` (`talkWindow.ts`), per segment, latest revision wins.
+3. Second press: the mic STT is finalized, `GRACE_MS` (1000 ms) lets the last finals arrive, the window closes. Windows are spoken in order; a later window never overtakes an earlier one.
+4. The window's text is translated once (`translateForInterpreting`, no context, target is the speech language of Settings > Audio & Translation), voiced once by the provider (`voiceProviders.ts`: Fish Audio, ElevenLabs), and sent to the overlay window on `interpreting-audio`. `useInterpretingPlayback` plays it with `AudioContext.setSinkId` on the output whose label matches the saved virtual microphone (`src/lib/virtualOutput.ts`); nothing falls back to another output, because speaking into the room would tell the other party nothing. The overlay reports the result on `interpreting:played`.
+5. Only after a successful play the Me row is updated: its source text stays first and larger, the spoken translation is under it (`showTranslation` through `emitNativeAudioTranscript`). That event reaches the windows only; the translation is not written to the meeting record.
+
+Phases shown on the overlay control: `off`, `idle`, `listening`, `translating`, `voicing`, `speaking`, `error`. `reset()` runs at meeting start and end: no window survives, nothing more is spoken and playback stops (`interpreting-stop`).
+
+Echo guard: the system-audio tap can hear Pika's synthetic voice. `noteSpoken` records the translated text in `appState.spokenEcho` (an `EchoFilter`: 20 s window, lines of at least 2 words, 0.75 word overlap) just before the clip is sent, and `audio-pipeline.ts` drops a Them line that repeats it (counted by `audioStats.noteEchoDropped`). This is separate from the existing filter that drops Me lines repeating the other party's stream, and from the native echo cancellation.
+
+Voice cloning (`voiceClone.ts`, main only): the settings window records a 15 to 30 s WAV sample after the user ticks the consent checkbox in `VoiceCloneDialog`; the sample is held in memory, sent once to the provider and dropped. The clone can be previewed on the default speakers (`interpreting:preview-voice`) and deleted at the provider (`interpreting:delete-voice`).
+
+Privacy and logging: translated text and the spoken text go to the translation model and the chosen voice service only; Pika keeps no audio. Logs carry provider and model ids, character and byte counts, durations, status and error class only: never the text, the translation, audio, a voice id, a key or a provider's error body. The Fish Audio key is never part of the settings object the renderer reads; the ElevenLabs key is the one from Provider setup.
+
+Settings (credentials file): `interpretingEnabled`, `interpretingNoticeAcceptedAt`, `interpretingProvider`, `interpretingVoices` (voice id, `cloned`, `consentAt` per provider), `interpretingOutputLabel` (the virtual microphone's label), `fishAudioApiKey`; validated in `electron/services/interpretingSettings.ts`.
+
+IPC channels (`electron/ipc/interpreting.ts`, `preload.ts`): `interpreting:get-settings`, `interpreting:set-settings`, `set-fish-audio-api-key`, `interpreting:get-state`, `interpreting:toggle-talk`, `interpreting:played`, `interpreting:test-voice`, `interpreting:clone-voice`, `interpreting:preview-voice`, `interpreting:delete-voice`; main to renderer: `interpreting-state-changed`, `interpreting-audio`, `interpreting-stop`.
+
+Files: `electron/interpreting/` (`InterpretingSession.ts`, `createSession.ts`, `talkWindow.ts`, `voiceClone.ts`, `voiceProviders.ts`), `electron/ipc/interpreting.ts`, `electron/services/interpretingSettings.ts`, `src/components/settings/` (`InterpretingSettings.tsx`, `InterpretingNoticeDialog.tsx`, `VoiceCloneDialog.tsx`), `src/hooks/useInterpretingPlayback.ts`, `src/lib/` (`virtualOutput.ts`, `interpretingChip.ts`, `interpretingSettingsUi.ts`).
+
 ## Meeting record
 
 Meetings start manually from the launcher. `MeetingPersistence` creates the row before capture, assembled transcript turns and usage are written incrementally, and stop or startup recovery completes the row without rewriting its children. Recovery preserves the stored start time and any provided title. New databases have no event-link or meeting-origin columns; existing unused nullable columns are left untouched and ignored by row mappings. No schema migration removes them.

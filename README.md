@@ -34,9 +34,19 @@ After each segment the other party finishes, a small, fast decision model judges
 
 ### Live transcript and translation
 - Captures system audio (the other party) and the microphone separately with a native Rust module, with acoustic echo cancellation.
-- Shows what the other party said with its translation under it. Your own speech is shown as a quiet source line.
+- Shows what the other party said with its translation under it. Your own speech is shown as a quiet source line (with Interpreting on, the spoken translation goes under it).
 - Optional **Fix misheard words**: a model of your choice repairs clearly misheard words using the scenario and the earlier lines. Corrected lines carry a small mark; hover to see the original. Off by default.
 - Hover any other-party line to put it into the chat box, then edit and send.
+
+### Interpreting (optional)
+Interpreting is off by default. When you turn it on in **Settings > Audio & Translation** and press **Talk**, Pika translates what you say into the other party's language and speaks it into a virtual microphone that you select as the microphone in your meeting app. Press Talk, speak, press Talk again (the overlay control or a global shortcut). The other party hears only the translation, never your own voice, and Pika never changes your system's default input. Your line in the transcript keeps your own words, with the spoken translation under it; the translation is not saved in the meeting record. Use a voice from Fish Audio or ElevenLabs by its ID, or clone your own voice from a short recording.
+
+To set it up:
+1. Install a virtual audio device yourself: [BlackHole 2ch](https://existential.audio/blackhole/) on macOS, [VB-CABLE](https://vb-audio.com/Cable/) on Windows (there is no Windows release yet, see the roadmap).
+2. In **Settings > Audio & Translation > Interpreting**, choose that device as the virtual microphone, pick Fish Audio or ElevenLabs, add its key (ElevenLabs uses the key from Provider setup), and give it a voice ID or clone your own. A translation model must also be set.
+3. In your meeting app, select the same virtual device as the microphone.
+
+**Use it responsibly.** Clone only your own voice, never anyone else's and never a minor's. Tell the people in the call that they are hearing a machine translation in a synthetic voice; the law may require it where you are. Translations can be wrong, and what is spoken goes out in your name. Your text, and your voice sample if you clone, are sent to the voice service you choose and handled under its terms (ElevenLabs Use Policy, Fish Audio Terms). Pika keeps no audio, and you can delete a cloned voice from Settings at any time. The first time you turn it on, Pika shows this notice and asks you to accept it.
 
 ### An agent that knows the meeting
 Ask during the call. The agent can read the recent transcript, search it, search your past meetings (local vector search with `sqlite-vec`) and your saved notes, and look at a screenshot. If you set a workspace folder, it can also run commands and edit files there; every command waits for your approval in the overlay. The role and task prompts are editable in Settings.
@@ -46,7 +56,7 @@ Transcripts are written to a local SQLite database as the meeting goes on, so yo
 
 ### Privacy
 - API keys and custom headers are encrypted with the operating system's secure storage (macOS Keychain, Windows DPAPI).
-- Network traffic goes only to the speech and model endpoints you configure.
+- Network traffic goes only to the speech, model and (if you turn on Interpreting) voice endpoints you configure.
 - "Hide from screen share" asks the operating system to keep the overlay out of screen sharing.
 
 ## Install
@@ -111,7 +121,7 @@ Progress is tracked in [GitHub Issues](https://github.com/royisme/pikabaka/issue
 Yes. It is AGPL-3.0: free for personal use, study and open-source projects. Commercial or proprietary use should review the AGPL terms or ask about a commercial license.
 
 **Does my audio leave my machine?**
-Audio and text go only to the speech and language services you configure. Speech recognition always uses a service you configure, so it is not available offline; a local model server and the bundled embedding model keep prompts and search on your machine.
+Audio and text go only to the speech, language and (if you turn on Interpreting) voice services you configure. Speech recognition always uses a service you configure, so it is not available offline; a local model server and the bundled embedding model keep prompts and search on your machine.
 
 **Where are my API keys stored?**
 In a local `credentials.enc` file encrypted by Electron's `safeStorage`. If secure storage is unavailable, Pika writes `credentials.json` in plain text and shows a notice in Settings > Provider setup.
