@@ -1,5 +1,70 @@
 # Changelog
 
+## [3.4.0](https://github.com/royisme/pikabaka/compare/v3.3.0...v3.4.0) (2026-11-08)
+
+
+### Features
+
+* **interpreting:** add Fish Audio and ElevenLabs voice providers ([83a3170](https://github.com/royisme/pikabaka/commit/83a31707010e0668712a278ede5caf9a8f85bf92))
+* **interpreting:** add talk-window state machine ([d28f87e](https://github.com/royisme/pikabaka/commit/d28f87e4d2312bb3db352960d230c3fdce074205))
+* **interpreting:** clone the user's own voice with consent, review and delete ([2be41c9](https://github.com/royisme/pikabaka/commit/2be41c9913418d7bed2b59586e0014c3d861edfb))
+* **interpreting:** clone your own voice ([6c3540d](https://github.com/royisme/pikabaka/commit/6c3540d324699f5d04a52520557b1db9f35325a7))
+* **interpreting:** drop Them lines that repeat the text Pika just spoke ([cd0947c](https://github.com/royisme/pikabaka/commit/cd0947c212b9b2f89be2c0062be8efd25a330014))
+* **interpreting:** overlay Talk control, virtual-sink playback and spoken-translation slot ([fd1f6f4](https://github.com/royisme/pikabaka/commit/fd1f6f41bc24f84238c735f32ca12c486fd0891a))
+* **interpreting:** session, talk toggle shortcut and reversed translation ([0f30ef6](https://github.com/royisme/pikabaka/commit/0f30ef6a62583a518eba3d583cf3593cf3941601))
+* **interpreting:** settings section with first-enable notice and voice setup ([06f8f9a](https://github.com/royisme/pikabaka/commit/06f8f9ace80deb5a5eb568b3f23a8fcb9eb0c3bb))
+* **interpreting:** settings section with first-enable notice and voice setup ([3b9a0a6](https://github.com/royisme/pikabaka/commit/3b9a0a637d7a2fc21189409688de5cbd3eeaa73a))
+* **interpreting:** settings storage, voice providers and talk-window state ([223b034](https://github.com/royisme/pikabaka/commit/223b034addd6c8d928a3968458f1480b5947ab34))
+* **interpreting:** store interpreting settings and the Fish Audio key ([ab2291d](https://github.com/royisme/pikabaka/commit/ab2291d3b61ccedca18f0e88e91a981fff515e2a))
+* **interpreting:** talk session, echo guard and overlay control ([ec6705e](https://github.com/royisme/pikabaka/commit/ec6705e941f718de01164b71108849203941f26c))
+* **transcript:** newest-line preview and one clear translation-down signal ([d57cba3](https://github.com/royisme/pikabaka/commit/d57cba39bc4350a957daf3454b8d0be9d9aff7c2))
+* **transcript:** one translation-down signal, on the newest failed row and the Translate button ([3c510e7](https://github.com/royisme/pikabaka/commit/3c510e7efb872c8fce1cbf5760e24a0a7eb593a3))
+* **transcript:** show a preview of the newest line in the new-lines pill ([4b9dd15](https://github.com/royisme/pikabaka/commit/4b9dd1580fabb52ce9e06f41352764db2e5de1c5))
+
+
+### Bug Fixes
+
+* **interpreting:** do not keep an ElevenLabs clone that needs verification ([717e30b](https://github.com/royisme/pikabaka/commit/717e30bc0d481cfc4a9be903faf17b4defe8422a))
+* **interpreting:** do not keep an ElevenLabs clone that needs verification ([4880cd2](https://github.com/royisme/pikabaka/commit/4880cd2737f8c3d68c157fd736aac0defa86dcad))
+* **release:** tolerate the null that execSync returns when stdio is inherited ([188d944](https://github.com/royisme/pikabaka/commit/188d944f21cf33141a56da5d6780b81c036aed08))
+* **release:** tolerate the null that execSync returns when stdio is inherited ([83febc4](https://github.com/royisme/pikabaka/commit/83febc4e32ef366b7651a505e7c95234b3dce0e6))
+* **window:** deliver the first click on the overlay instead of swallowing it ([5eff162](https://github.com/royisme/pikabaka/commit/5eff1621ce0fa0603f585e96ef489275dd8f44b7))
+
+
+### Refactoring
+
+* **audio:** move device and STT reconfiguration out of main.ts ([5403cd8](https://github.com/royisme/pikabaka/commit/5403cd8b3578822dbe8ead25957fe1bbcfd9cd0c))
+* **audio:** type the native module, STT responses and Google stream ([9f091a1](https://github.com/royisme/pikabaka/commit/9f091a17e10afdd5112145880ed4713620c49976))
+* **chat:** move streaming message transitions out of useMeetingChat ([76ca85d](https://github.com/royisme/pikabaka/commit/76ca85d8648434f1b1e310b27bbd7c361ea9d972))
+* **credentials:** move credential file helpers to credentialStore ([53fd0fc](https://github.com/royisme/pikabaka/commit/53fd0fc5141a1df55b2f2d6f1517ad602cc79a39))
+* **credentials:** move credential file helpers to credentialStore ([8181381](https://github.com/royisme/pikabaka/commit/8181381ab6fd360f8099bffe78fc99cfd8360e81))
+* **db:** drop the interviewer to them speaker migration ([3ea94e4](https://github.com/royisme/pikabaka/commit/3ea94e4dc5948985cd857ed1bb15ea70b431f68b))
+* **db:** type query rows and move migrations out of DatabaseManager ([45c0267](https://github.com/royisme/pikabaka/commit/45c02670dcd395f2c107bf9f90574ece5c2bf0f7))
+* **electron:** remove dead code (intent classifier, solve pipeline, unused files) ([a338c5b](https://github.com/royisme/pikabaka/commit/a338c5b9c3f1014d43180d39970789f70c57d269))
+* **electron:** remove interview-era tables, the solutions view and old migrations ([7d0a83c](https://github.com/royisme/pikabaka/commit/7d0a83c49bf5f117eab9cba3238270fd704b01b4))
+* **electron:** remove interview-era tables, the solutions view, legacy localStorage migration and unused locals ([85199a3](https://github.com/royisme/pikabaka/commit/85199a3ac38126c3d9c44f1b9283dbecd079dc0a))
+* **electron:** remove methods and constants nothing calls ([8c21f66](https://github.com/royisme/pikabaka/commit/8c21f66790c151f0e2f144a1fa05cc2451dd9618))
+* **electron:** type KeybindManager, cropper, logging and screenshot catch ([9fa647a](https://github.com/royisme/pikabaka/commit/9fa647a850fdf2f5ab7af2db5c5e01f9fc8fb470))
+* **ipc:** type handler catches, the ws import and safeHandle ([11b272f](https://github.com/royisme/pikabaka/commit/11b272faf0d850fe68fb29fa2fa9cee19f050f8b))
+* **ipc:** type meeting, update and language payloads end to end ([a4ea0a1](https://github.com/royisme/pikabaka/commit/a4ea0a193115930233d3011d2048d6d141d6554b))
+* **knowledge:** type chunk metadata and parsed document data ([82bf090](https://github.com/royisme/pikabaka/commit/82bf090e4ef5fc3c942151c7649cc52d98b467bf))
+* **llm:** remove the intent classifier, temporal context, transcript cleaner, solve pipeline and coding detection ([e044a4f](https://github.com/royisme/pikabaka/commit/e044a4fd328cef960b63aeb31673683cf0fdefcd))
+* **main:** drop dead AppState forwarders, type capture fields, move the Ollama handler to ipc/system ([533efec](https://github.com/royisme/pikabaka/commit/533efecb1226e38d9e9fc0d94886451c45e73d2c))
+* **main:** move shortcut dispatch, knowledge wiring and intelligence event forwarding out of AppState ([b196df7](https://github.com/royisme/pikabaka/commit/b196df784e17c376c9b59d1370fbd81969638f25))
+* **main:** move the screenshot capture session out of main.ts ([e42db2c](https://github.com/royisme/pikabaka/commit/e42db2c149896ccd1976481402a238ac62e20ddc))
+* **preload:** remove the unused electron/preload/*.ts duplicates ([93c6f8b](https://github.com/royisme/pikabaka/commit/93c6f8bdebe1952cd408ea377fefdcf0f018608d))
+* **preload:** type the bridge with ElectronAPI and fold listeners into on() ([fc48354](https://github.com/royisme/pikabaka/commit/fc48354482e0ff714b184ee7a0f6791c7f633e81))
+* **rag:** type rows, worker messages and provider responses ([26a44d3](https://github.com/royisme/pikabaka/commit/26a44d35d2d085c830eef816688526a03c29d6af))
+* **renderer:** remove unused components, constants and type files ([f2c1c9d](https://github.com/royisme/pikabaka/commit/f2c1c9d718f0dd9626e3ff19578debea13193c87))
+* **renderer:** type markdown component props with the library types ([8dea2f6](https://github.com/royisme/pikabaka/commit/8dea2f6ce39e4cea4417a3fb5292f883aea571b9))
+* smell cleanup batch A (preload, markdown props, small files) ([91977cf](https://github.com/royisme/pikabaka/commit/91977cf9e477f94fbd587c4a75104344ec9cddcd))
+* smell cleanup batch B (db, rag, ipc, audio types) ([5c4a8d1](https://github.com/royisme/pikabaka/commit/5c4a8d136c82c8ae736b467d44f3a52419d69eea))
+* smell cleanup batch C (chat transitions, main.ts forwarders, IPC payload types) ([f4864c9](https://github.com/royisme/pikabaka/commit/f4864c98260433ff7d1180b008fac0a27275b6c8))
+* smell cleanup wave 2 (usage types, translation split, screenshot module) ([0f3889f](https://github.com/royisme/pikabaka/commit/0f3889f8a8cede9b857cd92926bfd9dd19a31f06))
+* smell cleanup wave 3 (main.ts under 800 lines) ([1e2ec87](https://github.com/royisme/pikabaka/commit/1e2ec873768e85c5895e97d83e4607d2e886c850))
+* **transcript:** move the translation stage out of the assembler ([f51ea46](https://github.com/royisme/pikabaka/commit/f51ea4625b510fe2b19794725a2b2f26ae516573))
+* **types:** type session usage, meeting metadata and the knowledge orchestrator ([72f2e0a](https://github.com/royisme/pikabaka/commit/72f2e0a9b568d37cc9f356f3aad7d2d0c0111769))
+
 ## [3.3.0](https://github.com/royisme/pikabaka/compare/v3.2.0...v3.3.0) (2026-11-08)
 
 
