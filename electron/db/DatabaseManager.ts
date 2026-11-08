@@ -200,28 +200,6 @@ export class DatabaseManager {
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_chunks_meeting ON chunks(meeting_id);
-
-                CREATE TABLE IF NOT EXISTS user_profile (
-                    id INTEGER PRIMARY KEY,
-                    structured_json TEXT NOT NULL,
-                    compact_persona TEXT NOT NULL,
-                    intro_short TEXT,
-                    intro_interview TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                );
-
-                CREATE TABLE IF NOT EXISTS resume_nodes (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    category TEXT,
-                    title TEXT,
-                    organization TEXT,
-                    start_date TEXT,
-                    end_date TEXT,
-                    duration_months INTEGER,
-                    text_content TEXT,
-                    tags TEXT,
-                    embedding BLOB
-                );
             `);
             this.db.pragma('user_version = 1');
         }
@@ -418,6 +396,9 @@ export class DatabaseManager {
                 })();
             }
         }
+
+        // Tables the removed interview feature wrote; not versioned, so it cannot skip the v12 retry.
+        this.db.exec('DROP TABLE IF EXISTS user_profile; DROP TABLE IF EXISTS resume_nodes;');
 
         console.log('[DatabaseManager] Migrations completed.');
     }
@@ -866,9 +847,8 @@ export class DatabaseManager {
                 this.db!.exec('DELETE FROM transcripts');
                 this.db!.exec('DELETE FROM meetings');
 
-                // Dormant interview data goes with Clear all data: a stored resume or job description,
-                // its passages and vectors, and the tables the removed feature wrote. Notes and imported
-                // materials are kept. Guarded by table existence so an older database still flushes.
+                // Dormant interview data goes with Clear all data: a stored resume or job description
+                // and its passages and vectors. Notes and imported materials are kept. Guarded by table existence so an older database still flushes.
                 const tables = new Set((this.db!.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map(row => row.name));
                 if (tables.has('knowledge_chunks')) {
                     for (const name of tables) {
@@ -879,9 +859,6 @@ export class DatabaseManager {
                     this.db!.exec("DELETE FROM knowledge_chunks WHERE doc_type IN ('resume', 'jd')");
                 }
                 if (tables.has('knowledge_documents')) this.db!.exec("DELETE FROM knowledge_documents WHERE doc_type IN ('resume', 'jd')");
-                for (const table of ['knowledge_company_cache', 'knowledge_negotiation', 'interview_sessions', 'resume_nodes', 'user_profile']) {
-                    if (tables.has(table)) this.db!.exec(`DELETE FROM ${table}`);
-                }
             })();
 
             console.log('[DatabaseManager] All data cleared from database.');

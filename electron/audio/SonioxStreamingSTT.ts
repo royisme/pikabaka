@@ -41,7 +41,6 @@ export class SonioxStreamingSTT extends EventEmitter {
     private keepAliveTimer: NodeJS.Timeout | null = null;
 
     // Accumulated final tokens for building transcript text
-    private pendingFinalText = '';
     
     private buffer: Buffer[] = [];
     private isConnecting = false;
@@ -132,7 +131,6 @@ export class SonioxStreamingSTT extends EventEmitter {
         this.isActive = false;
         this.isConnecting = false;
         this.configSent = false;
-        this.pendingFinalText = '';
         this.buffer = [];
         console.log('[SonioxStreaming] Stopped');
     }
@@ -182,7 +180,6 @@ export class SonioxStreamingSTT extends EventEmitter {
         console.log(`[SonioxStreaming] Connecting (rate=${this.sampleRate}, ch=${this.numChannels})...`);
 
         this.configSent = false;
-        this.pendingFinalText = '';
         this.ws = new WebSocket(SONIOX_WEBSOCKET_URL);
 
         this.ws.on('open', () => {

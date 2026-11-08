@@ -4,7 +4,6 @@ import { getUpdateState } from "../lib/auto-updater"
 import { SettingsManager } from "../services/SettingsManager"
 import { AppState } from "../main"
 import { cancelActiveRagQueries } from "./rag"
-import { DatabaseManager } from "../db/DatabaseManager"
 import * as path from "path"
 import { RECOGNITION_LANGUAGES, AI_RESPONSE_LANGUAGES } from "../config/languages"
 
@@ -171,24 +170,13 @@ export function registerCoreHandlers(appState: AppState): void {
   })
 
   safeHandle("get-screenshots", async () => {
-    // console.log({ view: appState.getView() })
     try {
-      let previews = []
-      if (appState.getView() === "queue") {
-        previews = await Promise.all(
-          appState.getScreenshotQueue().map(async (path) => ({
-            path,
-            preview: await appState.getImagePreview(path)
-          }))
-        )
-      } else {
-        previews = await Promise.all(
-          appState.getExtraScreenshotQueue().map(async (path) => ({
-            path,
-            preview: await appState.getImagePreview(path)
-          }))
-        )
-      }
+      const previews = await Promise.all(
+        appState.getScreenshotQueue().map(async (path) => ({
+          path,
+          preview: await appState.getImagePreview(path)
+        }))
+      )
       // previews.forEach((preview: any) => console.log(preview.path))
       return previews
     } catch (error) {

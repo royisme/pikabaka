@@ -86,7 +86,7 @@ export class VectorStore {
      * Reject all pending requests (used on worker crash or exit).
      */
     private rejectAllPending(err: Error): void {
-        for (const [id, pending] of this.pendingRequests) {
+        for (const [, pending] of this.pendingRequests) {
             clearTimeout(pending.timer);
             pending.reject(err);
         }

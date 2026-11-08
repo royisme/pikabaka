@@ -10,8 +10,6 @@
 
 import { parentPort } from 'worker_threads';
 import Database from 'better-sqlite3';
-import * as sqliteVec from 'sqlite-vec';
-import path from 'path';
 
 interface NativeVecSearchChunksMessage {
     type: 'nativeVecSearch';

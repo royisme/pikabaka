@@ -14,9 +14,12 @@ export class KnowledgeDatabaseManager {
   }
 
   private initSchema(): void {
-    // knowledge_company_cache, knowledge_negotiation and interview_sessions are dormant: the
-    // interview feature that wrote them is gone, but the tables stay so no stored data is lost.
+    // Tables the removed interview feature wrote; existing installs lose them.
     this.db.exec(`
+      DROP TABLE IF EXISTS knowledge_company_cache;
+      DROP TABLE IF EXISTS knowledge_negotiation;
+      DROP TABLE IF EXISTS interview_sessions;
+
       CREATE TABLE IF NOT EXISTS knowledge_documents (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         doc_type TEXT NOT NULL,
@@ -39,23 +42,6 @@ export class KnowledgeDatabaseManager {
         UNIQUE(doc_id, chunk_index)
       );
 
-      CREATE TABLE IF NOT EXISTS knowledge_company_cache (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        company_name TEXT NOT NULL UNIQUE,
-        dossier TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now')),
-        expires_at TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS knowledge_negotiation (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        profile_id INTEGER,
-        jd_id INTEGER,
-        script TEXT,
-        session_state TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-      );
-
       CREATE INDEX IF NOT EXISTS idx_knowledge_docs_type ON knowledge_documents(doc_type);
       CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_doc ON knowledge_chunks(doc_id);
     `);
@@ -74,21 +60,6 @@ export class KnowledgeDatabaseManager {
         this.db.exec(`ALTER TABLE knowledge_documents ADD COLUMN ${column}`);
       } catch { /* column already exists */ }
     }
-
-    // Dormant interview sessions table
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS interview_sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        jd_id INTEGER REFERENCES knowledge_documents(id),
-        transcript TEXT,
-        qa_pairs TEXT,
-        recap TEXT,
-        jd_coverage TEXT,
-        prep_notes TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        duration_seconds INTEGER
-      );
-    `);
   }
 
   // Documents

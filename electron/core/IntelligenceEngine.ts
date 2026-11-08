@@ -4,7 +4,7 @@
 
 import { EventEmitter } from 'events';
 import { LLMHelper } from './LLMHelper';
-import { SessionTracker, TranscriptSegment, ContextItem } from './SessionTracker';
+import { SessionTracker, TranscriptSegment } from './SessionTracker';
 import { AnswerLLM, AssistLLM, AskLLM, FollowUpLLM, RecapLLM } from '../llm';
 
 // Mode types
@@ -71,7 +71,6 @@ export class IntelligenceEngine extends EventEmitter {
     private session: SessionTracker;
 
     // Timestamps for tracking
-    private lastTranscriptTime: number = 0;
 
     constructor(llmHelper: LLMHelper, session: SessionTracker) {
         super();
@@ -117,7 +116,6 @@ export class IntelligenceEngine extends EventEmitter {
      */
     handleTranscript(segment: TranscriptSegment, skipRefinementCheck: boolean = false): void {
         const result = this.session.handleTranscript(segment);
-        this.lastTranscriptTime = Date.now();
 
         // Check for follow-up intent if user is speaking
         if (result && !skipRefinementCheck && result.role === 'user' && this.session.getLastAssistantMessage()) {

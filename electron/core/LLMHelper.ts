@@ -62,7 +62,6 @@ export interface TranscriptTranslationRequest {
 export class LLMHelper {
   private knowledgeOrchestrator: any = null;
   private aiResponseLanguage: string = 'English';
-  private sttLanguage: string = 'english-us';
 
   public getAiResponseLanguage(): string {
     return this.aiResponseLanguage;
@@ -417,11 +416,6 @@ ANSWER DIRECTLY:`;
   public setAiResponseLanguage(language: string) {
     this.aiResponseLanguage = language;
     console.log(`[LLMHelper] AI Response Language set to: ${language}`);
-  }
-
-  public setSttLanguage(language: string) {
-    this.sttLanguage = language;
-    console.log(`[LLMHelper] STT Language set to: ${language}`);
   }
 
   /**

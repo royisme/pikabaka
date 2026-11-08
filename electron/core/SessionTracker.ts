@@ -118,8 +118,7 @@ export class SessionTracker {
         this.evictOldEntries();
 
         // Filter out internal system prompts that might be passed via IPC
-        const isInternalPrompt = text.startsWith("You are a real-time interview assistant") ||
-            text.startsWith("You are a helper") ||
+        const isInternalPrompt = text.startsWith("You are a helper") ||
             text.startsWith("CONTEXT:");
 
         if (!isInternalPrompt) {

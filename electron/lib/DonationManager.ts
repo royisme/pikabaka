@@ -1,5 +1,4 @@
 import Store from 'electron-store';
-import crypto from 'crypto';
 
 interface DonationState {
     hasDonated: boolean;
@@ -15,7 +14,6 @@ export class DonationManager {
     // Constants
     private readonly MAX_LIFETIME_SHOWS = 5;
     private readonly DAYS_INTERVAL = 21;
-    private readonly SHOW_DELAY_MS = 10000; // 10 seconds after app start
 
     private constructor() {
         this.store = new Store<DonationState>({

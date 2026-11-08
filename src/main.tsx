@@ -2,9 +2,6 @@ import React from "react"
 import ReactDOM from "react-dom/client"
 import App from "./App"
 import "./index.css"
-import { migrateLegacyLocalStorage } from "./lib/legacyLocalStorage"
-
-migrateLegacyLocalStorage(localStorage);
 
 const THEME_CACHE_KEY = "pika_resolved_theme";
 

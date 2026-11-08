@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AgentGateDecision } from '../../types/electron';
 import { primaryButton, secondaryButton } from './buttonStyles';

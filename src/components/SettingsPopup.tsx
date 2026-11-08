@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { MessageSquare, Link, Camera, Heart } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useShortcuts } from '../hooks/useShortcuts';

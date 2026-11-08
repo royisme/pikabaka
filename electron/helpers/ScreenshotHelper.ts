@@ -128,8 +128,6 @@ async function getDisplaysIntersectingSelection(
     
     console.log(`[ScreenshotHelper] Selection intersects with display ${display.id}:`, intersection);
     
-    const scaleFactor = display.scaleFactor;
-    
     // Find the corresponding source using the pre-built map
     const displayIdStr = display.id.toString();
     let source = sourceByDisplayId.get(displayIdStr);
@@ -342,30 +340,17 @@ async function stitchImages(captures: DisplayCapture[], selection: Electron.Rect
 
 export class ScreenshotHelper {
   private screenshotQueue: string[] = []
-  private extraScreenshotQueue: string[] = []
   private readonly MAX_SCREENSHOTS = 5
 
   private readonly screenshotDir: string
-  private readonly extraScreenshotDir: string
 
-  private view: "queue" | "solutions" = "queue"
-
-  constructor(view: "queue" | "solutions" = "queue") {
-    this.view = view
-
+  constructor() {
     // Initialize directories
     this.screenshotDir = path.join(app.getPath("userData"), "screenshots")
-    this.extraScreenshotDir = path.join(
-      app.getPath("userData"),
-      "extra_screenshots"
-    )
 
     // Create directories if they don't exist
     if (!fs.existsSync(this.screenshotDir)) {
       fs.mkdirSync(this.screenshotDir)
-    }
-    if (!fs.existsSync(this.extraScreenshotDir)) {
-      fs.mkdirSync(this.extraScreenshotDir)
     }
   }
 
@@ -544,50 +529,25 @@ export class ScreenshotHelper {
 
       const exec = util.promisify(require('child_process').exec)
 
-      if (this.view === "queue") {
-        screenshotPath = path.join(this.screenshotDir, `${uuidv4()}.png`)
-        console.log(`[ScreenshotHelper] Using queue directory: ${screenshotPath}`);
-        if (process.platform === 'darwin') {
-          await this.captureWithDesktopCapturer(screenshotPath, undefined, preferredDisplay);
-        } else if (process.platform === 'win32') {
-          await this.captureWithDesktopCapturer(screenshotPath);
-        } else {
-          await exec(this.getScreenshotCommand(screenshotPath, false))
-        }
-
-        this.screenshotQueue.push(screenshotPath)
-        if (this.screenshotQueue.length > this.MAX_SCREENSHOTS) {
-          const removedPath = this.screenshotQueue.shift()
-          if (removedPath) {
-            try {
-              await fs.promises.unlink(removedPath)
-              console.log(`[ScreenshotHelper] Removed old screenshot: ${removedPath}`);
-            } catch (error) {
-              console.warn(`[ScreenshotHelper] Failed to remove old screenshot: ${removedPath}`, error)
-            }
-          }
-        }
+      screenshotPath = path.join(this.screenshotDir, `${uuidv4()}.png`)
+      console.log(`[ScreenshotHelper] Using queue directory: ${screenshotPath}`);
+      if (process.platform === 'darwin') {
+        await this.captureWithDesktopCapturer(screenshotPath, undefined, preferredDisplay);
+      } else if (process.platform === 'win32') {
+        await this.captureWithDesktopCapturer(screenshotPath);
       } else {
-        screenshotPath = path.join(this.extraScreenshotDir, `${uuidv4()}.png`)
-        console.log(`[ScreenshotHelper] Using extra screenshots directory: ${screenshotPath}`);
-        if (process.platform === 'darwin') {
-          await this.captureWithDesktopCapturer(screenshotPath, undefined, preferredDisplay);
-        } else if (process.platform === 'win32') {
-          await this.captureWithDesktopCapturer(screenshotPath);
-        } else {
-          await exec(this.getScreenshotCommand(screenshotPath, false))
-        }
+        await exec(this.getScreenshotCommand(screenshotPath, false))
+      }
 
-        this.extraScreenshotQueue.push(screenshotPath)
-        if (this.extraScreenshotQueue.length > this.MAX_SCREENSHOTS) {
-          const removedPath = this.extraScreenshotQueue.shift()
-          if (removedPath) {
-            try {
-              await fs.promises.unlink(removedPath)
-              console.log(`[ScreenshotHelper] Removed old extra screenshot: ${removedPath}`);
-            } catch (error) {
-              console.warn(`[ScreenshotHelper] Failed to remove old extra screenshot: ${removedPath}`, error)
-            }
+      this.screenshotQueue.push(screenshotPath)
+      if (this.screenshotQueue.length > this.MAX_SCREENSHOTS) {
+        const removedPath = this.screenshotQueue.shift()
+        if (removedPath) {
+          try {
+            await fs.promises.unlink(removedPath)
+            console.log(`[ScreenshotHelper] Removed old screenshot: ${removedPath}`);
+          } catch (error) {
+            console.warn(`[ScreenshotHelper] Failed to remove old screenshot: ${removedPath}`, error)
           }
         }
       }
@@ -660,20 +620,8 @@ export class ScreenshotHelper {
     }
   }
 
-  public getView(): "queue" | "solutions" {
-    return this.view
-  }
-
-  public setView(view: "queue" | "solutions"): void {
-    this.view = view
-  }
-
   public getScreenshotQueue(): string[] {
     return this.screenshotQueue
-  }
-
-  public getExtraScreenshotQueue(): string[] {
-    return this.extraScreenshotQueue
   }
 
   public clearQueues(): void {
@@ -686,19 +634,6 @@ export class ScreenshotHelper {
       })
     })
     this.screenshotQueue = []
-
-    // Clear extraScreenshotQueue
-    this.extraScreenshotQueue.forEach((screenshotPath) => {
-      fs.unlink(screenshotPath, (err) => {
-        if (err) {
-          // console.error(
-          //   `Error deleting extra screenshot at ${screenshotPath}:`,
-          //   err
-          // )
-        }
-      })
-    })
-    this.extraScreenshotQueue = []
   }
 
   public async getImagePreview(filepath: string): Promise<string> {
@@ -730,15 +665,9 @@ export class ScreenshotHelper {
   ): Promise<{ success: boolean; error?: string }> {
     try {
       await fs.promises.unlink(path)
-      if (this.view === "queue") {
-        this.screenshotQueue = this.screenshotQueue.filter(
-          (filePath) => filePath !== path
-        )
-      } else {
-        this.extraScreenshotQueue = this.extraScreenshotQueue.filter(
-          (filePath) => filePath !== path
-        )
-      }
+      this.screenshotQueue = this.screenshotQueue.filter(
+        (filePath) => filePath !== path
+      )
       return { success: true }
     } catch (error) {
       // console.error("Error deleting file:", error)

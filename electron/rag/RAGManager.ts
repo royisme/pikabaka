@@ -12,7 +12,7 @@ import { EmbeddingPipeline } from './EmbeddingPipeline';
 import type { AppAPIConfig } from './EmbeddingProviderResolver';
 import { RAGRetriever } from './RAGRetriever';
 import { LiveRAGIndexer } from './LiveRAGIndexer';
-import { buildRAGPrompt, NO_CONTEXT_FALLBACK, NO_GLOBAL_CONTEXT_FALLBACK } from './prompts';
+import { buildRAGPrompt, NO_GLOBAL_CONTEXT_FALLBACK } from './prompts';
 import { buildMeetingSummaryText } from './meetingSummaryIndex';
 import { DatabaseManager } from '../db/DatabaseManager';
 
