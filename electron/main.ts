@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, ipcMain, screen } from "electron"
+import { app, BrowserWindow, Tray, screen } from "electron"
 import { logToFile, ensureMacMicrophoneAccess, setupConsoleOverrides } from "./lib/logging"
 
 if (!app.isPackaged) {
@@ -40,8 +40,6 @@ import { getMeetingAgent, getGate, refreshGate } from './agent/instance'
 import { type MeetingAgent, reportAgentError } from './agent/MeetingAgent'
 import {
   setupAutoUpdater as setupAutoUpdaterFn,
-  checkForUpdatesManual as checkForUpdatesManualFn,
-  isVersionNewer as isVersionNewerFn,
   quitAndInstallUpdate as quitAndInstallUpdateFn,
   checkForUpdates as checkForUpdatesFn,
   downloadUpdate as downloadUpdateFn,
@@ -52,21 +50,9 @@ import {
   type FlushedTranscriptTurn,
   DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE,
   type TranscriptAssemblerProfile,
-  type TranscriptAssemblerThresholds,
   type TranscriptSpeaker,
   isTranscriptAssemblerProfile,
-  getTranscriptAssemblerThresholds as getTranscriptAssemblerThresholdsFn,
-  emitNativeAudioTranscript as emitNativeAudioTranscriptFn,
-  createTranscriptSegmentId as createTranscriptSegmentIdFn,
-  normalizeTranscriptText as normalizeTranscriptTextFn,
-  endsSentence as endsSentenceFn,
-  mergeTranscriptText as mergeTranscriptTextFn,
-  scheduleBufferedTranscriptFlush as scheduleBufferedTranscriptFlushFn,
-  bufferFinalTranscriptChunk as bufferFinalTranscriptChunkFn,
-  handleSpeakerSpeechEnded as handleSpeakerSpeechEndedFn,
   resetBufferedTranscriptTurns as resetBufferedTranscriptTurnsFn,
-  flushBufferedTranscriptTurn as flushBufferedTranscriptTurnFn,
-  emitTranscriptWithTranslation as emitTranscriptWithTranslationFn,
 } from "./lib/transcript-assembler"
 import {
   type STTProvider,
@@ -75,14 +61,12 @@ import {
   wireSystemAudio as wireSystemAudioFn,
   wireMicrophone as wireMicrophoneFn,
   startAudioTest as startAudioTestFn,
-  _startAudioTestImpl as startAudioTestImplFn,
   stopAudioTest as stopAudioTestFn,
   finalizeMicSTT as finalizeMicSTTFn,
   translateTranscriptSegment as translateTranscriptSegmentFn,
   getNativeAudioStatus as getNativeAudioStatusFn,
 } from "./lib/audio-pipeline"
 import {
-  createTray as createTrayFn,
   showTray as showTrayFn,
   updateTrayMenu as updateTrayMenuFn,
 } from "./lib/tray-menu"
@@ -94,7 +78,6 @@ import {
   getOverlayMousePassthrough as getOverlayMousePassthroughFn,
   getVerboseLogging as getVerboseLoggingFn,
   setVerboseLogging as setVerboseLoggingFn,
-  _broadcastToAllWindows as broadcastToAllWindowsFn,
 } from "./helpers/stealth"
 import { initializeApp } from "./lib/lifecycle"
 import type { EchoFilter } from "./lib/echo-filter"
@@ -136,7 +119,7 @@ export class AppState {
   private intelligenceManager: IntelligenceManager
   private themeManager: ThemeManager
   private ragManager: RAGManager | null = null
-  private knowledgeOrchestrator: any = null
+  private knowledgeOrchestrator: KnowledgeOrchestratorClass | null = null
   public tray: Tray | null = null
   public updateAvailable: boolean = false
 
@@ -282,8 +265,6 @@ export class AppState {
 
     this.setupIntelligenceEvents()
 
-    // Setup Ollama IPC
-    this.setupOllamaIpcHandlers()
 
     // --- NEW SYSTEM AUDIO PIPELINE (SOX + NODE GOOGLE STT) ---
     // LAZY INIT: Do not setup pipeline here to prevent launch volume surge.
@@ -375,7 +356,8 @@ export class AppState {
 
       if (sqliteDb) {
         const knowledgeDb = new KnowledgeDatabaseManagerClass(sqliteDb);
-        this.knowledgeOrchestrator = new KnowledgeOrchestratorClass(knowledgeDb);
+        const orchestrator = new KnowledgeOrchestratorClass(knowledgeDb);
+        this.knowledgeOrchestrator = orchestrator;
 
         // Wire up LLM functions
         const llmHelper = this.processingHelper.getLLMHelper();
@@ -385,8 +367,8 @@ export class AppState {
         // We await waitForReady() so uploads during boot wait for the pipeline
         // instead of immediately throwing 'not ready'.
         const self = this;
-        this.knowledgeOrchestrator.setEmbeddingStatusFn(() => self.ragManager?.getEmbeddingPipeline().getStatus() ?? null);
-        this.knowledgeOrchestrator.setEmbedFn(async (text: string) => {
+        orchestrator.setEmbeddingStatusFn(() => self.ragManager?.getEmbeddingPipeline().getStatus() ?? null);
+        orchestrator.setEmbedFn(async (text: string) => {
           const pipeline = self.ragManager?.getEmbeddingPipeline();
           if (!pipeline) throw new Error('RAG pipeline not available');
           await pipeline.waitForReady();
@@ -395,20 +377,18 @@ export class AppState {
           const embedding = await pipeline.getEmbedding(text);
           return { embedding, provider: providerName, dimensions };
         });
-        if (typeof this.knowledgeOrchestrator.setEmbedQueryFn === 'function') {
-          this.knowledgeOrchestrator.setEmbedQueryFn(async (text: string) => {
-            const pipeline = self.ragManager?.getEmbeddingPipeline();
-            if (!pipeline) throw new Error('RAG pipeline not available');
-            await pipeline.waitForReady();
-            const { providerName, dimensions } = pipeline.getStatus();
-            if (!providerName || !dimensions) throw new Error('Embedding provider not initialized');
-            const embedding = await pipeline.getEmbeddingForQuery(text);
-            return { embedding, provider: providerName, dimensions };
-          });
-        }
+        orchestrator.setEmbedQueryFn(async (text: string) => {
+          const pipeline = self.ragManager?.getEmbeddingPipeline();
+          if (!pipeline) throw new Error('RAG pipeline not available');
+          await pipeline.waitForReady();
+          const { providerName, dimensions } = pipeline.getStatus();
+          if (!providerName || !dimensions) throw new Error('Embedding provider not initialized');
+          const embedding = await pipeline.getEmbeddingForQuery(text);
+          return { embedding, provider: providerName, dimensions };
+        });
 
         // Attach KnowledgeOrchestrator to LLMHelper
-        llmHelper.setKnowledgeOrchestrator(this.knowledgeOrchestrator);
+        llmHelper.setKnowledgeOrchestrator(orchestrator);
 
         console.log('[AppState] KnowledgeOrchestrator initialized');
       }
@@ -419,14 +399,6 @@ export class AppState {
 
   public setupAutoUpdater(): void {
     setupAutoUpdaterFn(this)
-  }
-
-  public async checkForUpdatesManual(): Promise<void> {
-    await checkForUpdatesManualFn(this)
-  }
-
-  public isVersionNewer(current: string, latest: string): boolean {
-    return isVersionNewerFn(this, current, latest)
   }
 
   public async quitAndInstallUpdate(): Promise<void> {
@@ -442,8 +414,8 @@ export class AppState {
   }
 
   // New Property for System Audio & Microphone
-  public systemAudioCapture: any = null;
-  public microphoneCapture: any = null;
+  public systemAudioCapture: SystemAudioCapture | null = null;
+  public microphoneCapture: MicrophoneCapture | null = null;
   public audioTestCapture: any = null; // For audio settings test
   public _audioTestStarting = false;                // P2-12: in-flight guard against concurrent calls
   public googleSTT: STTProvider | null = null; // Them
@@ -461,47 +433,6 @@ export class AppState {
   public lastFlushedTranscriptTurns: Record<TranscriptSpeaker, FlushedTranscriptTurn | null> = { them: null, user: null };
   public transcriptSegmentRevisions: Map<string, number> = new Map();
   public recentTranslatedTurns: Array<{ segmentId: string; source: string; translation: string }> = [];
-
-  public getTranscriptAssemblerThresholds(): TranscriptAssemblerThresholds {
-    return getTranscriptAssemblerThresholdsFn(this)
-  }
-
-  public emitNativeAudioTranscript(payload: any): void {
-    emitNativeAudioTranscriptFn(this, payload)
-  }
-
-  public createTranscriptSegmentId(speaker: TranscriptSpeaker, timestamp: number): string {
-    return createTranscriptSegmentIdFn(this, speaker, timestamp)
-  }
-
-  public normalizeTranscriptText(text: string): string {
-    return normalizeTranscriptTextFn(this, text)
-  }
-
-  public endsSentence(text: string): boolean {
-    return endsSentenceFn(this, text)
-  }
-
-  public mergeTranscriptText(existing: string, incoming: string): string {
-    return mergeTranscriptTextFn(this, existing, incoming)
-  }
-
-  public scheduleBufferedTranscriptFlush(speaker: TranscriptSpeaker, delayMs: number): void {
-    scheduleBufferedTranscriptFlushFn(this, speaker, delayMs)
-  }
-
-  public bufferFinalTranscriptChunk(
-    speaker: TranscriptSpeaker,
-    text: string,
-    timestamp: number,
-    confidence: number
-  ): void {
-    bufferFinalTranscriptChunkFn(this, speaker, text, timestamp, confidence)
-  }
-
-  public handleSpeakerSpeechEnded(speaker: TranscriptSpeaker): void {
-    handleSpeakerSpeechEndedFn(this, speaker)
-  }
 
   public resetBufferedTranscriptTurns(): void {
     resetBufferedTranscriptTurnsFn(this)
@@ -522,22 +453,6 @@ export class AppState {
     } catch (err) {
       console.error('[Main] Failed to record a transcript segment:', (err as Error).message);
     }
-  }
-
-  public async flushBufferedTranscriptTurn(speaker: TranscriptSpeaker): Promise<void> {
-    await flushBufferedTranscriptTurnFn(this, speaker)
-  }
-
-  public async emitTranscriptWithTranslation(params: {
-    speaker: TranscriptSpeaker;
-    text: string;
-    timestamp: number;
-    confidence: number;
-    segmentId: string;
-    speakerLabel?: string;
-    forceTranslate?: boolean;
-  }): Promise<{ success: boolean; error?: string }> {
-    return emitTranscriptWithTranslationFn(this, params)
   }
 
   public createSTTProvider(speaker: 'them' | 'user'): STTProvider {
@@ -657,10 +572,6 @@ export class AppState {
 
   public async startAudioTest(deviceId?: string): Promise<{ fallbackUsed: boolean }> {
     return startAudioTestFn(this, deviceId)
-  }
-
-  public async _startAudioTestImpl(deviceId?: string): Promise<{ fallbackUsed: boolean }> {
-    return startAudioTestImplFn(this, deviceId)
   }
 
   public stopAudioTest(): void {
@@ -1013,31 +924,6 @@ export class AppState {
     return this.screenshotHelper.getScreenshotQueue()
   }
 
-  // Window management methods
-  public setupOllamaIpcHandlers(): void {
-    ipcMain.handle('get-ollama-models', async () => {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout for detection
-
-        const response = await fetch('http://localhost:11434/api/tags', {
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const data = await response.json();
-          // data.models is an array of objects: { name: "llama3:latest", ... }
-          return data.models.map((m: any) => m.name);
-        }
-        return [];
-      } catch (error) {
-        // console.warn("Ollama detection failed:", error);
-        return [];
-      }
-    });
-  }
-
   public createWindow(): void {
     this.windowHelper.createWindow()
   }
@@ -1241,10 +1127,6 @@ export class AppState {
     this.windowHelper.centerAndShowWindow()
   }
 
-  public createTray(): void {
-    createTrayFn(this)
-  }
-
   public showTray(): void {
     showTrayFn(this)
   }
@@ -1282,11 +1164,6 @@ export class AppState {
 
   public setVerboseLogging(enabled: boolean): void {
     setVerboseLoggingFn(this, enabled)
-  }
-
-  // Helper: broadcast an IPC event to all windows
-  public _broadcastToAllWindows(channel: string, ...args: any[]): void {
-    broadcastToAllWindowsFn(this, channel, ...args)
   }
 
 }
