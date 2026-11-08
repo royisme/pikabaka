@@ -44,6 +44,7 @@ t.test('Soniox fails a non-JSON reply with its first line and no key', async t =
         } },
         [path.resolve('electron/audio/AudioDevices.ts')]: { AudioDevices: {} },
         [path.resolve('electron/lib/transcript-assembler.ts')]: {},
+        [path.resolve('electron/lib/transcript-translation.ts')]: {},
         [path.resolve('electron/services/SettingsManager.ts')]: {},
         ws: FakeSocket,
     }) as typeof import('../../electron/ipc/stt');
@@ -66,6 +67,7 @@ t.test('ElevenLabs key test requires a successful response and returns real fail
         } },
         [path.resolve('electron/audio/AudioDevices.ts')]: { AudioDevices: {} },
         [path.resolve('electron/lib/transcript-assembler.ts')]: {},
+        [path.resolve('electron/lib/transcript-translation.ts')]: {},
         [path.resolve('electron/services/SettingsManager.ts')]: {},
         axios: { get: async (url: string) => {
             requests++;

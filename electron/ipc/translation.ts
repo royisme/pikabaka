@@ -1,6 +1,6 @@
 import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
-import { testTranslation } from "../lib/transcript-assembler"
+import { testTranslation } from "../lib/transcript-translation"
 
 export function registerTranslationHandlers(appState: AppState): void {
   safeHandle("get-transcript-translation-settings", async () => {

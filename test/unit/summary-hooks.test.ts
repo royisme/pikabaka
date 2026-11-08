@@ -125,7 +125,7 @@ async function setup(t: Test) {
             'helpers/CropperWindowHelper', 'helpers/ScreenshotHelper', 'services/KeybindManager', 'helpers/ProcessingHelper',
             'IntelligenceManager', 'audio/SystemAudioCapture', 'audio/MicrophoneCapture', 'helpers/ThemeManager',
             'rag/RAGManager', 'rag/embeddingConfig', 'agent/MeetingAgent', 'llm/index', 'lib/auto-updater',
-            'lib/transcript-assembler', 'lib/audio-pipeline', 'lib/tray-menu', 'helpers/stealth',
+            'lib/transcript-assembler', 'lib/transcript-translation', 'lib/audio-pipeline', 'lib/tray-menu', 'helpers/stealth',
             'knowledge/KnowledgeOrchestrator', 'knowledge/KnowledgeDatabaseManager', 'services/CredentialsManager',
             'services/SettingsManager', 'lib/verboseLog', 'services/OllamaManager',
         ];

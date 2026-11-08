@@ -301,7 +301,7 @@ function mainClass(t: Test, getMeetingDetails: (id: string) => unknown = () => u
         'helpers/CropperWindowHelper', 'helpers/ScreenshotHelper', 'services/KeybindManager', 'helpers/ProcessingHelper',
         'IntelligenceManager', 'audio/SystemAudioCapture', 'audio/MicrophoneCapture', 'helpers/ThemeManager',
         'rag/RAGManager', 'rag/embeddingConfig', 'db/DatabaseManager', 'agent/MeetingAgent', 'llm/index',
-        'lib/auto-updater', 'lib/transcript-assembler', 'lib/audio-pipeline', 'lib/tray-menu', 'helpers/stealth',
+        'lib/auto-updater', 'lib/transcript-assembler', 'lib/transcript-translation', 'lib/audio-pipeline', 'lib/tray-menu', 'helpers/stealth',
         'knowledge/KnowledgeOrchestrator', 'knowledge/KnowledgeDatabaseManager', 'services/CredentialsManager',
         'services/SettingsManager', 'lib/verboseLog', 'services/OllamaManager',
     ];
