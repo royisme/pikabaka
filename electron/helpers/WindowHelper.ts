@@ -208,6 +208,7 @@ export class WindowHelper {
       backgroundColor: "#00000000",
       alwaysOnTop: true,
       focusable: true,
+      acceptFirstMouse: true, // the first click on the click-to-focus overlay is delivered, not swallowed focusing it
       resizable: true,
       movable: true,
       skipTaskbar: true, // Don't show separately in dock/taskbar
