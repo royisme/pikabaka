@@ -41,7 +41,7 @@ Transcripts are written to a local SQLite database as the meeting goes on, so yo
 ### Privacy
 - API keys and custom headers are encrypted with the operating system's secure storage (macOS Keychain, Windows DPAPI).
 - Network traffic goes only to the speech and model endpoints you configure.
-- "Hide from screen share" asks the operating system to keep the overlay out of screen sharing. It is not a guarantee; the FAQ lists its limits.
+- "Hide from screen share" asks the operating system to keep the overlay out of screen sharing.
 
 ## Install
 
@@ -109,9 +109,6 @@ Audio and text go only to the speech and language services you configure. Speech
 
 **Where are my API keys stored?**
 In a local `credentials.enc` file encrypted by Electron's `safeStorage`. If secure storage is unavailable, Pika writes `credentials.json` in plain text and shows a notice in Settings > Provider setup.
-
-**Why "Hide from screen share"?**
-It asks the operating system window manager to exclude Pika's overlay windows from screen sharing during meetings. It relies on standard OS window protection flags and is not a total guarantee: macOS screen recorders that use ScreenCaptureKit can still capture protected windows, and Linux is not supported.
 
 **Can I use Pika in a call that has rules about outside assistance?**
 Check the rules first and follow them. Exams, assessments and some interviews forbid outside help; Pika does not change that.
