@@ -1,59 +1,53 @@
 # Product Brief: Pika
 
 ## 1. Product
-Pika is a desktop overlay that transcribes a call, translates the other party, and suggests what to say. It runs on the user's machine with the user's own API keys. The application combines an Electron desktop shell, a React user interface, and a native Rust audio capture module.
+Pika is an open-source meeting assistant that the user sets up for the situation they are in. A desktop overlay shows a live transcript with translation of the other party, answers questions about the meeting through an agent, and puts up a short suggestion card when a small decision model judges that the user needs help. It runs on the user's machine with the user's own models and API keys. The application combines an Electron desktop shell, a React user interface, and a native Rust audio capture module.
 
 ## 2. Who uses it and when
-**Live phone and video calls**: A participant on a phone or video call who needs to follow what the other party is saying in another language [docs/design-live-translation-ui.md]. The overlay acts as a quiet subtitle strip delivering translations of the other speaker in under two seconds [docs/design-live-translation-ui.md].
+**Classes and lectures**: A student who follows a spoken class, possibly in another language, and wants terms explained and questions answered as they come up, for example a university computer science course.
 
-**Sales and customer success calls**: A representative in live customer discussions who needs real-time objection handling, pricing references, and product facts [README.md]. Hide from screen share keeps private notes off a shared screen on macOS and Windows. [README.md]
+**Cross-border work conversations**: A person in a call in a second language, for example a product design consultation with a client abroad, who needs to follow what is said and be reminded of questions put to them and action items.
 
-**Customer support**: A support specialist looking up relevant context from past tickets via on-device vector search during active customer conversations [README.md].
+**Everyday meetings and calls**: Other meetings where a configured assistant helps the user keep up.
 
-**Lectures and research**: A student or researcher listening to spoken presentations, transcribing content live, generating summaries, and asking follow-up questions on live material [README.md].
-
-**Accessibility**: A hearing-impaired individual who needs live speech-to-text captions across meetings [README.md].
+**Accessibility**: A hearing-impaired person who needs live captions across meetings.
 
 ## 3. How it is used
-The overlay is designed for quick glance reading lasting one to three seconds mid-call [DESIGN.md, docs/conventions.md]. It presents as a small, translucent, always-on-top window positioned over call software [DESIGN.md, RULES.md]. Window width defaults to 600px with a 380px minimum; height defaults to 420px with a 360px minimum [docs/conventions.md, DESIGN.md, docs/design-overlay-v2.md, PROGRESS.md]. Global keyboard shortcuts operate primary actions, translation toggles, and scrolling without stealing focus from the call [docs/conventions.md, docs/design-live-translation-ui.md, PROGRESS.md]. Hide from screen share asks the operating system to keep the window out of screen sharing during meetings; macOS recorders that use ScreenCaptureKit can still capture it, and Linux is not supported [README.md, RULES.md].
+The user writes a **scenario** once: a short brief (up to 600 characters) and an answer language. Cards, answers and the decision on when to step in follow it. The overlay is read in one to three seconds mid-call [DESIGN.md, docs/conventions.md]. It is a small, translucent, always-on-top window over the call software [DESIGN.md, RULES.md]. Global keyboard shortcuts operate the primary actions without stealing focus from the call [docs/conventions.md]. Hide from screen share asks the operating system to keep the window out of screen sharing [RULES.md].
+
+After each segment from the other party, the proactive gate asks a decision model whether help is wanted now; a card (question for the user, term, claim worth checking, action item) is shown only above the configured threshold and outside the cooldown [docs/architecture.md]. The user can take a card, or any transcript line, to the agent through the chat input (Ask more, Not right, the line button), and can have a model fix misheard words in the transcript (off by default).
 
 ## 4. Principles
 - **Glance-first**: Mid-call reading lasts one to three seconds, requiring minimal chrome and quiet secondary controls [DESIGN.md, docs/conventions.md].
-- **Answer or newest translation leads**: When an answer is streaming or pinned, the answer is the most prominent element [docs/conventions.md]. When translation is active and no answer exists, the newest translated line from the other party is most prominent [DESIGN.md, docs/conventions.md, docs/design-live-translation-ui.md].
-- **Nothing moves under the reader's eyes**: Layout positions stay stable, reserved slots absorb incoming text, and controls never shift active content [DESIGN.md, docs/conventions.md, docs/design-live-translation-ui.md].
-- **Privacy and bring-your-own-key**: Credentials remain in the OS keychain and audio goes only to the providers the user configures [README.md, RULES.md, docs/conventions.md, docs/architecture.md]. The README also says "no telemetry runs by default"; see section 5, where the code does not support that sentence.
-- **Never invent data**: The application never outputs fake statistics, scores, synthetic provenance, or fallback AI answers [RULES.md, docs/conventions.md].
+- **Quiet by default**: Pika steps in only when the decision model says so; a card never covers the chat, moves the page or makes a sound.
+- **Set up for the situation**: The scenario is the one place the user tells Pika what the meeting is; everything that talks to a model follows it.
+- **Answer or newest translation leads**: When an answer is streaming or pinned it is the most prominent element; otherwise the newest translated line [docs/conventions.md, DESIGN.md].
+- **Nothing moves under the reader's eyes**: Layout positions stay stable and controls never shift active content [DESIGN.md, docs/conventions.md].
+- **Privacy and bring-your-own-key**: Credentials stay in the OS secure storage, audio and text go only to the providers the user configures, and the application has no telemetry [RULES.md, docs/architecture.md].
+- **Never invent data**: The application never outputs fake statistics, scores or fallback AI answers; a failure shows the real error [RULES.md, docs/conventions.md].
 
-## 5. Claims this project must not make and claims in the README that this brief does not endorse
-- **Windows platform support badge and claim** (`Windows 10/11` and `platform-macOS | Windows` badge): `contradicted by the repo`. Issue #15 records that a Windows build was never released, and window behavior is verified only on macOS [TASKS.md, PROGRESS.md].
-- **Transcription latency under 500 ms** ("under 500 ms" and "Sub-500 ms transcription"): `not evidenced in the repo`. No transcription or translation latency measurements exist in the repository [PROGRESS.md, docs/architecture.md].
-- **"Audio never leaves your device" (table cell with an asterisk)**: `qualified by the README's own footnote and FAQ` ("only if you choose a cloud STT/LLM provider"); the repo lists only cloud STT providers (`src/config/stt.constants.ts`: google, groq, openai, deepgram, elevenlabs, azure, ibmwatson; `electron/audio/` adds Soniox), so the offline route the footnote describes is `not evidenced in the repo` [README.md, docs/architecture.md].
-- **"100% offline option (Ollama)" and "run completely offline with Ollama"**: `not evidenced in the repo`. Ollama covers the language model; no local speech-to-text engine is among the providers, so a call cannot be transcribed offline today [docs/architecture.md]. The FAQ mentions "a local STT engine (or system-only transcription)"; neither was found.
-- **"No telemetry runs by default" (README line 126)**: `evidenced` since 2026-10-26. The Google Analytics code (`initAnalytics()` and the tracking calls) and the one-time install ping to a third-party worker (`InstallPingManager`) were removed, because the product has neither feature. The only network traffic left is to the providers the user configures. This was checked by searching the code, not by observing traffic.
-- **Feature comparison table cells regarding Cluely, Granola, and Otter**: `not evidenced in the repo`. The repository contains no empirical tests, benchmarks, or documentation concerning competitor features or limitations [RULES.md].
-- **Hardware requirement numbers** ("4 GB RAM minimum, 8 GB recommended", "16 GB+ for Ollama"): `not evidenced in the repo`. No memory profiling or benchmark evidence exists in the codebase [PROGRESS.md].
-- **Provider speed and suitability assertions** (e.g. Groq "sub-second inference", Claude "best for code and long reasoning", Gemini "recommended default"): `not evidenced in the repo`. No comparative evaluation data or latency benchmarks exist in the repository [PROGRESS.md, docs/architecture.md].
-- **Open-source AGPL-3.0 licensing**: `evidenced`. Verified by the project license file [LICENSE].
-- **Bring-your-own-key architecture**: `evidenced`. Supported by `CredentialsManager` and client-side provider routing [docs/architecture.md, docs/conventions.md].
-- **Hide from screen share**: `evidenced` in code (`setContentProtection` in the window helpers); real-device behaviour is the owner's check. [RULES.md, docs/architecture.md]
-- **Custom global keyboard shortcuts**: `evidenced`. Verified by `KeybindManager` and settings store [docs/architecture.md, PROGRESS.md].
-- **Local RAG memory with sqlite-vec**: `evidenced`. Verified by `electron/rag/` and `electron/db/` [docs/architecture.md].
-- **Dual-channel audio capture (system audio and mic)**: `evidenced`. Verified by native Rust audio capture module implementation [docs/architecture.md].
+## 5. Claims this project must not make
+- **Windows support**: no Windows build has been released and window behaviour is verified only on macOS (issue #15).
+- **Latency or speed numbers** (transcription, translation, provider speed): no measurements exist in the repository.
+- **Working offline**: no local speech-to-text engine is among the providers. A local language model (for example Ollama) keeps prompts local, but a call cannot be transcribed offline.
+- **Comparisons with other products**: the repository holds no evidence about competitors.
+- **Hardware requirement numbers**: no profiling exists.
+- **The decision model, the misheard-word fix or the agent being correct**: they are models. The repository tests the plumbing with mocked providers, not the quality of real model output.
+
+Evidenced in the repository: AGPL-3.0 licence [LICENSE]; bring-your-own-key through `CredentialsManager` and client-side provider routing [docs/architecture.md]; dual-channel capture by the Rust module [docs/architecture.md]; local search with sqlite-vec [docs/architecture.md]; Hide from screen share through `setContentProtection` in the window helpers, with real-device behaviour the owner's check; custom global shortcuts through `KeybindManager`; the scenario, proactive gate and misheard-word fix [docs/architecture.md].
 
 ## 6. Not in scope / not yet built
-- **Windows distribution package**: no Windows build has been released (issue #15) [TASKS.md, PROGRESS.md].
+- **Windows distribution package** (issue #15) and **Linux support with Wayland capture**.
+- **Phone calls as an audio source**: an idea, not started.
+- **A live agent that takes part in a conversation**: an idea, not started.
 - **One answer component for every window**: the live overlay's answers have the Re line, the 16px lead and per-block Copy; the chat overlays and the post-meeting view still render answers themselves [TASKS.md, PROGRESS.md].
-- **Entity masking in live translation**: the module exists and is tested but is not in the request path [TASKS.md, PROGRESS.md].
-- **Translating before a turn flushes**: a design note recommends measuring first, then translating at the provider's own boundary; the stable-prefix design is not recommended [docs/design-early-translation.md].
+- **Entity masking in live translation**: the module exists and is tested but is not in the request path.
+- **Translating before a turn flushes**: a design note recommends measuring first [docs/design-early-translation.md].
 - **Translating own speech ("Me")**: excluded; own lines stay untranslated source text [docs/design-live-translation-ui.md].
-- **Linux support and Wayland capture**: open roadmap item [README.md].
 - **Native OS vibrancy blur**: deferred pending a content-protection review [docs/design-overlay-v2.md].
-- **Real-provider verification**: nothing built in the last weeks (streaming translation, Stop and Retry, the audio status, the top bar) has been exercised against a real STT or LLM provider or on Windows [PROGRESS.md].
+- **Real-provider verification**: recent features (streaming translation, the proactive gate, the scenario, the misheard-word fix) have not been exercised against real providers by automated checks; the owner verifies them in real meetings [PROGRESS.md].
+- **The interview feature, the resume and the profile**: removed in 3.0 [docs/design-interview-removal.md].
 
 ## 7. Questions for the owner
-1. Who is the primary target user and what is the primary workflow (live call translation or meeting copilot)?
-2. ~~Should interview prep remain a headline use case?~~ Decided 2026-10-29: no. The interview feature, the resume and the profile were removed (`docs/design-interview-removal.md`); the README leads with live translation and meetings.
-3. How should the privacy claims in README.md be amended: "audio never leaves your device", "100% offline", and "no telemetry runs by default" (both the analytics script and the install ping were removed on 2026-10-26; the README sentence now matches the code)?
-4. Should the Windows platform badge and Windows 10/11 support claims be marked experimental or removed until issue #15 is resolved and a Windows installer is released?
-5. Should the "100% offline option" claim be removed or qualified until a local STT engine is integrated alongside Ollama?
-6. ~~Which speaker vocabulary...~~ Decided 2026-10-26: "Interviewer" for the other party and "Me" for the user. Superseded 2026-10-29: the other party is "Them" (stored value `them`) and the user is "Me".
+1. Name and one-line tagline for the new positioning.
+2. Whether the Roadmap in the README keeps the phone-call and live-agent ideas.

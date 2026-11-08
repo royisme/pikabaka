@@ -18,7 +18,7 @@ What an agent (or a person) must never do in this repository, and the working ag
 **Screen-share privacy**
 - Never weaken "Hide from screen share" (content protection on all five windows, including the Windows hidden-first show) or the always-on-top / click-through window behaviour without the owner.
 - Never make Pika pretend to be another app (name, process title, helper name, icon, window title, AUMID) or hide its dock icon or tray (owner decision, 2026-10-28).
-- Never call content protection undetectable or guaranteed; copy states its limits (ScreenCaptureKit recorders on macOS, no Linux support).
+- Never call content protection undetectable or guaranteed.
 - Never add telemetry on meeting content without the owner.
 
 **Scope and shape**
