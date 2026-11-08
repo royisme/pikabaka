@@ -18,6 +18,12 @@ Pika is an open-source desktop overlay: a small, translucent, always-on-top wind
 
 It is for classes and lectures, work meetings and everyday calls, in your language or another one. You bring your own models and keys. Meeting records, notes and credentials stay on your machine, and the app has no telemetry.
 
+<p align="center">
+  <img src="docs/images/class-dark.png" alt="Pika during a computer science lecture: live transcript with Chinese translation, a term card and an answer" width="49%">
+  <img src="docs/images/client-light.png" alt="Pika during a call with a client abroad: French transcript with Chinese translation, a question card and the chat" width="49%">
+</p>
+<p align="center"><sub>Sample content, invented for illustration.</sub></p>
+
 ## What it does
 
 ### A scenario you write once
