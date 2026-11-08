@@ -111,7 +111,7 @@ export function failureReasonText(reason: TranscriptSegment['translationError'])
  * The slot is the line above the source text that holds "Live", then "Translating", then the
  * translation. It exists from the first live words, so a translation that arrives late fills a
  * line that is already there and moves nothing above it. No slot means translation is off, the
- * display mode is `original`, the row is own speech, or the row was skipped or is the same language.
+ * display mode is `original`, the row is own speech without a spoken translation (interpreting adds one), or the row was skipped or is the same language.
  */
 export function rowSlot(
   row:
@@ -121,7 +121,7 @@ export function rowSlot(
 ): RowSlot {
   if (context.mode === 'original') return null;
   if (row === 'live') return context.translationOn ? { kind: 'live' } : null;
-  if (row.speaker === 'user') return null;
+  if (row.speaker === 'user') return hasUsableTranslation(row) ? { kind: 'translation' } : null;
   if (hasUsableTranslation(row)) return { kind: 'translation' };
   if (!context.translationOn) return null;
   if (row.translationState === 'error') return { kind: 'failed', reason: row.translationError };

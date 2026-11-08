@@ -78,6 +78,12 @@ t.test('no slot when translation is off, the mode is original, or the row is own
   t.equal(rowSlot(same, ctx), null, 'same language collapses the slot');
 });
 
+t.test('a completed own-speech row with a spoken translation gets a translation slot', async (t) => {
+  t.same(rowSlot({ ...translated, speaker: 'user' }, ctx), { kind: 'translation' });
+  t.equal(rowSlot({ ...translated, speaker: 'user' }, { ...ctx, mode: 'original' }), null, 'original mode hides it');
+  t.equal(rowSlot({ ...translated, speaker: 'user', translatedText: translated.sourceText }, ctx), null, 'same text');
+});
+
 const stale = { sourceText: 'See you Monday morning', translatedText: 'À lundi', translatedRevision: 1, revision: 2 };
 
 t.test('a stale translation is shown as updating only while a new one is pending', async (t) => {

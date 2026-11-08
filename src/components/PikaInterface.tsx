@@ -21,6 +21,8 @@ import { latestOtherPartyText } from '../lib/answerLead';
 import { askAboutLineText, challengeCardText, replyToLineRequest } from '../lib/transcriptAsk';
 import type { TranscriptSegment } from '../lib/transcriptSegments';
 import { useMainEvent } from '../hooks/useMainEvent';
+import { useInterpretingPlayback } from '../hooks/useInterpretingPlayback';
+import type { InterpretingState } from '../../electron/interpreting/InterpretingSession';
 import { useWindowEvent } from '../hooks/useWindowEvent';
 import { useLocalStorageValue } from '../hooks/useLocalStorageValue';
 
@@ -108,6 +110,11 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     useMainEvent(window.electronAPI?.onMicrophoneMutedChanged, (muted: boolean) => {
         queryClient.setQueryData(['microphone-muted'], muted);
     });
+    const { data: interpreting } = useQuery<InterpretingState>({ queryKey: ['interpreting-state'], queryFn: () => window.electronAPI.interpretingGetState() });
+    useMainEvent(window.electronAPI?.onInterpretingStateChanged, (state: InterpretingState) => {
+        queryClient.setQueryData(['interpreting-state'], state);
+    });
+    useInterpretingPlayback();
     const toggleMicrophoneMute = useMutation({ mutationFn: (muted: boolean) => window.electronAPI.setMicrophoneMuted(muted) });
 
     // Mouse passthrough: read via query, stream via useMainEvent
@@ -240,7 +247,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
                 {isExpanded && (
                     <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="flex flex-col w-full flex-1 min-h-0">
                         <SplitterShell
-                            topBar={<OverlayTopBar status={audioState} hasRows={statusInBar} onFixAudio={fixAudio} microphoneMuted={microphoneMuted} onToggleMicrophoneMute={() => toggleMicrophoneMute.mutate(!microphoneMuted)} displayMode={transcript.transcriptDisplayMode} translationEnabled={transcript.translationEnabled} translationConfigured={transcript.translationConfigured} theirLanguage={transcript.theirLanguage} myLanguage={transcript.myLanguage} targetLanguage={transcript.targetLanguage} languageOptions={transcript.languageOptions} onToggleTranslation={() => transcript.saveTranslationSettings({ enabled: !transcript.translationEnabled })} onChangeSpokenLanguage={transcript.changeSpokenLanguage} onChangeTargetLanguage={(targetLanguage) => transcript.saveTranslationSettings({ targetLanguage })} onToggleOriginal={() => transcript.saveTranslationSettings({ displayMode: toggleOriginal(transcript.transcriptDisplayMode) })} onSetUpTranslation={() => { void window.electronAPI.toggleSettingsWindow(); }} modelName={modelName} isMousePassthrough={isMousePassthrough} toggleOriginalKeys={shortcuts.toggleOriginal} toggleTranslationKeys={shortcuts.toggleTranslation} onHide={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} onOpenModelSelector={openModelSelector} onOpenSettings={openSettings} onToggleMousePassthrough={() => generalHandlersRef.current.toggleMousePassthrough()} onOpenLauncher={() => window.electronAPI?.setWindowMode?.('launcher')} />}
+                            topBar={<OverlayTopBar status={audioState} hasRows={statusInBar} onFixAudio={fixAudio} microphoneMuted={microphoneMuted} onToggleMicrophoneMute={() => toggleMicrophoneMute.mutate(!microphoneMuted)} interpreting={interpreting} onToggleTalk={() => { void window.electronAPI.interpretingToggleTalk(); }} onSetUpInterpreting={() => { void window.electronAPI.toggleSettingsWindow(); }} talkKeys={shortcuts.interpretingTalk} displayMode={transcript.transcriptDisplayMode} translationEnabled={transcript.translationEnabled} translationConfigured={transcript.translationConfigured} theirLanguage={transcript.theirLanguage} myLanguage={transcript.myLanguage} targetLanguage={transcript.targetLanguage} languageOptions={transcript.languageOptions} onToggleTranslation={() => transcript.saveTranslationSettings({ enabled: !transcript.translationEnabled })} onChangeSpokenLanguage={transcript.changeSpokenLanguage} onChangeTargetLanguage={(targetLanguage) => transcript.saveTranslationSettings({ targetLanguage })} onToggleOriginal={() => transcript.saveTranslationSettings({ displayMode: toggleOriginal(transcript.transcriptDisplayMode) })} onSetUpTranslation={() => { void window.electronAPI.toggleSettingsWindow(); }} modelName={modelName} isMousePassthrough={isMousePassthrough} toggleOriginalKeys={shortcuts.toggleOriginal} toggleTranslationKeys={shortcuts.toggleTranslation} onHide={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} onOpenModelSelector={openModelSelector} onOpenSettings={openSettings} onToggleMousePassthrough={() => generalHandlersRef.current.toggleMousePassthrough()} onOpenLauncher={() => window.electronAPI?.setWindowMode?.('launcher')} />}
                             left={<TranscriptColumn {...transcriptProps} onAskSegment={askAboutLine} onReplySegment={replyToLine} status={audioState} onFixAudio={fixAudio} />}
                             right={<div className="relative flex-1 min-h-0 min-w-0 flex flex-col"><ApprovalDock />{proactiveCard && <ProactiveCard card={proactiveCard} onDismiss={() => setProactiveCard(null)} onAskMore={() => askAboutCard(proactiveCard)} onNotRight={() => challengeCard(proactiveCard)} />}<div className="flex-1 min-h-0 min-w-0 flex flex-col"><ChatColumn {...chatProps} /></div></div>}
                             splitterPosition={splitterPosition}
