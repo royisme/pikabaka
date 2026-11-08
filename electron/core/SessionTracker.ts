@@ -4,6 +4,7 @@
 
 import { RecapLLM } from '../llm';
 import { isVerboseLogging } from '../lib/verboseLog';
+import type { MeetingStartMetadata, MeetingUsage } from '../db/types';
 
 export interface TranscriptSegment {
     marker?: string;
@@ -40,17 +41,15 @@ export class SessionTracker {
     private assistantResponseHistory: AssistantResponse[] = [];
 
     // Meeting metadata
-    private currentMeetingMetadata: {
-        title?: string;
-    } | null = null;
+    private currentMeetingMetadata: MeetingStartMetadata | null = null;
 
     // Full Session Tracking (Persisted)
     private fullTranscript: TranscriptSegment[] = [];
-    private fullUsage: any[] = []; // UsageInteraction
+    private fullUsage: MeetingUsage[] = [];
     private sessionStartTime: number = Date.now();
     // The meeting this session records into; set when the meeting starts, cleared by reset().
     private meetingId: string | null = null;
-    private usageRecorder: ((meetingId: string, usage: any) => void) | null = null;
+    private usageRecorder: ((meetingId: string, usage: MeetingUsage) => void) | null = null;
 
     // Rolling summarization: epoch summaries preserve early context when arrays are compacted
     private static readonly MAX_EPOCH_SUMMARIES = 5;
@@ -71,11 +70,11 @@ export class SessionTracker {
         this.recapLLM = recapLLM;
     }
 
-    public setUsageRecorder(recorder: ((meetingId: string, usage: any) => void) | null): void {
+    public setUsageRecorder(recorder: ((meetingId: string, usage: MeetingUsage) => void) | null): void {
         this.usageRecorder = recorder;
     }
 
-    public setMeetingMetadata(metadata: any): void {
+    public setMeetingMetadata(metadata: MeetingStartMetadata | null): void {
         this.currentMeetingMetadata = metadata;
     }
 
@@ -308,7 +307,7 @@ export class SessionTracker {
         return this.fullTranscript;
     }
 
-    getFullUsage(): any[] {
+    getFullUsage(): MeetingUsage[] {
         return this.fullUsage;
     }
 
@@ -342,19 +341,19 @@ export class SessionTracker {
     /**
      * Public method to log usage from external sources (e.g. IPC direct chat)
      */
-    logUsage(type: string, question: string, answer: string): void {
+    logUsage(type: MeetingUsage['type'], question: string, answer: string): void {
         const entry = { type, timestamp: Date.now(), question, answer };
         this.fullUsage.push(entry);
         this.recordUsage(entry);
     }
 
-    pushUsage(entry: any): void {
+    pushUsage(entry: MeetingUsage): void {
         this.fullUsage.push(entry);
         this.capUsageArray();
         this.recordUsage(entry);
     }
 
-    private recordUsage(entry: any): void {
+    private recordUsage(entry: MeetingUsage): void {
         if (!this.meetingId || !this.usageRecorder) return;
         try {
             this.usageRecorder(this.meetingId, entry);
