@@ -1,6 +1,7 @@
 import { shell } from "electron"
 import { AppState } from "../main"
 import { DatabaseManager } from "../db/DatabaseManager"
+import type { MeetingStartMetadata, MeetingSummaryUpdates } from "../db/types"
 import { safeHandle } from "./safeHandle"
 import { refreshCommittedMeetingSummary } from "../rag/meetingSummaryIndex"
 
@@ -9,7 +10,7 @@ export function registerMeetingHandlers(appState: AppState): void {
   // Meeting Lifecycle Handlers
   // ==========================================
 
-  safeHandle("start-meeting", async (event, metadata?: any) => {
+  safeHandle("start-meeting", async (event, metadata?: MeetingStartMetadata) => {
     try {
       await appState.startMeeting(metadata);
       return { success: true };
@@ -43,7 +44,7 @@ export function registerMeetingHandlers(appState: AppState): void {
     return DatabaseManager.getInstance().updateMeetingTitle(id, title);
   });
 
-  safeHandle("update-meeting-summary", async (_, { id, updates }: { id: string; updates: any }) => {
+  safeHandle("update-meeting-summary", async (_, { id, updates }: { id: string; updates: MeetingSummaryUpdates }) => {
     const updated = DatabaseManager.getInstance().updateMeetingSummary(id, updates);
     if (updated) refreshCommittedMeetingSummary(appState.getRAGManager(), id);
     return updated;

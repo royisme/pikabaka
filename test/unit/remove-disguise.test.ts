@@ -123,7 +123,7 @@ for (const platform of ['darwin', 'win32'] as const) for (const protectedStartup
         t.teardown(() => events.forEach((event, i) => {
             for (const listener of process.listeners(event)) if (!previous[i].includes(listener)) process.removeListener(event, listener);
         }));
-        for (const name of ['initializeRAGManager', 'bootstrapOllamaEmbeddings', 'setupIntelligenceEvents', 'setupOllamaIpcHandlers', 'setupAutoUpdater']) {
+        for (const name of ['initializeRAGManager', 'bootstrapOllamaEmbeddings', 'setupIntelligenceEvents', 'setupAutoUpdater']) {
             Reflect.set(AppState.prototype, name, noop);
         }
         t.teardown(() => {

@@ -2,7 +2,7 @@ import t, { Test } from 'tap';
 import Database from 'better-sqlite3';
 import path from 'node:path';
 import { mockRequire } from '../node_modules/@tapjs/mock/dist/esm/mock-require.js';
-import type { Meeting } from '../electron/db/DatabaseManager';
+import type { Meeting } from '../electron/db/types';
 import type { MeetingPersistence } from '../electron/core/MeetingPersistence';
 import type { SessionTracker } from '../electron/core/SessionTracker';
 import * as record from '../electron/db/meetingRecord';

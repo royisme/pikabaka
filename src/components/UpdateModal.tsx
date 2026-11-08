@@ -1,22 +1,10 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-interface ReleaseNoteSection {
-    title: string;
-    items: string[];
-}
-
-interface ParsedReleaseNotes {
-    version: string;
-    summary: string;
-    sections: ReleaseNoteSection[];
-    fullBody?: string;
-    url?: string;
-}
+import type { UpdateNotice, ParsedReleaseNotes } from '../../electron/update/ReleaseNotesManager';
 
 interface UpdateModalProps {
     isOpen: boolean;
-    updateInfo: any;
+    updateInfo: UpdateNotice | null;
     parsedNotes: ParsedReleaseNotes | null;
     onDismiss: () => void;
     status: 'idle' | 'ready';
@@ -30,7 +18,7 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
     status
 }) => {
     // Helper to format version string
-    const formatVersion = (v: string) => {
+    const formatVersion = (v?: string) => {
         if (!v) return 'Unknown';
         if (v === 'latest') return 'Latest';
         if (v === 'vlatest') return 'Latest';

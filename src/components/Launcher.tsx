@@ -11,13 +11,8 @@ import { useShortcuts } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { useMainEvent } from '../hooks/useMainEvent';
 import { useWindowEvent } from '../hooks/useWindowEvent';
-export interface Meeting {
-    id: string; title: string; date: string; duration: string; summary: string;
-    detailedSummary?: { actionItems: string[]; keyPoints: string[] };
-    transcript?: Array<{ speaker: string; text: string; timestamp: number }>;
-    usage?: Array<{ type: 'assist' | 'followup' | 'chat' | 'followup_questions'; timestamp: number; question?: string; answer?: string; items?: string[] }>;
-    participants?: unknown[]; participantCount?: number; active?: boolean; time?: string;
-}
+import type { Meeting } from '../../electron/db/types';
+export type { Meeting };
 interface LauncherProps {
     onStartMeeting: () => void;
     onOpenSettings: (tab?: string) => void;

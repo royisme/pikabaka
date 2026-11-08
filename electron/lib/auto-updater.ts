@@ -1,6 +1,6 @@
 import { app } from "electron"
 import { autoUpdater, type UpdateDownloadedEvent } from "electron-updater"
-import { ReleaseNotesManager } from "../update/ReleaseNotesManager"
+import { ReleaseNotesManager, type UpdateNotice } from "../update/ReleaseNotesManager"
 import type { AppState } from "../main"
 import { SettingsManager } from "../services/SettingsManager"
 
@@ -125,21 +125,15 @@ export async function checkForUpdatesManual(appState: AppState): Promise<void> {
         console.log('[AutoUpdater] Manual Check: New version found!');
         appState.updateAvailable = true;
 
-        // Mock an info object compatible with electron-updater
-        const info = {
+        const notice: UpdateNotice = {
           version: latestVersion,
-          files: [] as any[],
-          path: '',
-          sha512: '',
           releaseName: notes.summary,
-          releaseNotes: notes.fullBody
+          releaseNotes: notes.fullBody,
+          parsedNotes: notes
         };
 
         // Notify renderer
-        appState.broadcast("update-available", {
-          ...info,
-          parsedNotes: notes
-        });
+        appState.broadcast("update-available", notice);
       } else {
         console.log('[AutoUpdater] Manual Check: App is up to date.');
         appState.broadcast("update-not-available", { version: currentVersion });
@@ -188,9 +182,9 @@ export async function checkForUpdates(appState: AppState): Promise<void> {
     } else {
       await autoUpdater.checkForUpdates()
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[AutoUpdater] checkForUpdates failed:', err)
-    const errorMessage = err.message || err.toString() || 'Update check failed'
+    const errorMessage = (err instanceof Error && err.message) || String(err) || 'Update check failed'
     appState.broadcast("update-error", errorMessage)
   }
 }
@@ -203,7 +197,7 @@ export function downloadUpdate(appState: AppState): void {
     autoUpdater.downloadUpdate().catch(err => {
       console.error('[AutoUpdater] downloadUpdate failed:', err)
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[AutoUpdater] downloadUpdate exception:', err)
   }
 }

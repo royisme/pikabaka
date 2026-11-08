@@ -9,6 +9,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import type { Meeting } from '../../electron/db/types';
+
+const TABS = ['summary', 'transcript', 'usage'] as const;
 
 const formatTime = (ms: number) => {
     const date = new Date(ms);
@@ -21,32 +24,6 @@ const cleanMarkdown = (content: string) => {
     return content.replace(/([^\n])```/g, '$1\n\n```');
 };
 
-interface Meeting {
-    id: string;
-    title: string;
-    date: string;
-    duration: string;
-    summary: string;
-    detailedSummary?: {
-        overview?: string;
-        actionItems: string[];
-        keyPoints: string[];
-        actionItemsTitle?: string;
-        keyPointsTitle?: string;
-    };
-    transcript?: Array<{
-        speaker: string;
-        text: string;
-        timestamp: number;
-    }>;
-    usage?: Array<{
-        type: 'assist' | 'followup' | 'chat' | 'followup_questions';
-        timestamp: number;
-        question?: string;
-        answer?: string;
-        items?: string[];
-    }>;
-}
 
 interface MeetingDetailsProps {
     meeting: Meeting;
@@ -58,7 +35,7 @@ const MeetingDetails: React.FC<MeetingDetailsProps> = ({ meeting: initialMeeting
     const isLight = useResolvedTheme() === 'light';
     // We need local state for the meeting object to reflect optimistic updates
     const [meeting, setMeeting] = useState<Meeting>(initialMeeting);
-    const [activeTab, setActiveTab] = useState<'summary' | 'transcript' | 'usage'>('summary');
+    const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('summary');
     const [query, setQuery] = useState('');
     const [isCopied, setIsCopied] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
@@ -253,10 +230,10 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                     {/* Designing Tabs to match reference 1:1 (Dark Pill Container) */}
                     <div className="flex items-center justify-between mb-8">
                         <div className={`p-1 rounded-xl inline-flex items-center gap-0.5 ${isLight ? 'bg-[#E5E5EA] border border-black/[0.06]' : 'bg-surface border border-white/[0.08]'}`}>
-                            {['summary', 'transcript', 'usage'].map((tab) => (
+                            {TABS.map((tab) => (
                                 <button
                                     key={tab}
-                                    onClick={() => setActiveTab(tab as any)}
+                                    onClick={() => setActiveTab(tab)}
                                     className={`
                                         relative px-3 py-1 text-[13px] font-medium rounded-lg transition-all duration-200 z-10
                                         ${activeTab === tab ? (isLight ? 'text-gray-900' : 'text-text-primary') : 'text-text-secondary hover:text-text-primary'}
@@ -500,14 +477,13 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                                                 ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
                                                                 li: ({ node, ...props }) => <li className="text-[15px] text-text-secondary font-normal" {...props} />,
                                                                 strong: ({ node, ...props }) => <span className="font-normal text-text-secondary" {...props} />,
-                                                                a: ({ node, ...props }: any) => <a className="text-primary hover:underline" {...props} />,
-                                                                pre: ({ children }: any) => <div className="not-prose mb-4">{children}</div>,
-                                                                code: ({ node, inline, className, children, ...props }: any) => {
+                                                                a: ({ node, ...props }) => <a className="text-primary hover:underline" {...props} />,
+                                                                pre: ({ children }) => <div className="not-prose mb-4">{children}</div>,
+                                                                code: ({ className, children }) => {
                                                                     const match = /language-(\w+)/.exec(className || '');
-                                                                    const isInline = inline ?? false;
                                                                     const lang = match ? match[1] : '';
 
-                                                                    return !isInline ? (
+                                                                    return (
                                                                         <div className="my-3 rounded-xl overflow-hidden border border-white/[0.08] shadow-lg bg-zinc-800/60 backdrop-blur-md">
                                                                             <div className="bg-white/[0.04] px-3 py-1.5 border-b border-white/[0.08]">
                                                                                 <span className="text-[10px] uppercase tracking-widest font-semibold text-white/40 font-mono">
@@ -530,16 +506,11 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                                                                     wrapLongLines={true}
                                                                                     showLineNumbers={true}
                                                                                     lineNumberStyle={{ minWidth: '2.5em', paddingRight: '1.2em', color: 'rgba(255,255,255,0.2)', textAlign: 'right', fontSize: '11px' }}
-                                                                                    {...props}
                                                                                 >
                                                                                     {String(children).replace(/\n$/, '')}
                                                                                 </SyntaxHighlighter>
                                                                             </div>
                                                                         </div>
-                                                                    ) : (
-                                                                        <code className="bg-bg-tertiary px-1.5 py-0.5 rounded text-[13px] font-mono text-text-primary border border-border-subtle whitespace-pre-wrap" {...props}>
-                                                                            {children}
-                                                                        </code>
                                                                     );
                                                                 }
                                                             }}
