@@ -17,6 +17,8 @@ The user writes a **scenario** once: a short brief (up to 600 characters) and an
 
 After each segment from the other party, the proactive gate asks a decision model whether help is wanted now; a card (question for the user, term, claim worth checking, action item) is shown only above the configured threshold and outside the cooldown [docs/architecture.md]. The user can take a card, or any transcript line, to the agent through the chat input (Ask more, Not right, the line button), and can have a model fix misheard words in the transcript (off by default).
 
+**Interpreting** (optional, off by default): when the user's own language is not the other party's, the user presses Talk, speaks, and presses Talk again; Pika translates what was said, voices it with Fish Audio or ElevenLabs (a voice the user picks by its ID, or the user's own cloned voice) and plays it into a virtual microphone that the user, not Pika, has installed (BlackHole on macOS; VB-CABLE on Windows, where no release exists yet) and selected as the microphone in the meeting app. Only translations go to the virtual microphone, never the user's own voice. The transcript row keeps the user's source text, with the spoken translation under it; the translation is not saved in the meeting record. The user is asked to tell the other party they hear machine translation. Pika never changes the system default input [docs/architecture.md, README.md].
+
 ## 4. Principles
 - **Glance-first**: Mid-call reading lasts one to three seconds, requiring minimal chrome and quiet secondary controls [DESIGN.md, docs/conventions.md].
 - **Quiet by default**: Pika steps in only when the decision model says so; a card never covers the chat, moves the page or makes a sound.
@@ -42,7 +44,6 @@ Evidenced in the repository: AGPL-3.0 licence [LICENSE]; bring-your-own-key thro
 - **A live agent that takes part in a conversation**: an idea, not started.
 - **One answer component for every window**: the live overlay's answers have the Re line, the 16px lead and per-block Copy; the chat overlays and the post-meeting view still render answers themselves.
 - **Entity masking in live translation**: the module exists and is tested but is not in the request path.
-- **Translating own speech ("Me")**: excluded; own lines stay untranslated source text.
 - **Native OS vibrancy blur**: deferred pending a content-protection review.
 - **Real-provider verification**: recent features (streaming translation, the proactive gate, the scenario, the misheard-word fix) have not been exercised against real providers by automated checks; the owner verifies them in real meetings.
 - **The interview feature, the resume and the profile**: removed in 3.0.
