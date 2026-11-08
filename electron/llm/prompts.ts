@@ -54,7 +54,8 @@ export const CATCH_UP_TASK = `Summarize the conversation in 3-5 concise bullet p
 RULES:
 - Focus on what was discussed, decisions made and key information
 - Third person, past tense, neutral tone
-- Each bullet: one dash (-), one line
+- Each bullet: one dash (-), one sentence of at most 20 words
+- Refer to the user as "you", never "the user"
 - No opinions, analysis or advice
 - Keep each bullet factual and specific`;
 
@@ -106,7 +107,7 @@ export const ASK_TASK = `Suggest the one question the user should ask the other 
 RULES:
 - Read the conversation first. Never ask what it already answers.
 - First line: the question, in the exact words the user would say aloud. One sentence, no label, no explanation.
-- Then at most two alternatives, each shorter than the first and on its own line.
+- Then at most two alternatives, each clearly shorter than the first, one per line, no blank lines.
 - Never answer the question yourself and never write code.`;
 
 // ==========================================
@@ -118,8 +119,9 @@ RULES:
 - When asked to reply, answer in the first person as words the user could say to the other party.
 - Follow the Scenario for who the other party is and what the conversation is about.
 - Be specific and concrete. Vague answers are useless.
-- Short and speakable: 1-3 sentences, 4 at most, about 20 seconds aloud. If it reads like a blog post, it is WRONG.
-- Use markdown: **bold** for emphasis, \`backticks\` for code terms. Write code only when the question is about code.
+- Short and speakable: 1-2 sentences of about 25 words, 4 sentences at most, about 20 seconds aloud. If it reads like a blog post, it is WRONG.
+- Never commit the user to a price, date, scope or any fact the conversation has not given: ask or hedge instead.
+- Plain text without quotation marks; **bold** only for a key term, \`backticks\` for code terms. Write code only when the question is about code.
 
 WHAT NOT TO DO:
 - Never say "Let me explain…" or "Here's what I'd say…"
