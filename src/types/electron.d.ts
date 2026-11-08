@@ -4,6 +4,7 @@ import type { PromptsEdit, PromptsReply } from '../../electron/llm/prompts'
 import type { Scenario, ScenarioReply } from '../../electron/llm/scenario'
 import type { LanguageOption } from '../../electron/config/languages'
 import type { Meeting, MeetingStartMetadata, MeetingSummaryUpdates } from '../../electron/db/types'
+import type { InterpretingSettings } from '../../electron/services/interpretingSettings'
 import type { UpdateNotice, UpdateProgress } from '../../electron/update/ReleaseNotesManager'
 
 export interface AgentGateDecision {
@@ -88,7 +89,7 @@ export interface ElectronAPI {
   onOpenSettingsSection: (callback: (data: { section: string }) => void) => () => void
   toggleAdvancedSettings: () => Promise<void>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
-  getStoredCredentials: () => Promise<{ storage: CredentialStorageStatus; connectionHeaders?: Record<string, HeaderState[]>; hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini'; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; groqSttModel?: string; sttModels?: Record<string, string>; hasSonioxKey?: boolean; hasTavilyKey?: boolean; transcriptTranslationEnabled?: boolean; transcriptTranslationProvider?: string; transcriptTranslationModel?: string; transcriptTranslationPrompt?: string; transcriptTranslationDisplayMode?: 'original' | 'translated' | 'both'; transcriptTranslationSourceLanguage?: string; transcriptTranslationTargetLanguage?: string; transcriptCorrectionEnabled?: boolean; transcriptCorrectionProvider?: string; transcriptCorrectionModel?: string; geminiPreferredModel?: string; groqPreferredModel?: string; openaiPreferredModel?: string; claudePreferredModel?: string }>
+  getStoredCredentials: () => Promise<{ storage: CredentialStorageStatus; connectionHeaders?: Record<string, HeaderState[]>; hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; googleServiceAccountPath: string | null; sttProvider: 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'gemini'; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasFishAudioKey?: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; groqSttModel?: string; sttModels?: Record<string, string>; hasSonioxKey?: boolean; hasTavilyKey?: boolean; transcriptTranslationEnabled?: boolean; transcriptTranslationProvider?: string; transcriptTranslationModel?: string; transcriptTranslationPrompt?: string; transcriptTranslationDisplayMode?: 'original' | 'translated' | 'both'; transcriptTranslationSourceLanguage?: string; transcriptTranslationTargetLanguage?: string; transcriptCorrectionEnabled?: boolean; transcriptCorrectionProvider?: string; transcriptCorrectionModel?: string; geminiPreferredModel?: string; groqPreferredModel?: string; openaiPreferredModel?: string; claudePreferredModel?: string }>
   testTranscriptTranslation: (draft: { provider: string; model: string; prompt?: string; targetLanguage: string }) => Promise<{ success: boolean; sample: string; translatedText?: string; firstTokenMs?: number; totalMs?: number; error?: string }>
   getTranscriptTranslationSettings: () => Promise<{ enabled: boolean; provider: string; model: string; prompt: string; displayMode: 'original' | 'translated' | 'both'; sourceLanguage: string; targetLanguage: string }>
   setTranscriptCorrectionSettings: (settings: { enabled?: boolean; provider?: string; model?: string }) => Promise<{ success: boolean; error?: string }>
@@ -132,6 +133,9 @@ export interface ElectronAPI {
   setOpenAiSttApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   setDeepgramApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   setElevenLabsApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
+  setFishAudioApiKey: (apiKey: string) => Promise<{ success: boolean }>
+  interpretingGetSettings: () => Promise<InterpretingSettings>
+  interpretingSetSettings: (settings: Partial<InterpretingSettings>) => Promise<{ success: boolean }>
   setAzureApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   setAzureRegion: (region: string) => Promise<{ success: boolean; error?: string }>
   setIbmWatsonApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
