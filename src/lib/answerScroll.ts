@@ -37,3 +37,8 @@ export function nextTranscriptScroll(args: { following: boolean; contentChanged:
 export function countNewRows(totalRows: number, rowsWhenFollowStopped: number | null): number {
   return rowsWhenFollowStopped === null ? 0 : Math.max(0, totalRows - rowsWhenFollowStopped);
 }
+
+/** One line of the newest row's source text for the "new" pill; the pill truncates it by width. */
+export function newestPreview(rows: ReadonlyArray<{ sourceText: string }>): string {
+  return rows.length === 0 ? '' : rows[rows.length - 1].sourceText.replace(/\s+/g, ' ').trim();
+}

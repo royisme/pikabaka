@@ -1,8 +1,8 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Languages, MessageSquarePlus, Reply, TriangleAlert } from 'lucide-react';
 import type { TranscriptDisplayMode, TranscriptSegment } from '../../lib/transcriptSegments';
-import { failureReasonText, rowSlot, transcriptRowParts, type RowSlot } from '../../lib/transcriptRow';
-import { countNewRows, isNearBottom, nextTranscriptScroll } from '../../lib/answerScroll';
+import { failureReasonText, newestFailedIndex, rowSlot, transcriptRowParts, type RowSlot } from '../../lib/transcriptRow';
+import { countNewRows, isNearBottom, newestPreview, nextTranscriptScroll } from '../../lib/answerScroll';
 import { nextAnnouncement } from '../../lib/transcriptAnnounce';
 
 interface TranscriptNotesProps {
@@ -28,7 +28,7 @@ function formatTime(ts: number): string {
 }
 
 /** The reserved line above the source text; 20px, the height of one line of translation. */
-function SlotLine({ slot, onRetry }: { slot: RowSlot; onRetry?: () => void }) {
+export function SlotLine({ slot, onRetry, quiet = false }: { slot: RowSlot; onRetry?: () => void; quiet?: boolean }) {
     if (!slot || slot.kind === 'translation') return null;
     return (
         <div className="flex min-h-[20px] items-center gap-2 text-[11px] overlay-text-muted">
@@ -36,7 +36,14 @@ function SlotLine({ slot, onRetry }: { slot: RowSlot; onRetry?: () => void }) {
             {slot.kind === 'translating' && (
                 <span>{slot.elapsedSeconds === null ? 'Translating' : `Translating · ${slot.elapsedSeconds}s`}</span>
             )}
-            {slot.kind === 'failed' && (
+            {slot.kind === 'failed' && quiet && (
+                // An older failure: the newest failed row carries the reason and Retry, this one only a marker.
+                <>
+                    <TriangleAlert className="h-3 w-3 opacity-60" aria-hidden="true" />
+                    <span className="sr-only">Translation failed</span>
+                </>
+            )}
+            {slot.kind === 'failed' && !quiet && (
                 <>
                     <TriangleAlert className="h-3 w-3 text-state-danger" aria-hidden="true" />
                     <span className="text-state-danger-strong">
@@ -54,6 +61,29 @@ function SlotLine({ slot, onRetry }: { slot: RowSlot; onRetry?: () => void }) {
                 </>
             )}
         </div>
+    );
+}
+
+/** The jump-to-latest pill. Its width is fixed so a longer preview or a bigger count never makes it jump. */
+export function NewRowsPill({ count, preview, onClick }: { count: number; preview: string; onClick: () => void }) {
+    return (
+        <button
+            type="button"
+            aria-label={count > 0 ? `Jump to latest, ${count} new ${count === 1 ? 'line' : 'lines'}` : 'Jump to latest'}
+            onClick={onClick}
+            className="absolute bottom-2 right-3 flex w-44 max-w-[calc(100%-1.5rem)] items-center gap-1 rounded-full border border-border-subtle px-2.5 py-1 text-[11px] font-medium overlay-text-primary overlay-subtle-surface min-[480px]:w-56"
+        >
+            <span aria-hidden="true" className="shrink-0">↓</span>
+            <span aria-hidden="true" className="shrink-0">
+                {count > 0 ? count : 'Latest'}
+                {count > 0 && <span className="hidden min-[480px]:inline"> new</span>}
+            </span>
+            {preview && (
+                <span aria-hidden="true" data-pill-preview="true" className="min-w-0 flex-1 truncate text-left font-normal overlay-text-secondary">
+                    {preview}
+                </span>
+            )}
+        </button>
     );
 }
 
@@ -89,6 +119,8 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
     }, [hasPending]);
 
     const slotContext = { mode: displayMode, translationOn, now };
+    const slots = segments.map((seg) => rowSlot(seg, slotContext));
+    const failedIndex = newestFailedIndex(slots);
 
     // Screen readers hear each finished translation once. The list itself is not a live region.
     const announcedRef = useRef<Set<string> | null>(null);
@@ -169,7 +201,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                         const expanded = expandedId === seg.segmentId;
                         // Own speech is never translated: it stays one quiet source line.
                         const parts = transcriptRowParts(seg, own ? 'original' : displayMode, expanded);
-                        const slot = rowSlot(seg, slotContext);
+                        const slot = slots[index];
                         const newest = index === newestOtherIndex;
                         const showSpeaker = index === 0 || segments[index - 1].speakerLabel !== seg.speakerLabel;
                         const hasMeta = !!onTranslateSegment || !!seg.detectedLanguage;
@@ -190,7 +222,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                 {showSpeaker && (
                                     <div className="text-[11px] font-medium overlay-text-muted">{seg.speakerLabel}</div>
                                 )}
-                                <SlotLine slot={slot} onRetry={onTranslateSegment ? () => onTranslateSegment(seg) : undefined} />
+                                <SlotLine slot={slot} quiet={index !== failedIndex} onRetry={onTranslateSegment ? () => onTranslateSegment(seg) : undefined} />
                                 <div className="flex items-start gap-1">
                                 <button
                                     type="button"
@@ -295,18 +327,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
             </div>
 
             {rowsWhenFollowStopped !== null && (
-                <button
-                    type="button"
-                    aria-label={newRows > 0 ? `Jump to latest, ${newRows} new ${newRows === 1 ? 'line' : 'lines'}` : 'Jump to latest'}
-                    onClick={jumpToLatest}
-                    className="absolute bottom-2 right-3 flex items-center gap-1 rounded-full border border-border-subtle px-2.5 py-1 text-[11px] font-medium overlay-text-primary overlay-subtle-surface"
-                >
-                    <span aria-hidden="true">↓</span>
-                    <span aria-hidden="true">
-                        {newRows > 0 ? newRows : 'Latest'}
-                        {newRows > 0 && <span className="hidden min-[480px]:inline"> new</span>}
-                    </span>
-                </button>
+                <NewRowsPill count={newRows} preview={newestPreview(segments)} onClick={jumpToLatest} />
             )}
         </div>
     );

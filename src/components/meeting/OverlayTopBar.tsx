@@ -24,6 +24,8 @@ interface OverlayTopBarProps {
     displayMode: TranscriptDisplayMode;
     translationEnabled: boolean;
     translationConfigured: boolean;
+    /** The newest translation attempt failed; shown as a ▲ on the Translate button. */
+    translationFailing?: boolean;
     theirLanguage: string;
     myLanguage: string;
     targetLanguage: string;
@@ -74,6 +76,7 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
     displayMode,
     translationEnabled,
     translationConfigured,
+    translationFailing,
     theirLanguage,
     myLanguage,
     targetLanguage,
@@ -185,13 +188,14 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
                         <button
                             type="button"
                             aria-pressed={translationEnabled}
-                            aria-label="Translate"
-                            title="Translate"
+                            aria-label={translationFailing ? 'Translate, translation failing' : 'Translate'}
+                            title={translationFailing ? 'Translation is failing' : 'Translate'}
                             onClick={onToggleTranslation}
                             className={`no-drag hidden min-[560px]:inline-flex ${barButton}`}
                         >
                             <Languages className="h-3 w-3" aria-hidden="true" />
                             <span>Translate</span>
+                            {translationFailing && <span aria-hidden="true" data-translation-failing="true" className="hidden text-state-danger-strong min-[480px]:inline">▲</span>}
                         </button>
                         <PopoverMenu
                             label="Their language"
