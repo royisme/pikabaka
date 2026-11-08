@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import type { LanguageOption } from '../../../electron/config/languages';
 import { Globe, Info, MapPin, Mic, Speaker } from 'lucide-react';
 import { useWindowEvent } from '../../hooks/useWindowEvent';
 import { useLocalStorageValue } from '../../hooks/useLocalStorageValue';
@@ -24,7 +25,7 @@ export function useAudioSettings({ isOpen, isActive }: { isOpen: boolean; isActi
     const [recognitionLanguage, setRecognitionLanguage] = useState('');
     const [userRecognitionLanguage, setUserRecognitionLanguage] = useState('');
     const [selectedSttGroup, setSelectedSttGroup] = useState('');
-    const [availableLanguages, setAvailableLanguages] = useState<Record<string, any>>({});
+    const [availableLanguages, setAvailableLanguages] = useState<Record<string, LanguageOption & { alternates?: string[] }>>({});
 
     useEffect(() => {
         const loadLanguages = async () => {
@@ -39,7 +40,7 @@ export function useAudioSettings({ isOpen, isActive }: { isOpen: boolean; isActi
                 if (!currentLangKey) {
                     const systemLocale = navigator.language;
                     // Try to find exact match or primary match
-                    const match = Object.entries(langs).find(([_, config]: [string, any]) =>
+                    const match = Object.entries(langs).find(([_, config]) =>
                         config.bcp47 === systemLocale ||
                         config.iso639 === systemLocale ||
                         (config.alternates && config.alternates.includes(systemLocale))
@@ -100,7 +101,7 @@ export function useAudioSettings({ isOpen, isActive }: { isOpen: boolean; isActi
 
     // Base list of unique language groups. The "Auto" group is injected at
     // render time below (only when the current STT provider supports it).
-    const baseLanguageGroups = Array.from(new Set(Object.values(availableLanguages).map((l: any) => l.group)))
+    const baseLanguageGroups = Array.from(new Set(Object.values(availableLanguages).map(l => l.group)))
         .sort((a, b) => {
             if (a === 'English') return -1;
             if (b === 'English') return 1;
@@ -109,7 +110,7 @@ export function useAudioSettings({ isOpen, isActive }: { isOpen: boolean; isActi
 
     const translationLanguageOptions = useMemo(() => {
         return Object.entries(availableLanguages)
-            .map(([k, v]) => ({ value: k, label: (v as { label?: string }).label || k }))
+            .map(([k, v]) => ({ value: k, label: v.label || k }))
             .sort((a, b) => a.label.localeCompare(b.label));
     }, [availableLanguages]);
 
@@ -127,13 +128,11 @@ export function useAudioSettings({ isOpen, isActive }: { isOpen: boolean; isActi
     // Audio Settings
     const { data: devices } = useQuery({ queryKey: ['settings', 'devices'], queryFn: async () => {
             const [inputs, outputs] = await Promise.all([
-                // @ts-ignore
                 window.electronAPI?.getInputDevices() || Promise.resolve([]),
-                // @ts-ignore
                 window.electronAPI?.getOutputDevices() || Promise.resolve([])
             ]);
-            const formatDevices = (devs: any[]) =>
-                devs.map((d: any) => ({
+            const formatDevices = (devs: Array<{ id: string; name: string }>) =>
+                devs.map(d => ({
                     deviceId: d.id,
                     label: d.name,
                     kind: 'audioinput' as MediaDeviceKind,
@@ -184,7 +183,6 @@ export function useAudioSettings({ isOpen, isActive }: { isOpen: boolean; isActi
     useEffect(() => {
         const loadSttSettings = async () => {
             try {
-                // @ts-ignore
                 const creds = await window.electronAPI?.getStoredCredentials?.();
                 if (creds) {
                     setSttProvider(creds.sttProvider || 'google');
@@ -209,7 +207,6 @@ export function useAudioSettings({ isOpen, isActive }: { isOpen: boolean; isActi
         setSpeechResult(null);
         try {
             // Switch first: saving a model rebuilds the pipeline, and the old service may have no key.
-            // @ts-ignore
             const providerResult = await api.setSttProvider?.(sttProvider);
             if (providerResult && !providerResult.success) throw new Error(providerResult.error || 'The service was not saved');
             const wantModel = (sttModelDraft[sttProvider] ?? '').trim();
@@ -429,12 +426,6 @@ export function renderAudioSettings(
                         <button
                             onClick={async () => {
                                 try {
-                                    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-                                    if (!AudioContext) {
-                                        console.error("Web Audio API not supported");
-                                        return;
-                                    }
-
                                     const ctx = new AudioContext();
 
                                     if (ctx.state === 'suspended') {
@@ -452,9 +443,9 @@ export function renderAudioSettings(
                                     gainNode.gain.setValueAtTime(0.5, ctx.currentTime);
                                     gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.0);
 
-                                    if (selectedOutput && (ctx as any).setSinkId) {
+                                    if (selectedOutput) {
                                         try {
-                                            await (ctx as any).setSinkId(selectedOutput);
+                                            await ctx.setSinkId(selectedOutput);
                                         } catch (e) {
                                             console.warn("Error setting sink for AudioContext", e);
                                         }
@@ -504,7 +495,7 @@ export function renderAudioSettings(
                         <div className="relative">
                             {configuredSpeechServices.length > 0 && <ProviderSelect
                                 value={sttProvider}
-                                onChange={(val) => handleSttProviderChange(val as any)}
+                                onChange={(val) => handleSttProviderChange(val as typeof sttProvider)}
                                 options={[
                                     { id: 'google', label: 'Google Cloud', badge: speechCredentials?.googleServiceAccountPath ? 'Saved' : null, recommended: true, desc: 'gRPC streaming via Service Account', icon: <Mic size={14} /> },
                                     { id: 'groq', label: 'Groq Whisper', badge: speechCredentials?.hasSttGroqKey ? 'Saved' : null, recommended: true, desc: 'Ultra-fast REST transcription', icon: <Mic size={14} /> },

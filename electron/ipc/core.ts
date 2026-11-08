@@ -1,6 +1,7 @@
 import { app } from "electron"
 import { safeHandle } from "./safeHandle"
 import { getUpdateState } from "../lib/auto-updater"
+import type { UpdateNotice } from "../update/ReleaseNotesManager"
 import { SettingsManager } from "../services/SettingsManager"
 import { AppState } from "../main"
 import { cancelActiveRagQueries } from "./rag"
@@ -26,11 +27,8 @@ export function registerCoreHandlers(appState: AppState): void {
 
       if (notes) {
         console.log("[IPC] Notes fetched for:", notes.version);
-        const info = {
+        const info: UpdateNotice = {
           version: notes.version || 'latest',
-          files: [] as any[],
-          path: '',
-          sha512: '',
           releaseName: notes.summary,
           releaseNotes: notes.fullBody,
           parsedNotes: notes

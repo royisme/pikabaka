@@ -8,33 +8,7 @@ import * as meetingRecord from './meetingRecord';
 import { KNOWN_DIMS, runMigrations } from './migrations';
 import { VectorStore } from '../rag/VectorStore';
 
-// Interfaces for our data objects
-export interface Meeting {
-    id: string;
-    title: string;
-    date: string; // ISO string
-    startTimeMs?: number;
-    duration: string;
-    summary: string;
-    detailedSummary?: {
-        overview?: string;
-        actionItems: string[];
-        keyPoints: string[];
-    };
-    transcript?: Array<{
-        speaker: string;
-        text: string;
-        timestamp: number;
-    }>;
-    usage?: Array<{
-        type: 'assist' | 'followup' | 'chat' | 'followup_questions';
-        timestamp: number;
-        question?: string;
-        answer?: string;
-        items?: string[];
-    }>;
-    isProcessed?: boolean;
-}
+import type { Meeting, MeetingSummaryUpdates } from './types';
 
 interface SegmentRow {
     segmentId: string; revision: number | null; speaker: string; text: string; timestampMs: number;
@@ -381,7 +355,7 @@ export class DatabaseManager {
         }
     }
 
-    public updateMeetingSummary(id: string, updates: { overview?: string, actionItems?: string[], keyPoints?: string[], actionItemsTitle?: string, keyPointsTitle?: string }): boolean {
+    public updateMeetingSummary(id: string, updates: MeetingSummaryUpdates): boolean {
         if (!this.db) return false;
 
         try {

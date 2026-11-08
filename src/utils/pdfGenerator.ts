@@ -1,28 +1,6 @@
 import jsPDF from 'jspdf';
+import type { Meeting } from '../../electron/db/types';
 
-interface Meeting {
-    id: string;
-    title: string;
-    date: string;
-    duration: string;
-    summary: string;
-    detailedSummary?: {
-        actionItems: string[];
-        keyPoints: string[];
-    };
-    transcript?: Array<{
-        speaker: string;
-        text: string;
-        timestamp: number;
-    }>;
-    usage?: Array<{
-        type: 'assist' | 'followup' | 'chat' | 'followup_questions';
-        timestamp: number;
-        question?: string;
-        answer?: string;
-        items?: string[];
-    }>;
-}
 
 export const generateMeetingPDF = (meeting: Meeting) => {
     const doc = new jsPDF();
