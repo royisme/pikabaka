@@ -366,15 +366,15 @@ export function renderGeneralSettings(state: ReturnType<typeof useGeneralSetting
                                 {/* Dropdown Menu */}
                                 {isThemeDropdownOpen && (
                                     <div className="absolute right-0 top-full mt-1 min-w-full w-max bg-bg-elevated border border-border-subtle rounded-lg shadow-xl overflow-hidden z-20 p-1 animated fadeIn select-none">
-                                        {[
+                                        {([
                                             { mode: 'system', label: 'System', icon: <Monitor size={14} /> },
                                             { mode: 'light', label: 'Light', icon: <Sun size={14} /> },
                                             { mode: 'dark', label: 'Dark', icon: <Moon size={14} /> }
-                                        ].map((option) => (
+                                        ] as const).map((option) => (
                                             <button
                                                 key={option.mode}
                                                 onClick={() => {
-                                                    handleSetTheme(option.mode as any);
+                                                    handleSetTheme(option.mode);
                                                     setIsThemeDropdownOpen(false);
                                                 }}
                                                 className={`w-full text-left px-2 py-1.5 rounded-md text-xs flex items-center gap-2 transition-colors ${themeMode === option.mode ? 'text-text-primary bg-bg-item-active/50' : 'text-text-secondary hover:bg-bg-input hover:text-text-primary'}`}
