@@ -40,4 +40,19 @@ export function registerSystemHandlers(appState: AppState): void {
     return { success: true };
   });
 
+  // Ollama model detection (local server, 2s timeout)
+  safeHandle("get-ollama-models", async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const response = await fetch('http://localhost:11434/api/tags', { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!response.ok) return [];
+      const data: unknown = await response.json();
+      const models = (data as { models?: Array<{ name: string }> }).models;
+      return Array.isArray(models) ? models.map(m => m.name) : [];
+    } catch {
+      return [];
+    }
+  });
 }

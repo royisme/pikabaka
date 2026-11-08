@@ -218,15 +218,16 @@ export function createSTTProvider(appState: AppState, speaker: 'them' | 'user'):
 /** The one place the system audio capture is connected to the speech service. */
 export function wireSystemAudio(appState: AppState): void {
   const state = appState;
-  state.systemAudioCapture.on('data', (chunk: Buffer) => {
+  const capture = state.systemAudioCapture!;
+  capture.on('data', (chunk: Buffer) => {
     state.lastSystemAudioChunkAt = Date.now();
     sendLag.timed('them', () => state.googleSTT?.write(chunk));
   });
-  state.systemAudioCapture.on('speech_ended', () => {
+  capture.on('speech_ended', () => {
     state.googleSTT?.notifySpeechEnded?.();
     handleSpeakerSpeechEnded(appState, 'them');
   });
-  state.systemAudioCapture.on('error', (err: Error) => {
+  capture.on('error', (err: Error) => {
     console.error('[Main] SystemAudioCapture Error:', err);
     state.lastAudioPipelineError = err.message || 'System audio capture error';
   });
@@ -235,15 +236,16 @@ export function wireSystemAudio(appState: AppState): void {
 /** The one place the microphone capture is connected to the speech service. */
 export function wireMicrophone(appState: AppState): void {
   const state = appState;
-  state.microphoneCapture.on('data', (chunk: Buffer) => {
+  const capture = state.microphoneCapture!;
+  capture.on('data', (chunk: Buffer) => {
     // Muted: silence of the same length goes on, so the speech service keeps its connection.
     sendLag.timed('user', () => state.googleSTT_User?.write(state.microphoneMuted ? Buffer.alloc(chunk.length) : chunk));
   });
-  state.microphoneCapture.on('speech_ended', () => {
+  capture.on('speech_ended', () => {
     state.googleSTT_User?.notifySpeechEnded?.();
     handleSpeakerSpeechEnded(appState, 'user');
   });
-  state.microphoneCapture.on('error', (err: Error) => {
+  capture.on('error', (err: Error) => {
     console.error('[Main] MicrophoneCapture Error:', err);
   });
 }
