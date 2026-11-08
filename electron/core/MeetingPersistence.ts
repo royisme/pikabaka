@@ -9,7 +9,8 @@ import { renameMeetingFolder } from '../agent/workspace';
 import { SessionTracker, TranscriptSegment } from './SessionTracker';
 import { LLMHelper } from './LLMHelper';
 import { DatabaseManager } from '../db/DatabaseManager';
-import type { Meeting } from '../db/types';
+import type { Meeting, MeetingStartMetadata, MeetingUsage } from '../db/types';
+import type { BrowserWindow } from 'electron';
 import type { RAGManager } from '../rag/RAGManager';
 import { refreshCommittedMeetingSummary } from '../rag/meetingSummaryIndex';
 const crypto = require('crypto');
@@ -39,7 +40,7 @@ export class MeetingPersistence {
      * transcript line can be written to the record as it happens. Returns the meeting id, or null
      * when the row could not be created (the meeting is then saved whole at stop, as before).
      */
-    public startMeeting(metadata?: { title?: string } | null): string | null {
+    public startMeeting(metadata?: MeetingStartMetadata | null): string | null {
         const startTime = Date.now();
         let meetingId: string | null = crypto.randomUUID();
         try {
@@ -126,7 +127,7 @@ export class MeetingPersistence {
             }
             // Notify Frontend
             const wins = require('electron').BrowserWindow.getAllWindows();
-            wins.forEach((w: any) => w.webContents.send('meetings-updated'));
+            wins.forEach((w: BrowserWindow) => w.webContents.send('meetings-updated'));
         } catch (e) {
             console.error('Failed to save placeholder', (e as Error).message);
         }
@@ -141,7 +142,7 @@ export class MeetingPersistence {
      * Heavy lifting: LLM Title, Summary, and DB Write
      */
     private async processAndSaveMeeting(
-        data: { transcript: TranscriptSegment[], usage: any[], startTime: number, durationMs: number, context: string },
+        data: { transcript: TranscriptSegment[], usage: MeetingUsage[], startTime: number, durationMs: number, context: string },
         meetingId: string,
         metadata?: { title?: string } | null,
         fullSave = false
@@ -250,7 +251,7 @@ export class MeetingPersistence {
 
             // Notify Frontend to refresh list
             const wins = require('electron').BrowserWindow.getAllWindows();
-            wins.forEach((w: any) => w.webContents.send('meetings-updated'));
+            wins.forEach((w: BrowserWindow) => w.webContents.send('meetings-updated'));
 
         } catch (error) {
             console.error('[MeetingPersistence] Failed to save meeting:', (error as Error).message);

@@ -8,6 +8,7 @@ import { redactConnectionError } from '../services/connectionSecrets';
 import { CredentialsManager } from '../services/CredentialsManager';
 import { getAnswerSources, getScenario } from '../services/SettingsManager';
 import { buildTranscriptTranslationPrompt } from '../transcript/translationExecutor';
+import type { KnowledgeOrchestrator } from '../knowledge/KnowledgeOrchestrator';
 import { classifyTranslationError } from '../transcript/translationError';
 import { answerLanguageInstruction } from '../llm/answerLanguage';
 import { speakingStyleInstruction } from '../llm/speakingStyle';
@@ -60,7 +61,7 @@ export interface TranscriptTranslationRequest {
 // Simple prompt for image analysis (not the chat prompt - kept separate)
 
 export class LLMHelper {
-  private knowledgeOrchestrator: any = null;
+  private knowledgeOrchestrator: KnowledgeOrchestrator | null = null;
   private aiResponseLanguage: string = 'English';
 
   public getAiResponseLanguage(): string {
@@ -404,12 +405,12 @@ ANSWER DIRECTLY:`;
     return this.processResponse(text);
   }
 
-  public setKnowledgeOrchestrator(orchestrator: any): void {
+  public setKnowledgeOrchestrator(orchestrator: KnowledgeOrchestrator): void {
     this.knowledgeOrchestrator = orchestrator;
     console.log('[LLMHelper] KnowledgeOrchestrator attached');
   }
 
-  public getKnowledgeOrchestrator(): any {
+  public getKnowledgeOrchestrator(): KnowledgeOrchestrator | null {
     return this.knowledgeOrchestrator;
   }
 
@@ -468,7 +469,7 @@ ANSWER DIRECTLY:`;
               }
             }
           }
-        } catch (knowledgeError: any) {
+        } catch (knowledgeError: unknown) {
           console.warn('[LLMHelper] Materials intercept failed, falling back to normal:', classifyTranslationError(knowledgeError));
         }
       }
@@ -525,8 +526,8 @@ ANSWER DIRECTLY:`;
     // MATERIALS INTERCEPT (Streaming)
     // ============================================================
     const sources = getAnswerSources();
-    const documents = !options?.verbatimPrompt && sources.materials ? this.knowledgeOrchestrator?.prepareDocumentContext(message) : null;
-    if (!options?.verbatimPrompt && sources.materials && this.knowledgeOrchestrator) {
+    const documents = message !== undefined && !options?.verbatimPrompt && sources.materials ? this.knowledgeOrchestrator?.prepareDocumentContext(message) : null;
+    if (message !== undefined && !options?.verbatimPrompt && sources.materials && this.knowledgeOrchestrator) {
       try {
         const knowledgeResult = await this.knowledgeOrchestrator.processQuestion(message, documents?.queryEmbedding);
         if (knowledgeResult) {
@@ -541,7 +542,7 @@ ANSWER DIRECTLY:`;
               : knowledgeResult.contextBlock;
           }
         }
-      } catch (knowledgeError: any) {
+      } catch (knowledgeError: unknown) {
         console.warn('[LLMHelper] Materials intercept (stream) failed, falling back:', classifyTranslationError(knowledgeError));
       }
     }
@@ -554,7 +555,7 @@ ANSWER DIRECTLY:`;
       ? `CONTEXT:\n${context}\n\nUSER QUESTION:\n${message}`
       : message;
 
-    // The connection and model chosen for quick answers (Settings, Models & Agent): any host, any model id.
+    // The connection and model chosen for quick answers (Settings, Models & Agent): a host and model id of any kind.
     const chatUse = CredentialsManager.getInstance().resolveModelUse('chat');
     if ('connection' in chatUse) {
       yield* this.streamViaConnectionChat(chatUse.connection, chatUse.model, options?.verbatimPrompt ? systemPromptOverride ?? '' : this.injectLanguageInstruction(systemPromptOverride || systemPrompt()), userContent, imagePaths, options?.history, options?.signal);

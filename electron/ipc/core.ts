@@ -7,6 +7,7 @@ import { AppState } from "../main"
 import { cancelActiveRagQueries } from "./rag"
 import * as path from "path"
 import { RECOGNITION_LANGUAGES, AI_RESPONSE_LANGUAGES } from "../config/languages"
+import { takeScreenshot, takeSelectiveScreenshot } from "../lib/screenshot-capture"
 
 let _chatStreamId = 0
 
@@ -144,7 +145,7 @@ export function registerCoreHandlers(appState: AppState): void {
 
   safeHandle("take-screenshot", async () => {
     try {
-      const screenshotPath = await appState.takeScreenshot()
+      const screenshotPath = await takeScreenshot(appState)
       const preview = await appState.getImagePreview(screenshotPath)
       return { path: screenshotPath, preview }
     } catch (error) {
@@ -155,7 +156,7 @@ export function registerCoreHandlers(appState: AppState): void {
 
   safeHandle("take-selective-screenshot", async () => {
     try {
-      const screenshotPath = await appState.takeSelectiveScreenshot()
+      const screenshotPath = await takeSelectiveScreenshot(appState)
       const preview = await appState.getImagePreview(screenshotPath)
       return { path: screenshotPath, preview }
     } catch (error) {

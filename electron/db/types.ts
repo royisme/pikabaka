@@ -29,6 +29,9 @@ export interface Meeting {
     isProcessed?: boolean;
 }
 
+// One recorded answer or question in a meeting.
+export type MeetingUsage = NonNullable<Meeting['usage']>[number];
+
 // Edits the renderer sends for a meeting summary.
 export type MeetingSummaryUpdates = {
     overview?: string;

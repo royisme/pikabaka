@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import type { Meeting } from './types';
+import type { Meeting, MeetingUsage } from './types';
 
 export function migrateRecordColumns(db: Database.Database): void {
     const columns = db.pragma('table_info(transcripts)') as { name: string }[];
@@ -45,7 +45,7 @@ export function upsertSegment(db: Database.Database, s: {
     return result.changes > 0;
 }
 
-export function interactionRow(usage: NonNullable<Meeting['usage']>[number]) {
+export function interactionRow(usage: MeetingUsage) {
     let metadata = null;
     if (usage.items) {
         metadata = JSON.stringify(usage.items);
@@ -61,7 +61,7 @@ export function interactionRow(usage: NonNullable<Meeting['usage']>[number]) {
     };
 }
 
-export function addInteraction(db: Database.Database, meetingId: string, usage: NonNullable<Meeting['usage']>[number]): void {
+export function addInteraction(db: Database.Database, meetingId: string, usage: MeetingUsage): void {
     db.prepare(`
         INSERT INTO ai_interactions (meeting_id, type, timestamp, user_query, ai_response, metadata_json)
         VALUES (@meeting_id, @type, @timestamp, @user_query, @ai_response, @metadata_json)

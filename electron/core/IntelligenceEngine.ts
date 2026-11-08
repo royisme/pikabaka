@@ -442,7 +442,7 @@ export class IntelligenceEngine extends EventEmitter {
         return () => this.currentGenerationId === generation;
     }
 
-    private setMode(mode: IntelligenceMode): void {
+    public setMode(mode: IntelligenceMode): void {
         if (this.activeMode !== mode) {
             this.activeMode = mode;
             this.emit('mode_changed', mode);

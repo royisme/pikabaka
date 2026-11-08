@@ -96,7 +96,7 @@ for (const platform of ['darwin', 'win32'] as const) for (const protectedStartup
         });
         const modules = [
             'audio/SystemAudioCapture', 'audio/MicrophoneCapture', 'rag/RAGManager', 'rag/embeddingConfig',
-            'db/DatabaseManager', 'agent/MeetingAgent', 'lib/auto-updater', 'lib/transcript-assembler',
+            'db/DatabaseManager', 'agent/MeetingAgent', 'lib/auto-updater', 'lib/transcript-assembler', 'lib/transcript-translation',
             'lib/audio-pipeline', 'knowledge/KnowledgeOrchestrator', 'knowledge/KnowledgeDatabaseManager',
         ];
         const events = ['uncaughtException', 'unhandledRejection'] as const;

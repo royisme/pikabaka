@@ -16,13 +16,13 @@ import {
   TranscriptSpeaker,
   bufferFinalTranscriptChunk,
   emitNativeAudioTranscript,
-  emitTranscriptWithTranslation,
   getBufferedTranscriptText,
   handleSpeakerSpeechEnded,
   mergeTranscriptText,
   noteTranscriptActivity,
   normalizeTranscriptText,
 } from "./transcript-assembler"
+import { emitTranscriptWithTranslation } from "./transcript-translation"
 
 export type STTProvider = (GoogleSTT | RestSTT | DeepgramStreamingSTT | SonioxStreamingSTT | GeminiLiveSTT | ElevenLabsStreamingSTT | OpenAIStreamingSTT) & {
   finalize?: () => void;
