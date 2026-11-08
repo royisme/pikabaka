@@ -10,6 +10,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT } from '../transcript/translationExecutor';
 import { getCredentialsJsonPath } from './configPaths';
+import { applyInterpreting, readInterpreting, type InterpretingCredentials, type InterpretingSettings } from './interpretingSettings';
 import { availableStorageStatus, encryptedPath, readCredentials, storageError, writeCredentials, type CredentialStorageStatus } from './credentialStore';
 
 /** OpenAI-compatible Chat Completions (URL + API key; uses /v1/chat/completions and /v1/models). */
@@ -25,7 +26,7 @@ export interface OpenAICompatibleProvider {
     preferredModel?: string;
 }
 
-export interface StoredCredentials {
+export interface StoredCredentials extends InterpretingCredentials {
     geminiApiKey?: string;
     groqApiKey?: string;
     openaiApiKey?: string;
@@ -440,6 +441,19 @@ export class CredentialsManager {
         this.credentials.transcriptTranslationPrompt = prompt;
         this.saveCredentials();
         console.log('[CredentialsManager] Transcript Translation Prompt updated');
+    }
+
+    public getInterpretingSettings(): InterpretingSettings { return readInterpreting(this.credentials); }
+
+    public setInterpretingSettings(patch: Partial<InterpretingSettings>): void {
+        applyInterpreting(this.credentials, patch);
+        this.saveCredentials();
+    }
+
+    public setFishAudioApiKey(key: string): void {
+        this.credentials.fishAudioApiKey = key;
+        this.saveCredentials();
+        console.log('[CredentialsManager] Fish Audio API Key updated');
     }
 
     public getTranscriptCorrectionEnabled(): boolean {

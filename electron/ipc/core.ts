@@ -601,6 +601,7 @@ export function registerCoreHandlers(appState: AppState): void {
         hasSttOpenaiKey: hasKey(creds.openAiSttApiKey),
         hasDeepgramKey: hasKey(creds.deepgramApiKey),
         hasElevenLabsKey: hasKey(creds.elevenLabsApiKey),
+        hasFishAudioKey: hasKey(creds.fishAudioApiKey),
         hasAzureKey: hasKey(creds.azureApiKey),
         azureRegion: creds.azureRegion || 'eastus',
         hasIbmWatsonKey: hasKey(creds.ibmWatsonApiKey),
