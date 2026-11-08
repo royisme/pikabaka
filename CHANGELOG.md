@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.3.1](https://github.com/royisme/pikabaka/compare/v3.3.0...v3.3.1) (2026-11-08)
+
+
+### Bug Fixes
+
+* **release:** tolerate the null that execSync returns when stdio is inherited ([188d944](https://github.com/royisme/pikabaka/commit/188d944f21cf33141a56da5d6780b81c036aed08))
+* **release:** tolerate the null that execSync returns when stdio is inherited ([83febc4](https://github.com/royisme/pikabaka/commit/83febc4e32ef366b7651a505e7c95234b3dce0e6))
+
 ## [3.3.0](https://github.com/royisme/pikabaka/compare/v3.2.0...v3.3.0) (2026-11-08)
 
 
