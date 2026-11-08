@@ -5,7 +5,7 @@ export interface ScoredChunk {
   id: number;
   text: string;
   score: number;
-  metadata: any;
+  metadata: unknown;
   docType: string;
 }
 
@@ -330,7 +330,7 @@ export class KnowledgeVectorStore {
     return dot / (Math.sqrt(normA) * Math.sqrt(normB));
   }
 
-  private parseMetadata(metadata: string | null): any {
+  private parseMetadata(metadata: string | null): unknown {
     if (!metadata) {
       return null;
     }

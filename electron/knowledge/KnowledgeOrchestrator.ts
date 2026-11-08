@@ -2,7 +2,7 @@ import path from 'path';
 import { stat } from 'fs/promises';
 import { getAnswerSources } from '../services/SettingsManager';
 
-import { KnowledgeDatabaseManager } from './KnowledgeDatabaseManager';
+import { KnowledgeDatabaseManager, KnowledgeChunkInput } from './KnowledgeDatabaseManager';
 import { DocumentParser } from './DocumentParser';
 import { KnowledgeVectorStore } from './KnowledgeVectorStore';
 import {
@@ -257,9 +257,9 @@ export class KnowledgeOrchestrator {
     }
   }
 
-  private chunkDocument(text: string, docType: DocType): Array<{ text: string; metadata?: any }> {
+  private chunkDocument(text: string, docType: DocType): KnowledgeChunkInput[] {
     const sections = text.split(/\n{2,}|\n(?=#{1,3}\s)/);
-    const chunks: Array<{ text: string; metadata?: any }> = [];
+    const chunks: KnowledgeChunkInput[] = [];
 
     for (const section of sections) {
       const trimmed = section.trim();

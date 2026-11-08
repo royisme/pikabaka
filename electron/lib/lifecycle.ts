@@ -75,7 +75,7 @@ export async function initializeApp() {
   const allWindows = BrowserWindow.getAllWindows();
   console.log(`[Diagnostic] Total BrowserWindows after init: ${allWindows.length}`);
   allWindows.forEach((win, i) => {
-    console.log(`[Diagnostic]   Window ${i}: id=${win.id} title="${win.getTitle()}" visible=${win.isVisible()} skipTaskbar=${(win as any).skipTaskbar ?? 'unknown'}`);
+    console.log(`[Diagnostic]   Window ${i}: id=${win.id} title="${win.getTitle()}" visible=${win.isVisible()}`);
   });
 
   // Recover unprocessed meetings (persistence check)

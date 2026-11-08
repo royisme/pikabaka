@@ -34,7 +34,6 @@ const SettingsPopup = () => {
                 const rect = entry.target.getBoundingClientRect();
                 // Send exact dimensions to Electron
                 try {
-                    // @ts-ignore
                     window.electronAPI?.updateContentDimensions({
                         width: Math.ceil(rect.width),
                         height: Math.ceil(rect.height)
@@ -151,7 +150,6 @@ const SettingsPopup = () => {
 
                 {/* Donate */}
                 <div
-                    // @ts-ignore
                     onClick={() => window.electronAPI.openExternal('https://buymeacoffee.com/royisme')}
                     className="flex items-center justify-between px-3 py-2 hover:bg-pink-500/10 rounded-lg transition-colors duration-200 group interaction-base interaction-press"
                 >

@@ -122,7 +122,7 @@ const EditableTextBlock: React.FC<EditableTextBlockProps> = ({
         }
     }, [isEditing]);
 
-    const Tag = tagName as any;
+    const Tag = tagName as React.ElementType<React.HTMLAttributes<HTMLElement> & { ref?: React.Ref<HTMLElement> }>;
 
     return (
         <Tag

@@ -37,18 +37,6 @@ export class ErrorBoundary extends Component<Props, State> {
         const context = this.props.context ?? 'App';
         console.error(`[ErrorBoundary:${context}] Uncaught render error:`, error, info.componentStack);
         this.setState({ componentStack: info.componentStack ?? '' });
-
-        // Report to the main process's log if IPC is available (non-blocking)
-        try {
-            // @ts-ignore  
-            window.electronAPI?.logErrorToMain?.({
-                type: 'uncaught-render-error',
-                context,
-                message: error?.message,
-                stack: error?.stack,
-                componentStack: info.componentStack
-            });
-        } catch { /* reporting must never crash the handler */ }
     }
 
     private handleReload = (): void => {

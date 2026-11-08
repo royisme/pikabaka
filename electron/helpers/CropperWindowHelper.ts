@@ -419,7 +419,7 @@ export class CropperWindowHelper {
         // Windows requires enableLargerThanScreen to span multiple monitors
         // macOS uses fullscreenable + visibleOnAllWorkspaces instead
         if (process.platform === 'win32') {
-            (windowSettings as any).enableLargerThanScreen = true;
+            windowSettings.enableLargerThanScreen = true;
         } else {
             windowSettings.type = CROPPER_CONFIG.WINDOW_TYPE;
         }

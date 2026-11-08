@@ -5,7 +5,7 @@ import { loadAgentRuntime } from './loader';
 import { GateError, type GateClassify, type GateErrorClass, type GateKind } from './gate';
 
 // The agent's model is a connection (type, host, key) and a model id, both chosen by the user. Pika
-// is not tied to a provider: any host of the openai, anthropic or gemini type works, and
+// is not tied to a provider: a host of the openai, anthropic or gemini type works, and
 // the exact model id typed or fetched is the one that runs. It is registered with pi-ai as it is,
 // so an id pi-ai has never heard of runs as itself and is never swapped for another model.
 

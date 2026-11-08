@@ -72,7 +72,7 @@ export async function ensureMacMicrophoneAccess(context: string): Promise<boolea
 }
 
 export function setupConsoleOverrides(): void {
-  console.log = (...args: any[]) => {
+  console.log = (...args: unknown[]) => {
     const msg = args.map(a => (a instanceof Error) ? a.stack || a.message : (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
     logToFile('[LOG] ' + msg);
     try {
@@ -80,7 +80,7 @@ export function setupConsoleOverrides(): void {
     } catch { }
   };
 
-  console.warn = (...args: any[]) => {
+  console.warn = (...args: unknown[]) => {
     const msg = args.map(a => (a instanceof Error) ? a.stack || a.message : (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
     logToFile('[WARN] ' + msg);
     try {
@@ -88,7 +88,7 @@ export function setupConsoleOverrides(): void {
     } catch { }
   };
 
-  console.error = (...args: any[]) => {
+  console.error = (...args: unknown[]) => {
     const msg = args.map(a => (a instanceof Error) ? a.stack || a.message : (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
     logToFile('[ERROR] ' + msg);
     try {
