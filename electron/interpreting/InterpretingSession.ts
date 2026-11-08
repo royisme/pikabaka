@@ -20,7 +20,7 @@ export interface PlayedAck { id: string; ok: boolean; error?: string }
 /** How long to wait for the overlay to report that a clip has played. */
 const ACK_TIMEOUT_MS = 60_000;
 const TEST_SENTENCE = 'This is a test of the interpreting voice.';
-const PROVIDER_LABEL: Record<VoiceProviderId, string> = { fishaudio: 'Fish Audio', elevenlabs: 'ElevenLabs' };
+export const PROVIDER_LABEL: Record<VoiceProviderId, string> = { fishaudio: 'Fish Audio', elevenlabs: 'ElevenLabs' };
 const PROVIDER_MODEL: Record<VoiceProviderId, string> = { fishaudio: FISH_MODEL, elevenlabs: ELEVENLABS_MODEL };
 
 export interface SessionDeps {

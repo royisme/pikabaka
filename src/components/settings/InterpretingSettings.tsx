@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { InterpretingSettings as Settings, VoiceProviderId } from '../../../electron/services/interpretingSettings';
+import type { InterpretingSettings as Settings, VoiceChoice, VoiceProviderId } from '../../../electron/services/interpretingSettings';
 import { KeyBadge } from '../ui/KeyBadge';
 import { useShortcuts } from '../../hooks/useShortcuts';
 import { useInterpretingPlayback } from '../../hooks/useInterpretingPlayback';
@@ -8,6 +8,7 @@ import { isKnownVirtualName, listOutputDevices } from '../../lib/virtualOutput';
 import { NO_VIRTUAL_DEVICE, PERSISTENT_NOTICE, noticeNeeded, outputNames, preselectOutput } from '../../lib/interpretingSettingsUi';
 import { primaryButton, secondaryButton } from './buttonStyles';
 import InterpretingNoticeDialog from './InterpretingNoticeDialog';
+import VoiceCloneDialog from './VoiceCloneDialog';
 
 const fieldLabel = 'text-xs font-medium text-text-secondary block';
 const field = 'w-full min-w-0 h-11 bg-bg-input border border-border-subtle rounded-lg px-3 text-sm text-text-primary placeholder-text-tertiary';
@@ -23,6 +24,7 @@ const InterpretingSettings = () => {
     const interpretingTalk = shortcuts.interpretingTalk;
     const [names, setNames] = useState<string[]>([]);
     const [noticeOpen, setNoticeOpen] = useState(false);
+    const [cloneOpen, setCloneOpen] = useState(false);
     const [voiceDraft, setVoiceDraft] = useState<string | undefined>();
     const [keyDraft, setKeyDraft] = useState('');
     const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -44,6 +46,13 @@ const InterpretingSettings = () => {
         onError: fail,
     });
 
+    // A failed delete keeps the record, so the user knows the provider still holds the voice.
+    const deleteVoice = useMutation({
+        mutationFn: (id: VoiceProviderId) => window.electronAPI.interpretingDeleteVoice(id),
+        onSuccess: () => { setMessage({ ok: true, text: 'Your voice was deleted.' }); void queryClient.invalidateQueries({ queryKey: ['interpreting-settings'] }); },
+        onError: fail,
+    });
+
     const refreshDevices = () => { void listOutputDevices().then((devices) => setNames(outputNames(devices))).catch(fail); };
     useEffect(refreshDevices, []);
 
@@ -60,6 +69,9 @@ const InterpretingSettings = () => {
     const provider = settings.provider;
     const keySaved = provider === 'fishaudio' ? !!credentials?.hasFishAudioKey : !!credentials?.hasElevenLabsKey;
     const voiceId = voiceDraft ?? settings.voices[provider]?.voiceId ?? '';
+    const providerName = providers.find((item) => item.id === provider)?.name ?? provider;
+    const cloned = settings.voices[provider]?.cloned ? settings.voices[provider] : undefined;
+    const keepClone = (choice: VoiceChoice) => { setCloneOpen(false); save.mutate({ voices: { ...settings.voices, [provider]: choice } }); };
     const turnOn = () => { setNoticeOpen(false); save.mutate({ enabled: true, noticeAcceptedAt: new Date().toISOString() }); };
     const onToggle = () => {
         if (settings.enabled) save.mutate({ enabled: false });
@@ -103,13 +115,25 @@ const InterpretingSettings = () => {
                     )}
                 </div>
 
-                <div className="space-y-1.5">
-                    <label htmlFor="interpreting-voice-id" className={fieldLabel}>Voice ID</label>
-                    <div className="flex gap-2">
-                        <input id="interpreting-voice-id" value={voiceId} onChange={(event) => setVoiceDraft(event.target.value)} placeholder="Paste a voice ID" className={field} />
-                        <button type="button" disabled={voiceDraft === undefined} onClick={() => { save.mutate({ voices: { ...settings.voices, [provider]: { voiceId: voiceId.trim(), cloned: false } } }); setVoiceDraft(undefined); }} className={primaryButton}>Save</button>
+                {cloned ? (
+                    <div className="space-y-1.5">
+                        <label className={fieldLabel}>Voice</label>
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm text-text-primary">Your voice, cloned on {cloned.consentAt ? new Date(cloned.consentAt).toLocaleDateString() : 'an unknown date'}</span>
+                            <button type="button" disabled={deleteVoice.isPending} onClick={() => deleteVoice.mutate(provider)} className={secondaryButton}>{deleteVoice.isError ? 'Retry delete' : 'Delete my voice'}</button>
+                        </div>
+                        <p className="text-[11px] text-text-tertiary">Your cloned voice stays at {providerName} until you delete it here.</p>
                     </div>
-                </div>
+                ) : (
+                    <div className="space-y-1.5">
+                        <label htmlFor="interpreting-voice-id" className={fieldLabel}>Voice ID</label>
+                        <div className="flex gap-2">
+                            <input id="interpreting-voice-id" value={voiceId} onChange={(event) => setVoiceDraft(event.target.value)} placeholder="Paste a voice ID" className={field} />
+                            <button type="button" disabled={voiceDraft === undefined} onClick={() => { save.mutate({ voices: { ...settings.voices, [provider]: { voiceId: voiceId.trim(), cloned: false } } }); setVoiceDraft(undefined); }} className={primaryButton}>Save</button>
+                            <button type="button" onClick={() => setCloneOpen(true)} className={secondaryButton}>Clone my voice</button>
+                        </div>
+                    </div>
+                )}
 
                 <div className="space-y-1.5">
                     <label htmlFor="interpreting-output" className={fieldLabel}>Virtual microphone</label>
@@ -137,6 +161,7 @@ const InterpretingSettings = () => {
                 </div>
                 {message ? <p role={message.ok ? 'status' : 'alert'} className={`text-[11px] break-words [overflow-wrap:anywhere] ${message.ok ? 'text-text-secondary' : 'text-state-danger'}`}>{message.text}</p> : null}
             </div>
+            {cloneOpen ? <VoiceCloneDialog provider={provider} providerName={providerName} outputLabel={settings.outputLabel} onKeep={keepClone} onClose={() => setCloneOpen(false)} /> : null}
             {noticeOpen ? <InterpretingNoticeDialog onConfirm={turnOn} onCancel={() => setNoticeOpen(false)} /> : null}
         </div>
     );

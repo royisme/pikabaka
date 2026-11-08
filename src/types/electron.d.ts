@@ -4,7 +4,7 @@ import type { PromptsEdit, PromptsReply } from '../../electron/llm/prompts'
 import type { Scenario, ScenarioReply } from '../../electron/llm/scenario'
 import type { LanguageOption } from '../../electron/config/languages'
 import type { Meeting, MeetingStartMetadata, MeetingSummaryUpdates } from '../../electron/db/types'
-import type { InterpretingSettings } from '../../electron/services/interpretingSettings'
+import type { InterpretingSettings, VoiceProviderId } from '../../electron/services/interpretingSettings'
 import type { AudioMessage, InterpretingState, PlayedAck } from '../../electron/interpreting/InterpretingSession'
 import type { UpdateNotice, UpdateProgress } from '../../electron/update/ReleaseNotesManager'
 
@@ -141,6 +141,9 @@ export interface ElectronAPI {
   interpretingToggleTalk: () => Promise<InterpretingState>
   interpretingPlayed: (ack: PlayedAck) => Promise<{ success: boolean }>
   interpretingTestVoice: () => Promise<{ success: boolean }>
+  interpretingCloneVoice: (provider: VoiceProviderId, sample: Uint8Array) => Promise<{ voiceId: string; needsVerification: boolean }>
+  interpretingPreviewVoice: (provider: VoiceProviderId) => Promise<{ success: boolean }>
+  interpretingDeleteVoice: (provider: VoiceProviderId) => Promise<{ success: boolean }>
   onInterpretingStateChanged: (callback: (state: InterpretingState) => void) => () => void
   onInterpretingAudio: (callback: (message: AudioMessage) => void) => () => void
   onInterpretingStop: (callback: () => void) => () => void

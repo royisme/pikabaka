@@ -3,8 +3,20 @@ import { CredentialsManager } from "../services/CredentialsManager"
 import { parseInterpretingPatch } from "../services/interpretingSettings"
 import type { AppState } from "../main"
 import type { PlayedAck } from "../interpreting/InterpretingSession"
+import { VoiceCloner } from "../interpreting/voiceClone"
+import { elevenLabs, fishAudio } from "../interpreting/voiceProviders"
 
 export function registerInterpretingHandlers(appState: AppState): void {
+  const cm = () => CredentialsManager.getInstance()
+  const cloner = new VoiceCloner({
+    settings: () => cm().getInterpretingSettings(),
+    apiKey: (provider) => (provider === 'fishaudio' ? cm().getFishAudioApiKey() : cm().getElevenLabsApiKey()),
+    provider: (id, key) => (id === 'fishaudio' ? fishAudio(key) : elevenLabs(key)),
+    saveVoices: (voices) => cm().setInterpretingSettings({ voices }),
+    targetLanguage: () => cm().getSttLanguage(),
+    log: (line) => console.log(line),
+  })
+
   safeHandle("interpreting:get-settings", async () => CredentialsManager.getInstance().getInterpretingSettings())
 
   // A bad field rejects the whole call with its reason; nothing is stored.
@@ -33,6 +45,20 @@ export function registerInterpretingHandlers(appState: AppState): void {
   // The audio goes to the window that asked, so the settings window plays its own test.
   safeHandle("interpreting:test-voice", async (event) => {
     await appState.interpreting.testVoice((message) => event.sender.send('interpreting-audio', message))
+    return { success: true }
+  })
+
+  // The sample is in memory only: it goes to the provider and is dropped.
+  safeHandle("interpreting:clone-voice", async (_, payload: { provider?: unknown; sample?: unknown } | null) => cloner.clone(payload?.provider, payload?.sample))
+
+  // The clone speaks one line to the window that asked, on its default speakers.
+  safeHandle("interpreting:preview-voice", async (event, payload: { provider?: unknown } | null) => {
+    await cloner.preview(payload?.provider, (message) => event.sender.send('interpreting-audio', message))
+    return { success: true }
+  })
+
+  safeHandle("interpreting:delete-voice", async (_, payload: { provider?: unknown } | null) => {
+    await cloner.delete(payload?.provider)
     return { success: true }
   })
 }
