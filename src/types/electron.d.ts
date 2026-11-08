@@ -5,6 +5,7 @@ import type { Scenario, ScenarioReply } from '../../electron/llm/scenario'
 import type { LanguageOption } from '../../electron/config/languages'
 import type { Meeting, MeetingStartMetadata, MeetingSummaryUpdates } from '../../electron/db/types'
 import type { InterpretingSettings } from '../../electron/services/interpretingSettings'
+import type { AudioMessage, InterpretingState, PlayedAck } from '../../electron/interpreting/InterpretingSession'
 import type { UpdateNotice, UpdateProgress } from '../../electron/update/ReleaseNotesManager'
 
 export interface AgentGateDecision {
@@ -136,6 +137,13 @@ export interface ElectronAPI {
   setFishAudioApiKey: (apiKey: string) => Promise<{ success: boolean }>
   interpretingGetSettings: () => Promise<InterpretingSettings>
   interpretingSetSettings: (settings: Partial<InterpretingSettings>) => Promise<{ success: boolean }>
+  interpretingGetState: () => Promise<InterpretingState>
+  interpretingToggleTalk: () => Promise<InterpretingState>
+  interpretingPlayed: (ack: PlayedAck) => Promise<{ success: boolean }>
+  interpretingTestVoice: () => Promise<{ success: boolean }>
+  onInterpretingStateChanged: (callback: (state: InterpretingState) => void) => () => void
+  onInterpretingAudio: (callback: (message: AudioMessage) => void) => () => void
+  onInterpretingStop: (callback: () => void) => () => void
   setAzureApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   setAzureRegion: (region: string) => Promise<{ success: boolean; error?: string }>
   setIbmWatsonApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>

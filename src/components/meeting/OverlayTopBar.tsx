@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronUp, Languages, Mic, MicOff, MoreHorizontal, Type } from 'lucide-react';
+import { AudioLines, ChevronUp, Languages, Mic, MicOff, MoreHorizontal, Type } from 'lucide-react';
 import PopoverMenu, { type PopoverMenuItem } from '../ui/PopoverMenu';
 import { KeyBadge } from '../ui/KeyBadge';
 import type { AudioStatus } from '../../lib/audioStatus';
 import type { TranscriptDisplayMode } from '../../lib/transcriptSegments';
 import { shortLanguageLabel } from '../../lib/languageLabel';
+import { interpretingLabel, interpretingTitle } from '../../lib/interpretingChip';
+import type { InterpretingState } from '../../../electron/interpreting/InterpretingSession';
 
 interface OverlayTopBarProps {
     status: AudioStatus;
@@ -14,6 +16,11 @@ interface OverlayTopBarProps {
     /** The microphone is muted: the other party is still heard and translated, the user's own voice is not sent. */
     microphoneMuted: boolean;
     onToggleMicrophoneMute: () => void;
+    /** Interpreting state; the Talk control is shown only when the phase is not `off`. */
+    interpreting?: InterpretingState;
+    onToggleTalk?: () => void;
+    onSetUpInterpreting?: () => void;
+    talkKeys?: string[];
     displayMode: TranscriptDisplayMode;
     translationEnabled: boolean;
     translationConfigured: boolean;
@@ -60,6 +67,10 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
     onFixAudio,
     microphoneMuted,
     onToggleMicrophoneMute,
+    interpreting,
+    onToggleTalk,
+    onSetUpInterpreting,
+    talkKeys = [],
     displayMode,
     translationEnabled,
     translationConfigured,
@@ -119,7 +130,17 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
         onSelect: () => onChangeSpokenLanguage('user', option.value),
     }));
 
+    const talk = interpreting && interpreting.phase !== 'off' && onToggleTalk ? interpreting : undefined;
+    const talkListening = talk?.phase === 'listening';
+    const talkTitle = microphoneMuted ? 'Unmute the microphone to talk' : talk ? interpretingTitle(talk, talkKeys.join('')) : '';
+
     const menuItems: PopoverMenuItem[] = [
+        ...(talk && onToggleTalk
+            ? [{ key: 'talk', label: 'Talk', role: 'menuitemcheckbox', checked: talkListening, hint: talkKeys.length > 0 ? <KeyBadge keys={talkKeys} /> : undefined, onSelect: onToggleTalk, className: 'min-[560px]:hidden' } satisfies PopoverMenuItem]
+            : []),
+        ...(interpreting?.phase === 'error' && onSetUpInterpreting
+            ? [{ key: 'set-up-interpreting', label: 'Set up interpreting', onSelect: onSetUpInterpreting } satisfies PopoverMenuItem]
+            : []),
         ...(hasRows && status.action === 'fix-audio'
             ? [{ key: 'fix', label: 'Fix audio', onSelect: onFixAudio, className: 'min-[560px]:hidden' } satisfies PopoverMenuItem]
             : []),
@@ -205,6 +226,20 @@ const OverlayTopBar: React.FC<OverlayTopBarProps> = ({
                 ) : (
                     <button type="button" onClick={onSetUpTranslation} className={`no-drag ${barButton}`}>
                         Set up translation
+                    </button>
+                )}
+                {talk && onToggleTalk && (
+                    <button
+                        type="button"
+                        aria-pressed={talkListening}
+                        aria-label={`Talk: ${talk.phase}`}
+                        title={talkTitle}
+                        disabled={microphoneMuted}
+                        onClick={onToggleTalk}
+                        className={`no-drag ${barButton} w-7 !px-0 disabled:opacity-50 min-[560px]:w-auto min-[560px]:min-w-[96px] min-[560px]:!px-2`}
+                    >
+                        <AudioLines className="h-3 w-3 min-[560px]:hidden" aria-hidden="true" />
+                        <span className="hidden min-[560px]:inline">{interpretingLabel(talk)}</span>
                     </button>
                 )}
                 <button

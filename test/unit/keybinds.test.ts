@@ -49,12 +49,12 @@ function fixture(saved: { id: string; accelerator: string }[] = []) {
     };
 }
 
-t.test('the default table has exactly six bound globals and five optional unbound globals', t => {
+t.test('the default table has exactly seven bound globals and five optional unbound globals', t => {
     const f = fixture();
     t.teardown(f.cleanup);
     t.same(f.defaults.filter(kb => kb.accelerator).map(kb => kb.id), [
         'general:toggle-visibility', 'general:toggle-mouse-passthrough', 'chat:reply',
-        'general:selective-screenshot', 'translation:toggle', 'general:reset-cancel',
+        'general:selective-screenshot', 'translation:toggle', 'general:reset-cancel', 'interpreting:toggle-talk',
     ]);
     t.same(f.defaults.filter(kb => !kb.accelerator).map(kb => kb.id), [
         'translation:toggle-original', 'window:move-up', 'window:move-down', 'window:move-left', 'window:move-right',
@@ -68,7 +68,7 @@ t.test('the default table has exactly six bound globals and five optional unboun
     t.equal(f.defaults[3].label, 'Capture Selected Area');
     t.equal(f.defaults[5].label, 'Stop Generation');
     f.manager.setMode('overlay');
-    t.equal(f.registered.size, 6);
+    t.equal(f.registered.size, 7);
     t.ok(f.manager.getAllKeybinds().filter(kb => kb.accelerator).every(kb => kb.registered));
     t.end();
 });
@@ -83,7 +83,7 @@ t.test('saved unknown and removed ids are ignored, without aliases or a migratio
     ];
     const f = fixture(saved);
     t.teardown(f.cleanup);
-    t.equal(f.manager.getAllKeybinds().length, 11);
+    t.equal(f.manager.getAllKeybinds().length, 12);
     for (const { id } of saved.slice(0, 4)) t.equal(f.manager.getKeybind(id), undefined);
     t.equal(f.manager.getKeybind('translation:toggle-original'), 'CommandOrControl+Alt+O');
     t.same(JSON.parse(fs.readFileSync(f.file, 'utf8')), saved, 'loading does not rewrite the saved file');
@@ -155,7 +155,7 @@ t.test('launcher registers only visibility, including when optional shortcuts ha
     t.same([...f.registered.keys()], ['CommandOrControl+B']);
     t.same(f.attempts, ['CommandOrControl+B']);
     f.manager.setMode('overlay');
-    t.equal(f.registered.size, 8);
+    t.equal(f.registered.size, 9);
     f.attempts.length = 0;
     f.manager.setMode('launcher');
     t.same([...f.registered.keys()], ['CommandOrControl+B']);
@@ -183,7 +183,7 @@ t.test('set, clear, reset and IPC keep their contracts and persist only ids and 
     t.same(set('invented:unknown', 'CommandOrControl+9'), { success: false, error: 'Unknown shortcut' });
     t.same(f.handlers.get('keybinds:set')!(null, null, 42), { success: false, error: 'Invalid shortcut' });
     const stored = JSON.parse(fs.readFileSync(f.file, 'utf8')) as object[];
-    t.equal(stored.length, 11);
+    t.equal(stored.length, 12);
     t.ok(stored.every(kb => Object.keys(kb).sort().join(',') === 'accelerator,id'));
     t.same(f.handlers.get('keybinds:get-all')!(), f.manager.getAllKeybinds());
     t.ok(f.updates.every(update => update.channel === 'keybinds:update'));
@@ -196,6 +196,6 @@ t.test('set, clear, reset and IPC keep their contracts and persist only ids and 
     const reset = f.handlers.get('keybinds:reset')!();
     t.same(reset, f.manager.getAllKeybinds());
     t.equal(f.manager.getKeybind('chat:reply'), 'CommandOrControl+1');
-    t.equal(f.registered.size, 6);
+    t.equal(f.registered.size, 7);
     t.end();
 });

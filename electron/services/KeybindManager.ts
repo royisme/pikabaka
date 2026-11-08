@@ -22,6 +22,7 @@ export interface KeybindResult {
 
 // Ctrl+Alt is AltGr on many Windows keyboard layouts, so avoid it on Windows.
 const TOGGLE_TRANSLATION_DEFAULT = process.platform === 'win32' ? 'Control+Shift+F9' : 'CommandOrControl+Alt+T';
+const INTERPRETING_TALK_DEFAULT = process.platform === 'win32' ? 'Control+Shift+F10' : 'CommandOrControl+Alt+I';
 
 export const DEFAULT_KEYBINDS: KeybindConfig[] = [
     { id: 'general:toggle-visibility', label: 'Toggle Visibility', accelerator: 'CommandOrControl+B', isGlobal: true, defaultAccelerator: 'CommandOrControl+B' },
@@ -30,6 +31,7 @@ export const DEFAULT_KEYBINDS: KeybindConfig[] = [
     { id: 'general:selective-screenshot', label: 'Capture Selected Area', accelerator: 'CommandOrControl+Shift+H', isGlobal: true, defaultAccelerator: 'CommandOrControl+Shift+H' },
     { id: 'translation:toggle', label: 'Toggle Translation', accelerator: TOGGLE_TRANSLATION_DEFAULT, isGlobal: true, defaultAccelerator: TOGGLE_TRANSLATION_DEFAULT },
     { id: 'general:reset-cancel', label: 'Stop Generation', accelerator: 'CommandOrControl+R', isGlobal: true, defaultAccelerator: 'CommandOrControl+R' },
+    { id: 'interpreting:toggle-talk', label: 'Interpreting: Talk', accelerator: INTERPRETING_TALK_DEFAULT, isGlobal: true, defaultAccelerator: INTERPRETING_TALK_DEFAULT },
     { id: 'translation:toggle-original', label: 'Toggle Original Text', accelerator: '', isGlobal: true, defaultAccelerator: '' },
     { id: 'window:move-up', label: 'Move Window Up', accelerator: '', isGlobal: true, defaultAccelerator: '' },
     { id: 'window:move-down', label: 'Move Window Down', accelerator: '', isGlobal: true, defaultAccelerator: '' },

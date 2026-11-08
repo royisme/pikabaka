@@ -129,6 +129,7 @@ function meeting(t: Test, f: ReturnType<typeof pipeline>) {
     Reflect.set(state, 'intelligenceManager', { startMeeting: () => null, setMeetingMetadata: () => {} });
     Reflect.set(state, 'getWindowHelper', () => ({ getOverlayWindow: () => undefined, getLauncherWindow: () => undefined }));
     for (const name of ['setMicrophoneMuted', 'resetBufferedTranscriptTurns', 'broadcastMeetingState']) Reflect.set(state, name, () => {});
+    Reflect.set(state, 'interpreting', { reset: () => {} });
     return { state, broadcasts };
 }
 

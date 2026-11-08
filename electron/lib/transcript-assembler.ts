@@ -482,8 +482,9 @@ export async function flushBufferedTranscriptTurn(appState: AppState, speaker: T
   emitOwnTurn(appState, { text, timestamp, confidence, segmentId: buffer.segmentId, revision: buffer.revision });
 }
 
-/** The user's own speech is shown as it was heard; it is never translated. */
+/** The user's own speech is shown as it was heard. Interpreting speaks a translation of it, but the row keeps the source text. */
 function emitOwnTurn(appState: AppState, turn: { text: string; timestamp: number; confidence: number; segmentId: string; revision: number }): void {
+  appState.interpreting?.noteOwnTurn({ segmentId: turn.segmentId, revision: turn.revision, text: turn.text, startedAt: turn.timestamp });
   const displayMode = CredentialsManager.getInstance().getTranscriptTranslationDisplayMode();
   emitNativeAudioTranscript(appState, {
     speaker: 'user' as const,

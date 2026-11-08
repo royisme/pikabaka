@@ -49,6 +49,10 @@ export function registerGlobalShortcutDispatch(appState: AppState, keybindManage
         // Send to all windows without focusing — stealth operation
         sendToAllWindows(actionMap[actionId]);
 
+      // Interpreting: the same press starts and sends the talk window
+      } else if (actionId === 'interpreting:toggle-talk') {
+        await appState.interpreting.toggleTalk();
+
       // Window movement — move window position without focus change
       } else if (actionId === 'window:move-up') {
         appState.windowHelper.moveWindowUp();

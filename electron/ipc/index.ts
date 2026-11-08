@@ -34,5 +34,5 @@ export function initializeIpcHandlers(appState: AppState): void {
   registerAgentHandlers(appState)
   registerPromptHandlers()
   registerScenarioHandlers()
-  registerInterpretingHandlers()
+  registerInterpretingHandlers(appState)
 }

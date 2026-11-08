@@ -146,6 +146,7 @@ async function setup(t: Test) {
         Reflect.set(state, 'ragManager', manager);
         Reflect.set(state, 'intelligenceManager', { stopMeeting: async () => id, cancelGeneration: () => {} });
         for (const name of ['broadcastMeetingState', 'resetBufferedTranscriptTurns']) Reflect.set(state, name, () => {});
+        Reflect.set(state, 'interpreting', { reset: () => {} });
         return state;
     };
     return { db, database, intelligence, manager, pipeline, p, inputs, edit, seed, start, summary, jobs, errors, mainState,
