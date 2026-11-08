@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { ApprovalBroker } from './approval';
 import { appendGateDecision } from './gateLog';
 import { reportAgentError } from './MeetingAgent';
+import { takeScreenshot } from '../lib/screenshot-capture';
 
 let instance: MeetingAgent | undefined;
 const broker = new ApprovalBroker();
@@ -59,7 +60,7 @@ export function getMeetingAgent(): MeetingAgent {
       return passages.length ? JSON.stringify(passages) : 'No notes or documents match that question.';
     },
     captureScreenshot: async () => ({
-      data: (await readFile(await state.takeScreenshot(false))).toString('base64'), mimeType: 'image/png',
+      data: (await readFile(await takeScreenshot(state, false))).toString('base64'), mimeType: 'image/png',
     }),
   });
   return instance;
