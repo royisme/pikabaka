@@ -14,6 +14,17 @@ export interface ParsedReleaseNotes {
     url: string;
 }
 
+// What main sends the renderer for update-available and update-downloaded.
+export type UpdateNotice = {
+  version: string
+  releaseName?: string | null
+  releaseNotes?: unknown
+  parsedNotes?: ParsedReleaseNotes | null
+}
+
+// What main sends for download-progress (electron-updater does not export its ProgressInfo).
+export type UpdateProgress = { percent: number; bytesPerSecond: number; transferred: number; total: number }
+
 export class ReleaseNotesManager {
     private static instance: ReleaseNotesManager;
     private cachedNotes: ParsedReleaseNotes | null = null;

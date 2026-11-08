@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import UpdateModal from './UpdateModal';
 import { useMainEvent } from '../hooks/useMainEvent';
 import { useWindowEvent } from '../hooks/useWindowEvent';
+import type { UpdateNotice, ParsedReleaseNotes } from '../../electron/update/ReleaseNotesManager';
 
 const UpdateBanner: React.FC = () => {
-    const [updateInfo, setUpdateInfo] = useState<any>(null);
-    const [parsedNotes, setParsedNotes] = useState<any>(null);
+    const [updateInfo, setUpdateInfo] = useState<UpdateNotice | null>(null);
+    const [parsedNotes, setParsedNotes] = useState<ParsedReleaseNotes | null>(null);
     const [isVisible, setIsVisible] = useState(false);
     const [status, setStatus] = useState<'idle' | 'ready'>('idle');
 
@@ -20,7 +21,7 @@ const UpdateBanner: React.FC = () => {
     // Listen for update-downloaded event
     useMainEvent(window.electronAPI?.onUpdateDownloaded, (info) => {
         console.log('[UpdateBanner] Update downloaded:', info);
-        setUpdateInfo((previous: any) => info ?? previous);
+        setUpdateInfo((previous) => info ?? previous);
         if (info?.parsedNotes) setParsedNotes(info.parsedNotes);
 
         setStatus('ready');
@@ -41,7 +42,7 @@ const UpdateBanner: React.FC = () => {
             e.preventDefault();
             console.log("[UpdateBanner] Cmd+J pressed: Triggering Update Ready UI mock...");
             setUpdateInfo({ version: '2.0.8' });
-            setParsedNotes({ summary: 'Test Update', fullBody: 'Testing', sections: [{ title: 'Notes', items: ['UI Test'] }] });
+            setParsedNotes({ version: '2.0.8', url: '', summary: 'Test Update', fullBody: 'Testing', sections: [{ title: 'Notes', items: ['UI Test'] }] });
             setStatus('ready');
             setIsVisible(true);
         }

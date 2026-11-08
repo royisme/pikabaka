@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import type { Meeting } from './DatabaseManager';
+import type { Meeting } from './types';
 
 export function migrateRecordColumns(db: Database.Database): void {
     const columns = db.pragma('table_info(transcripts)') as { name: string }[];

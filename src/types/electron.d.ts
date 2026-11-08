@@ -2,6 +2,9 @@ import type { ImportedDocument, NotesIndexStatus } from '../../electron/knowledg
 import type { CredentialStorageStatus } from '../../electron/services/CredentialsManager'
 import type { PromptsEdit, PromptsReply } from '../../electron/llm/prompts'
 import type { Scenario, ScenarioReply } from '../../electron/llm/scenario'
+import type { LanguageOption } from '../../electron/config/languages'
+import type { Meeting, MeetingStartMetadata, MeetingSummaryUpdates } from '../../electron/db/types'
+import type { UpdateNotice, UpdateProgress } from '../../electron/update/ReleaseNotesManager'
 
 export interface AgentGateDecision {
   time: number; meetingId: string; segmentId: string; revision: number; model: string; threshold: number; cooldownSeconds: number
@@ -31,7 +34,7 @@ export interface ElectronAPI {
     height: number
   }) => Promise<void>
   onToggleExpand: (callback: () => void) => () => void
-  getRecognitionLanguages: () => Promise<Record<string, any>>
+  getRecognitionLanguages: () => Promise<Record<string, LanguageOption & { alternates?: string[] }>>
   getScreenshots: () => Promise<Array<{ path: string; preview: string }>>
   deleteScreenshot: (
     path: string
@@ -189,13 +192,13 @@ export interface ElectronAPI {
   // Dynamic Action Button Mode
 
   // Meeting Lifecycle
-  startMeeting: (metadata?: any) => Promise<{ success: boolean; error?: string }>
+  startMeeting: (metadata?: MeetingStartMetadata) => Promise<{ success: boolean; error?: string }>
   endMeeting: () => Promise<{ success: boolean; error?: string }>
   finalizeMicSTT: () => Promise<void>
-  getRecentMeetings: () => Promise<Array<{ id: string; title: string; date: string; duration: string; summary: string }>>
-  getMeetingDetails: (id: string) => Promise<any>
+  getRecentMeetings: () => Promise<Meeting[]>
+  getMeetingDetails: (id: string) => Promise<Meeting | null>
   updateMeetingTitle: (id: string, title: string) => Promise<boolean>
-  updateMeetingSummary: (id: string, updates: { overview?: string, actionItems?: string[], keyPoints?: string[], actionItemsTitle?: string, keyPointsTitle?: string }) => Promise<boolean>
+  updateMeetingSummary: (id: string, updates: MeetingSummaryUpdates) => Promise<boolean>
   deleteMeeting: (id: string) => Promise<boolean>
   setWindowMode: (mode: 'launcher' | 'overlay', inactive?: boolean) => Promise<void>
 
@@ -262,12 +265,12 @@ export interface ElectronAPI {
   onThemeChanged: (callback: (data: { mode: 'system' | 'light' | 'dark', resolved: 'light' | 'dark' }) => void) => () => void
 
   // Auto-Update
-  onUpdateAvailable: (callback: (info: any) => void) => () => void
-  onUpdateDownloaded: (callback: (info: any) => void) => () => void
+  onUpdateAvailable: (callback: (info: UpdateNotice) => void) => () => void
+  onUpdateDownloaded: (callback: (info: UpdateNotice) => void) => () => void
   onUpdateChecking: (callback: () => void) => () => void
-  onUpdateNotAvailable: (callback: (info: any) => void) => () => void
+  onUpdateNotAvailable: (callback: (info: { version: string }) => void) => () => void
   onUpdateError: (callback: (err: string) => void) => () => void
-  onDownloadProgress: (callback: (progressObj: any) => void) => () => void
+  onDownloadProgress: (callback: (progressObj: UpdateProgress) => void) => () => void
   restartAndInstall: () => Promise<void>
   getUpdateState: () => Promise<{ autoCheck: boolean; checking: boolean; lastCheckedAt: number | null; availableVersion: string | null; downloadedVersion: string | null }>
   setAutoCheckUpdates: (enabled: boolean) => Promise<{ success: boolean }>
@@ -377,6 +380,10 @@ export type AgentSubmitResult =
   | { ok: false; reason: string };
 
 declare global {
+  // lib.dom does not declare it yet.
+  interface AudioContext {
+    setSinkId(sinkId: string): Promise<void>
+  }
   interface Window {
     electronAPI: ElectronAPI
   }

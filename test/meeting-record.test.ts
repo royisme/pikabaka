@@ -1,6 +1,6 @@
 import t from 'tap';
 import Database from 'better-sqlite3';
-import type { Meeting } from '../electron/db/DatabaseManager';
+import type { Meeting } from '../electron/db/types';
 import {
   migrateRecordColumns,
   createMeeting,

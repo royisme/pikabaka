@@ -1,4 +1,5 @@
-import { DatabaseManager, type Meeting } from '../db/DatabaseManager';
+import { DatabaseManager } from '../db/DatabaseManager';
+import type { Meeting } from '../db/types';
 import type { RAGManager } from './RAGManager';
 
 export function buildMeetingSummaryText(meeting: Pick<Meeting, 'detailedSummary'>): string {

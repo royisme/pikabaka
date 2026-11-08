@@ -4,6 +4,7 @@ import { Search, Sparkles, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { useWindowEvent } from '../hooks/useWindowEvent';
+import type { Meeting as DbMeeting } from '../../electron/db/types';
 
 // ============================================
 // Types
@@ -11,12 +12,7 @@ import { useWindowEvent } from '../hooks/useWindowEvent';
 
 type PillState = 'idle' | 'focused' | 'typing' | 'results';
 
-interface Meeting {
-    id: string;
-    title: string;
-    date: string;
-    summary?: string;
-}
+type Meeting = Pick<DbMeeting, 'id' | 'title' | 'date' | 'summary'>;
 
 interface SearchResult {
     id: string;
