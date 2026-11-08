@@ -1,6 +1,6 @@
 // Sample content, invented for illustration. No real meeting, person or product appears here.
 // The types come from the app's own IPC types: a change to them fails `tsc` here.
-import type { AgentEvent, AgentProactiveCard, ElectronAPI } from '../../src/types/electron';
+import type { AgentProactiveCard, ElectronAPI } from '../../src/types/electron';
 
 type Transcript = Parameters<Parameters<ElectronAPI['onNativeAudioTranscript']>[0]>[0];
 
@@ -10,14 +10,10 @@ export type SceneId = 'class' | 'client';
 export type Step =
   | { kind: 'transcript'; transcript: Transcript }
   | { kind: 'card'; card: AgentProactiveCard }
-  /** Presses the "ask the agent about this line" button of the row with this segment id. */
-  | { kind: 'askLine'; segmentId: string }
-  /** Presses "Not right" on the card. */
-  | { kind: 'notRight' }
-  /** Adds text at the end of the chat input, then sends it. */
-  | { kind: 'submit'; append: string }
-  /** The agent's reply to the submitted question. */
-  | { kind: 'agent'; events: AgentEvent[] };
+  /** Presses the Reply button of the chat. */
+  | { kind: 'reply' }
+  /** The reply the model streams back into the chat. */
+  | { kind: 'stream'; text: string };
 
 export interface Scene {
   id: SceneId;
@@ -53,41 +49,34 @@ function card(segmentId: string, kind: AgentProactiveCard['kind'], text: string)
   return { kind: 'card', card: { id: `card-${segmentId}`, meetingId: MEETING_ID, segmentId, kind, text, time: BASE + 120000 } };
 }
 
-function answer(text: string): Step {
-  const events: AgentEvent[] = [
-    { meetingId: MEETING_ID, type: 'run_started' },
-    { meetingId: MEETING_ID, type: 'text_final', text },
-    { meetingId: MEETING_ID, type: 'run_settled' },
-  ];
-  return { kind: 'agent', events };
-}
-
 export const classScene: Scene = {
   id: 'class',
   callTitle: 'CS 201 · Hash tables and Big-O',
   themLanguage: 'english-us',
   targetLanguage: 'chinese',
   steps: [
-    ...them(1, 'Lecturer', 'Today we look at hash tables, and why they are fast.', '今天我们讲哈希表，以及它为什么快。'),
+    ...them(1, 'Lecturer', "Today: hash tables, with constant-time lookup on average.", '今天讲哈希表，平均查找是常数时间。'),
     ...them(
       2,
       'Lecturer',
-      'A hash table maps a key to a bucket with a hash function.',
-      '哈希表用哈希函数把键映射到一个桶。',
-      'A hash cable maps a key to a bucket with a hash function.'
+      "Two keys can land on the same index. That's a collision.",
+      '两个键可能落在同一个索引上，这就是冲突。',
+      "Two keys can land on the same index. That's a collusion."
     ),
-    ...them(3, 'Lecturer', 'Lookup is O(1) on average, but O(n) in the worst case.', '查找平均是 O(1)，最坏情况是 O(n)。'),
-    mine(4, 'So a collision is what makes it slow?'),
-    ...them(5, 'Lecturer', 'Right. We handle collisions with chaining or open addressing.', '对。处理冲突可以用链地址法或开放寻址法。'),
+    mine(3, 'So what happens when two keys get the same index?'),
+    ...them(4, 'Lecturer', 'The table needs a strategy, like chaining: each slot holds a linked list.', '哈希表需要冲突处理策略，比如链地址法：每个槽位存一个链表。'),
+    ...them(5, 'Lecturer', 'The cost depends on the load factor: items divided by slots.', '代价取决于负载因子：元素数除以槽位数。'),
     card(
       'them-5',
       'explain_term',
-      'Open addressing: on a collision, the table probes other slots in a fixed order (linear probing, for example) until it finds a free one. No linked lists are used.'
+      'Load factor: items divided by slots. Small means short chains and O(1) lookups; large drifts toward O(n).'
     ),
-    { kind: 'submit', append: 'Chaining or open addressing: which is faster in practice?' },
-    answer(
-      'Open addressing is often faster on small tables: probing stays cache friendly. Chaining degrades more gently at a high load factor. Name both and state the trade-off.'
-    ),
+    ...them(6, 'Lecturer', 'Resize at a threshold, say 0.75: allocate a bigger array and rehash.', '超过阈值（比如0.75）就扩容：分配更大的数组并重新哈希。'),
+    { kind: 'reply' },
+    {
+      kind: 'stream',
+      text: 'Got it. So if one insert triggers an O(n) rehash, why is the amortized cost still constant? Is it because the expensive resizes get rarer as the array doubles?',
+    },
   ],
 };
 
@@ -95,27 +84,30 @@ export const clientScene: Scene = {
   id: 'client',
   callTitle: 'Product design consultation',
   themLanguage: 'french',
-  targetLanguage: 'chinese',
+  targetLanguage: 'english-us',
   steps: [
+    ...them(1, 'Client', "Nous voulons refaire l'application mobile de nos adhérents.", 'We want to redo our members\' mobile app.'),
+    ...them(2, 'Client', 'Beaucoup abandonnent la réservation au moment du paiement.', 'Many give up on booking at the payment step.'),
+    ...them(3, 'Client', "Nous aimerions un premier prototype d'ici le 15 mars.", 'We would like a first prototype by 15 March.'),
+    mine(4, 'We would streamline checkout with guest payment options.'),
     ...them(
-      1,
+      5,
       'Client',
-      "Bonjour, merci pour votre temps. Nous voulons refondre l'application de nos salles de sport.",
-      '你好，谢谢你的时间。我们想重新设计健身房的应用。',
-      "Bonjour, merci pour votre temps. Nous voulons refonder l'application de nos salles de sport."
+      "Comment gérez-vous l'authentification forte 3D Secure ?",
+      'How do you handle 3D Secure strong authentication?',
+      "Comment gérez-vous l'authentification fort 3D Secours ?"
     ),
-    ...them(2, 'Client', "Trop d'adhérents abandonnent la réservation au moment du paiement.", '太多会员在支付环节放弃了预约。'),
-    ...them(3, 'Client', "Pourriez-vous nous présenter une première maquette d'ici le 15 mars ?", '你们能在3月15日前给我们看第一版设计稿吗？'),
     card(
-      'them-3',
+      'them-5',
       'answer_question',
-      'They ask for a first mock-up by 15 March. A safe reply: yes for the booking and payment screens, the other screens a week later.'
+      'They ask how 3D Secure is handled. Say: the user retries from the same step and keeps their progress.'
     ),
-    { kind: 'askLine', segmentId: 'them-3' },
-    { kind: 'submit', append: 'which screens does the first mock-up need to cover?' },
-    answer('They named the booking flow and the payment step, where members drop out. Start the mock-up with those two screens.'),
-    ...them(4, 'Client', 'Parfait. Je vous envoie le cahier des charges demain matin.', '好的。我明天上午把需求文档发给你们。'),
-    { kind: 'notRight' },
+    ...them(6, 'Client', 'Ce budget de quarante mille euros couvre-t-il les tests utilisateurs ?', 'Does the 40,000 euro budget cover user testing?'),
+    { kind: 'reply' },
+    {
+      kind: 'stream',
+      text: "Good question. I'd want to confirm scope before promising anything. User testing can fit within that budget, but it depends on how many rounds and participants you want. Could we agree on a lean testing round for the payment recovery flow, then confirm the numbers in writing after this call?",
+    },
   ],
 };
 

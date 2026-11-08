@@ -43,7 +43,6 @@ export function installElectronStub(scene: Scene): { emit: (event: string, paylo
     getUndetectable: async () => false,
     getMicrophoneMuted: async () => false,
     getOverlayMousePassthrough: async () => false,
-    getActionButtonMode: async () => 'recap',
   };
 
   const api = new Proxy(overrides, {

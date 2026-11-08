@@ -23,7 +23,7 @@ const scene = scenes[sceneId];
 
 document.documentElement.setAttribute('data-theme', theme);
 document.documentElement.setAttribute('data-platform', 'darwin');
-// The split between transcript and chat is the user's own setting: here it gives the transcript the rows and the chat the card and an answer.
+// The split between transcript and chat is the user's own setting: here it gives the transcript the rows and the chat the card and a reply.
 localStorage.setItem('pika_splitter_position', '38');
 const { emit } = installElectronStub(scene);
 
@@ -43,46 +43,30 @@ function press(find: () => HTMLElement | undefined | null, what: string) {
 const byLabel = (label: string) => document.querySelector<HTMLElement>(`[aria-label="${label}"]`);
 
 /** Runs one step through the event or the control the app already has. */
-async function run(step: Step, lines: Map<string, string>) {
+async function run(step: Step) {
   switch (step.kind) {
     case 'transcript':
-      if (step.transcript.segmentId && step.transcript.final) lines.set(step.transcript.segmentId, step.transcript.text);
       emit('onNativeAudioTranscript', step.transcript);
       break;
     case 'card':
       emit('onAgentProactive', step.card);
       break;
-    case 'askLine': {
-      const text = lines.get(step.segmentId) ?? '';
-      press(() => Array.from(document.querySelectorAll<HTMLElement>('[data-ask-line]')).find((b) => b.closest('.group')?.textContent?.includes(text)), 'the ask-line button');
+    case 'reply':
+      press(() => byLabel('Reply'), 'the Reply button');
       break;
-    }
-    case 'notRight':
-      press(() => Array.from(document.querySelectorAll<HTMLElement>('aside button')).find((b) => b.textContent === 'Not right'), 'the Not right button');
-      break;
-    case 'submit': {
-      const input = document.querySelector<HTMLInputElement>('input[aria-label="Ask a question"]');
-      if (!input) throw new Error('Shot replay: the chat input not found');
-      setInputValue(input, input.value + step.append);
-      await wait(100);
-      press(() => byLabel('Send'), 'the send button');
-      break;
-    }
-    case 'agent':
-      await wait(300);
-      for (const event of step.events) {
-        emit('onAgentEvent', event);
-        await wait(80);
-      }
+    case 'stream':
+      await wait(800);
+      emit('onGeminiStreamToken', step.text);
+      await wait(80);
+      emit('onGeminiStreamDone', undefined);
       break;
   }
 }
 
 async function replay(current: Scene) {
   await wait(500);
-  const lines = new Map<string, string>();
   for (const step of current.steps) {
-    await run(step, lines);
+    await run(step);
     await wait(120);
   }
   await wait(800);
