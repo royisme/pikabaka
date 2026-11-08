@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Languages, MessageSquarePlus, Reply, TriangleAlert } from 'lucide-react';
 import type { TranscriptDisplayMode, TranscriptSegment } from '../../lib/transcriptSegments';
-import { failureReasonText, rowSlot, transcriptRowParts, type RowSlot } from '../../lib/transcriptRow';
+import { failureReasonText, newestFailedIndex, rowSlot, transcriptRowParts, type RowSlot } from '../../lib/transcriptRow';
 import { countNewRows, isNearBottom, newestPreview, nextTranscriptScroll } from '../../lib/answerScroll';
 import { nextAnnouncement } from '../../lib/transcriptAnnounce';
 
@@ -28,7 +28,7 @@ function formatTime(ts: number): string {
 }
 
 /** The reserved line above the source text; 20px, the height of one line of translation. */
-function SlotLine({ slot, onRetry }: { slot: RowSlot; onRetry?: () => void }) {
+export function SlotLine({ slot, onRetry, quiet = false }: { slot: RowSlot; onRetry?: () => void; quiet?: boolean }) {
     if (!slot || slot.kind === 'translation') return null;
     return (
         <div className="flex min-h-[20px] items-center gap-2 text-[11px] overlay-text-muted">
@@ -36,7 +36,14 @@ function SlotLine({ slot, onRetry }: { slot: RowSlot; onRetry?: () => void }) {
             {slot.kind === 'translating' && (
                 <span>{slot.elapsedSeconds === null ? 'Translating' : `Translating · ${slot.elapsedSeconds}s`}</span>
             )}
-            {slot.kind === 'failed' && (
+            {slot.kind === 'failed' && quiet && (
+                // An older failure: the newest failed row carries the reason and Retry, this one only a marker.
+                <>
+                    <TriangleAlert className="h-3 w-3 opacity-60" aria-hidden="true" />
+                    <span className="sr-only">Translation failed</span>
+                </>
+            )}
+            {slot.kind === 'failed' && !quiet && (
                 <>
                     <TriangleAlert className="h-3 w-3 text-state-danger" aria-hidden="true" />
                     <span className="text-state-danger-strong">
@@ -112,6 +119,8 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
     }, [hasPending]);
 
     const slotContext = { mode: displayMode, translationOn, now };
+    const slots = segments.map((seg) => rowSlot(seg, slotContext));
+    const failedIndex = newestFailedIndex(slots);
 
     // Screen readers hear each finished translation once. The list itself is not a live region.
     const announcedRef = useRef<Set<string> | null>(null);
@@ -192,7 +201,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                         const expanded = expandedId === seg.segmentId;
                         // Own speech is never translated: it stays one quiet source line.
                         const parts = transcriptRowParts(seg, own ? 'original' : displayMode, expanded);
-                        const slot = rowSlot(seg, slotContext);
+                        const slot = slots[index];
                         const newest = index === newestOtherIndex;
                         const showSpeaker = index === 0 || segments[index - 1].speakerLabel !== seg.speakerLabel;
                         const hasMeta = !!onTranslateSegment || !!seg.detectedLanguage;
@@ -213,7 +222,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                 {showSpeaker && (
                                     <div className="text-[11px] font-medium overlay-text-muted">{seg.speakerLabel}</div>
                                 )}
-                                <SlotLine slot={slot} onRetry={onTranslateSegment ? () => onTranslateSegment(seg) : undefined} />
+                                <SlotLine slot={slot} quiet={index !== failedIndex} onRetry={onTranslateSegment ? () => onTranslateSegment(seg) : undefined} />
                                 <div className="flex items-start gap-1">
                                 <button
                                     type="button"

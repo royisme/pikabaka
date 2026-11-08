@@ -129,3 +129,19 @@ export function rowSlot(
   const waitedMs = row.receivedAt === undefined ? 0 : context.now - row.receivedAt;
   return { kind: 'translating', elapsedSeconds: waitedMs >= SLOW_TRANSLATION_MS ? Math.floor(waitedMs / 1000) : null };
 }
+
+/** Index of the newest row whose slot is a failure, or -1. Only that row keeps the reason and Retry. */
+export function newestFailedIndex(slots: ReadonlyArray<RowSlot>): number {
+  for (let i = slots.length - 1; i >= 0; i--) if (slots[i]?.kind === 'failed') return i;
+  return -1;
+}
+
+/** Translation is failing when the newest other-party row that was tried failed; a later success clears it. */
+export function translationFailing(rows: ReadonlyArray<Pick<TranscriptSegment, 'speaker' | 'translationState'>>): boolean {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (rows[i].speaker === 'user') continue;
+    if (rows[i].translationState === 'error') return true;
+    if (rows[i].translationState === 'complete') return false;
+  }
+  return false;
+}
