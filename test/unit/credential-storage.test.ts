@@ -209,9 +209,10 @@ function ipc(f: ReturnType<typeof fixture>, manager: ReturnType<ReturnType<typeo
         [path.resolve('electron/ipc/rag.ts')]: {},
         [path.resolve('electron/audio/AudioDevices.ts')]: {},
         [path.resolve('electron/lib/transcript-assembler.ts')]: {},
+        [path.resolve('electron/lib/audio-pipeline.ts')]: { reconfigureSttProvider: async () => {} },
         [path.resolve('electron/lib/transcript-translation.ts')]: {},
     }) as Record<string, (state: unknown) => void>;
-    loaded[register]({ reconfigureSttProvider: async () => {} });
+    loaded[register]({});
     return (name: string, ...args: unknown[]) => handlers.get(name)!(null, ...args);
 }
 

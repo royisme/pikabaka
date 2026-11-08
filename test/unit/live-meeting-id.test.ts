@@ -295,7 +295,7 @@ t.test('agent past-meeting search excludes the real active id and leaves histori
     t.equal((await f.search('real-current')).length, 1, 'active content is excluded by the tool, not removed from the index');
 });
 
-function mainClass(t: Test, getMeetingDetails: (id: string) => unknown = () => undefined) {
+function mainClass(t: Test, getMeetingDetails: (id: string) => unknown = () => undefined, audioPipeline: object = {}) {
     const modules = [
         'helpers/WindowHelper', 'helpers/SettingsWindowHelper', 'helpers/ModelSelectorWindowHelper',
         'helpers/CropperWindowHelper', 'helpers/ScreenshotHelper', 'services/KeybindManager', 'helpers/ProcessingHelper',
@@ -312,6 +312,7 @@ function mainClass(t: Test, getMeetingDetails: (id: string) => unknown = () => u
         ...mocks,
         electron: { app: { isPackaged: true } },
         [file('db/DatabaseManager')]: { DatabaseManager: { getInstance: () => ({ getMeetingDetails }) } },
+        [file('lib/audio-pipeline')]: audioPipeline,
         [file('lib/logging')]: { setupConsoleOverrides: () => {}, ensureMacMicrophoneAccess: async () => true },
         [file('lib/lifecycle')]: { initializeApp: async () => {} },
         [file('agent/instance')]: { refreshGate: async () => {}, getGate: () => ({ stop: () => {} }) },
@@ -421,15 +422,14 @@ t.test('record creation failure does not start live indexing, even after deferre
 });
 
 t.test('a deferred audio reconfiguration is dropped when the session ended or was replaced', async t => {
-    const AppState = mainClass(t);
+    const pending: Array<() => void> = [];
+    const AppState = mainClass(t, undefined, { reconfigureAudio: async () => new Promise<void>(resolve => pending.push(resolve)) });
     const state = Object.create(AppState.prototype) as State;
     const ids = ['session-a', 'session-b'];
-    const pending: Array<() => void> = [];
     const setupCalls: string[] = [];
     Reflect.set(state, 'intelligenceManager', { startMeeting: () => ids.shift() ?? null, setMeetingMetadata: () => {} });
     Reflect.set(state, 'getMeetingAgent', () => ({ open: async () => {} }));
     Reflect.set(state, 'getWindowHelper', () => ({ getOverlayWindow: () => undefined, getLauncherWindow: () => undefined }));
-    Reflect.set(state, 'reconfigureAudio', async () => new Promise<void>(resolve => pending.push(resolve)));
     Reflect.set(state, 'setupSystemAudioPipeline', () => setupCalls.push(state.getCurrentMeetingId() ?? 'none'));
     for (const name of ['setMicrophoneMuted', 'resetBufferedTranscriptTurns', 'broadcastMeetingState']) Reflect.set(state, name, () => {});
 

@@ -47,7 +47,7 @@ function pipeline(service: string | undefined, credential?: string) {
         ...mocks,
         electron: {},
         [file('services/CredentialsManager')]: { CredentialsManager: { getInstance: () => credentials } },
-        [file('lib/transcript-assembler')]: {},
+        [file('lib/transcript-assembler')]: { resetBufferedTranscriptTurns: () => {} },
         [file('lib/transcript-translation')]: {},
     }) as typeof import('../../electron/lib/audio-pipeline');
     const captures = Object.fromEntries(['SystemAudioCapture', 'MicrophoneCapture'].map(name => [file(`audio/${name}`), mocks[file(`audio/${name}`)]]));

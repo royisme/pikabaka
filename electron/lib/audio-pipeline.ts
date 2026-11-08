@@ -21,6 +21,7 @@ import {
   mergeTranscriptText,
   noteTranscriptActivity,
   normalizeTranscriptText,
+  resetBufferedTranscriptTurns,
 } from "./transcript-assembler"
 import { emitTranscriptWithTranslation } from "./transcript-translation"
 
@@ -432,4 +433,110 @@ export function getNativeAudioStatus(appState: AppState): {
     lastThemTranscriptAt: state.lastThemTranscriptAt,
     lastError: state.lastAudioPipelineError,
   };
+}
+
+export async function reconfigureAudio(appState: AppState, inputDeviceId?: string, outputDeviceId?: string): Promise<void> {
+  console.log(`[Main] Reconfiguring Audio: Input=${inputDeviceId}, Output=${outputDeviceId}`);
+  resetBufferedTranscriptTurns(appState);
+
+  // 1. System Audio (Output Capture)
+  if (appState.systemAudioCapture) {
+    appState.systemAudioCapture.stop();
+    appState.systemAudioCapture = null;
+  }
+
+  try {
+    console.log('[Main] Initializing SystemAudioCapture...');
+    appState.systemAudioCapture = new SystemAudioCapture(outputDeviceId || undefined);
+    const rate = appState.systemAudioCapture.getSampleRate();
+    console.log(`[Main] SystemAudioCapture rate: ${rate}Hz`);
+    appState.googleSTT?.setSampleRate(rate);
+
+    wireSystemAudio(appState);
+    console.log('[Main] SystemAudioCapture initialized.');
+  } catch (err) {
+    console.warn('[Main] Failed to initialize SystemAudioCapture with preferred ID. Falling back to default.', err);
+    try {
+      appState.systemAudioCapture = new SystemAudioCapture(); // Default
+      const rate = appState.systemAudioCapture.getSampleRate();
+      console.log(`[Main] SystemAudioCapture (Default) rate: ${rate}Hz`);
+      appState.googleSTT?.setSampleRate(rate);
+
+      wireSystemAudio(appState);
+    } catch (err2) {
+      console.error('[Main] Failed to initialize SystemAudioCapture (Default):', err2);
+    }
+  }
+
+  // 2. Microphone (Input Capture)
+  if (appState.microphoneCapture) {
+    appState.microphoneCapture.stop();
+    appState.microphoneCapture = null;
+  }
+
+  try {
+    console.log('[Main] Initializing MicrophoneCapture...');
+    appState.microphoneCapture = new MicrophoneCapture(inputDeviceId || undefined);
+    const rate = appState.microphoneCapture.getSampleRate();
+    console.log(`[Main] MicrophoneCapture rate: ${rate}Hz`);
+    appState.googleSTT_User?.setSampleRate(rate);
+
+    wireMicrophone(appState);
+    console.log('[Main] MicrophoneCapture initialized.');
+  } catch (err) {
+    console.warn('[Main] Failed to initialize MicrophoneCapture with preferred ID. Falling back to default.', err);
+    try {
+      appState.microphoneCapture = new MicrophoneCapture(); // Default
+      const rate = appState.microphoneCapture.getSampleRate();
+      console.log(`[Main] MicrophoneCapture (Default) rate: ${rate}Hz`);
+      appState.googleSTT_User?.setSampleRate(rate);
+
+      wireMicrophone(appState);
+    } catch (err2) {
+      console.error('[Main] Failed to initialize MicrophoneCapture (Default):', err2);
+    }
+  }
+}
+
+/**
+ * Reconfigure STT provider mid-session (called from IPC when user changes provider)
+ * Destroys existing STT instances and recreates them with the new provider
+ */
+export async function reconfigureSttProvider(appState: AppState): Promise<void> {
+  console.log('[Main] Reconfiguring STT Provider...');
+
+  // RC-01 fix: pause audio captures FIRST so their EventEmitter queues drain
+  // before we null-out the STT instances. Without this, buffered 'data' events
+  // still in-flight call appState.googleSTT?.write() while googleSTT is already null.
+  if (appState.getIsMeetingActive()) {
+    appState.systemAudioCapture?.stop();
+    appState.microphoneCapture?.stop();
+  }
+
+  // Now safe to destroy STT instances — no more audio events incoming
+  if (appState.googleSTT) {
+    appState.googleSTT.stop();
+    appState.googleSTT.removeAllListeners();
+    appState.googleSTT = null;
+  }
+  if (appState.googleSTT_User) {
+    appState.googleSTT_User.stop();
+    appState.googleSTT_User.removeAllListeners();
+    appState.googleSTT_User = null;
+  }
+
+  // Reinitialize the pipeline (will pick up the new provider from CredentialsManager)
+  setupSystemAudioPipeline(appState);
+
+  // Restart audio captures and new STT instances if a meeting is active
+  if (appState.getIsMeetingActive()) {
+    appState.systemAudioCapture?.start();
+    appState.microphoneCapture?.start();
+    // setupSystemAudioPipeline() recreates these instances from another module, which TS cannot
+    // see through; widen back to the declared type before starting the new ones.
+    (appState.googleSTT as STTProvider | null)?.start();
+    (appState.googleSTT_User as STTProvider | null)?.start();
+  }
+
+  console.log('[Main] STT Provider reconfigured');
 }
