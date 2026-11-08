@@ -18,9 +18,5 @@
     "**/*.ts",
     "**/*.js",
     "../premium/electron/**/*.ts"
-  ],
-  "exclude": [
-    "db/seedDemo.ts",
-    "db/test-db.ts"
   ]
 }
