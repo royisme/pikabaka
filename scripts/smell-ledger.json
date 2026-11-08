@@ -1,19 +1,15 @@
 {
-  "any": 59,
-  "tsSuppress": 4,
-  "filesOver800Lines": 4,
+  "any": 32,
+  "tsSuppress": 0,
+  "filesOver800Lines": 3,
   "largeFiles": [
     {
       "file": "electron/main.ts",
-      "lines": 1295
+      "lines": 1172
     },
     {
       "file": "electron/lib/transcript-assembler.ts",
       "lines": 953
-    },
-    {
-      "file": "src/hooks/useMeetingChat.ts",
-      "lines": 871
     },
     {
       "file": "electron/services/CredentialsManager.ts",
