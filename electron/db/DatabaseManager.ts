@@ -368,36 +368,12 @@ export class DatabaseManager {
             this.db.pragma('user_version = 11');
         }
 
-        // Version 11 → 12: The other party's speaker value is `them`, not `interviewer`.
+        // Version 11 → 12: no schema change; the other party's speaker value is `them`.
         if (version < 12) {
-            console.log('[DatabaseManager] Applying migration v11 → v12: Rename the other-party speaker to them');
-            // The backup is the way back (older builds do not know `them`); it is written once.
-            const backupPath = `${this.dbPath}.before-them`;
-            const hasOldRows = this.db.prepare(
-                "SELECT 1 FROM transcripts WHERE speaker = 'interviewer' UNION ALL SELECT 1 FROM chunks WHERE speaker = 'interviewer' LIMIT 1"
-            ).get() !== undefined;
-            // A database with no old rows (a new install) has nothing to protect.
-            let backupReady = !hasOldRows || (fs.existsSync(backupPath) && fs.statSync(backupPath).isFile());
-            if (!backupReady) {
-                try {
-                    // A WAL database's main file is incomplete until the WAL is checkpointed.
-                    this.db.pragma('wal_checkpoint(TRUNCATE)');
-                    fs.copyFileSync(this.dbPath, backupPath);
-                    backupReady = true;
-                } catch (e) {
-                    console.warn('[DatabaseManager] v12 migration skipped: the database backup could not be written; it retries at the next start');
-                }
-            }
-            if (backupReady) {
-                this.db.transaction(() => {
-                    this.db!.prepare("UPDATE transcripts SET speaker = 'them' WHERE speaker = 'interviewer'").run();
-                    this.db!.prepare("UPDATE chunks SET speaker = 'them' WHERE speaker = 'interviewer'").run();
-                    this.db!.pragma('user_version = 12');
-                })();
-            }
+            this.db.pragma('user_version = 12');
         }
 
-        // Tables the removed interview feature wrote; not versioned, so it cannot skip the v12 retry.
+        // Tables the removed interview feature wrote.
         this.db.exec('DROP TABLE IF EXISTS user_profile; DROP TABLE IF EXISTS resume_nodes;');
 
         console.log('[DatabaseManager] Migrations completed.');
