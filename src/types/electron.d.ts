@@ -1,5 +1,5 @@
 import type { ImportedDocument, NotesIndexStatus } from '../../electron/knowledge/types'
-import type { CredentialStorageStatus } from '../../electron/services/CredentialsManager'
+import type { CredentialStorageStatus } from '../../electron/services/credentialStore'
 import type { PromptsEdit, PromptsReply } from '../../electron/llm/prompts'
 import type { Scenario, ScenarioReply } from '../../electron/llm/scenario'
 import type { LanguageOption } from '../../electron/config/languages'

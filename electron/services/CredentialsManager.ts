@@ -6,11 +6,11 @@
 import { BUILTIN_CONNECTIONS, CONNECTION_TYPES, connectionNeedsKey, isBuiltinConnection, normalizeBaseUrl, type Connection, type ConnectionType, type ConnectionView } from './aiConnections';
 import { editConnectionHeaders, type HeaderEdit } from './connectionHeaders';
 import fs from 'fs';
-import { safeStorage } from 'electron';
 import { isDeepStrictEqual } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_TRANSCRIPT_TRANSLATION_PROMPT } from '../transcript/translationExecutor';
 import { getCredentialsJsonPath } from './configPaths';
+import { availableStorageStatus, encryptedPath, readCredentials, storageError, writeCredentials, type CredentialStorageStatus } from './credentialStore';
 
 /** OpenAI-compatible Chat Completions (URL + API key; uses /v1/chat/completions and /v1/models). */
 export interface OpenAICompatibleProvider {
@@ -97,15 +97,6 @@ export interface StoredCredentials {
     groqPreferredModel?: string;
     openaiPreferredModel?: string;
     claudePreferredModel?: string;
-}
-
-export type CredentialStorageStatus = { mode: 'encrypted' | 'plaintext' | 'locked'; reason?: string };
-
-export class CredentialStorageError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'CredentialStorageError';
-    }
 }
 
 export class CredentialsManager {
@@ -686,7 +677,7 @@ export class CredentialsManager {
     public clearAll(): void {
         this.scrubMemory();
         const jsonPath = getCredentialsJsonPath();
-        for (const file of [jsonPath, this.encryptedPath(jsonPath)]) {
+        for (const file of [jsonPath, encryptedPath(jsonPath)]) {
             if (fs.existsSync(file)) fs.unlinkSync(file);
         }
         this.saveBlocked = undefined;
@@ -704,7 +695,7 @@ export class CredentialsManager {
         for (const key of Object.keys(this.credentials) as (keyof StoredCredentials)[]) {
             const val = this.credentials[key];
             if (typeof val === 'string') {
-                (this.credentials as any)[key] = '';
+                this.credentials[key] = '' as never;
             }
         }
         this.credentials = {};
@@ -716,60 +707,7 @@ export class CredentialsManager {
     // =========================================================================
 
     public getStorageStatus(): CredentialStorageStatus {
-        return { ...(this.storageStatus ?? this.availableStorageStatus()) };
-    }
-
-    private availableStorageStatus(): CredentialStorageStatus {
-        // Linux's basic_text backend uses a hardcoded password, not an OS secret store.
-        try {
-            if (safeStorage?.isEncryptionAvailable() &&
-                !(process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text')) {
-                return { mode: 'encrypted' };
-            }
-        } catch { /* An unavailable keychain must not prevent loading the plaintext store. */ }
-        return { mode: 'plaintext', reason: 'No operating-system secure storage is available on this system.' };
-    }
-
-    private encryptedPath(jsonPath: string): string {
-        return jsonPath.replace(/\.json$/, '.enc');
-    }
-
-    private storageError(error: unknown): CredentialStorageError {
-        // Storage errors may quote input (notably JSON errors); never expose credential values.
-        let message = error instanceof SyntaxError ? 'The credential file is not valid JSON.'
-            : error instanceof Error ? error.message : 'Credential storage failed.';
-        const redact = (value: unknown, name = ''): void => {
-            if (typeof value === 'string' && value && (/apiKey$/i.test(name) || name === 'headerValue')) {
-                message = message.split(value).join('[redacted]');
-            } else if (value && typeof value === 'object') {
-                Object.entries(value).forEach(([key, entry]) => redact(entry, name === 'headers' ? 'headerValue' : key));
-            }
-        };
-        redact(this.credentials);
-        redact(this.persistedCredentials);
-        return new CredentialStorageError(message);
-    }
-
-    private readCredentials(file: string, encrypted: boolean): StoredCredentials {
-        const data = encrypted ? safeStorage.decryptString(fs.readFileSync(file)) : fs.readFileSync(file, 'utf-8');
-        const parsed = JSON.parse(data);
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('The credential file must contain an object.');
-        return parsed;
-    }
-
-    private writeCredentials(file: string, encrypted: boolean): void {
-        const data = JSON.stringify(this.credentials);
-        const tmp = file + '.tmp';
-        try {
-            fs.writeFileSync(tmp, encrypted ? safeStorage.encryptString(data) : data, { mode: 0o600 });
-            // Verify before publishing: an unverified .enc must never shadow the good plaintext.
-            if (encrypted && !isDeepStrictEqual(this.readCredentials(tmp, true), JSON.parse(data))) {
-                throw new Error('Encrypted credential verification failed.');
-            }
-            fs.renameSync(tmp, file);
-        } finally {
-            if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
-        }
+        return { ...(this.storageStatus ?? availableStorageStatus()) };
     }
 
     private saveCredentials(): void {
@@ -777,8 +715,8 @@ export class CredentialsManager {
             if (this.scrubbed) throw new Error('Credentials cannot be saved after memory has been scrubbed.');
             if (this.saveBlocked) throw new Error(this.saveBlocked);
             const jsonPath = getCredentialsJsonPath();
-            const encPath = this.encryptedPath(jsonPath);
-            const status = this.availableStorageStatus();
+            const encPath = encryptedPath(jsonPath);
+            const status = availableStorageStatus();
             const encrypted = status.mode === 'encrypted';
             if (!encrypted && fs.existsSync(encPath)) {
                 this.saveBlocked = 'Stored credentials cannot be decrypted without operating-system secure storage. Unlock it and restart Pika.';
@@ -789,17 +727,17 @@ export class CredentialsManager {
             const newKeys = Object.values(this.credentials).filter(value => value !== undefined && value !== '');
             // Keep the existing empty-store wipe guard, including for encrypted credentials.
             if (newKeys.length === 0 && fs.existsSync(existingFile)) {
-                const existing = this.readCredentials(existingFile, existingFile === encPath);
+                const existing = readCredentials(existingFile, existingFile === encPath);
                 if (Object.values(existing).some(value => value !== undefined && value !== '')) {
                     throw new Error('Refusing to overwrite stored keys with empty credentials.');
                 }
             }
-            this.writeCredentials(encrypted ? encPath : jsonPath, encrypted);
+            writeCredentials(encrypted ? encPath : jsonPath, encrypted, this.credentials);
             if (encrypted && fs.existsSync(jsonPath)) fs.unlinkSync(jsonPath);
             this.storageStatus = status;
             this.persistedCredentials = structuredClone(this.credentials);
         } catch (error) {
-            const failure = this.storageError(error);
+            const failure = storageError(error, this.credentials, this.persistedCredentials);
             this.credentials = structuredClone(this.persistedCredentials ?? {});
             throw failure;
         }
@@ -812,32 +750,32 @@ export class CredentialsManager {
         this.scrubbed = false;
         try {
             const jsonPath = getCredentialsJsonPath();
-            const encPath = this.encryptedPath(jsonPath);
-            this.storageStatus = this.availableStorageStatus();
+            const encPath = encryptedPath(jsonPath);
+            this.storageStatus = availableStorageStatus();
             if (fs.existsSync(encPath)) {
                 try {
                     if (this.storageStatus.mode !== 'encrypted') throw new Error('Secure storage unavailable');
-                    this.credentials = this.readCredentials(encPath, true);
+                    this.credentials = readCredentials(encPath, true);
                 } catch {
                     this.saveBlocked = 'Stored credentials cannot be decrypted. Unlock operating-system secure storage or restore the credential file, then restart Pika.';
                     this.storageStatus = { mode: 'locked', reason: this.saveBlocked };
                     return;
                 }
             } else if (fs.existsSync(jsonPath)) {
-                this.credentials = this.readCredentials(jsonPath, false);
+                this.credentials = readCredentials(jsonPath, false);
             }
             this.persistedCredentials = structuredClone(this.credentials);
             if (fs.existsSync(jsonPath) && this.storageStatus.mode === 'encrypted') {
                 // After a crash or failed deletion, the verified .enc takes precedence; retry cleanup only if equal.
                 if (fs.existsSync(encPath)) {
-                    if (!isDeepStrictEqual(this.readCredentials(jsonPath, false), this.credentials)) {
+                    if (!isDeepStrictEqual(readCredentials(jsonPath, false), this.credentials)) {
                         throw new Error('Plaintext and encrypted credentials differ; plaintext has been kept.');
                     }
-                } else this.writeCredentials(encPath, true);
+                } else writeCredentials(encPath, true, this.credentials);
                 fs.unlinkSync(jsonPath);
             }
         } catch (error) {
-            this.storageStatus = { mode: 'plaintext', reason: this.storageError(error).message };
+            this.storageStatus = { mode: 'plaintext', reason: storageError(error, this.credentials, this.persistedCredentials).message };
             console.error('[CredentialsManager] Failed to load or migrate credentials');
         }
     }
