@@ -60,8 +60,8 @@ Four sizes, one family (the sans of `src/index.css`; mono only for code).
 | Size | Use |
 | --- | --- |
 | 11px | status chip, speaker label, meta, key badges, small labels |
-| 12px | source lines, chips and button labels, help and empty-state text |
-| 14px | translations, answers, the input, a title in an empty state |
+| 12px | the translation under a source line, your own speech, chips and button labels, help and empty-state text |
+| 14px | transcript source lines (and the translation when it leads alone), answers, the input, a title in an empty state |
 | 16px | the lead sentence of a "what to say" answer (`splitLead`; other answer layouts keep 14px) |
 
 Nothing the reader must read is under 11px. Do not add another `text-[Npx]`.
