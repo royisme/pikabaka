@@ -3,6 +3,7 @@ import fs from "fs"
 import path from "path"
 import { KeybindManager } from "../services/KeybindManager"
 import type { AppState } from "../main"
+import { takeScreenshot } from "./screenshot-capture"
 
 export function createTray(appState: AppState): void {
   showTray(appState);
@@ -90,7 +91,7 @@ export function updateTrayMenu(appState: AppState) {
       label: 'Take Screenshot',
       click: async () => {
         try {
-          const screenshotPath = await appState.takeScreenshot()
+          const screenshotPath = await takeScreenshot(appState)
           const preview = await appState.getImagePreview(screenshotPath)
           const mainWindow = appState.getMainWindow()
           if (mainWindow) {
