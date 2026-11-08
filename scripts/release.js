@@ -27,7 +27,7 @@ const projectDir = path.resolve(__dirname, '..');
 process.chdir(projectDir);
 
 function sh(cmd, opts = {}) {
-    return execSync(cmd, { encoding: 'utf8', ...opts }).trim();
+    return (execSync(cmd, { encoding: 'utf8', ...opts }) ?? '').trim();
 }
 
 function step(title) {
