@@ -1,6 +1,11 @@
 import Database from 'better-sqlite3';
 import { DocumentRow, ChunkRow, DocType } from './types';
 
+export interface KnowledgeChunkInput {
+  text: string;
+  metadata?: { docType: DocType; section: string };
+}
+
 export class KnowledgeDatabaseManager {
   private db: Database.Database;
 
@@ -63,7 +68,7 @@ export class KnowledgeDatabaseManager {
   }
 
   // Documents
-  upsertDocument(docType: DocType, fileName: string, rawText: string, parsedData: any): number {
+  upsertDocument(docType: DocType, fileName: string, rawText: string, parsedData: unknown): number {
     const upsert = this.db.transaction(() => {
       this.db.prepare('DELETE FROM knowledge_documents WHERE doc_type = ?').run(docType);
 
@@ -78,7 +83,7 @@ export class KnowledgeDatabaseManager {
     return upsert();
   }
 
-  insertDocument(docType: DocType, fileName: string, rawText: string, parsedData: any): number {
+  insertDocument(docType: DocType, fileName: string, rawText: string, parsedData: unknown): number {
     const result = this.db.prepare(`
       INSERT INTO knowledge_documents (doc_type, file_name, raw_text, parsed_data, label, is_active)
       VALUES (?, ?, ?, ?, NULL, 0)
@@ -118,7 +123,7 @@ export class KnowledgeDatabaseManager {
   }
 
   // Chunks
-  saveChunks(docId: number, chunks: Array<{ text: string; metadata?: any }>): number[] {
+  saveChunks(docId: number, chunks: KnowledgeChunkInput[]): number[] {
     const insertChunk = this.db.prepare(`
       INSERT INTO knowledge_chunks (doc_id, doc_type, chunk_index, text, token_count, metadata)
       SELECT id, doc_type, ?, ?, ?, ?
@@ -126,7 +131,7 @@ export class KnowledgeDatabaseManager {
       WHERE id = ?
     `);
 
-    const save = this.db.transaction((items: Array<{ text: string; metadata?: any }>) => {
+    const save = this.db.transaction((items: KnowledgeChunkInput[]) => {
       const ids: number[] = [];
 
       items.forEach((chunk, index) => {
