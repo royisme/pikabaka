@@ -66,12 +66,12 @@ Knowledge documents use a separate store (`electron/knowledge/`). Main injects e
 | Window size and position | `electron/helpers/WindowHelper.ts` |
 | Overlay tokens and drag regions | `src/index.css` (`--overlay-*`, `draggable-area`, `no-drag`) |
 
-`useMeetingChat` subscribes to the intelligence IPC channels (catch-up, ask, assist, follow-up and refined answers; Reply goes through the generic Gemini stream, with the row-hover Reply sending the chosen line as `replyTo`) and to the generic Gemini stream. A channel the main process sends that the hook does not listen to is silently lost; see `docs/HANDOFF_ANSWER_TRANSCRIPT_DISPLAY.md`.
+`useMeetingChat` subscribes to the intelligence IPC channels (catch-up, ask, assist, follow-up and refined answers; Reply goes through the generic Gemini stream, with the row-hover Reply sending the chosen line as `replyTo`) and to the generic Gemini stream. A channel the main process sends that the hook does not listen to is silently lost;.
 
 ## Transcript and translation pipeline
 
 1. STT providers emit interim and final results (`electron/audio/*`), through `electron/lib/audio-pipeline.ts`.
-2. `electron/lib/transcript-assembler.ts` merges them into turns and flushes a turn after a delay that depends on the profile (sentence flush 700-2500 ms, fragment flush 1450-5000 ms, shorter after the speech-ended signal). Flushed turns can be reopened and merged by second-pass correction (`docs/SPEC_TRANSCRIPT_SECOND_PASS.md`, `revision`).
+2. `electron/lib/transcript-assembler.ts` merges them into turns and flushes a turn after a delay that depends on the profile (sentence flush 700-2500 ms, fragment flush 1450-5000 ms, shorter after the speech-ended signal). Flushed turns can be reopened and merged by second-pass correction: a flushed turn that did not end a sentence stays reopenable for `reopenWindowMs` (4000 to 9500 ms by profile, never past `maxTurnDurationMs`), a continuation merges into the same segment with `revision` + 1, and a translation result for a superseded revision is dropped. A turn is fed to the RAG index once, when it is sealed (`sealFlushedTranscriptTurn`). `electron/transcript/speculativeTranslation.ts` starts at most one translation per segment and revision before the flush (turns under three words are skipped) and the flush claims it.
 3. After a flush, `emitTranscriptWithTranslation` (`transcript-assembler.ts`) emits the turn, then, if translation is enabled and the source language differs from the target, calls `LLMHelper.translateTranscriptText` once for the whole turn (non-streaming, with the two previous translated turns as context). The prompt is built in `electron/transcript/translationExecutor.ts`.
 4. The renderer receives `translationState` of `pending`, `complete`, `skipped` or `error` through `emitNativeAudioTranscript`.
 
@@ -96,3 +96,21 @@ The follow-up email modal keeps transcript-based recipient lookup and manual ent
 `test/unit/` and `test/integration/`, run by tap with tsx (`docs/development.md`). There are no UI or end-to-end tests.
 
 Two renderer-only shortcuts fill the chat input without sending it (`src/lib/transcriptAsk.ts`): a hover or focus button on each other-party transcript row quotes that line, and the proactive card's "Not right" link quotes the card and the line that triggered it (found by the card's segment id). The user edits the text and sends it; no IPC or stored shape changes.
+
+## Meeting agent safety
+
+`electron/agent/` runs the agent, assist runs and the proactive gate. The other party's speech is untrusted input that reaches a model with tools, so:
+
+- Approval is enforced inside Pika's local tools (`electron/agent/tools/localTools.ts`): `bash`, `read`, `write` and `edit` ask the `ApprovalBroker` in `execute()` before any side effect. Pending approvals live in memory and are denied when the meeting stops, the run aborts or the app quits.
+- The local tools are not declared replay-safe, so after a crash the model is told the call was interrupted and it is never run again.
+- File paths are resolved with `realpath` and must stay inside the meeting folder; another path asks with the full path shown, and Pika's own data folder (database, credentials) is refused (`electron/agent/workspace.ts`).
+- `bash` runs with a minimal environment (the login shell `PATH`, `HOME`, `LANG`); no Pika keys or provider variables reach it.
+- Errors at the agent boundary are logged as a class and status code only; command output, file contents and paths are never logged.
+
+## Embedding store integrity
+
+`VectorStore.clearNativeVectors` finds every `vec_chunks_<n>` and `vec_summaries_<n>` table in `sqlite_master` and is the one place that clears a meeting's native vectors (re-index, summary refresh, meeting deletion), so no dimension is missed. A job that exhausts its retries stays `failed` with its real error; the meeting is never silently switched to another embedding provider, because retrieval filters by the meeting's recorded provider.
+
+## Auto-update
+
+`electron/lib/auto-updater.ts` uses `electron-updater` against the GitHub release (`build.publish` in `package.json`). It checks 10 seconds after start and then every 4 hours, only when `app.isPackaged`; the download runs in the background (`autoDownload`) as a block-level difference where a previous `update.zip` exists, and an installed update applies on quit. When the download finishes the modal offers "Restart & Install" / "Not Now"; nothing restarts on its own. While a meeting is active the notice waits and is flushed when the meeting ends (`flushPendingUpdateNotice`), because a restart would lose the live transcript. Background errors go to the log only; Settings > About shows the state. `scripts/release.js` uploads exactly the `.dmg`, `.dmg.blockmap`, `-mac.zip`, `-mac.zip.blockmap` and `latest-mac.yml` of one build and stops if one is missing; builds made before `app-update.yml` was shipped (2.2 to 2.4) must be installed by hand once.

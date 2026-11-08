@@ -1,6 +1,6 @@
 'use strict';
 
-// Ratchet for the code smells listed in docs/design-code-health.md: the ledger holds today's
+// Ratchet for the code smells tracked in its ledger: the ledger holds today's
 // numbers, and a run fails when any number is higher. Lower numbers are reported so the ledger can
 // be written down at the new level; --update does that write.
 
