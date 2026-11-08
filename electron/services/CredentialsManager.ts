@@ -444,6 +444,7 @@ export class CredentialsManager {
     }
 
     public getInterpretingSettings(): InterpretingSettings { return readInterpreting(this.credentials); }
+    public getFishAudioApiKey(): string | undefined { return this.credentials.fishAudioApiKey; }
 
     public setInterpretingSettings(patch: Partial<InterpretingSettings>): void {
         applyInterpreting(this.credentials, patch);
@@ -453,7 +454,6 @@ export class CredentialsManager {
     public setFishAudioApiKey(key: string): void {
         this.credentials.fishAudioApiKey = key;
         this.saveCredentials();
-        console.log('[CredentialsManager] Fish Audio API Key updated');
     }
 
     public getTranscriptCorrectionEnabled(): boolean {

@@ -362,6 +362,7 @@ for (const short of [false, true]) {
         Reflect.set(state, 'getMeetingAgent', () => ({ open: async () => {}, stop: async () => {}, deleteStore: async () => {} }));
         Reflect.set(state, 'getWindowHelper', () => ({ getOverlayWindow: () => undefined, getLauncherWindow: () => undefined }));
         for (const name of ['setMicrophoneMuted', 'resetBufferedTranscriptTurns', 'broadcastMeetingState', 'setupSystemAudioPipeline']) Reflect.set(state, name, () => {});
+        Reflect.set(state, 'interpreting', { reset: () => {} });
         Reflect.set(state, 'processCompletedMeetingForRAG', async (id: string) => {
             t.not(f.manager.getActiveLiveMeetingId(), 'real-1', 'the full index starts after the old live session has ended');
             postStarted.resolve();
@@ -411,6 +412,7 @@ t.test('record creation failure does not start live indexing, even after deferre
     Reflect.set(state, 'intelligenceManager', { startMeeting: () => null });
     Reflect.set(state, 'getWindowHelper', () => ({ getOverlayWindow: () => undefined, getLauncherWindow: () => undefined }));
     for (const name of ['setMicrophoneMuted', 'resetBufferedTranscriptTurns', 'broadcastMeetingState', 'setupSystemAudioPipeline']) Reflect.set(state, name, () => {});
+    Reflect.set(state, 'interpreting', { reset: () => {} });
     await state.startMeeting();
     await new Promise<void>(resolve => setTimeout(resolve, 10));
     t.equal(state.getCurrentMeetingId(), null);
@@ -432,6 +434,7 @@ t.test('a deferred audio reconfiguration is dropped when the session ended or wa
     Reflect.set(state, 'getWindowHelper', () => ({ getOverlayWindow: () => undefined, getLauncherWindow: () => undefined }));
     Reflect.set(state, 'setupSystemAudioPipeline', () => setupCalls.push(state.getCurrentMeetingId() ?? 'none'));
     for (const name of ['setMicrophoneMuted', 'resetBufferedTranscriptTurns', 'broadcastMeetingState']) Reflect.set(state, name, () => {});
+    Reflect.set(state, 'interpreting', { reset: () => {} });
 
     const tick = async () => { for (let i = 0; i < 50 && pending.length < 2 && setupCalls.length === 0; i++) await new Promise<void>(resolve => setImmediate(resolve)); };
     await state.startMeeting({ audio: { inputDeviceId: 'invented-input' } });

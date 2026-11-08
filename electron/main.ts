@@ -83,6 +83,8 @@ import type { EchoFilter } from "./lib/echo-filter"
 import { audioStats } from "./lib/audio-stats"
 import { sendLag } from "./lib/send-lag"
 import { registerGlobalShortcutDispatch } from "./lib/global-shortcuts"
+import { createInterpretingSession } from "./interpreting/createSession"
+import type { InterpretingSession } from "./interpreting/InterpretingSession"
 import { forwardIntelligenceEvents } from "./ipc/intelligence"
 import { createKnowledgeOrchestrator } from "./knowledge/wiring"
 
@@ -309,6 +311,7 @@ export class AppState {
   public lastAudioPipelineError: string | null = null;
   // The microphone hears the speakers: lines that repeat the other party's stream are dropped. Created on first use.
   public echoFilter: EchoFilter | null = null;
+  public interpreting: InterpretingSession = createInterpretingSession(this);
   public transcriptAssemblerProfile: TranscriptAssemblerProfile = 'sentence_bias';
   public transcriptTurnBuffers: Record<TranscriptSpeaker, BufferedTranscriptTurn | null> = {
     them: null,
@@ -395,6 +398,7 @@ export class AppState {
     audioStats.reset();
     sendLag.start();
     this.setMicrophoneMuted(false);
+    this.interpreting.reset();
     this.resetBufferedTranscriptTurns();
     this.lastSystemAudioChunkAt = null;
     this.lastThemTranscriptAt = null;
@@ -477,6 +481,7 @@ export class AppState {
     console.log('[Main] Ending Meeting...');
     const stoppedAtMs = Date.now();
     this.isMeetingActive = false; // Block new data immediately
+    this.interpreting.reset(); // No window survives the meeting; nothing more is spoken
     console.log(audioStats.summary());
     console.log(sendLag.summary());
     this.broadcastMeetingState();

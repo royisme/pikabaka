@@ -64,6 +64,7 @@ t.test('ending a meeting cancels the engine before it waits for the agent', asyn
     for (const name of ['setOverlayMousePassthrough', 'resetBufferedTranscriptTurns', 'broadcastMeetingState']) {
         Reflect.set(state, name, () => {});
     }
+    Reflect.set(state, 'interpreting', { reset: () => {} });
     Reflect.set(state, 'systemAudioCapture', capture());
     Reflect.set(state, 'googleSTT', capture());
     Reflect.set(state, 'microphoneCapture', capture());

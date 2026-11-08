@@ -52,19 +52,22 @@ export class TalkWindows {
   }
 
   /**
-   * Text of the oldest window, once it is closed, in startedAt order; removes
+   * Turns of the oldest window, once it is closed, in startedAt order; removes
    * it. Returns null while the oldest window is still open or none exists, so
    * a later window never overtakes an earlier one.
    */
-  collect(): string | null {
+  collectTurns(): OwnTurn[] | null {
     const first = this.windows[0];
     if (!first || !first.closed) return null;
     this.windows.shift();
-    return [...first.segments.values()]
-      .sort((a, b) => a.startedAt - b.startedAt)
-      .map((s) => s.text.trim())
-      .filter((s) => s.length > 0)
-      .join(' ');
+    return [...first.segments.values()].sort((a, b) => a.startedAt - b.startedAt);
+  }
+
+  /** The text of `collectTurns()`, joined. */
+  collect(): string | null {
+    const turns = this.collectTurns();
+    if (!turns) return null;
+    return turns.map((s) => s.text.trim()).filter((s) => s.length > 0).join(' ');
   }
 
   /** Drop every window without speaking. */

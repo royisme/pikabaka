@@ -60,6 +60,23 @@ function resolveTranslationConfig(
   };
 }
 
+/** Interpreting translates the user's speech the other way: into the other party's language. */
+function interpretingConfig(): TranslationConfig {
+  const cm = CredentialsManager.getInstance();
+  return { ...resolveTranslationConfig(true, { targetLanguage: cm.getSttLanguage() }), sourceLanguageKey: cm.getSttLanguageUser() };
+}
+
+export function isInterpretingTranslationReady(): boolean {
+  return interpretingConfig().isConfigured;
+}
+
+/** One translation of what the user said, with no context: the recent turns run the other way. */
+export function translateForInterpreting(appState: AppState, text: string): Promise<string> {
+  const config = interpretingConfig();
+  if (!config.isConfigured) return Promise.reject(new Error('Choose a translation model in Audio & Translation first.'));
+  return runTranslationRequest(appState, config, { text, segmentId: 'interpreting', noContext: true }, () => {});
+}
+
 /** The text is already in the language it would be translated into. */
 function isSameAsTarget(config: TranslationConfig, detectedLanguage?: string): boolean {
   const effectiveSource =

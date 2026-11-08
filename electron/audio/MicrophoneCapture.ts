@@ -33,6 +33,8 @@ export class MicrophoneCapture extends EventEmitter {
         }
     }
 
+    public getDeviceId(): string | null { return this.deviceId; }
+
     public getSampleRate(): number {
         if (this.monitor && typeof this.monitor.getSampleRate === 'function') {
             const nativeRate = this.monitor.getSampleRate();
