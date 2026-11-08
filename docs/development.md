@@ -73,6 +73,18 @@ Mutation testing is optional, reserved for a specific unresolved risk in importa
 - Visual acceptance is the owner's, in the running app: overlay at 380px and 600px width, light and dark theme, a streaming answer, a live transcript. The report lists what the owner must look at.
 - Do not start Electron or a dev server on port 5180 if the owner already runs one.
 
+## Product images
+
+`docs/images/{class,client}-{dark,light}.png` are rendered from the real renderer, not drawn: `demo/shots/main.tsx` mounts the real `PikaInterface` over a drawn call-window backdrop, with a `window.electronAPI` stub (`demo/shots/stub.ts`) that replays the invented scenes in `demo/shots/fixture.ts` through the events the app listens to. The fixture is typed against `src/types/electron.d.ts`, so an IPC type change fails `tsc`. The images are sample content, invented for illustration; label them so wherever they are used.
+
+Regenerate all four (Node and Electron from `node_modules`, no pnpm; the script starts and stops its own Vite server on port 5190 or the next free one):
+
+```sh
+./node_modules/.bin/electron demo/shots/render.mjs
+```
+
+The window is hidden; each page is captured at 2x, scaled to 1200x840 and reduced to a palette PNG (under 350 KB). Look at the four files after a run. The old Remotion demo in `demo/src` is not used for this.
+
 ## Finishing a change
 
 1. Re-read your diff: no unrelated edits, debug output, screenshots or scratch files.
