@@ -1,7 +1,7 @@
 {
-  "any": 332,
-  "tsSuppress": 7,
-  "filesOver800Lines": 6,
+  "any": 185,
+  "tsSuppress": 4,
+  "filesOver800Lines": 5,
   "largeFiles": [
     {
       "file": "electron/main.ts",
@@ -9,11 +9,7 @@
     },
     {
       "file": "electron/db/DatabaseManager.ts",
-      "lines": 1053
-    },
-    {
-      "file": "electron/preload.ts",
-      "lines": 1006
+      "lines": 1029
     },
     {
       "file": "electron/lib/transcript-assembler.ts",
