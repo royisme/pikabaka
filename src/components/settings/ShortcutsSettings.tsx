@@ -39,7 +39,7 @@ export function renderShortcutsSettings(state: ReturnType<typeof useShortcutsSet
                 {([
                     { id: 'toggleVisibility', label: 'Show or hide Pika' },
                     { id: 'toggleMousePassthrough', label: 'Toggle click-through' },
-                    { id: 'whatToAnswer', label: 'What to say' },
+                    { id: 'reply', label: 'Reply' },
                     { id: 'selectiveScreenshot', label: 'Capture Selected Area' },
                     { id: 'toggleTranslation', label: 'Turn translation on or off' },
                     { id: 'resetCancel', label: 'Stop generation' },

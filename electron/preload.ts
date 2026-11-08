@@ -166,9 +166,9 @@ interface ElectronAPI {
 
   // Intelligence Mode IPC
   generateAssist: () => Promise<{ insight: string | null }>
-  generateWhatToSay: (question?: string, imagePaths?: string[]) => Promise<{ answer: string | null; question?: string; error?: string }>
   generateFollowUp: (intent: string, userRequest?: string) => Promise<{ refined: string | null; intent: string }>
-  generateRecap: () => Promise<{ summary: string | null }>
+  generateAsk: () => Promise<{ question: string | null }>
+  generateCatchUp: () => Promise<{ summary: string | null }>
   submitManualQuestion: (question: string) => Promise<{ answer: string | null; question: string }>
   getIntelligenceContext: () => Promise<{ context: string; lastAssistantMessage: string | null; activeMode: string }>
   resetIntelligence: () => Promise<{ success: boolean; error?: string }>
@@ -185,11 +185,11 @@ interface ElectronAPI {
 
   // Intelligence Mode Events
   onIntelligenceAssistUpdate: (callback: (data: { insight: string }) => void) => () => void
-  onIntelligenceSuggestedAnswer: (callback: (data: { answer: string; question: string; confidence: number }) => void) => () => void
   onIntelligenceRefinedAnswer: (callback: (data: { answer: string; intent: string }) => void) => () => void
-  onIntelligenceRecap: (callback: (data: { summary: string }) => void) => () => void
-  onIntelligenceClarify: (callback: (data: { clarification: string }) => void) => () => void
-  onIntelligenceClarifyToken: (callback: (data: { token: string }) => void) => () => void
+  onIntelligenceCatchUp: (callback: (data: { summary: string }) => void) => () => void
+  onIntelligenceCatchUpToken: (callback: (data: { token: string }) => void) => () => void
+  onIntelligenceAsk: (callback: (data: { question: string }) => void) => () => void
+  onIntelligenceAskToken: (callback: (data: { token: string }) => void) => () => void
   onIntelligenceManualStarted: (callback: () => void) => () => void
   onIntelligenceManualResult: (callback: (data: { answer: string; question: string }) => void) => () => void
   onIntelligenceModeChanged: (callback: (data: { mode: string }) => void) => () => void
@@ -679,25 +679,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // Intelligence Mode IPC
   generateAssist: () => ipcRenderer.invoke("generate-assist"),
-  generateWhatToSay: (question?: string, imagePaths?: string[]) => ipcRenderer.invoke("generate-what-to-say", question, imagePaths),
-  generateClarify: () => ipcRenderer.invoke("generate-clarify"),
-  generateCodeHint: (imagePaths?: string[], problemStatement?: string) => ipcRenderer.invoke("generate-code-hint", imagePaths, problemStatement),
-  generateBrainstorm: (imagePaths?: string[], problemStatement?: string) => ipcRenderer.invoke("generate-brainstorm", imagePaths, problemStatement),
+  generateAsk: () => ipcRenderer.invoke("generate-ask"),
   generateFollowUp: (intent: string, userRequest?: string) => ipcRenderer.invoke("generate-follow-up", intent, userRequest),
-  generateFollowUpQuestions: () => ipcRenderer.invoke("generate-follow-up-questions"),
-  generateRecap: () => ipcRenderer.invoke("generate-recap"),
+  generateCatchUp: () => ipcRenderer.invoke("generate-catch-up"),
   submitManualQuestion: (question: string) => ipcRenderer.invoke("submit-manual-question", question),
   getIntelligenceContext: () => ipcRenderer.invoke("get-intelligence-context"),
   resetIntelligence: () => ipcRenderer.invoke("reset-intelligence"),
-
-  // Action Button Mode (Dynamic Recap / Brainstorm toggle)
-  getActionButtonMode: () => ipcRenderer.invoke("get-action-button-mode"),
-  setActionButtonMode: (mode: 'recap' | 'brainstorm') => ipcRenderer.invoke("set-action-button-mode", mode),
-  onActionButtonModeChanged: (callback: (mode: 'recap' | 'brainstorm') => void) => {
-    const subscription = (_: any, mode: 'recap' | 'brainstorm') => callback(mode);
-    ipcRenderer.on('action-button-mode-changed', subscription);
-    return () => { ipcRenderer.removeListener('action-button-mode-changed', subscription); };
-  },
 
   // Meeting Lifecycle
   startMeeting: (metadata?: any) => ipcRenderer.invoke("start-meeting", metadata),
@@ -728,20 +715,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.removeListener("intelligence-assist-update", subscription)
     }
   },
-  onIntelligenceSuggestedAnswerToken: (callback: (data: { token: string; question: string; confidence: number }) => void) => {
-    const subscription = (_: any, data: any) => callback(data)
-    ipcRenderer.on("intelligence-suggested-answer-token", subscription)
-    return () => {
-      ipcRenderer.removeListener("intelligence-suggested-answer-token", subscription)
-    }
-  },
-  onIntelligenceSuggestedAnswer: (callback: (data: { answer: string; question: string; confidence: number }) => void) => {
-    const subscription = (_: any, data: any) => callback(data)
-    ipcRenderer.on("intelligence-suggested-answer", subscription)
-    return () => {
-      ipcRenderer.removeListener("intelligence-suggested-answer", subscription)
-    }
-  },
   onIntelligenceRefinedAnswerToken: (callback: (data: { token: string; intent: string }) => void) => {
     const subscription = (_: any, data: any) => callback(data)
     ipcRenderer.on("intelligence-refined-answer-token", subscription)
@@ -756,46 +729,32 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.removeListener("intelligence-refined-answer", subscription)
     }
   },
-  onIntelligenceRecapToken: (callback: (data: { token: string }) => void) => {
+  onIntelligenceCatchUpToken: (callback: (data: { token: string }) => void) => {
     const subscription = (_: any, data: any) => callback(data)
-    ipcRenderer.on("intelligence-recap-token", subscription)
+    ipcRenderer.on("intelligence-catch-up-token", subscription)
     return () => {
-      ipcRenderer.removeListener("intelligence-recap-token", subscription)
+      ipcRenderer.removeListener("intelligence-catch-up-token", subscription)
     }
   },
-  onIntelligenceRecap: (callback: (data: { summary: string }) => void) => {
+  onIntelligenceCatchUp: (callback: (data: { summary: string }) => void) => {
     const subscription = (_: any, data: any) => callback(data)
-    ipcRenderer.on("intelligence-recap", subscription)
+    ipcRenderer.on("intelligence-catch-up", subscription)
     return () => {
-      ipcRenderer.removeListener("intelligence-recap", subscription)
+      ipcRenderer.removeListener("intelligence-catch-up", subscription)
     }
   },
-  onIntelligenceClarifyToken: (callback: (data: { token: string }) => void) => {
+  onIntelligenceAskToken: (callback: (data: { token: string }) => void) => {
     const subscription = (_: any, data: any) => callback(data)
-    ipcRenderer.on("intelligence-clarify-token", subscription)
+    ipcRenderer.on("intelligence-ask-token", subscription)
     return () => {
-      ipcRenderer.removeListener("intelligence-clarify-token", subscription)
+      ipcRenderer.removeListener("intelligence-ask-token", subscription)
     }
   },
-  onIntelligenceClarify: (callback: (data: { clarification: string }) => void) => {
+  onIntelligenceAsk: (callback: (data: { question: string }) => void) => {
     const subscription = (_: any, data: any) => callback(data)
-    ipcRenderer.on("intelligence-clarify", subscription)
+    ipcRenderer.on("intelligence-ask", subscription)
     return () => {
-      ipcRenderer.removeListener("intelligence-clarify", subscription)
-    }
-  },
-  onIntelligenceFollowUpQuestionsToken: (callback: (data: { token: string }) => void) => {
-    const subscription = (_: any, data: any) => callback(data)
-    ipcRenderer.on("intelligence-follow-up-questions-token", subscription)
-    return () => {
-      ipcRenderer.removeListener("intelligence-follow-up-questions-token", subscription)
-    }
-  },
-  onIntelligenceFollowUpQuestionsUpdate: (callback: (data: { questions: string }) => void) => {
-    const subscription = (_: any, data: any) => callback(data)
-    ipcRenderer.on("intelligence-follow-up-questions-update", subscription)
-    return () => {
-      ipcRenderer.removeListener("intelligence-follow-up-questions-update", subscription)
+      ipcRenderer.removeListener("intelligence-ask", subscription)
     }
   },
   onIntelligenceManualStarted: (callback: () => void) => {

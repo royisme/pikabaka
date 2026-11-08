@@ -14,12 +14,6 @@ export interface TranscriptSegment {
     confidence?: number;
 }
 
-export interface SuggestionTrigger {
-    context: string;
-    lastQuestion: string;
-    confidence: number;
-}
-
 // Context item matching Swift ContextManager structure
 export interface ContextItem {
     role: 'them' | 'user' | 'assistant';

@@ -18,7 +18,7 @@ import { isNearBottom, nextScrollAction } from '../lib/answerScroll';
 import { toggleOriginal } from '../lib/transcriptDisplay';
 import { audioStatus } from '../lib/audioStatus';
 import { latestOtherPartyText } from '../lib/answerLead';
-import { askAboutLineText, challengeCardText } from '../lib/transcriptAsk';
+import { askAboutLineText, challengeCardText, replyToLineRequest } from '../lib/transcriptAsk';
 import type { TranscriptSegment } from '../lib/transcriptSegments';
 import { useMainEvent } from '../hooks/useMainEvent';
 import { useWindowEvent } from '../hooks/useWindowEvent';
@@ -66,6 +66,9 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
         chat.setInputValue(askAboutLineText(segment));
         textInputRef.current?.focus();
     }, [chat.setInputValue]);
+    const replyToLine = useCallback((segment: TranscriptSegment) => {
+        void chat.handleReplyToLine(replyToLineRequest(segment));
+    }, [chat.handleReplyToLine]);
     const appearance = useMemo(() => getOverlayAppearance(overlayOpacity, isLightTheme ? 'light' : 'dark'), [overlayOpacity, isLightTheme]);
 
     // The split is the user's once they move it. Until then it follows what the zone is for: more room for the
@@ -155,7 +158,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     }, [chat.messages, isExpanded, chat.isProcessing]);
 
     useWindowEvent('keydown', (e: KeyboardEvent) => {
-        if (isShortcutPressed(e, 'whatToAnswer')) { e.preventDefault(); chat.handleWhatToSay(); }
+        if (isShortcutPressed(e, 'reply')) { e.preventDefault(); chat.handleReply(); }
         else if (isShortcutPressed(e, 'moveWindowUp') || isShortcutPressed(e, 'moveWindowDown')) e.preventDefault();
     });
 
@@ -221,7 +224,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     useMainEvent(window.electronAPI?.onGlobalShortcut, ({ action }) => {
         const g = generalHandlersRef.current;
         isStealthRef.current = true;
-        if (action === 'whatToAnswer') chat.handleWhatToSay();
+        if (action === 'reply') chat.handleReply();
         else if (action === 'resetCancel') void g.resetCancel();
         else if (action === 'toggleTranslation') g.toggleTranslation();
         else if (action === 'toggleOriginal') g.toggleOriginal();
@@ -229,7 +232,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
     });
 
     const transcriptProps = { ...transcript, ...audio, appearance, isLightTheme };
-    const chatProps = { onCaptureScreen: () => void generalHandlersRef.current.takeScreenshot(), onCaptureArea: () => void generalHandlersRef.current.selectiveScreenshot(), messages: chat.messages, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, actionButtonMode: chat.actionButtonMode, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleWhatToSay: chat.handleWhatToSay, primaryQuiet: audioState.action === 'fix-audio' || (audioState.key !== 'live' && !hasTranscriptRows), onStop: chat.stopGeneration, onRetry: chat.canRetry ? chat.retryLast : undefined, audioKey: audioState.key, hasTranscriptRows, handleClarify: chat.handleClarify, handleFollowUpQuestions: chat.handleFollowUpQuestions, handleRecap: chat.handleRecap, handleBrainstorm: chat.handleBrainstorm, handleManualSubmit: chat.handleManualSubmit, appearance, isLightTheme, shortcuts, scrollContainerRef, textInputRef };
+    const chatProps = { onCaptureScreen: () => void generalHandlersRef.current.takeScreenshot(), onCaptureArea: () => void generalHandlersRef.current.selectiveScreenshot(), messages: chat.messages, attachedContext: chat.attachedContext, setAttachedContext: chat.setAttachedContext, inputValue: chat.inputValue, setInputValue: chat.setInputValue, isProcessing: chat.isProcessing, handleReply: chat.handleReply, primaryQuiet: audioState.action === 'fix-audio' || (audioState.key !== 'live' && !hasTranscriptRows), onStop: chat.stopGeneration, onRetry: chat.canRetry ? chat.retryLast : undefined, audioKey: audioState.key, hasTranscriptRows, handleAsk: chat.handleAsk, handleCatchUp: chat.handleCatchUp, handleManualSubmit: chat.handleManualSubmit, appearance, isLightTheme, shortcuts, scrollContainerRef, textInputRef };
 
     return (
         <div ref={contentRef} className={`flex flex-col items-center w-full mx-auto ${isExpanded ? 'h-screen' : 'h-fit'} min-h-0 bg-transparent p-0 rounded-[24px] font-sans overlay-text-primary`}>
@@ -238,7 +241,7 @@ const PikaInterface: React.FC<PikaInterfaceProps> = ({ onEndMeeting, overlayOpac
                     <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="flex flex-col w-full flex-1 min-h-0">
                         <SplitterShell
                             topBar={<OverlayTopBar status={audioState} hasRows={statusInBar} onFixAudio={fixAudio} microphoneMuted={microphoneMuted} onToggleMicrophoneMute={() => toggleMicrophoneMute.mutate(!microphoneMuted)} displayMode={transcript.transcriptDisplayMode} translationEnabled={transcript.translationEnabled} translationConfigured={transcript.translationConfigured} theirLanguage={transcript.theirLanguage} myLanguage={transcript.myLanguage} targetLanguage={transcript.targetLanguage} languageOptions={transcript.languageOptions} onToggleTranslation={() => transcript.saveTranslationSettings({ enabled: !transcript.translationEnabled })} onChangeSpokenLanguage={transcript.changeSpokenLanguage} onChangeTargetLanguage={(targetLanguage) => transcript.saveTranslationSettings({ targetLanguage })} onToggleOriginal={() => transcript.saveTranslationSettings({ displayMode: toggleOriginal(transcript.transcriptDisplayMode) })} onSetUpTranslation={() => { void window.electronAPI.toggleSettingsWindow(); }} modelName={modelName} isMousePassthrough={isMousePassthrough} toggleOriginalKeys={shortcuts.toggleOriginal} toggleTranslationKeys={shortcuts.toggleTranslation} onHide={() => setIsExpanded((prev) => !prev)} onQuit={() => (onEndMeeting ? onEndMeeting() : window.electronAPI.quitApp())} onOpenModelSelector={openModelSelector} onOpenSettings={openSettings} onToggleMousePassthrough={() => generalHandlersRef.current.toggleMousePassthrough()} onOpenLauncher={() => window.electronAPI?.setWindowMode?.('launcher')} />}
-                            left={<TranscriptColumn {...transcriptProps} onAskSegment={askAboutLine} status={audioState} onFixAudio={fixAudio} />}
+                            left={<TranscriptColumn {...transcriptProps} onAskSegment={askAboutLine} onReplySegment={replyToLine} status={audioState} onFixAudio={fixAudio} />}
                             right={<div className="relative flex-1 min-h-0 min-w-0 flex flex-col"><ApprovalDock />{proactiveCard && <ProactiveCard card={proactiveCard} onDismiss={() => setProactiveCard(null)} onAskMore={() => askAboutCard(proactiveCard)} onNotRight={() => challengeCard(proactiveCard)} />}<div className="flex-1 min-h-0 min-w-0 flex flex-col"><ChatColumn {...chatProps} /></div></div>}
                             splitterPosition={splitterPosition}
                             onSplitterChange={changeSplitter}

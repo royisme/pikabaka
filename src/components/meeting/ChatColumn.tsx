@@ -14,20 +14,17 @@ interface ChatColumnProps {
     messages: Message[];
     attachedContext: AttachedContext;
     setAttachedContext: React.Dispatch<React.SetStateAction<AttachedContext>>;
-    actionButtonMode: 'recap' | 'brainstorm';
     inputValue: string;
     setInputValue: React.Dispatch<React.SetStateAction<string>>;
     isProcessing: boolean;
-    handleWhatToSay: () => void;
+    handleReply: () => void;
     primaryQuiet?: boolean;
     onStop?: () => void;
     onRetry?: () => void;
     audioKey?: AudioStatusKey;
     hasTranscriptRows?: boolean;
-    handleClarify: () => void;
-    handleFollowUpQuestions: () => void;
-    handleRecap: () => void;
-    handleBrainstorm: () => void;
+    handleAsk: () => void;
+    handleCatchUp: () => void;
     handleManualSubmit: () => void;
     appearance: ReturnType<typeof getOverlayAppearance>;
     isLightTheme: boolean;
@@ -42,20 +39,17 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
     messages,
     attachedContext,
     setAttachedContext,
-    actionButtonMode,
     inputValue,
     setInputValue,
     isProcessing,
-    handleWhatToSay,
+    handleReply,
     primaryQuiet,
     onStop,
     onRetry,
     audioKey,
     hasTranscriptRows,
-    handleClarify,
-    handleFollowUpQuestions,
-    handleRecap,
-    handleBrainstorm,
+    handleAsk,
+    handleCatchUp,
     handleManualSubmit,
     appearance,
     isLightTheme,
@@ -70,20 +64,17 @@ const ChatColumn: React.FC<ChatColumnProps> = ({
             onCaptureArea={onCaptureArea}
             attachedContext={attachedContext}
             setAttachedContext={setAttachedContext}
-            actionButtonMode={actionButtonMode}
             inputValue={inputValue}
             setInputValue={setInputValue}
             isProcessing={isProcessing}
-            handleWhatToSay={handleWhatToSay}
+            handleReply={handleReply}
             primaryQuiet={primaryQuiet}
             onStop={onStop}
             onRetry={onRetry}
             audioKey={audioKey}
             hasTranscriptRows={hasTranscriptRows}
-            handleClarify={handleClarify}
-            handleFollowUpQuestions={handleFollowUpQuestions}
-            handleRecap={handleRecap}
-            handleBrainstorm={handleBrainstorm}
+            handleAsk={handleAsk}
+            handleCatchUp={handleCatchUp}
             handleManualSubmit={handleManualSubmit}
             appearance={appearance}
             isLightTheme={isLightTheme}

@@ -37,12 +37,6 @@ export const MODE_CONFIGS = {
         temperature: 0.25,
         topP: 0.85,
     } as GenerationConfig,
-
-    followUpQuestions: {
-        maxOutputTokens: 65536,
-        temperature: 0.4, // Slightly higher creative freedom
-        topP: 0.9,
-    } as GenerationConfig,
 } as const;
 
 /**

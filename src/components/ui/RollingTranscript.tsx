@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Languages, MessageSquarePlus, TriangleAlert } from 'lucide-react';
+import { Languages, MessageSquarePlus, Reply, TriangleAlert } from 'lucide-react';
 import type { TranscriptDisplayMode, TranscriptSegment } from '../../lib/transcriptSegments';
 import { failureReasonText, rowSlot, transcriptRowParts, type RowSlot } from '../../lib/transcriptRow';
 import { countNewRows, isNearBottom, nextTranscriptScroll } from '../../lib/answerScroll';
@@ -13,6 +13,7 @@ interface TranscriptNotesProps {
     partialSpeakerLabel?: string;
     onTranslateSegment?: (segment: TranscriptSegment) => void;
     onAskSegment?: (segment: TranscriptSegment) => void;
+    onReplySegment?: (segment: TranscriptSegment) => void;
 }
 
 function isOwnSpeech(segment: TranscriptSegment): boolean {
@@ -64,6 +65,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
     partialSpeakerLabel = 'Them',
     onTranslateSegment,
     onAskSegment,
+    onReplySegment,
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     // Following is read from scroll events, not measured after a render: by then new content has
@@ -228,6 +230,18 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
                                         className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full overlay-text-muted opacity-0 hover:text-[var(--overlay-text-primary)] focus-visible:opacity-100 group-hover:opacity-100"
                                     >
                                         <MessageSquarePlus className="h-3 w-3" aria-hidden="true" />
+                                    </button>
+                                )}
+                                {onReplySegment && !own && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onReplySegment(seg)}
+                                        aria-label="Reply to this line"
+                                        title="Reply to this line"
+                                        data-reply-line="true"
+                                        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full overlay-text-muted opacity-0 hover:text-[var(--overlay-text-primary)] focus-visible:opacity-100 group-hover:opacity-100"
+                                    >
+                                        <Reply className="h-3 w-3" aria-hidden="true" />
                                     </button>
                                 )}
                                 </div>

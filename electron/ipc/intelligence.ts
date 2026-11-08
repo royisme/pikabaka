@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog } from "electron"
+import { dialog } from "electron"
 import { AppState } from "../main"
 import { safeHandle } from "./safeHandle"
 
@@ -18,100 +18,21 @@ export function registerIntelligenceHandlers(appState: AppState): void {
     }
   });
 
-  // MODE 2: What Should I Say (Primary auto-answer)
-  safeHandle("generate-what-to-say", async (_, question?: string, imagePaths?: string[]) => {
+  // The one question to ask the other party
+  safeHandle("generate-ask", async () => {
     try {
       const intelligenceManager = appState.getIntelligenceManager();
-      // Question and imagePaths are now optional - IntelligenceManager infers from transcript
-      const answer = await intelligenceManager.runWhatShouldISay(question, 0.8, imagePaths);
-      return { answer, question: question || 'inferred from context' };
-    } catch (error: any) {
-      // Return graceful fallback instead of throwing
-      return {
-        question: question || 'unknown'
-      };
-    }
-  });
-
-  safeHandle("generate-clarify", async () => {
-    try {
-      const intelligenceManager = appState.getIntelligenceManager();
-      const clarification = await intelligenceManager.runClarify();
+      const question = await intelligenceManager.runAsk();
       // If null returned without throwing, the engine already set mode to idle.
       // We must still ensure the frontend un-sticks — emit an error so onIntelligenceError fires.
-      if (clarification === null) {
+      if (question === null) {
         const win = appState.getMainWindow();
-        win?.webContents.send('intelligence-error', { error: 'Could not generate a clarifying question. Try again after some audio context is available.', mode: 'clarify' });
+        win?.webContents.send('intelligence-error', { error: 'Could not generate a question. Try again after some audio context is available.', mode: 'ask' });
       }
-      return { clarification };
+      return { question };
     } catch (error: any) {
       throw error;
     }
-  });
-
-  safeHandle("generate-code-hint", async (_, imagePaths?: string[], problemStatement?: string) => {
-    try {
-      // If no explicit images were passed from the frontend, fall back to the
-      // screenshot queue so the AI can always "see" the user's screen.
-      const resolvedImagePaths: string[] =
-        imagePaths && imagePaths.length > 0
-          ? imagePaths
-          : appState.getScreenshotQueue();
-
-      console.log(`[IPC] generate-code-hint: using ${resolvedImagePaths.length} image(s) (${imagePaths?.length ? 'explicit' : 'queue fallback'})`);
-
-      const intelligenceManager = appState.getIntelligenceManager();
-      const hint = await intelligenceManager.runCodeHint(
-        resolvedImagePaths.length > 0 ? resolvedImagePaths : undefined,
-        problemStatement
-      );
-      return { hint };
-    } catch (error: any) {
-      throw error;
-    }
-  });
-
-  safeHandle("generate-brainstorm", async (_, imagePaths?: string[], problemStatement?: string) => {
-    try {
-      // If no explicit images were passed from the frontend, fall back to the
-      // screenshot queue so the AI can always "see" the user's screen.
-      const resolvedImagePaths: string[] =
-        imagePaths && imagePaths.length > 0
-          ? imagePaths
-          : appState.getScreenshotQueue();
-
-      console.log(`[IPC] generate-brainstorm: using ${resolvedImagePaths.length} image(s) (${imagePaths?.length ? 'explicit' : 'queue fallback'})`);
-
-      const intelligenceManager = appState.getIntelligenceManager();
-      const script = await intelligenceManager.runBrainstorm(
-        resolvedImagePaths.length > 0 ? resolvedImagePaths : undefined,
-        problemStatement
-      );
-      return { script };
-    } catch (error: any) {
-      throw error;
-    }
-  });
-
-  // Dynamic Action Button Mode (Recap vs Brainstorm)
-  safeHandle("get-action-button-mode", () => {
-    const { SettingsManager } = require('../services/SettingsManager');
-    const sm = SettingsManager.getInstance();
-    return sm.get('actionButtonMode') ?? 'recap';
-  });
-
-  safeHandle("set-action-button-mode", (_, mode: 'recap' | 'brainstorm') => {
-    const { SettingsManager } = require('../services/SettingsManager');
-    const sm = SettingsManager.getInstance();
-    sm.set('actionButtonMode', mode);
-
-    BrowserWindow.getAllWindows().forEach(win => {
-      if (!win.isDestroyed()) {
-        win.webContents.send('action-button-mode-changed', mode);
-      }
-    });
-
-    return { success: true };
   });
 
   // MODE 3: Follow-Up (Refinement)
@@ -125,23 +46,12 @@ export function registerIntelligenceHandlers(appState: AppState): void {
     }
   });
 
-  // MODE 4: Recap (Summary)
-  safeHandle("generate-recap", async () => {
+  // MODE 4: Catch up (Summary)
+  safeHandle("generate-catch-up", async () => {
     try {
       const intelligenceManager = appState.getIntelligenceManager();
-      const summary = await intelligenceManager.runRecap();
+      const summary = await intelligenceManager.runCatchUp();
       return { summary };
-    } catch (error: any) {
-      throw error;
-    }
-  });
-
-  // MODE 6: Follow-Up Questions
-  safeHandle("generate-follow-up-questions", async () => {
-    try {
-      const intelligenceManager = appState.getIntelligenceManager();
-      const questions = await intelligenceManager.runFollowUpQuestions();
-      return { questions };
     } catch (error: any) {
       throw error;
     }

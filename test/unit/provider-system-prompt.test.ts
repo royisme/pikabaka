@@ -113,33 +113,17 @@ t.test('each answer class sends its own task prompt', async (t) => {
             const { AssistLLM } = mockRequire(path.resolve('electron/llm/AssistLLM.ts'), MOCKED_HELPER) as typeof import('../../electron/llm/AssistLLM');
             return new AssistLLM(llm).generate('Invented context');
         }],
-        ['BrainstormLLM', 'brainstorm', async (llm) => {
-            const { BrainstormLLM } = mockRequire(path.resolve('electron/llm/BrainstormLLM.ts'), MOCKED_HELPER) as typeof import('../../electron/llm/BrainstormLLM');
-            return collect(new BrainstormLLM(llm).generateStream('Invented problem'));
-        }],
-        ['ClarifyLLM', 'clarify', async (llm) => {
-            const { ClarifyLLM } = mockRequire(path.resolve('electron/llm/ClarifyLLM.ts'), MOCKED_HELPER) as typeof import('../../electron/llm/ClarifyLLM');
-            return new ClarifyLLM(llm).generate('Invented question');
-        }],
-        ['CodeHintLLM', 'codeHint', async (llm) => {
-            const { CodeHintLLM } = mockRequire(path.resolve('electron/llm/CodeHintLLM.ts'), MOCKED_HELPER) as typeof import('../../electron/llm/CodeHintLLM');
-            return collect(new CodeHintLLM(llm).generateStream());
+        ['AskLLM', 'ask', async (llm) => {
+            const { AskLLM } = mockRequire(path.resolve('electron/llm/AskLLM.ts'), MOCKED_HELPER) as typeof import('../../electron/llm/AskLLM');
+            return new AskLLM(llm).generate('Invented question');
         }],
         ['FollowUpLLM', 'followUp', async (llm) => {
             const { FollowUpLLM } = mockRequire(path.resolve('electron/llm/FollowUpLLM.ts'), MOCKED_HELPER) as typeof import('../../electron/llm/FollowUpLLM');
             return new FollowUpLLM(llm).generate('Invented previous answer', 'Invented request');
         }],
-        ['FollowUpQuestionsLLM', 'followUpQuestions', async (llm) => {
-            const { FollowUpQuestionsLLM } = mockRequire(path.resolve('electron/llm/FollowUpQuestionsLLM.ts'), MOCKED_HELPER) as typeof import('../../electron/llm/FollowUpQuestionsLLM');
-            return new FollowUpQuestionsLLM(llm).generate('Invented context');
-        }],
-        ['RecapLLM', 'recap', async (llm) => {
+        ['RecapLLM', 'catchUp', async (llm) => {
             const { RecapLLM } = mockRequire(path.resolve('electron/llm/RecapLLM.ts'), MOCKED_HELPER) as typeof import('../../electron/llm/RecapLLM');
             return new RecapLLM(llm).generate('Invented context');
-        }],
-        ['WhatToAnswerLLM', 'whatToAnswer', async (llm) => {
-            const { WhatToAnswerLLM } = mockRequire(path.resolve('electron/llm/WhatToAnswerLLM.ts'), MOCKED_HELPER) as typeof import('../../electron/llm/WhatToAnswerLLM');
-            return collect(new WhatToAnswerLLM(llm).generateStream('Invented transcript'));
         }],
     ];
     for (const [name, task, run] of cases) {
