@@ -15,6 +15,6 @@
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true
   },
-  "include": ["src", "premium/src", "demo/shots"], // React source files, optional premium components and the product-shot entry
+  "include": ["src", "premium/src"], // React source files and optional premium components
   "references": [{ "path": "./tsconfig.node.json" }]
 }

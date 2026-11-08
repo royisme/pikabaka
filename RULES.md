@@ -47,10 +47,10 @@ What an agent (or a person) must never do in this repository, and the working ag
 
 ## Working agreements
 
-- **One small step at a time** (`TASKS.md`). A step has an acceptance line and an issue; it is done when the checks pass, the owner-manual checks are listed, and the diff has been read.
+- **One small step at a time.** A step has an acceptance line and an issue; it is done when the checks pass, the owner-manual checks are listed, and the diff has been read.
 - **Read before you change**: the files you will touch, the issue, and the document for the area (`AGENTS.md` map).
 - **Evidence first**: a bug issue names file and line. If a claim has not been seen in the running app, the issue says so and the first step is a check by the owner.
 - **Verification report**: say what ran, what did not, and what the owner must check by hand (visual acceptance, real devices, real keys, Windows).
 - **Platform before polish**: pipeline and structure before copy and visual refinement. Do not spend review rounds on wording while a structural step is open.
-- **Docs move with the code**: module responsibilities move `docs/architecture.md`; a rule changes `RULES.md` or `docs/conventions.md`; a landed or broken step is recorded in `PROGRESS.md` and the next step in `TASKS.md`, but never in a feature branch (parallel branches all edit the top of those files and conflict): the progress entry goes in the PR description, and one docs PR adds the entries of a merged batch to `PROGRESS.md` and updates `TASKS.md`. The changelog is not on this list: release-please writes it.
+- **Docs move with the code**: module responsibilities move `docs/architecture.md`; a rule changes `RULES.md` or `docs/conventions.md`. What landed, the evidence and what is unverified go in the PR description. The changelog is not on this list: release-please writes it.
 - **One owner per fact**: if two files disagree, fix the one that is not the owner of that fact (`AGENTS.md`, document set) and say which in the PR.

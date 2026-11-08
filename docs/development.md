@@ -27,7 +27,7 @@ What made Node 26 work, and what to keep in mind:
 
 ## pnpm caveat
 
-pnpm 11 checks that `node_modules` matches the lockfile before running any `pnpm run` or `pnpm exec` script, and if it does not (here `node_modules/.modules.yaml` is missing) it runs a full `pnpm install` first, including every dependency's install scripts. That is why `pnpm run dev` printed only "Lockfile is up to date, resolution step is skipped" and then compiled `better-sqlite3` instead of starting Vite. An agent must not trigger that unasked: it rewrites `node_modules` and rebuilds native modules (it happened on 2026-10-26 while diagnosing, see `PROGRESS.md`). Run the tools through the local binaries instead:
+pnpm 11 checks that `node_modules` matches the lockfile before running any `pnpm run` or `pnpm exec` script, and if it does not (here `node_modules/.modules.yaml` is missing) it runs a full `pnpm install` first, including every dependency's install scripts. That is why `pnpm run dev` printed only "Lockfile is up to date, resolution step is skipped" and then compiled `better-sqlite3` instead of starting Vite. An agent must not trigger that unasked: it rewrites `node_modules` and rebuilds native modules (it happened on 2026-10-26 while diagnosing). Run the tools through the local binaries instead:
 
 ```sh
 ./node_modules/.bin/tsc --noEmit
@@ -73,30 +73,18 @@ Mutation testing is optional, reserved for a specific unresolved risk in importa
 - Visual acceptance is the owner's, in the running app: overlay at 380px and 600px width, light and dark theme, a streaming answer, a live transcript. The report lists what the owner must look at.
 - Do not start Electron or a dev server on port 5180 if the owner already runs one.
 
-## Product images
-
-`docs/images/{class,client}-{dark,light}.png` are rendered from the real renderer, not drawn: `demo/shots/main.tsx` mounts the real `PikaInterface` over a drawn call-window backdrop, with a `window.electronAPI` stub (`demo/shots/stub.ts`) that replays the invented scenes in `demo/shots/fixture.ts` through the events the app listens to. The fixture is typed against `src/types/electron.d.ts`, so an IPC type change fails `tsc`. The images are sample content, invented for illustration; label them so wherever they are used.
-
-Regenerate all four (Node and Electron from `node_modules`, no pnpm; the script starts and stops its own Vite server on port 5190 or the next free one):
-
-```sh
-./node_modules/.bin/electron demo/shots/render.mjs
-```
-
-The window is hidden; each page is captured at 2x, scaled to 1064x1000 and reduced to a palette PNG (under 350 KB). Look at the four files after a run. The old Remotion demo in `demo/src` is not used for this.
-
 ## Finishing a change
 
 1. Re-read your diff: no unrelated edits, debug output, screenshots or scratch files.
 2. Run the checks above and read each exit code. Report which ran and which did not.
 3. Keep verification proportional to the business risk. Do not expand tests or add defensive code solely for coverage or mutation scores.
-4. Do not edit `TASKS.md`, `PROGRESS.md` or `CHANGELOG.md` in a feature branch: parallel branches would all conflict at the top of those files. Put the progress entry (what landed, the evidence, the checks that ran, what is not verified, what the owner checks by hand) in the PR description. After the PRs of a batch merge, one docs PR adds their entries to `PROGRESS.md` and updates `TASKS.md` (the step leaves the queue, the next is named).
+4. Do not edit `CHANGELOG.md`: release-please writes it. Put the progress entry (what landed, the evidence, the checks that ran, what is not verified, what the owner checks by hand) in the PR description.
 5. Commit on a branch (`type(scope): summary`; no issue number in the title; `Fixes #N` in the body). End the message with the attribution lines the session requires.
 6. Push and open a PR only when the owner asks. The PR template needs a type and a manual-test line naming the OS.
 7. Report: what changed, what was verified and how, what was not run, what the owner must check by hand.
 
 ## Releases
 
-release-please opens and updates a release PR from the conventional commits on `main` (`.github/workflows/release-please.yml`, config in `.release-please-config.json`). `feat`, `fix`, `perf`, `build`, `deps`, `refactor` and `revert` appear in release notes; `docs`, `style`, `chore`, `test` and `ci` are hidden. Pick the type with that in mind. Packaging, notarization and publishing are owner-run (`scripts/release.js`, `scripts/notarize-only.js`). The release script uploads `latest-mac.yml` with the installers. Installed apps read it to update themselves (see `docs/design-auto-update.md`).
+release-please opens and updates a release PR from the conventional commits on `main` (`.github/workflows/release-please.yml`, config in `.release-please-config.json`). `feat`, `fix`, `perf`, `build`, `deps`, `refactor` and `revert` appear in release notes; `docs`, `style`, `chore`, `test` and `ci` are hidden. Pick the type with that in mind. Packaging, notarization and publishing are owner-run (`scripts/release.js`, `scripts/notarize-only.js`). The release script uploads `latest-mac.yml` with the installers. Installed apps read it to update themselves (see "Auto-update" in `docs/architecture.md`).
 
 tap runs without its TypeScript plugin (`.taprc`: `plugin: ["!@tapjs/typescript"]`) because that plugin needs the TypeScript compiler API, which TypeScript 7 does not have; tests are loaded through `tsx`. `.taprc` only takes effect after `tap build` regenerates the plugin set (a git-ignored build in `node_modules` and `.tap`), so the `test` script runs `tap build` first. When you call tap by hand in a fresh checkout or worktree, run `node node_modules/tap/dist/esm/run.mjs build` once.

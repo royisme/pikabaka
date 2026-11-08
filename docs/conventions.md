@@ -39,7 +39,7 @@ The overlay is read for one to three seconds mid-call. These rules come from the
 - No gradients as decoration. Intent colours must carry meaning, not variety.
 - Meaning is never carried by colour alone.
 
-**Chrome budget, status, legibility** (`DESIGN.md`, `docs/design-overlay-v2.md` Q3, Q6, Q7)
+**Chrome budget, status, legibility** (`DESIGN.md`)
 - At a 420px window, everything except the transcript and the answers is at most 140px, and each of those two areas keeps at least 112px. A new row of chrome must come out of this budget; the pixel floors are in `src/lib/splitClamp.ts`.
 - The audio status is spelled out in one place (`audioStatus()`): the top-bar chip when the transcript has rows, the transcript area when it has none. Do not add a second banner for the same condition.
 - Panel opacity never goes below the legibility floor (`getOverlayAppearance`: 0.95 dark, 0.94 light); do not add `backdrop-filter` to the overlay, and do not put a transparent band around the panel.

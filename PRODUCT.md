@@ -40,13 +40,12 @@ Evidenced in the repository: AGPL-3.0 licence [LICENSE]; bring-your-own-key thro
 - **Windows distribution package** (issue #15) and **Linux support with Wayland capture**.
 - **Phone calls as an audio source**: an idea, not started.
 - **A live agent that takes part in a conversation**: an idea, not started.
-- **One answer component for every window**: the live overlay's answers have the Re line, the 16px lead and per-block Copy; the chat overlays and the post-meeting view still render answers themselves [TASKS.md, PROGRESS.md].
+- **One answer component for every window**: the live overlay's answers have the Re line, the 16px lead and per-block Copy; the chat overlays and the post-meeting view still render answers themselves.
 - **Entity masking in live translation**: the module exists and is tested but is not in the request path.
-- **Translating before a turn flushes**: a design note recommends measuring first [docs/design-early-translation.md].
-- **Translating own speech ("Me")**: excluded; own lines stay untranslated source text [docs/design-live-translation-ui.md].
-- **Native OS vibrancy blur**: deferred pending a content-protection review [docs/design-overlay-v2.md].
-- **Real-provider verification**: recent features (streaming translation, the proactive gate, the scenario, the misheard-word fix) have not been exercised against real providers by automated checks; the owner verifies them in real meetings [PROGRESS.md].
-- **The interview feature, the resume and the profile**: removed in 3.0 [docs/design-interview-removal.md].
+- **Translating own speech ("Me")**: excluded; own lines stay untranslated source text.
+- **Native OS vibrancy blur**: deferred pending a content-protection review.
+- **Real-provider verification**: recent features (streaming translation, the proactive gate, the scenario, the misheard-word fix) have not been exercised against real providers by automated checks; the owner verifies them in real meetings.
+- **The interview feature, the resume and the profile**: removed in 3.0.
 
 ## 7. Questions for the owner
 1. Name and one-line tagline for the new positioning.

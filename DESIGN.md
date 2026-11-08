@@ -1,6 +1,6 @@
 # DESIGN
 
-The visual rules of the overlay, the surface this app is judged on. The acceptance checks Q1 to Q14 and their reasons are in `docs/design-overlay-v2.md`; the rules for contributors are in `docs/conventions.md` ("Overlay UI"). Token values live in `src/index.css`; this file names them and says what they are for. It does not copy numbers that can drift, except the floors that were chosen on purpose.
+The visual rules of the overlay, the surface this app is judged on. The rules for contributors are in `docs/conventions.md` ("Overlay UI"). Token values live in `src/index.css`; this file names them and says what they are for. It does not copy numbers that can drift, except the floors that were chosen on purpose.
 
 ## What the surface is
 

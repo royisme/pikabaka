@@ -13,8 +13,7 @@
     "node_modules/**",
     "native-module/**",
     "resources/**",
-    "premium/**",
-    "demo/**"
+    "premium/**"
   ],
   "rules": {
     // The previous gate ran @typescript-eslint's recommended set as errors. These are its rules with

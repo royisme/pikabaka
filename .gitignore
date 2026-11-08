@@ -24,7 +24,6 @@ resources/models/
 .cursorrules
 .windsurfrules
 tmp
-demo.mp4
 change.md
 npm-debug.log*
 yarn-debug.log*
@@ -210,5 +209,5 @@ tsx-*/
 v8-compile-cache-*/
 test/sample/*
 
-# Live session state for agents: local only (history belongs in the git log and PROGRESS.md)
+# Live session state for agents: local only (history belongs in the git log)
 docs/HANDOFF.md
