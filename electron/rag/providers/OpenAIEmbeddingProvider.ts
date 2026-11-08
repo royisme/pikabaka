@@ -1,5 +1,9 @@
 import { IEmbeddingProvider } from './IEmbeddingProvider';
 
+interface OpenAIEmbeddingResponse {
+  data: { embedding: number[] }[];
+}
+
 export class OpenAIEmbeddingProvider implements IEmbeddingProvider {
   readonly name = 'openai';
   readonly dimensions = 1536;
@@ -24,7 +28,7 @@ export class OpenAIEmbeddingProvider implements IEmbeddingProvider {
       body: JSON.stringify({ model: this.model, input: text })
     });
     if (!res.ok) throw new Error(`OpenAI embedding failed: ${res.statusText}`);
-    const data = await res.json();
+    const data = await res.json() as OpenAIEmbeddingResponse;
     return data.data[0].embedding;
   }
 
@@ -42,7 +46,7 @@ export class OpenAIEmbeddingProvider implements IEmbeddingProvider {
       body: JSON.stringify({ model: this.model, input: texts })
     });
     if (!res.ok) throw new Error(`OpenAI batch embedding failed: ${res.statusText}`);
-    const data = await res.json();
-    return data.data.map((d: any) => d.embedding);
+    const data = await res.json() as OpenAIEmbeddingResponse;
+    return data.data.map((d) => d.embedding);
   }
 }
