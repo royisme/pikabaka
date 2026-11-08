@@ -324,10 +324,6 @@ export class MeetingAgent {
     return inspection.tasks.length || inspection.submissions.length ? 'running' : 'idle';
   }
 
-  async openForDetails(meetingId: string): Promise<MeetingStore> {
-    return this.openOwned(meetingId, true);
-  }
-
   stop(meetingId: string): Promise<void> { return this.stopWithin(meetingId, 3000); }
 
   private stopWithin(meetingId: string, timeoutMs: number): Promise<void> {

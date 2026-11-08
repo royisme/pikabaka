@@ -172,7 +172,4 @@ export class ReleaseNotesManager {
         });
     }
 
-    public getCachedNotes(): ParsedReleaseNotes | null {
-        return this.cachedNotes;
-    }
 }

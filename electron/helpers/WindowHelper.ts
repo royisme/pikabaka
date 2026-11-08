@@ -417,10 +417,6 @@ export class WindowHelper {
     }
   }
 
-  public toggleOverlayWindow(): void {
-    this.toggleMainWindow();
-  }
-
   public centerAndShowWindow(): void {
     // If a meeting is active (overlay mode), bring the overlay up instead of the
     // launcher — switching to the launcher during a meeting would expose it in the

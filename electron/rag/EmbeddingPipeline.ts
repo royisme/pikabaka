@@ -566,17 +566,6 @@ export class EmbeddingPipeline {
         return result;
     }
 
-    /**
-     * Clear completed queue items older than N days
-     */
-    cleanupQueue(daysOld: number = 7): void {
-        const cutoff = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000).toISOString();
-        this.db.prepare(`
-            DELETE FROM embedding_queue 
-            WHERE status = 'completed' AND processed_at < ?
-        `).run(cutoff);
-    }
-
     private delay(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
     }

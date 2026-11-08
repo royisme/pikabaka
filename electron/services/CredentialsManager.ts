@@ -144,16 +144,8 @@ export class CredentialsManager {
         return this.credentials.geminiApiKey;
     }
 
-    public getGroqApiKey(): string | undefined {
-        return this.credentials.groqApiKey;
-    }
-
     public getOpenaiApiKey(): string | undefined {
         return this.credentials.openaiApiKey;
-    }
-
-    public getClaudeApiKey(): string | undefined {
-        return this.credentials.claudeApiKey;
     }
 
     public getGoogleServiceAccountPath(): string | undefined {
@@ -403,12 +395,6 @@ export class CredentialsManager {
         this.credentials.ibmWatsonApiKey = key;
         this.saveCredentials();
         console.log('[CredentialsManager] IBM Watson API Key updated');
-    }
-
-    public setIbmWatsonRegion(region: string): void {
-        this.credentials.ibmWatsonRegion = region;
-        this.saveCredentials();
-        console.log(`[CredentialsManager] IBM Watson Region set to: ${region}`);
     }
 
     public setGeminiApiKey(key: string): void {
