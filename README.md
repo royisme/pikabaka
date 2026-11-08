@@ -14,7 +14,7 @@ Tell Pika what the meeting is. It listens, translates, and steps in with a short
 
 ---
 
-Pika is an open-source live-translation and meeting assistant, shown as a desktop overlay: a small, translucent, always-on-top window you glance at for one to three seconds in the middle of a call. It shows a live transcript with translation, answers questions about the meeting through an agent, and watches the other party's speech so that it can put up a quiet suggestion card without being asked.
+Pika is an open-source desktop overlay: a small, translucent, always-on-top window you glance at for one to three seconds in the middle of a call. It shows a live transcript with translation, answers questions about the meeting through an agent, and watches the other party's speech so that it can put up a quiet suggestion card without being asked.
 
 It is for classes and lectures, work meetings and everyday calls, in your language or another one. You bring your own models and keys. Meeting records, notes and credentials stay on your machine, and the app has no telemetry.
 
@@ -41,7 +41,7 @@ Transcripts are written to a local SQLite database as the meeting goes on, so yo
 ### Privacy
 - API keys and custom headers are encrypted with the operating system's secure storage (macOS Keychain, Windows DPAPI).
 - Network traffic goes only to the speech and model endpoints you configure.
-- **Window content protection ("Hide from screen share")** keeps the overlay out of screen sharing during meetings. Its limits are in the FAQ.
+- "Hide from screen share" asks the operating system to keep the overlay out of screen sharing. It is not a guarantee; the FAQ lists its limits.
 
 ## Install
 

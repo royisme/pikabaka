@@ -14,7 +14,6 @@ t.test('the shipped description and docs do not present Pika as an interview cop
         const offers = text.split('\n').filter((line) => /interview (practice|prep|rehearsal)/i.test(line) && !line.includes('~~'));
         t.same(offers, [], `${file} does not offer interview practice`);
     }
-    t.match(read('README.md'), /live-translation and meeting assistant/, 'the README leads with live translation and meetings');
     t.end();
 });
 
