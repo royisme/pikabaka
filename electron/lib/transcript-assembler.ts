@@ -109,8 +109,28 @@ export function isSupersededRevision(
 /** Text a model corrected, as the recognizer heard it, by segment. Shown on hover, never stored. */
 const correctedOriginals = new Map<string, { revision: number; text: string }>();
 
-export function emitNativeAudioTranscript(appState: AppState, payload: any): void {
-  const original = correctedOriginals.get(payload?.segmentId);
+/** What the renderer receives as 'native-audio-transcript'; a live line has no segmentId. */
+export interface NativeAudioTranscriptPayload {
+  speaker: TranscriptSpeaker;
+  text: string;
+  sourceText: string;
+  translatedText?: string;
+  segmentId?: string;
+  replaces?: string[];
+  timestamp: number;
+  final: boolean;
+  confidence?: number;
+  displayMode: 'original' | 'translated' | 'both';
+  translationState: 'pending' | 'skipped' | 'streaming' | 'complete' | 'error';
+  translationError?: string;
+  speakerLabel?: string;
+  detectedLanguage?: string;
+  revision?: number;
+  originalText?: string;
+}
+
+export function emitNativeAudioTranscript(appState: AppState, payload: NativeAudioTranscriptPayload): void {
+  const original = payload.segmentId ? correctedOriginals.get(payload.segmentId) : undefined;
   if (original && payload.revision === original.revision) payload = { ...payload, originalText: original.text };
   const helper = appState.getWindowHelper();
   helper.getLauncherWindow()?.webContents.send('native-audio-transcript', payload);

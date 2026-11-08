@@ -1,11 +1,6 @@
 {
-  "any": 11,
+  "any": 8,
   "tsSuppress": 0,
-  "filesOver800Lines": 1,
-  "largeFiles": [
-    {
-      "file": "electron/main.ts",
-      "lines": 1027
-    }
-  ]
+  "filesOver800Lines": 0,
+  "largeFiles": []
 }

@@ -6,6 +6,7 @@ import { DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE, isTranscriptAssemblerProfile } fr
 import { SettingsManager } from "../services/SettingsManager"
 import WebSocket from "ws"
 import { safeHandle } from "./safeHandle"
+import { reconfigureSttProvider } from "../lib/audio-pipeline"
 
 export function registerSttHandlers(appState: AppState): void {
   // ==========================================
@@ -26,7 +27,7 @@ export function registerSttHandlers(appState: AppState): void {
       CredentialsManager.getInstance().setSttProvider(provider);
 
       // Reconfigure the audio pipeline to use the new STT provider
-      await appState.reconfigureSttProvider();
+      await reconfigureSttProvider(appState);
 
       return { success: true };
     } catch (error: unknown) {
@@ -42,7 +43,7 @@ export function registerSttHandlers(appState: AppState): void {
     }
     const { CredentialsManager } = require('../services/CredentialsManager');
     CredentialsManager.getInstance().setSttModel(provider, model);
-    await appState.reconfigureSttProvider();
+    await reconfigureSttProvider(appState);
     return { success: true };
   });
 
@@ -126,7 +127,7 @@ export function registerSttHandlers(appState: AppState): void {
       CredentialsManager.getInstance().setGroqSttModel(model);
 
       // Reconfigure the audio pipeline to use the new model
-      await appState.reconfigureSttProvider();
+      await reconfigureSttProvider(appState);
 
       return { success: true };
     } catch (error: unknown) {
@@ -163,7 +164,7 @@ export function registerSttHandlers(appState: AppState): void {
       CredentialsManager.getInstance().setAzureRegion(region);
 
       // Reconfigure the pipeline since region changes the endpoint URL
-      await appState.reconfigureSttProvider();
+      await reconfigureSttProvider(appState);
 
       return { success: true };
     } catch (error: unknown) {
@@ -396,8 +397,10 @@ export function registerSttHandlers(appState: AppState): void {
 
       return { success: true };
     } catch (error: unknown) {
-      const axiosError = error as { message?: string; response?: { data?: any } };
-      const respData = axiosError.response?.data;
+      const axiosError = error as { message?: string; response?: { data?: unknown } };
+      const respData = axiosError.response?.data as
+        | { error?: { message?: string }; detail?: { message?: string }; message?: string }
+        | undefined;
       const rawMsg = respData?.error?.message || respData?.detail?.message || respData?.message || axiosError.message || 'Connection failed';
       const msg = sanitizeErrorMessage(rawMsg);
       console.error("STT connection test failed:", msg);
