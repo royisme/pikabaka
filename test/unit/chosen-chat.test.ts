@@ -43,14 +43,13 @@ t.test('interactive generation resolves the quick-answers row, including screens
         yield '{"solution":';
         yield '{"code":"invented"}}';
     });
-    t.same(await llm.generateSolution({ problem: 'Invented puzzle' }), { solution: { code: 'invented' } });
-    t.same(await llm.extractProblemFromImages(['invented.png']), { solution: { code: 'invented' } });
+    await llm.analyzeImageFiles(['invented.png']);
     t.equal(await llm.generateContentStructured('Invented JSON request'), '{"solution":{"code":"invented"}}');
     await llm.generateSuggestion('Invented context', 'Invented question');
     await llm.chatWithGemini('Invented question');
-    t.same(jobs, ['chat', 'chat', 'chat', 'chat', 'chat', 'chat']);
+    t.same(jobs, ['chat', 'chat', 'chat', 'chat', 'chat']);
     t.ok(requests.every(args => args[0] === connection && args[1] === 'exact-unprefixed-id'));
-    t.same(requests[1][4], ['invented.png']);
+    t.same(requests[0][4], ['invented.png']);
 });
 
 t.test('missing selections and provider failures are not replaced with another model or an apology', async t => {

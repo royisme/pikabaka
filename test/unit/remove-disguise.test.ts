@@ -114,7 +114,7 @@ for (const platform of ['darwin', 'win32'] as const) for (const protectedStartup
             [file('services/KeybindManager')]: { KeybindManager: { getInstance: () => keybinds } },
             [file('services/CredentialsManager')]: { CredentialsManager: { getInstance: () => credentials } },
             [file('services/SettingsManager')]: { SettingsManager },
-            [file('services/OllamaManager')]: {}, [file('llm/index')]: { warmupIntentClassifier: noop },
+            [file('services/OllamaManager')]: {},
             [file('lib/logging')]: { setupConsoleOverrides: noop }, [file('lib/verboseLog')]: { setVerboseLoggingFlag: noop },
             [file('lib/transcript-assembler')]: { isTranscriptAssemblerProfile: () => false, DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE: 'sentence_bias' },
             [file('lib/tray-menu')]: { showTray: noop }, [file('helpers/stealth')]: stealth,
