@@ -11,7 +11,6 @@ const platform = normalizePlatform(
 
 export const isMac = platform === 'darwin';
 export const isWindows = platform === 'win32';
-export const isLinux = platform === 'linux';
 
 export function getModifierSymbol(modifier: 'commandorcontrol' | 'ctrl' | 'control' | 'cmd' | 'command' | 'meta' | 'alt' | 'option' | 'shift'): string {
     const m = modifier.toLowerCase();
@@ -25,23 +24,4 @@ export function getModifierSymbol(modifier: 'commandorcontrol' | 'ctrl' | 'contr
         return isMac ? '⇧' : 'Shift';
     }
     return modifier;
-}
-
-export function getPlatformShortcut(keys: string[]): string[] {
-    return keys.map(key => {
-        const k = key.toLowerCase();
-        if (k === '⌘' || k === 'command' || k === 'meta' || k === 'cmd') {
-            return isMac ? '⌘' : 'Ctrl';
-        }
-        if (k === '⌃' || k === 'control' || k === 'ctrl') {
-            return isMac ? '⌃' : 'Ctrl';
-        }
-        if (k === '⌥' || k === 'option' || k === 'alt') {
-            return isMac ? '⌥' : 'Alt';
-        }
-        if (k === '⇧' || k === 'shift') {
-            return isMac ? '⇧' : 'Shift';
-        }
-        return key;
-    });
 }
