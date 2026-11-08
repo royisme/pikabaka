@@ -32,7 +32,6 @@ const TASKS = Object.keys(BUILT_IN) as TaskName[];
 /** The sha256 of `taskPrompt(task)` on the commit before the setting was added, for the tasks whose text has not changed since. */
 const PRE_SETTING_SHA256: Partial<Record<TaskName, string>> = {
     answer: 'be476d5d679e6a395874c81a718df748df4cf25195abcad5a406a2a85fc3db03',
-    catchUp: '83ca2562eda711bd85a7a22833c9fa915118e9712cae4a7eb630c1ebe3a69645',
     followUp: 'f9788133cd76f9ce88e6e779d79ed0293dc767dbbe4860371819c3f4fe18e79f',
     assist: 'b6b3e2e62a8dc3eb3fb1e1fd50bd18d2b073171ceeb0ce316bbfbf8a4ae85f30',
 };

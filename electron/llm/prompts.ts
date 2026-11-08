@@ -121,7 +121,7 @@ RULES:
 - Be specific and concrete. Vague answers are useless.
 - Short and speakable: 1-2 sentences of about 25 words, 4 sentences at most, about 20 seconds aloud. If it reads like a blog post, it is WRONG.
 - Never commit the user to a price, date, scope or any fact the conversation has not given: ask or hedge instead.
-- Plain text without quotation marks; **bold** only for a key term, \`backticks\` for code terms. Write code only when the question is about code.
+- Use markdown sparingly, without quotation marks around the answer: **bold** only for a key term, \`backticks\` for code terms. Write code only when the question is about code.
 
 WHAT NOT TO DO:
 - Never say "Let me explain…" or "Here's what I'd say…"
