@@ -40,9 +40,9 @@ export function registerCoreHandlers(appState: AppState): void {
         return { success: true };
       }
       return { success: false, error: "No notes returned" };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[IPC] test-release-fetch failed:", err);
-      return { success: false, error: err.message };
+      return { success: false, error: (err instanceof Error ? err.message : String(err)) };
     }
   });
 
@@ -177,10 +177,8 @@ export function registerCoreHandlers(appState: AppState): void {
           preview: await appState.getImagePreview(path)
         }))
       )
-      // previews.forEach((preview: any) => console.log(preview.path))
       return previews
     } catch (error) {
-      // console.error("Error getting screenshots:", error)
       throw error
     }
   })
@@ -215,9 +213,9 @@ export function registerCoreHandlers(appState: AppState): void {
       appState.clearQueues()
       // console.log("Screenshot queues have been cleared.")
       return { success: true }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // console.error("Error resetting queues:", error)
-      return { success: false, error: error.message }
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) }
     }
   })
 
@@ -250,7 +248,7 @@ export function registerCoreHandlers(appState: AppState): void {
     try {
       const suggestion = await appState.processingHelper.getLLMHelper().generateSuggestion(context, lastQuestion)
       return { suggestion }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // console.error("Error generating suggestion:", error)
       throw error
     }
@@ -272,7 +270,7 @@ export function registerCoreHandlers(appState: AppState): void {
     try {
       const result = await appState.processingHelper.getLLMHelper().analyzeImageFiles([resolved])
       return result
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw error
     }
   })
@@ -313,7 +311,7 @@ export function registerCoreHandlers(appState: AppState): void {
       intelligenceManager.logUsage('chat', message, result);
 
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // console.error("Error in gemini-chat handler:", error);
       throw error;
     }
@@ -391,16 +389,16 @@ export function registerCoreHandlers(appState: AppState): void {
           }
         }
 
-      } catch (streamError: any) {
+      } catch (streamError: unknown) {
         console.error("[IPC] Streaming request failed");
         if (_chatStreamId === myStreamId && meetingStillCurrent(meetingId)) {
-          event.sender.send("gemini-stream-error", streamError.message || "Unknown streaming error");
+          event.sender.send("gemini-stream-error", (streamError instanceof Error ? streamError.message : String(streamError)) || "Unknown streaming error");
         }
       }
 
       return null; // Return null as data is sent via events
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[IPC] Chat stream setup failed");
       throw error;
     }
@@ -417,9 +415,9 @@ export function registerCoreHandlers(appState: AppState): void {
       console.log('[IPC] Quit and install update requested')
       await appState.quitAndInstallUpdate()
       return { success: true }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[IPC] quit-and-install-update failed:', err)
-      return { success: false, error: err.message }
+      return { success: false, error: (err instanceof Error ? err.message : String(err)) }
     }
   })
 
@@ -436,9 +434,9 @@ export function registerCoreHandlers(appState: AppState): void {
       console.log('[IPC] Manual update check requested')
       await appState.checkForUpdates()
       return { success: true }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[IPC] check-for-updates failed:', err)
-      return { success: false, error: err.message }
+      return { success: false, error: (err instanceof Error ? err.message : String(err)) }
     }
   })
 
@@ -447,9 +445,9 @@ export function registerCoreHandlers(appState: AppState): void {
       console.log('[IPC] Download update requested')
       appState.downloadUpdate()
       return { success: true }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[IPC] download-update failed:', err)
-      return { success: false, error: err.message }
+      return { success: false, error: (err instanceof Error ? err.message : String(err)) }
     }
   })
 
@@ -575,8 +573,8 @@ export function registerCoreHandlers(appState: AppState): void {
       const { OllamaManager } = require('../services/OllamaManager');
       await OllamaManager.getInstance().init();
       return { success: true };
-    } catch (error: any) {
-      return { success: false, message: error.message };
+    } catch (error: unknown) {
+      return { success: false, message: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -626,7 +624,7 @@ export function registerCoreHandlers(appState: AppState): void {
         openaiPreferredModel: creds.openaiPreferredModel || undefined,
         claudePreferredModel: creds.claudePreferredModel || undefined,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return { storage: { mode: 'locked', reason: 'Credential storage status could not be read. Restart Pika and try again.' }, hasGeminiKey: false, hasGroqKey: false, hasOpenaiKey: false, hasClaudeKey: false, googleServiceAccountPath: null, sttProvider: 'google', groqSttModel: 'whisper-large-v3-turbo', hasSttGroqKey: false, hasSttOpenaiKey: false, hasDeepgramKey: false, hasElevenLabsKey: false, hasAzureKey: false, azureRegion: 'eastus', hasIbmWatsonKey: false, ibmWatsonRegion: 'us-south', hasSonioxKey: false, hasTavilyKey: false, transcriptTranslationEnabled: false, transcriptTranslationProvider: 'ollama', transcriptTranslationModel: '', transcriptTranslationPrompt: '', transcriptTranslationDisplayMode: 'original', transcriptTranslationSourceLanguage: 'auto', transcriptTranslationTargetLanguage: 'chinese' };
     }
   });
