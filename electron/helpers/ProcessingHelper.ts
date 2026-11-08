@@ -52,12 +52,7 @@ export class ProcessingHelper {
     }
 
     // Load Languages
-    const sttLanguage = credManager.getSttLanguage();
     const aiResponseLanguage = credManager.getAiResponseLanguage();
-    
-    if (sttLanguage) {
-      this.llmHelper.setSttLanguage(sttLanguage);
-    }
     
     if (aiResponseLanguage) {
       this.llmHelper.setAiResponseLanguage(aiResponseLanguage);

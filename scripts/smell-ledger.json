@@ -5,11 +5,11 @@
   "largeFiles": [
     {
       "file": "electron/main.ts",
-      "lines": 1320
+      "lines": 1295
     },
     {
       "file": "electron/db/DatabaseManager.ts",
-      "lines": 1076
+      "lines": 1053
     },
     {
       "file": "electron/preload.ts",
@@ -21,7 +21,7 @@
     },
     {
       "file": "src/hooks/useMeetingChat.ts",
-      "lines": 872
+      "lines": 871
     },
     {
       "file": "electron/services/CredentialsManager.ts",

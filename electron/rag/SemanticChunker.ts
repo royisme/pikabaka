@@ -16,7 +16,6 @@ export interface Chunk {
 }
 
 // Chunking parameters
-const TARGET_TOKENS = 300;
 const MAX_TOKENS = 400;
 const MIN_TOKENS = 100;
 

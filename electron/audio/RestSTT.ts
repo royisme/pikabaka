@@ -314,7 +314,6 @@ export class RestSTT extends EventEmitter {
         // Grab current buffer and reset
         const currentChunks = this.chunks;
         this.chunks = [];
-        const currentBytes = this.totalBufferedBytes;
         this.totalBufferedBytes = 0;
 
         // Concatenate all chunks

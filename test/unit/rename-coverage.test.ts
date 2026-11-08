@@ -8,9 +8,6 @@ import path from 'node:path';
  */
 const ALLOWED: { file: string; line: RegExp; why: string }[] = [
   // The old stored value: only the migration that replaces it may name it.
-  { file: 'electron/db/DatabaseManager.ts', line: /interviewer/, why: 'migration and its comment' },
-  // The old persisted localStorage keys: only their legacy entries may name them.
-  { file: 'src/lib/legacyLocalStorage.ts', line: /interviewer_transcript/, why: 'legacy localStorage keys' },
 ];
 
 function productionFiles(root: string): string[] {
@@ -21,8 +18,7 @@ function productionFiles(root: string): string[] {
   });
 }
 
-// Case-sensitive: the speaker value is lowercase `interviewer`, so only the migration and the
-// legacy-key list may name it; prompt and UI labels no longer do.
+// Case-sensitive: the speaker value is lowercase `interviewer`, so nothing may name it; prompt and UI labels no longer do.
 const leftovers = ['electron', 'src'].flatMap((root) =>
   productionFiles(path.resolve(root))
     .flatMap((file) => fs.readFileSync(file, 'utf8').split('\n')

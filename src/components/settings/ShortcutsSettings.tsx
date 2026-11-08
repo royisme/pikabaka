@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ChevronRight, RotateCcw } from 'lucide-react';
 import { useShortcuts } from '../../hooks/useShortcuts';
 import { KeyRecorder } from '../ui/KeyRecorder';

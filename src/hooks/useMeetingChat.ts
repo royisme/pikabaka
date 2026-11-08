@@ -32,7 +32,6 @@ export type Message = {
   replyTo?: string;
   hasScreenshot?: boolean;
   screenshotPreview?: string;
-  isCode?: boolean;
   intent?: string;
   isWorkingState?: boolean;
 };

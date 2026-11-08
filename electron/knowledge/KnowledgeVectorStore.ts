@@ -11,8 +11,6 @@ export interface ScoredChunk {
 
 export class KnowledgeVectorStore {
   private db: Database.Database;
-  private vecTableReady: boolean = false;
-  private embeddingDim: number | null = null;
   private ensuredDims = new Set<number>();
 
   constructor(db: Database.Database) {
@@ -277,8 +275,6 @@ export class KnowledgeVectorStore {
     }
 
     if (this.ensuredDims.has(dim)) {
-      this.vecTableReady = true;
-      this.embeddingDim = dim;
       return true;
     }
 
@@ -291,11 +287,8 @@ export class KnowledgeVectorStore {
       `);
 
       this.ensuredDims.add(dim);
-      this.vecTableReady = true;
-      this.embeddingDim = dim;
       return true;
     } catch (error) {
-      this.vecTableReady = false;
       console.warn(`[KnowledgeVectorStore] sqlite-vec unavailable for dim=${dim}, using JS fallback:`, error);
       return false;
     }

@@ -26,7 +26,7 @@ Status: owner decisions recorded 2026-10-29 (including the answers on prompts an
 
 **Keep (shared with K4 and K5b, which shipped).** `DocumentParser`, the documents and chunks tables in `KnowledgeDatabaseManager`, `KnowledgeVectorStore`, the material paths of `KnowledgeOrchestrator`, the four document channels (`knowledge:list-documents`, `import-document`, `remove-document`, `reindex-document`), `ImportedDocuments.tsx`, the notes document type (`DocType.NOTES`, text the user writes, searched with materials), and the `meetings` and `materials` answer-source switches.
 
-**Dormant, not dropped (released contracts).** Tables `knowledge_company_cache`, `knowledge_negotiation`, `interview_sessions`, `resume_nodes`, `user_profile`, the rows of type `resume` and `jd` in `knowledge_documents` and their chunks, and the stored setting `answerUsesProfile` (ignored from X5-3). Nothing reads them after X5-3. Dropping them is a separate migration the owner can ask for later; keeping them costs nothing and loses no user data.
+**Dormant, then dropped.** Tables `knowledge_company_cache`, `knowledge_negotiation`, `interview_sessions`, `resume_nodes`, `user_profile`, the rows of type `resume` and `jd` in `knowledge_documents` and their chunks, and the stored setting `answerUsesProfile` (ignored from X5-3). Nothing reads them after X5-3. The five tables are now dropped at startup (`DROP TABLE IF EXISTS`); the `resume`/`jd` rows and `answerUsesProfile` remain and are removed by Clear all data or ignored.
 
 ## 3. `interviewer` to `them`
 

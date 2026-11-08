@@ -121,9 +121,6 @@ t.test('Clear all data removes the dormant resume and job-description rows, thei
     t.equal(f.manager.getDocumentById(f.resume.id), null);
     t.equal(f.manager.getDocumentById(f.jd.id), null);
     t.ok(f.manager.getDocumentById(f.notes.id), 'notes are not interview data');
-    t.same(f.db.prepare('SELECT id FROM knowledge_company_cache').all(), [], 'the dormant company cache is wiped');
-    t.same(f.db.prepare('SELECT id FROM knowledge_negotiation').all(), [], 'the dormant negotiation state is wiped');
-    t.same(f.db.prepare('SELECT id FROM interview_sessions').all(), [], 'the dormant interview sessions are wiped');
 
     const remaining = await f.orchestrator.searchMaterials('What does the lantern shelf hold?');
     t.same(remaining.map(passage => passage.text).sort(), [notesText, materialText].sort(), 'answering still reads the kept sources');

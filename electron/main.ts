@@ -1,6 +1,4 @@
 import { app, BrowserWindow, Tray, ipcMain, screen } from "electron"
-import path from "path"
-import fs from "fs"
 import { logToFile, ensureMacMicrophoneAccess, setupConsoleOverrides } from "./lib/logging"
 
 if (!app.isPackaged) {
@@ -122,10 +120,8 @@ interface ScreenshotCaptureSession {
 import { KnowledgeOrchestrator as KnowledgeOrchestratorClass } from './knowledge/KnowledgeOrchestrator';
 import { KnowledgeDatabaseManager as KnowledgeDatabaseManagerClass } from './knowledge/KnowledgeDatabaseManager';
 
-import { CredentialsManager } from "./services/CredentialsManager"
 import { SettingsManager } from "./services/SettingsManager"
 import { setVerboseLoggingFlag } from "./lib/verboseLog"
-import { OllamaManager } from './services/OllamaManager'
 
 export class AppState {
   private static instance: AppState | null = null
@@ -145,7 +141,6 @@ export class AppState {
   public updateAvailable: boolean = false
 
   // View management
-  private view: "queue" | "solutions" = "queue"
   public isUndetectable: boolean = false
 
   private isMeetingActive: boolean = false; // Guard for session state leaks
@@ -154,7 +149,6 @@ export class AppState {
   private endingMeeting: Promise<void> | undefined;
   private _isQuitting: boolean = false;
   public _verboseLogging: boolean = false;
-  private _ollamaBootstrapPromise: Promise<void> | null = null;
   public screenshotCaptureInProgress: boolean = false;
 
 
@@ -177,7 +171,7 @@ export class AppState {
     this.cropperWindowHelper = new CropperWindowHelper()
 
     // 3. Initialize other helpers
-    this.screenshotHelper = new ScreenshotHelper(this.view)
+    this.screenshotHelper = new ScreenshotHelper()
     this.processingHelper = new ProcessingHelper(this)
 
     this.windowHelper.setContentProtection(this.isUndetectable);
@@ -330,7 +324,7 @@ export class AppState {
   }
 
   private async bootstrapOllamaEmbeddings() {
-    this._ollamaBootstrapPromise = (async () => {
+    void (async () => {
       try {
         const { OllamaBootstrap } = require('./rag/OllamaBootstrap');
         const bootstrap = new OllamaBootstrap();
@@ -971,7 +965,6 @@ export class AppState {
     }
     CredentialsManager.getInstance().setSttLanguage(key);
     this.googleSTT?.setRecognitionLanguage(key);
-    this.processingHelper.getLLMHelper().setSttLanguage(key);
   }
 
   public static getInstance(): AppState {
@@ -1008,15 +1001,6 @@ export class AppState {
     return this.knowledgeOrchestrator;
   }
 
-  public getView(): "queue" | "solutions" {
-    return this.view
-  }
-
-  public setView(view: "queue" | "solutions"): void {
-    this.view = view
-    this.screenshotHelper.setView(view)
-  }
-
   public isVisible(): boolean {
     return this.windowHelper.isVisible()
   }
@@ -1027,10 +1011,6 @@ export class AppState {
 
   public getScreenshotQueue(): string[] {
     return this.screenshotHelper.getScreenshotQueue()
-  }
-
-  public getExtraScreenshotQueue(): string[] {
-    return this.screenshotHelper.getExtraScreenshotQueue()
   }
 
   // Window management methods
@@ -1075,9 +1055,7 @@ export class AppState {
   public toggleMainWindow(): void {
     console.log(
       "Screenshots: ",
-      this.screenshotHelper.getScreenshotQueue().length,
-      "Extra screenshots: ",
-      this.screenshotHelper.getExtraScreenshotQueue().length
+      this.screenshotHelper.getScreenshotQueue().length
     )
     
     const mode = this.windowHelper.getCurrentWindowMode();
@@ -1100,9 +1078,6 @@ export class AppState {
 
   public clearQueues(): void {
     this.screenshotHelper.clearQueues()
-
-    // Reset view to initial state
-    this.setView("queue")
   }
 
   private createScreenshotCaptureSession(

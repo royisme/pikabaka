@@ -1,6 +1,5 @@
 import { SpeechClient } from '@google-cloud/speech';
 import { EventEmitter } from 'events';
-import * as path from 'path';
 import { RECOGNITION_LANGUAGES, EnglishVariant } from '../config/languages';
 import { normalizeLanguageToIso639 } from '../transcript/translationExecutor';
 

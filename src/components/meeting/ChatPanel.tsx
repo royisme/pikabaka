@@ -14,7 +14,6 @@ import {
   Image,
   X,
   Copy,
-  Code,
   Monitor,
   Crop,
 } from 'lucide-react';
@@ -36,7 +35,6 @@ interface Message {
   replyTo?: string;
   hasScreenshot?: boolean;
   screenshotPreview?: string;
-  isCode?: boolean;
   intent?: string;
 }
 
@@ -167,14 +165,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const renderMessageText = (msg: Message) => {
     // An answer with its own layout below (reply, catch up, ...) keeps it even when it contains a code fence.
     const hasOwnLayout = msg.intent === 'shorten' || msg.intent === 'catch_up' || msg.intent === 'ask' || msg.intent === 'reply';
-    if (msg.isCode || (msg.role === 'system' && !hasOwnLayout && msg.text.includes('```'))) {
+    if (msg.role === 'system' && !hasOwnLayout && msg.text.includes('```')) {
       const parts = msg.text.split(/(```[\s\S]*?```)/g);
       return (
         <div className={`rounded-lg p-3 my-1 border ${subtleSurfaceClass}`} style={appearance.subtleStyle}>
-          <div className={`flex items-center gap-2 mb-2 font-medium text-[11px] tracking-[0.02em] ${isLightTheme ? 'text-violet-600' : 'text-purple-300'}`}>
-            <Code className="w-3.5 h-3.5" />
-            <span>Code Solution</span>
-          </div>
           <div className={`space-y-2 text-sm leading-relaxed ${isLightTheme ? 'text-slate-800' : 'text-text-primary'}`}>
             {parts.map((part, i) => {
               if (part.startsWith('```')) {

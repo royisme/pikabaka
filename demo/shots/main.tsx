@@ -29,11 +29,6 @@ const { emit } = installElectronStub(scene);
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function setInputValue(input: HTMLInputElement, value: string) {
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
 function press(find: () => HTMLElement | undefined | null, what: string) {
   const element = find();
   if (!element) throw new Error(`Shot replay: ${what} not found`);
