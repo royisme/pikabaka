@@ -12,6 +12,7 @@ import { LLMHelper } from './core/LLMHelper';
 import { SessionTracker } from './core/SessionTracker';
 import { IntelligenceEngine } from './core/IntelligenceEngine';
 import { MeetingPersistence } from './core/MeetingPersistence';
+import type { MeetingStartMetadata, MeetingUsage } from './db/types';
 import type { RAGManager } from './rag/RAGManager';
 
 // Re-export types for backward compatibility
@@ -55,7 +56,7 @@ export class IntelligenceManager extends EventEmitter {
         ];
 
         for (const event of events) {
-            this.engine.on(event, (...args: any[]) => {
+            this.engine.on(event, (...args: unknown[]) => {
                 this.emit(event, ...args);
             });
         }
@@ -80,7 +81,7 @@ export class IntelligenceManager extends EventEmitter {
     // Context Management (delegates to session)
     // ============================================
 
-    setMeetingMetadata(metadata: any): void {
+    setMeetingMetadata(metadata: MeetingStartMetadata | null): void {
         this.session.setMeetingMetadata(metadata);
     }
 
@@ -114,7 +115,7 @@ export class IntelligenceManager extends EventEmitter {
         return this.session.getLastThemTurn();
     }
 
-    logUsage(type: string, question: string, answer: string): void {
+    logUsage(type: MeetingUsage['type'], question: string, answer: string): void {
         this.session.logUsage(type, question, answer);
     }
 
@@ -159,15 +160,14 @@ export class IntelligenceManager extends EventEmitter {
     }
 
     setMode(mode: import('./core/IntelligenceEngine').IntelligenceMode): void {
-        // This was private in the original, but kept for compatibility
-        (this.engine as any).setMode(mode);
+        this.engine.setMode(mode);
     }
 
     // ============================================
     // Meeting Lifecycle (delegates to persistence)
     // ============================================
 
-    startMeeting(metadata?: any): string | null {
+    startMeeting(metadata?: MeetingStartMetadata): string | null {
         return this.persistence.startMeeting(metadata);
     }
 

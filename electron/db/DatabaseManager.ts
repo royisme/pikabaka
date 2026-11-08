@@ -8,7 +8,7 @@ import * as meetingRecord from './meetingRecord';
 import { KNOWN_DIMS, runMigrations } from './migrations';
 import { VectorStore } from '../rag/VectorStore';
 
-import type { Meeting, MeetingSummaryUpdates } from './types';
+import type { Meeting, MeetingSummaryUpdates, MeetingUsage } from './types';
 
 interface SegmentRow {
     segmentId: string; revision: number | null; speaker: string; text: string; timestampMs: number;
@@ -260,7 +260,7 @@ export class DatabaseManager {
         `).all(meetingId, query, Math.max(1, Math.min(8, Math.trunc(limit))));
     }
 
-    public addInteraction(meetingId: string, usage: NonNullable<Meeting['usage']>[number]): void {
+    public addInteraction(meetingId: string, usage: MeetingUsage): void {
         if (!this.db) {
             console.error('[DatabaseManager] DB not initialized');
             return;
