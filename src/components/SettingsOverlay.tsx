@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { BookOpen, FlaskConical, Info, Keyboard, Mic, Monitor, Settings, X } from 'lucide-react';
 import { AboutSection } from './AboutSection';
@@ -18,7 +18,8 @@ interface SettingsOverlayProps {
 
 const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, initialTab = 'general' }) => {
     const initialProviderId = initialTab.startsWith('providers:') ? initialTab.slice('providers:'.length) : undefined;
-    const initialSection = initialProviderId ? 'providers' : initialTab;
+    const initialSection = initialProviderId ? 'providers' : initialTab.split(':')[0];
+    const initialAnchor = initialTab.startsWith('audio:') ? initialTab.slice('audio:'.length) : undefined;
     const [activeTab, setActiveTab] = useState(initialSection);
     const [providerEditorId, setProviderEditorId] = useState(initialProviderId);
     // Sync active tab when modal opens or initialTab prop changes
@@ -30,6 +31,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     } else if (!isOpen && prevOpenState.isOpen) {
         setPrevOpenState({ isOpen, initialTab });
     }
+
+    // `audio:interpreting` lands on the section with that id.
+    useEffect(() => {
+        if (isOpen && initialAnchor) requestAnimationFrame(() => document.getElementById(`${initialAnchor}-settings`)?.scrollIntoView({ block: 'start' }));
+    }, [isOpen, initialAnchor]);
 
     // Each tab owns its own state and handlers; they run here, unconditionally, so the tab a visit
     // starts on does not change what is held or when it loads.
