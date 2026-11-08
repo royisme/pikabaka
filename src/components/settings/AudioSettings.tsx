@@ -9,6 +9,7 @@ import SttModelPicker, { STT_MODEL_DEFAULTS } from './SttModelPicker';
 import { speechServices } from './SpeechProvidersSettings';
 import TranslationSettings from './TranslationSettings';
 import CorrectionSettings from './CorrectionSettings';
+import InterpretingSettings from './InterpretingSettings';
 import { CustomSelect, ProviderSelect } from './AudioSelects';
 import { primaryButton, secondaryButton } from './buttonStyles';
 
@@ -613,6 +614,8 @@ export function renderAudioSettings(
             <TranslationSettings languages={translationLanguageOptions} />
 
             <CorrectionSettings />
+
+            <InterpretingSettings />
 
         </div>
     );
