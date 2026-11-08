@@ -82,12 +82,13 @@ import { initializeApp } from "./lib/lifecycle"
 import type { EchoFilter } from "./lib/echo-filter"
 import { audioStats } from "./lib/audio-stats"
 import { sendLag } from "./lib/send-lag"
-import { takeSelectiveScreenshot } from "./lib/screenshot-capture"
+import { registerGlobalShortcutDispatch } from "./lib/global-shortcuts"
+import { forwardIntelligenceEvents } from "./ipc/intelligence"
+import { createKnowledgeOrchestrator } from "./knowledge/wiring"
 
 /** Unified type for all STT providers with optional extended capabilities */
 // Knowledge modules (local implementation)
 import { KnowledgeOrchestrator as KnowledgeOrchestratorClass } from './knowledge/KnowledgeOrchestrator';
-import { KnowledgeDatabaseManager as KnowledgeDatabaseManagerClass } from './knowledge/KnowledgeDatabaseManager';
 
 import { SettingsManager } from "./services/SettingsManager"
 import { setVerboseLoggingFlag } from "./lib/verboseLog"
@@ -159,73 +160,7 @@ export class AppState {
       this.updateTrayMenu();
     });
 
-    keybindManager.onShortcutTriggered(async (actionId) => {
-      console.log(`[Main] Global shortcut triggered: ${actionId}`);
-      try {
-        if (actionId === 'general:toggle-visibility') {
-          this.toggleMainWindow();
-        } else if (actionId === 'general:toggle-mouse-passthrough') {
-          // Adapted from public PR #113 — verify premium interaction
-          this.toggleOverlayMousePassthrough();
-        } else if (actionId === 'general:selective-screenshot') {
-          const screenshotPath = await takeSelectiveScreenshot(this, false);
-          const preview = await this.getImagePreview(screenshotPath);
-          const mainWindow = this.getMainWindow();
-          if (mainWindow) {
-            // preload.ts maps 'screenshot-attached' to onScreenshotAttached
-            mainWindow.webContents.send("screenshot-attached", {
-              path: screenshotPath,
-              preview
-            });
-          }
-
-        // --- STEALTH SHORTCUTS: no focus, no show, pure IPC dispatch ---
-
-        // Chat actions — fire into the renderer without focusing the window
-        } else if (
-          actionId === 'chat:reply' ||
-          actionId === 'translation:toggle' ||
-          actionId === 'translation:toggle-original'
-        ) {
-          const actionMap: Record<string, string> = {
-            'chat:reply': 'reply',
-            'translation:toggle': 'toggleTranslation',
-            'translation:toggle-original': 'toggleOriginal',
-          };
-          const action = actionMap[actionId];
-          // Send to all windows without focusing — stealth operation
-          const allWindows = BrowserWindow.getAllWindows();
-          allWindows.forEach(win => {
-            if (!win.isDestroyed()) {
-              win.webContents.send('global-shortcut', { action });
-            }
-          });
-
-        // Window movement — move window position without focus change
-        } else if (actionId === 'window:move-up') {
-          this.windowHelper.moveWindowUp();
-        } else if (actionId === 'window:move-down') {
-          this.windowHelper.moveWindowDown();
-        } else if (actionId === 'window:move-left') {
-          this.windowHelper.moveWindowLeft();
-        } else if (actionId === 'window:move-right') {
-          this.windowHelper.moveWindowRight();
-
-        // General actions that are now global (stealth)
-        } else if (actionId === 'general:reset-cancel') {
-          const allWindows = BrowserWindow.getAllWindows();
-          allWindows.forEach(win => {
-            if (!win.isDestroyed()) {
-              win.webContents.send('global-shortcut', { action: 'resetCancel' });
-            }
-          });
-        }
-      } catch (e: any) {
-        if (e.message !== "Selection cancelled" && e.message !== "Screenshot capture already in progress") {
-          console.error(`[Main] Error handling global shortcut ${actionId}:`, e);
-        }
-      }
-    });
+    registerGlobalShortcutDispatch(this, keybindManager);
 
     // Inject WindowHelper into other helpers
     this.settingsWindowHelper.setWindowHelper(this.windowHelper);
@@ -248,7 +183,7 @@ export class AppState {
     this.bootstrapOllamaEmbeddings()
 
 
-    this.setupIntelligenceEvents()
+    forwardIntelligenceEvents(this)
 
 
     // --- NEW SYSTEM AUDIO PIPELINE (SOX + NODE GOOGLE STT) ---
@@ -336,45 +271,9 @@ export class AppState {
 
     // Initialize Knowledge Orchestrator
     try {
-      const db = DatabaseManager.getInstance();
-      const sqliteDb = db.getDb();
-
+      const sqliteDb = DatabaseManager.getInstance().getDb();
       if (sqliteDb) {
-        const knowledgeDb = new KnowledgeDatabaseManagerClass(sqliteDb);
-        const orchestrator = new KnowledgeOrchestratorClass(knowledgeDb);
-        this.knowledgeOrchestrator = orchestrator;
-
-        // Wire up LLM functions
-        const llmHelper = this.processingHelper.getLLMHelper();
-
-        // Embedding function — lazily delegate to the cascaded EmbeddingPipeline
-        // (OpenAI → Gemini → Ollama → Local bundled model).
-        // We await waitForReady() so uploads during boot wait for the pipeline
-        // instead of immediately throwing 'not ready'.
-        const self = this;
-        orchestrator.setEmbeddingStatusFn(() => self.ragManager?.getEmbeddingPipeline().getStatus() ?? null);
-        orchestrator.setEmbedFn(async (text: string) => {
-          const pipeline = self.ragManager?.getEmbeddingPipeline();
-          if (!pipeline) throw new Error('RAG pipeline not available');
-          await pipeline.waitForReady();
-          const { providerName, dimensions } = pipeline.getStatus();
-          if (!providerName || !dimensions) throw new Error('Embedding provider not initialized');
-          const embedding = await pipeline.getEmbedding(text);
-          return { embedding, provider: providerName, dimensions };
-        });
-        orchestrator.setEmbedQueryFn(async (text: string) => {
-          const pipeline = self.ragManager?.getEmbeddingPipeline();
-          if (!pipeline) throw new Error('RAG pipeline not available');
-          await pipeline.waitForReady();
-          const { providerName, dimensions } = pipeline.getStatus();
-          if (!providerName || !dimensions) throw new Error('Embedding provider not initialized');
-          const embedding = await pipeline.getEmbeddingForQuery(text);
-          return { embedding, provider: providerName, dimensions };
-        });
-
-        // Attach KnowledgeOrchestrator to LLMHelper
-        llmHelper.setKnowledgeOrchestrator(orchestrator);
-
+        this.knowledgeOrchestrator = createKnowledgeOrchestrator(sqliteDb, () => this.ragManager, this.processingHelper.getLLMHelper());
         console.log('[AppState] KnowledgeOrchestrator initialized');
       }
     } catch (error) {
@@ -661,73 +560,6 @@ export class AppState {
       console.error('[AppState] Failed to process meeting for RAG:', error);
     }
   }
-
-  private setupIntelligenceEvents(): void {
-    const sendToChatWindows = (channel: string, payload?: unknown) => {
-      const helper = this.getWindowHelper()
-      const launcher = helper.getLauncherWindow()
-      const overlay = helper.getOverlayWindow()
-
-      if (launcher && !launcher.isDestroyed()) {
-        launcher.webContents.send(channel, payload)
-      }
-      if (overlay && !overlay.isDestroyed()) {
-        overlay.webContents.send(channel, payload)
-      }
-    }
-
-    // Forward intelligence events to renderer
-    this.intelligenceManager.on('assist_update', (insight: string) => {
-      sendToChatWindows('intelligence-assist-update', { insight })
-    })
-
-    this.intelligenceManager.on('refined_answer_token', (token: string, intent: string) => {
-      sendToChatWindows('intelligence-refined-answer-token', { token, intent })
-    })
-
-    this.intelligenceManager.on('refined_answer', (answer: string, intent: string) => {
-      sendToChatWindows('intelligence-refined-answer', { answer, intent })
-
-    })
-
-    this.intelligenceManager.on('catch_up', (summary: string) => {
-      sendToChatWindows('intelligence-catch-up', { summary })
-    })
-
-    this.intelligenceManager.on('catch_up_token', (token: string) => {
-      sendToChatWindows('intelligence-catch-up-token', { token })
-    })
-
-    this.intelligenceManager.on('ask', (question: string) => {
-      sendToChatWindows('intelligence-ask', { question })
-    })
-
-    this.intelligenceManager.on('ask_token', (token: string) => {
-      sendToChatWindows('intelligence-ask-token', { token })
-    })
-
-    this.intelligenceManager.on('manual_answer_started', () => {
-      sendToChatWindows('intelligence-manual-started')
-    })
-
-    this.intelligenceManager.on('manual_answer_result', (answer: string, question: string) => {
-      sendToChatWindows('intelligence-manual-result', { answer, question })
-
-    })
-
-    this.intelligenceManager.on('mode_changed', (mode: string) => {
-      sendToChatWindows('intelligence-mode-changed', { mode })
-    })
-
-    this.intelligenceManager.on('error', (error: Error, mode: string) => {
-      console.error(`[IntelligenceManager] Error in ${mode}:`, error)
-      sendToChatWindows('intelligence-error', { error: error.message, mode })
-    })
-  }
-
-
-
-
 
   public updateGoogleCredentials(keyPath: string): void {
     console.log(`[AppState] Updating Google Credentials to: ${keyPath}`);

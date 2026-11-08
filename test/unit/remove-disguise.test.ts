@@ -97,7 +97,7 @@ for (const platform of ['darwin', 'win32'] as const) for (const protectedStartup
         const modules = [
             'audio/SystemAudioCapture', 'audio/MicrophoneCapture', 'rag/RAGManager', 'rag/embeddingConfig',
             'db/DatabaseManager', 'agent/MeetingAgent', 'lib/auto-updater', 'lib/transcript-assembler', 'lib/transcript-translation',
-            'lib/audio-pipeline', 'knowledge/KnowledgeOrchestrator', 'knowledge/KnowledgeDatabaseManager',
+            'lib/audio-pipeline', 'knowledge/KnowledgeOrchestrator', 'knowledge/KnowledgeDatabaseManager', 'knowledge/wiring',
         ];
         const events = ['uncaughtException', 'unhandledRejection'] as const;
         const previous = events.map(event => process.listeners(event));
@@ -119,11 +119,12 @@ for (const platform of ['darwin', 'win32'] as const) for (const protectedStartup
             [file('lib/transcript-assembler')]: { isTranscriptAssemblerProfile: () => false, DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE: 'sentence_bias' },
             [file('lib/tray-menu')]: { showTray: noop }, [file('helpers/stealth')]: stealth,
             [file('lib/lifecycle')]: { initializeApp: async () => {} }, [file('agent/instance')]: {},
+            [file('lib/global-shortcuts')]: { registerGlobalShortcutDispatch: noop }, [file('ipc/intelligence')]: { forwardIntelligenceEvents: noop },
         }) as { AppState: typeof State };
         t.teardown(() => events.forEach((event, i) => {
             for (const listener of process.listeners(event)) if (!previous[i].includes(listener)) process.removeListener(event, listener);
         }));
-        for (const name of ['initializeRAGManager', 'bootstrapOllamaEmbeddings', 'setupIntelligenceEvents', 'setupAutoUpdater']) {
+        for (const name of ['initializeRAGManager', 'bootstrapOllamaEmbeddings', 'setupAutoUpdater']) {
             Reflect.set(AppState.prototype, name, noop);
         }
         t.teardown(() => {

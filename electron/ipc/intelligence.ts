@@ -122,3 +122,68 @@ export function registerIntelligenceHandlers(appState: AppState): void {
     }
   });
 }
+
+/** Forwards the intelligence engine events to the launcher and overlay windows. Called once, from the AppState constructor. */
+export function forwardIntelligenceEvents(appState: AppState): void {
+  const intelligenceManager = appState.getIntelligenceManager()
+  const sendToChatWindows = (channel: string, payload?: unknown) => {
+    const helper = appState.getWindowHelper()
+    const launcher = helper.getLauncherWindow()
+    const overlay = helper.getOverlayWindow()
+
+    if (launcher && !launcher.isDestroyed()) {
+      launcher.webContents.send(channel, payload)
+    }
+    if (overlay && !overlay.isDestroyed()) {
+      overlay.webContents.send(channel, payload)
+    }
+  }
+
+  // Forward intelligence events to renderer
+  intelligenceManager.on('assist_update', (insight: string) => {
+    sendToChatWindows('intelligence-assist-update', { insight })
+  })
+
+  intelligenceManager.on('refined_answer_token', (token: string, intent: string) => {
+    sendToChatWindows('intelligence-refined-answer-token', { token, intent })
+  })
+
+  intelligenceManager.on('refined_answer', (answer: string, intent: string) => {
+    sendToChatWindows('intelligence-refined-answer', { answer, intent })
+
+  })
+
+  intelligenceManager.on('catch_up', (summary: string) => {
+    sendToChatWindows('intelligence-catch-up', { summary })
+  })
+
+  intelligenceManager.on('catch_up_token', (token: string) => {
+    sendToChatWindows('intelligence-catch-up-token', { token })
+  })
+
+  intelligenceManager.on('ask', (question: string) => {
+    sendToChatWindows('intelligence-ask', { question })
+  })
+
+  intelligenceManager.on('ask_token', (token: string) => {
+    sendToChatWindows('intelligence-ask-token', { token })
+  })
+
+  intelligenceManager.on('manual_answer_started', () => {
+    sendToChatWindows('intelligence-manual-started')
+  })
+
+  intelligenceManager.on('manual_answer_result', (answer: string, question: string) => {
+    sendToChatWindows('intelligence-manual-result', { answer, question })
+
+  })
+
+  intelligenceManager.on('mode_changed', (mode: string) => {
+    sendToChatWindows('intelligence-mode-changed', { mode })
+  })
+
+  intelligenceManager.on('error', (error: Error, mode: string) => {
+    console.error(`[IntelligenceManager] Error in ${mode}:`, error)
+    sendToChatWindows('intelligence-error', { error: error.message, mode })
+  })
+}
