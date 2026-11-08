@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.3.0](https://github.com/royisme/pikabaka/compare/v3.2.0...v3.3.0) (2026-11-08)
+
+
+### Features
+
+* **chat:** replace the quick actions with Reply, Ask and Catch up, and add a Reply button on transcript rows ([39adce0](https://github.com/royisme/pikabaka/commit/39adce031c71c82b62a999af77e9d956afec2d44))
+* **chat:** Reply, Ask and Catch up quick actions; rewrite README and docs for scenarios ([53d8c0a](https://github.com/royisme/pikabaka/commit/53d8c0a0b0323202317b0a089c805828377c2d35))
+* **docs:** render product images from the real overlay components ([f3975a0](https://github.com/royisme/pikabaka/commit/f3975a04df9e91ef8a9d815dff0c0385e17b25a7))
+
+
+### Bug Fixes
+
+* **docs:** fit the whole scene in each product image ([f457289](https://github.com/royisme/pikabaka/commit/f4572890149080e9f66507de283d6ba38727a284))
+* **prompts:** keep replies from inventing commitments and catch-up bullets to one short sentence ([5325d8a](https://github.com/royisme/pikabaka/commit/5325d8ab8efe951884aa48b4b51d8f99019244c0))
+
 ## [3.2.0](https://github.com/royisme/pikabaka/compare/v3.1.0...v3.2.0) (2026-11-07)
 
 
