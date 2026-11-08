@@ -4,6 +4,7 @@ import { AppState } from "../main"
 import { AudioDevices } from "../audio/AudioDevices"
 import { DEFAULT_TRANSCRIPT_ASSEMBLER_PROFILE, isTranscriptAssemblerProfile } from "../lib/transcript-assembler"
 import { SettingsManager } from "../services/SettingsManager"
+import WebSocket from "ws"
 import { safeHandle } from "./safeHandle"
 
 export function registerSttHandlers(appState: AppState): void {
@@ -28,9 +29,9 @@ export function registerSttHandlers(appState: AppState): void {
       await appState.reconfigureSttProvider();
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error setting STT provider:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -66,7 +67,7 @@ export function registerSttHandlers(appState: AppState): void {
     try {
       const { CredentialsManager } = require('../services/CredentialsManager');
       return CredentialsManager.getInstance().getSttProvider();
-    } catch (error: any) {
+    } catch (error: unknown) {
       return 'google';
     }
   });
@@ -91,9 +92,9 @@ export function registerSttHandlers(appState: AppState): void {
       const { CredentialsManager } = require('../services/CredentialsManager');
       CredentialsManager.getInstance().setGroqSttApiKey(apiKey);
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving Groq STT API key:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -102,9 +103,9 @@ export function registerSttHandlers(appState: AppState): void {
       const { CredentialsManager } = require('../services/CredentialsManager');
       CredentialsManager.getInstance().setOpenAiSttApiKey(apiKey);
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving OpenAI STT API key:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -113,9 +114,9 @@ export function registerSttHandlers(appState: AppState): void {
       const { CredentialsManager } = require('../services/CredentialsManager');
       CredentialsManager.getInstance().setDeepgramApiKey(apiKey);
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving Deepgram API key:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -128,9 +129,9 @@ export function registerSttHandlers(appState: AppState): void {
       await appState.reconfigureSttProvider();
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error setting Groq STT model:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -139,9 +140,9 @@ export function registerSttHandlers(appState: AppState): void {
       const { CredentialsManager } = require('../services/CredentialsManager');
       CredentialsManager.getInstance().setElevenLabsApiKey(apiKey);
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving ElevenLabs API key:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -150,9 +151,9 @@ export function registerSttHandlers(appState: AppState): void {
       const { CredentialsManager } = require('../services/CredentialsManager');
       CredentialsManager.getInstance().setAzureApiKey(apiKey);
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving Azure API key:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -165,9 +166,9 @@ export function registerSttHandlers(appState: AppState): void {
       await appState.reconfigureSttProvider();
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error setting Azure region:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -176,9 +177,9 @@ export function registerSttHandlers(appState: AppState): void {
       const { CredentialsManager } = require('../services/CredentialsManager');
       CredentialsManager.getInstance().setIbmWatsonApiKey(apiKey);
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving IBM Watson API key:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -203,9 +204,9 @@ export function registerSttHandlers(appState: AppState): void {
       const { CredentialsManager } = require('../services/CredentialsManager');
       CredentialsManager.getInstance().setSonioxApiKey(apiKey);
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving Soniox API key:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -244,7 +245,6 @@ export function registerSttHandlers(appState: AppState): void {
     try {
       if (provider === 'deepgram') {
         // Test Deepgram via WebSocket connection
-        const WebSocket = require('ws');
         return await new Promise<{ success: boolean; error?: string }>((resolve) => {
           const url = 'wss://api.deepgram.com/v1/listen?model=nova-3&encoding=linear16&sample_rate=16000&channels=1';
           const ws = new WebSocket(url, {
@@ -263,7 +263,7 @@ export function registerSttHandlers(appState: AppState): void {
             resolve({ success: true });
           });
 
-          ws.on('error', (err: any) => {
+          ws.on('error', (err: Error) => {
             clearTimeout(timeout);
             resolve({ success: false, error: err.message || 'Connection failed' });
           });
@@ -272,7 +272,6 @@ export function registerSttHandlers(appState: AppState): void {
 
       if (provider === 'soniox') {
         // Test Soniox via WebSocket connection
-        const WebSocket = require('ws');
         return await new Promise<{ success: boolean; error?: string }>((resolve) => {
           const ws = new WebSocket('wss://stt-rt.soniox.com/transcribe-websocket');
 
@@ -292,7 +291,7 @@ export function registerSttHandlers(appState: AppState): void {
             }));
           });
 
-          ws.on('message', (msg: any) => {
+          ws.on('message', (msg: WebSocket.RawData) => {
             clearTimeout(timeout);
             try {
               const res = JSON.parse(msg.toString());
@@ -309,7 +308,7 @@ export function registerSttHandlers(appState: AppState): void {
             ws.close();
           });
 
-          ws.on('error', (err: any) => {
+          ws.on('error', (err: Error) => {
             clearTimeout(timeout);
             resolve({ success: false, error: err.message || 'Connection failed' });
           });
@@ -396,9 +395,10 @@ export function registerSttHandlers(appState: AppState): void {
       }
 
       return { success: true };
-    } catch (error: any) {
-      const respData = error?.response?.data;
-      const rawMsg = respData?.error?.message || respData?.detail?.message || respData?.message || error.message || 'Connection failed';
+    } catch (error: unknown) {
+      const axiosError = error as { message?: string; response?: { data?: any } };
+      const respData = axiosError.response?.data;
+      const rawMsg = respData?.error?.message || respData?.detail?.message || respData?.message || axiosError.message || 'Connection failed';
       const msg = sanitizeErrorMessage(rawMsg);
       console.error("STT connection test failed:", msg);
       return { success: false, error: msg };

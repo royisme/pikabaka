@@ -13,9 +13,9 @@ export function registerMeetingHandlers(appState: AppState): void {
     try {
       await appState.startMeeting(metadata);
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error starting meeting:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -23,9 +23,9 @@ export function registerMeetingHandlers(appState: AppState): void {
     try {
       await appState.endMeeting();
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error ending meeting:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 

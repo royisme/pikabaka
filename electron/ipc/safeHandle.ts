@@ -1,6 +1,6 @@
-import { ipcMain } from "electron"
+import { ipcMain, type IpcMainInvokeEvent } from "electron"
 
-export const safeHandle = (channel: string, listener: (event: any, ...args: any[]) => Promise<any> | any) => {
+export const safeHandle = (channel: string, listener: (event: IpcMainInvokeEvent, ...args: any[]) => Promise<unknown> | unknown) => {
   ipcMain.removeHandler(channel);
   ipcMain.handle(channel, async (event, ...args) => {
     try {
