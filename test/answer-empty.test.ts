@@ -14,8 +14,8 @@ t.test('every audio state has a one-line hint, with no hard-coded key names', as
 });
 
 t.test('hints that name a shortcut say which one', async (t) => {
-  t.equal(answerEmptyHint('listening').key, 'whatToAnswer');
-  t.equal(answerEmptyHint('live').key, 'whatToAnswer');
+  t.equal(answerEmptyHint('listening').key, 'reply');
+  t.equal(answerEmptyHint('live').key, 'reply');
   t.equal(answerEmptyHint('stopped').key, 'selectiveScreenshot');
   t.equal(answerEmptyHint('no-audio').key, null);
 });
@@ -28,5 +28,5 @@ t.test('with lines on screen, no audio does not claim their words are missing', 
   const hint = answerEmptyHint('no-audio', true);
   t.notMatch(hint.before, /needs their words/);
   t.match(hint.before, /No new sound/);
-  t.equal(answerEmptyHint('listening', true).key, 'whatToAnswer', 'other states are unchanged');
+  t.equal(answerEmptyHint('listening', true).key, 'reply', 'other states are unchanged');
 });

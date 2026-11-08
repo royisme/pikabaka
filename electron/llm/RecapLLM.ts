@@ -14,7 +14,7 @@ export class RecapLLM {
     async generate(context: string): Promise<string> {
         if (!context.trim()) return "";
         try {
-            const stream = this.llmHelper.streamChat(context, undefined, undefined, taskPrompt('recap'));
+            const stream = this.llmHelper.streamChat(context, undefined, undefined, taskPrompt('catchUp'));
             let fullResponse = "";
             for await (const chunk of stream) fullResponse += chunk;
             return this.clampRecapResponse(fullResponse);
@@ -31,7 +31,7 @@ export class RecapLLM {
         if (!context.trim()) return;
         try {
             // Use our universal helper
-            yield* this.llmHelper.streamChat(context, undefined, undefined, taskPrompt('recap'));
+            yield* this.llmHelper.streamChat(context, undefined, undefined, taskPrompt('catchUp'));
         } catch (error) {
             console.error("[RecapLLM] Streaming generation failed:", error);
         }

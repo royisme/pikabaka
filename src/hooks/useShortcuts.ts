@@ -7,7 +7,7 @@ import { useMainEvent } from './useMainEvent';
 export const SHORTCUT_IDS = {
     toggleVisibility: 'general:toggle-visibility',
     toggleMousePassthrough: 'general:toggle-mouse-passthrough',
-    whatToAnswer: 'chat:whatToAnswer',
+    reply: 'chat:reply',
     selectiveScreenshot: 'general:selective-screenshot',
     toggleTranslation: 'translation:toggle',
     resetCancel: 'general:reset-cancel',
@@ -27,7 +27,7 @@ function buildDefaultShortcuts(): ShortcutConfig {
     return {
         toggleVisibility: [mod, 'B'],
         toggleMousePassthrough: [mod, shift, 'B'],
-        whatToAnswer: [mod, '1'],
+        reply: [mod, '1'],
         selectiveScreenshot: [mod, shift, 'H'],
         toggleTranslation: isWindows ? ['Ctrl', shift, 'F9'] : [mod, isMac ? '⌥' : 'Alt', 'T'],
         resetCancel: [mod, 'R'],

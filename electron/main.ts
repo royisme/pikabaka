@@ -251,12 +251,12 @@ export class AppState {
 
         // Chat actions — fire into the renderer without focusing the window
         } else if (
-          actionId === 'chat:whatToAnswer' ||
+          actionId === 'chat:reply' ||
           actionId === 'translation:toggle' ||
           actionId === 'translation:toggle-original'
         ) {
           const actionMap: Record<string, string> = {
-            'chat:whatToAnswer': 'whatToAnswer',
+            'chat:reply': 'reply',
             'translation:toggle': 'toggleTranslation',
             'translation:toggle-original': 'toggleOriginal',
           };
@@ -931,15 +931,6 @@ export class AppState {
       sendToChatWindows('intelligence-assist-update', { insight })
     })
 
-    this.intelligenceManager.on('suggested_answer', (answer: string, question: string, confidence: number) => {
-      sendToChatWindows('intelligence-suggested-answer', { answer, question, confidence })
-
-    })
-
-    this.intelligenceManager.on('suggested_answer_token', (token: string, question: string, confidence: number) => {
-      sendToChatWindows('intelligence-suggested-answer-token', { token, question, confidence })
-    })
-
     this.intelligenceManager.on('refined_answer_token', (token: string, intent: string) => {
       sendToChatWindows('intelligence-refined-answer-token', { token, intent })
     })
@@ -949,28 +940,20 @@ export class AppState {
 
     })
 
-    this.intelligenceManager.on('recap', (summary: string) => {
-      sendToChatWindows('intelligence-recap', { summary })
+    this.intelligenceManager.on('catch_up', (summary: string) => {
+      sendToChatWindows('intelligence-catch-up', { summary })
     })
 
-    this.intelligenceManager.on('recap_token', (token: string) => {
-      sendToChatWindows('intelligence-recap-token', { token })
+    this.intelligenceManager.on('catch_up_token', (token: string) => {
+      sendToChatWindows('intelligence-catch-up-token', { token })
     })
 
-    this.intelligenceManager.on('clarify', (clarification: string) => {
-      sendToChatWindows('intelligence-clarify', { clarification })
+    this.intelligenceManager.on('ask', (question: string) => {
+      sendToChatWindows('intelligence-ask', { question })
     })
 
-    this.intelligenceManager.on('clarify_token', (token: string) => {
-      sendToChatWindows('intelligence-clarify-token', { token })
-    })
-
-    this.intelligenceManager.on('follow_up_questions_update', (questions: string) => {
-      sendToChatWindows('intelligence-follow-up-questions-update', { questions })
-    })
-
-    this.intelligenceManager.on('follow_up_questions_token', (token: string) => {
-      sendToChatWindows('intelligence-follow-up-questions-token', { token })
+    this.intelligenceManager.on('ask_token', (token: string) => {
+      sendToChatWindows('intelligence-ask-token', { token })
     })
 
     this.intelligenceManager.on('manual_answer_started', () => {

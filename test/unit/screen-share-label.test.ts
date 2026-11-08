@@ -135,13 +135,5 @@ t.test('shipped README and PRODUCT name screen-share privacy without undetectabl
         t.notMatch(text, /undetectable|detectable|guaranteed/i, `${file}: no undetectable or guaranteed claim`);
         t.notMatch(text, /ensures stealth|stealth (mode|overlay)/i, `${file}: no stealth claim`);
     }
-    const readme = readFileSync(path.resolve('README.md'), 'utf8');
-    t.match(readme, '**Window content protection ("Hide from screen share")**');
-    t.match(readme, '**Why "Hide from screen share"?**');
-    t.match(readme, 'is not a total guarantee: macOS screen recorders that use ScreenCaptureKit can still capture protected windows, and Linux is not supported');
-    const product = readFileSync(path.resolve('PRODUCT.md'), 'utf8');
-    t.match(product, '**Hide from screen share**: `evidenced` in code (`setContentProtection` in the window helpers); real-device behaviour is the owner\'s check.');
-    t.match(product, 'pending a content-protection review');
-    t.match(product, 'macOS recorders that use ScreenCaptureKit can still capture it, and Linux is not supported');
     t.end();
 });

@@ -948,7 +948,7 @@ Pika is a real-time AI meeting assistant designed to help you stay focused, info
 Click **Start Session** from the dashboard.
 
 ### During a Meeting
-- Use the **five quick action buttons** for real-time assistance
+- Use the **quick action buttons** for real-time assistance
 - Show or hide Pika at any time:
   - **Mac**: Cmd + B
   - **Windows**: Ctrl + B
@@ -956,12 +956,11 @@ Click **Start Session** from the dashboard.
 
 # Main Features
 
-## Five Quick Action Buttons
-- **What to answer**: Instantly generates a context-aware response to the current topic.
-- **Clarify**: Asks a targeted, senior-level clarifying question to establish constraints.
-- **Recap**: Generates a comprehensive summary of the conversation so far.
-- **Follow Up Question**: Suggests strategic questions you can ask to drive the conversation.
-- **Answer**: Manually trigger a response or use voice input to ask specific questions.
+## Quick Action Buttons
+- **Reply**: Suggests what to say to the other party's latest words.
+- **Ask**: Suggests the one question that most changes what happens next.
+- **Catch up**: Summarizes what was said in the last few minutes.
+- **Answer**: Type a question about the call or the screen.
 
 ## Meeting Insights (Launcher)
 - **Smart Note Taking**: Automatically captures key points, action items, and structured summaries.
@@ -1075,12 +1074,12 @@ pika.contact@gmail.com`;
             transcript: [
                 { speaker: 'them', text: "Welcome to Pika! Let me show you how it works.", timestamp: 0 },
                 { speaker: 'user', text: "Thanks! I'm excited to try it out.", timestamp: 5000 },
-                { speaker: 'them', text: "You have 5 quick action buttons. 'What to answer' listens to the conversation and suggests what you should say.", timestamp: 10000 },
+                { speaker: 'them', text: "You have three quick action buttons. 'Reply' listens to the conversation and suggests what you should say.", timestamp: 10000 },
                 { speaker: 'user', text: "That sounds helpful for interviews.", timestamp: 18000 },
                 { speaker: 'them', text: "Check out the 'How to Use' section in the notes for API setup instructions.", timestamp: 20000 },
-                { speaker: 'them', text: "'Clarify' asks a targeted question to get missing constraints. 'Recap' summarizes the entire conversation so far.", timestamp: 22000 },
-                { speaker: 'user', text: "What about the other buttons?", timestamp: 30000 },
-                { speaker: 'them', text: "'Follow Up Questions' suggests questions you can ask. 'Answer' lets you speak a question and get an instant response.", timestamp: 35000 },
+                { speaker: 'them', text: "'Ask' suggests a question to get missing information. 'Catch up' summarizes what was said recently.", timestamp: 22000 },
+                { speaker: 'user', text: "What about typing a question?", timestamp: 30000 },
+                { speaker: 'them', text: "Type a question in the box and press Enter to get an instant response.", timestamp: 35000 },
                 { speaker: 'user', text: "Can I take screenshots during calls?", timestamp: 45000 },
                 { speaker: 'them', text: "Yes! Press Cmd+H for full screen or Cmd+Shift+H to select an area. The AI will analyze it and help you.", timestamp: 50000 },
                 { speaker: 'user', text: "How do I hide Pika during screen share?", timestamp: 60000 },
@@ -1089,8 +1088,8 @@ pika.contact@gmail.com`;
                 { speaker: 'them', text: "You get detailed meeting notes with action items, key points, full transcript, and a log of all AI interactions.", timestamp: 80000 }
             ],
             usage: [
-                { type: 'assist', timestamp: 15000, question: 'What features does Pika have?', answer: 'Pika offers 5 quick action buttons, screenshot analysis, real-time transcription, and comprehensive meeting notes.' },
-                { type: 'followup', timestamp: 40000, question: 'How do the action buttons work?', answer: 'Each button serves a specific purpose: suggest answers, clarify questions, recap conversations, generate follow-up questions, or get instant voice-to-answer responses.' }
+                { type: 'assist', timestamp: 15000, question: 'What features does Pika have?', answer: 'Pika offers quick action buttons, screenshot analysis, real-time transcription, and comprehensive meeting notes.' },
+                { type: 'followup', timestamp: 40000, question: 'How do the action buttons work?', answer: 'Each button serves a specific purpose: suggest a reply, suggest a question to ask, or catch up on what was said.' }
             ],
             isProcessed: true
         };

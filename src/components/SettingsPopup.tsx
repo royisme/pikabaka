@@ -23,16 +23,6 @@ const SettingsPopup = () => {
     const [storedTranscript, setStoredTranscript] = useLocalStorageValue('pika_them_transcript');
     const showTranscript = storedTranscript !== 'false';
 
-    // Action button mode: read via query, stream via useMainEvent
-    const actionButtonModeQuery = useQuery<'recap' | 'brainstorm'>({ queryKey: ['action-button-mode'], queryFn: async () => {
-            const mode = await window.electronAPI?.getActionButtonMode?.();
-            return mode ?? 'recap';
-        } });
-    const actionButtonMode = actionButtonModeQuery.data ?? 'recap';
-    useMainEvent(window.electronAPI?.onActionButtonModeChanged, (mode: 'recap' | 'brainstorm') => {
-        queryClient.setQueryData(['action-button-mode'], mode);
-    });
-
     const contentRef = useRef<HTMLDivElement>(null);
 
     // Auto-resize Window
@@ -128,40 +118,6 @@ const SettingsPopup = () => {
                         className={`w-[30px] h-[18px] rounded-full p-[1.5px] transition-all duration-300 ease-spring active:scale-[0.92] ${showTranscript ? 'bg-state-success shadow-[0_2px_10px_rgba(16,185,129,0.3)]' : defaultToggleTrackClass}`}
                     >
                         <div className={`w-[15px] h-[15px] rounded-full transition-transform duration-300 ease-spring ${toggleKnobClass} ${showTranscript ? 'translate-x-[12px]' : 'translate-x-0'}`} />
-                    </button>
-                </div>
-
-                {/* Brainstorm Toggle */}
-                <div className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors duration-200 group cursor-default ${itemHoverClass}`}>
-                    <div className="flex items-center gap-3">
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className={`w-3.5 h-3.5 transition-colors ${actionButtonMode === 'brainstorm' ? 'text-violet-400' : iconInactiveClass}`}
-                        >
-                            <line x1="6" y1="3" x2="6" y2="15" />
-                            <circle cx="18" cy="6" r="3" />
-                            <circle cx="6" cy="18" r="3" />
-                            <path d="M18 9a9 9 0 0 1-9 9" />
-                        </svg>
-                        <span className={`text-[12px] font-medium transition-colors ${actionButtonMode === 'brainstorm' ? (isLightTheme ? 'text-slate-950' : 'text-white') : labelInactiveClass}`}>Brainstorm</span>
-                    </div>
-                    <button
-                        onClick={async () => {
-                            const newMode: 'recap' | 'brainstorm' = actionButtonMode === 'brainstorm' ? 'recap' : 'brainstorm';
-                            queryClient.setQueryData(['action-button-mode'], newMode);
-                            try {
-                                await window.electronAPI?.setActionButtonMode?.(newMode);
-                            } catch (e) { console.error(e); }
-                        }}
-                        className={`w-[30px] h-[18px] rounded-full p-[1.5px] transition-all duration-300 ease-spring active:scale-[0.92] ${actionButtonMode === 'brainstorm' ? 'bg-violet-500 shadow-[0_2px_10px_rgba(139,92,246,0.3)]' : defaultToggleTrackClass}`}
-                    >
-                        <div className={`w-[15px] h-[15px] rounded-full transition-transform duration-300 ease-spring ${toggleKnobClass} ${actionButtonMode === 'brainstorm' ? 'translate-x-[12px]' : 'translate-x-0'}`} />
                     </button>
                 </div>
 

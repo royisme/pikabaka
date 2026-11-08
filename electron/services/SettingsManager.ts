@@ -9,7 +9,6 @@ export interface AppSettings {
     // can be moved here from CredentialsManager to allow early boot access.
     isUndetectable?: boolean;
     verboseLogging?: boolean;
-    actionButtonMode?: 'recap' | 'brainstorm';
     autoCheckUpdates?: boolean;
     transcriptAssemblerProfile?: 'sentence_bias' | 'low_latency' | 'coherent';
     answerUsesMeetings?: boolean;

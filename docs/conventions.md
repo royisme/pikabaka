@@ -54,11 +54,11 @@ The overlay is read for one to three seconds mid-call. These rules come from the
 - Text input honours IME composition: Enter does not submit while composing.
 - Respect `prefers-reduced-motion`. The CSS rule covers CSS animation; motion run by framer-motion needs its own handling.
 
-## IPC and persisted shapes
+## IPC and stored keys
 
 - A channel is added, renamed or removed in handler, preload, types and renderer in one commit (`docs/architecture.md`).
 - Register handlers through `safeHandle`. Handlers validate the payload at the boundary and return the real error.
-- A persisted key (SQLite column, credential key, localStorage key such as `pika_splitter_position`) is a released contract. A change that needs a migration is an owner decision.
+- A persisted key (SQLite column, credential key, localStorage key such as `pika_splitter_position`) may be renamed, reshaped or removed when the design is better: change its readers, writers, preload and types in the same commit. Backward compatibility is not a design goal; do not keep a stale key only to avoid a rename. Say in the PR what a user loses (a reset to the new default is fine).
 
 ## Git names and releases
 
