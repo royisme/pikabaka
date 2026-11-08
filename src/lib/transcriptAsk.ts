@@ -19,3 +19,15 @@ export function challengeCardText(card: { text: string; segmentId: string }, seg
   const about = line ? ` for what they said "${line.sourceText.trim()}"` : '';
   return `Pika suggested "${card.text}"${about}, but that is not right: `;
 }
+
+/** What a Reply to one transcript line sends: the prompt, and the line the answer card shows as "Re:". */
+export interface ReplyRequest {
+  userText: string;
+  replyTo: string;
+}
+
+/** Reply to this line, not to the latest words: the line is quoted in the prompt and becomes the card's context. */
+export function replyToLineRequest(segment: Pick<TranscriptSegment, 'sourceText'>): ReplyRequest {
+  const line = segment.sourceText.trim();
+  return { userText: `What should I say in response to: "${line}"?`, replyTo: line };
+}

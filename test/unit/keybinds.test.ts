@@ -53,7 +53,7 @@ t.test('the default table has exactly six bound globals and five optional unboun
     const f = fixture();
     t.teardown(f.cleanup);
     t.same(f.defaults.filter(kb => kb.accelerator).map(kb => kb.id), [
-        'general:toggle-visibility', 'general:toggle-mouse-passthrough', 'chat:whatToAnswer',
+        'general:toggle-visibility', 'general:toggle-mouse-passthrough', 'chat:reply',
         'general:selective-screenshot', 'translation:toggle', 'general:reset-cancel',
     ]);
     t.same(f.defaults.filter(kb => !kb.accelerator).map(kb => kb.id), [
@@ -97,11 +97,11 @@ t.test('a conflicting Pika shortcut is refused without swapping, registering or 
     const before = f.manager.getAllKeybinds();
     const disk = fs.readFileSync(f.file, 'utf8');
     f.attempts.length = 0;
-    t.same(f.manager.setKeybind('chat:whatToAnswer', 'shift+commandorcontrol+b'), {
+    t.same(f.manager.setKeybind('chat:reply', 'shift+commandorcontrol+b'), {
         success: false, error: 'Already used by Toggle Mouse Passthrough',
     });
     const explicitMod = process.platform === 'darwin' ? 'Command' : 'Ctrl';
-    t.same(f.manager.setKeybind('chat:whatToAnswer', `${explicitMod}+B`), {
+    t.same(f.manager.setKeybind('chat:reply', `${explicitMod}+B`), {
         success: false, error: 'Already used by Toggle Visibility',
     });
     t.same(f.manager.getAllKeybinds(), before);
@@ -114,14 +114,14 @@ t.test('OS refusal or exception keeps the previous binding and its registration'
     const f = fixture();
     t.teardown(f.cleanup);
     f.manager.setMode('overlay');
-    const old = f.manager.getKeybind('chat:whatToAnswer')!;
+    const old = f.manager.getKeybind('chat:reply')!;
     const before = f.manager.getAllKeybinds();
     const disk = fs.readFileSync(f.file, 'utf8');
     f.refused.add('CommandOrControl+9');
     f.throwing.add('CommandOrControl+8');
     for (const accelerator of ['CommandOrControl+9', 'CommandOrControl+8']) {
-        t.match(f.manager.setKeybind('chat:whatToAnswer', accelerator), { success: false, error: /another app/i });
-        t.equal(f.manager.getKeybind('chat:whatToAnswer'), old);
+        t.match(f.manager.setKeybind('chat:reply', accelerator), { success: false, error: /another app/i });
+        t.equal(f.manager.getKeybind('chat:reply'), old);
         t.ok(f.registered.has(old));
         t.same(f.manager.getAllKeybinds(), before);
         t.equal(fs.readFileSync(f.file, 'utf8'), disk);
@@ -132,16 +132,16 @@ t.test('OS refusal or exception keeps the previous binding and its registration'
 t.test('startup registration failures are returned to Settings and can be retried', t => {
     const f = fixture();
     t.teardown(f.cleanup);
-    const accelerator = f.manager.getKeybind('chat:whatToAnswer')!;
+    const accelerator = f.manager.getKeybind('chat:reply')!;
     f.refused.add(accelerator);
     f.manager.setMode('overlay');
-    t.match(f.manager.getAllKeybinds().find(kb => kb.id === 'chat:whatToAnswer'), { accelerator, registered: false });
-    t.equal(f.manager.setKeybind('chat:whatToAnswer', accelerator).success, false);
-    t.equal(f.manager.getKeybind('chat:whatToAnswer'), accelerator);
+    t.match(f.manager.getAllKeybinds().find(kb => kb.id === 'chat:reply'), { accelerator, registered: false });
+    t.equal(f.manager.setKeybind('chat:reply', accelerator).success, false);
+    t.equal(f.manager.getKeybind('chat:reply'), accelerator);
     f.refused.delete(accelerator);
-    t.same(f.manager.setKeybind('chat:whatToAnswer', accelerator), { success: true });
-    t.match(f.manager.getAllKeybinds().find(kb => kb.id === 'chat:whatToAnswer'), { registered: true });
-    t.same(f.manager.setKeybind('chat:whatToAnswer', accelerator), { success: true }, 'saving the same active chord succeeds');
+    t.same(f.manager.setKeybind('chat:reply', accelerator), { success: true });
+    t.match(f.manager.getAllKeybinds().find(kb => kb.id === 'chat:reply'), { registered: true });
+    t.same(f.manager.setKeybind('chat:reply', accelerator), { success: true }, 'saving the same active chord succeeds');
     t.end();
 });
 
@@ -192,10 +192,10 @@ t.test('set, clear, reset and IPC keep their contracts and persist only ids and 
     f.manager.onShortcutTriggered(id => fired.push(id));
     f.registered.get('CommandOrControl+B')!();
     t.same(fired, ['general:toggle-visibility']);
-    set('chat:whatToAnswer', '');
+    set('chat:reply', '');
     const reset = f.handlers.get('keybinds:reset')!();
     t.same(reset, f.manager.getAllKeybinds());
-    t.equal(f.manager.getKeybind('chat:whatToAnswer'), 'CommandOrControl+1');
+    t.equal(f.manager.getKeybind('chat:reply'), 'CommandOrControl+1');
     t.equal(f.registered.size, 6);
     t.end();
 });

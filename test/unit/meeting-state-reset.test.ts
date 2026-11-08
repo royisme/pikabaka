@@ -174,9 +174,9 @@ const interfaceStubs = {
     [at('src/hooks/useLocalStorageValue.ts')]: { useLocalStorageValue: () => [null, () => {}] },
     [at('src/hooks/useMeetingChat.ts')]: { useMeetingChat: () => ({
         stop: () => { stopped.push('stop'); }, setSystemMessages: () => {}, setInputValue: () => {}, setAttachedContext: () => {},
-        setIsProcessing: () => {}, messages: [], attachedContext: [], actionButtonMode: 'recap', inputValue: '', isProcessing: false,
-        canRetry: false, stopGeneration: () => {}, retryLast: () => {}, handleWhatToSay: () => {}, handleClarify: () => {},
-        handleFollowUpQuestions: () => {}, handleRecap: () => {}, handleBrainstorm: () => {}, handleManualSubmit: () => {},
+        setIsProcessing: () => {}, messages: [], attachedContext: [], inputValue: '', isProcessing: false,
+        canRetry: false, stopGeneration: () => {}, retryLast: () => {}, handleReply: () => {}, handleReplyToLine: () => {},
+        handleAsk: () => {}, handleCatchUp: () => {}, handleManualSubmit: () => {},
     }) },
     [at('src/hooks/useMeetingTranscript.ts')]: { useMeetingTranscript: () => ({
         transcriptSegments: [], isThemSpeaking: false, currentThemPartial: '', livePartial: null, showTranscript: true, transcriptDisplayMode: 'original',

@@ -5,15 +5,11 @@ import { primaryButton, secondaryButton } from './buttonStyles';
 
 const TASK_LABELS: Array<[TaskName, string]> = [
     ['answer', 'Answer'],
-    ['whatToAnswer', 'What to answer'],
-    ['recap', 'Recap'],
+    ['catchUp', 'Catch up'],
     ['followUp', 'Follow-up'],
-    ['followUpQuestions', 'Follow-up questions'],
     ['assist', 'Assist'],
-    ['clarify', 'Clarify'],
-    ['codeHint', 'Code hint'],
-    ['brainstorm', 'Brainstorm'],
-    ['chat', 'Chat'],
+    ['ask', 'Ask'],
+    ['chat', 'Chat and Reply'],
 ];
 
 const fieldClass = 'w-full min-w-0 bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent-primary transition-colors';

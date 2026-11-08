@@ -52,11 +52,11 @@ t.test('the settings manager round-trips the prompts key and reset removes it', 
     const manager = s.SettingsManager.getInstance();
     manager.set('answerUsesMaterials', true);
 
-    manager.set('prompts', { role: 'Invented role line.', tasks: { recap: 'Invented recap text.' } });
-    t.same(manager.get('prompts'), { role: 'Invented role line.', tasks: { recap: 'Invented recap text.' } });
+    manager.set('prompts', { role: 'Invented role line.', tasks: { catchUp: 'Invented recap text.' } });
+    t.same(manager.get('prompts'), { role: 'Invented role line.', tasks: { catchUp: 'Invented recap text.' } });
     t.same(JSON.parse(readFileSync(path_.settingsPath, 'utf8')), {
         answerUsesMaterials: true,
-        prompts: { role: 'Invented role line.', tasks: { recap: 'Invented recap text.' } },
+        prompts: { role: 'Invented role line.', tasks: { catchUp: 'Invented recap text.' } },
     });
 
     manager.set('prompts', undefined);
@@ -72,7 +72,7 @@ t.test('prompts:get reports the text in force, the built-in text and whether it 
     t.equal(unedited.role.text, prompts.ROLE_PROMPT);
     t.equal(unedited.role.defaultText, prompts.ROLE_PROMPT);
     t.equal(unedited.role.edited, false);
-    t.same(Object.keys(unedited.tasks), [...prompts.TASK_NAMES], 'the ten tasks, in the declared order');
+    t.same(Object.keys(unedited.tasks), [...prompts.TASK_NAMES], 'the six tasks, in the declared order');
     for (const task of prompts.TASK_NAMES) {
         t.equal(unedited.tasks[task].text, prompts.taskText(task, {}), `${task}: the built-in text is in force`);
         t.equal(unedited.tasks[task].edited, false);
@@ -80,10 +80,10 @@ t.test('prompts:get reports the text in force, the built-in text and whether it 
     }
     t.equal(unedited.rules, prompts.CORE_RULES, 'the fixed rules are shown as they are');
     t.equal(unedited.maxLength, prompts.PROMPT_MAX_LENGTH);
-    t.same(await f.invoke('prompts:set', { role: 'Invented role line.', tasks: { recap: 'Invented recap text.' } }), { success: true });
+    t.same(await f.invoke('prompts:set', { role: 'Invented role line.', tasks: { catchUp: 'Invented recap text.' } }), { success: true });
     const edited = await f.invoke('prompts:get') as Prompts.PromptsReply;
     t.same(edited.role, { text: 'Invented role line.', defaultText: prompts.ROLE_PROMPT, edited: true });
-    t.same(edited.tasks.recap, { text: 'Invented recap text.', defaultText: prompts.RECAP_TASK, edited: true });
+    t.same(edited.tasks.catchUp, { text: 'Invented recap text.', defaultText: prompts.CATCH_UP_TASK, edited: true });
     t.same(edited.tasks.answer, { text: prompts.ANSWER_TASK, defaultText: prompts.ANSWER_TASK, edited: false }, 'the other tasks are untouched');
     t.end();
 });
@@ -102,7 +102,7 @@ t.test('the edited chat text is the next request system prompt, with no restart'
 t.test('prompts:set rejects an unknown task, a non-string and an over-long text, and a mixed payload writes nothing', async (t) => {
     const f = handlers(t);
     const prompts = await import('../../electron/llm/prompts') as typeof Prompts;
-    t.same(await f.invoke('prompts:set', { tasks: { recap: 'Invented recap text.' } }), { success: true });
+    t.same(await f.invoke('prompts:set', { tasks: { catchUp: 'Invented recap text.' } }), { success: true });
     const before = f.saved();
     const bad: Array<[string, unknown]> = [
         ['an unknown task', { tasks: { everything: 'Invented text.' } }],
@@ -130,7 +130,7 @@ t.test('prompts:set resets by null, by empty text and by the built-in text', asy
     const prompts = await import('../../electron/llm/prompts') as typeof Prompts;
     const edited = async () => (await f.invoke('prompts:get') as Prompts.PromptsReply);
 
-    t.same(await f.invoke('prompts:set', { role: 'Invented role line.', tasks: { answer: 'Invented answer text.', recap: 'Invented recap text.' } }), { success: true });
+    t.same(await f.invoke('prompts:set', { role: 'Invented role line.', tasks: { answer: 'Invented answer text.', catchUp: 'Invented recap text.' } }), { success: true });
     t.same(await f.invoke('prompts:set', { role: null }), { success: true });
     t.equal((await edited()).role.edited, false, 'null resets the role');
     t.equal((await edited()).tasks.answer.edited, true, 'the task edits stay');
@@ -138,13 +138,13 @@ t.test('prompts:set resets by null, by empty text and by the built-in text', asy
     t.same(await f.invoke('prompts:set', { tasks: { answer: '' } }), { success: true });
     t.equal((await edited()).tasks.answer.edited, false, 'an empty text resets');
 
-    t.same(await f.invoke('prompts:set', { tasks: { recap: `  ${prompts.RECAP_TASK}\n` } }), { success: true });
-    t.equal((await edited()).tasks.recap.edited, false, 'the built-in text, spacing aside, is stored as no override');
-    t.equal((JSON.parse(f.saved()).prompts?.tasks ?? {}).recap, undefined, 'no override is written for a text equal to the built-in one');
+    t.same(await f.invoke('prompts:set', { tasks: { catchUp: `  ${prompts.CATCH_UP_TASK}\n` } }), { success: true });
+    t.equal((await edited()).tasks.catchUp.edited, false, 'the built-in text, spacing aside, is stored as no override');
+    t.equal((JSON.parse(f.saved()).prompts?.tasks ?? {}).catchUp, undefined, 'no override is written for a text equal to the built-in one');
 
-    t.same(await f.invoke('prompts:set', { tasks: { recap: 'Invented recap text.' } }), { success: true });
-    t.same(await f.invoke('prompts:set', { tasks: { recap: '   ' } }), { success: true });
-    t.equal((await edited()).tasks.recap.edited, false, 'a whitespace-only text resets');
+    t.same(await f.invoke('prompts:set', { tasks: { catchUp: 'Invented recap text.' } }), { success: true });
+    t.same(await f.invoke('prompts:set', { tasks: { catchUp: '   ' } }), { success: true });
+    t.equal((await edited()).tasks.catchUp.edited, false, 'a whitespace-only text resets');
 
     t.same(JSON.parse(f.saved()), {}, 'with every override removed the key is gone');
     t.end();
@@ -158,14 +158,10 @@ const reply = (edited: { role?: string; tasks?: Record<string, string> } = {}): 
             : { text: role, defaultText: 'Built-in role.', edited: true },
         tasks: Object.fromEntries([
             ['answer', 'Answer built-in.'],
-            ['whatToAnswer', 'What to answer built-in.'],
-            ['recap', 'Recap built-in.'],
+            ['catchUp', 'Catch up built-in.'],
             ['followUp', 'Follow-up built-in.'],
-            ['followUpQuestions', 'Follow-up questions built-in.'],
             ['assist', 'Assist built-in.'],
-            ['clarify', 'Clarify built-in.'],
-            ['codeHint', 'Code hint built-in.'],
-            ['brainstorm', 'Brainstorm built-in.'],
+            ['ask', 'Ask built-in.'],
             ['chat', 'Chat built-in.'],
         ].map(([task, text]) => {
             const saved = edited.tasks?.[task];
@@ -185,8 +181,8 @@ function host(t: Test, api: Record<string, unknown>, data: Prompts.PromptsReply 
     return h;
 }
 
-t.test('the Prompts section shows the role and the ten tasks with their badge and count', (t) => {
-    const h = host(t, { getPrompts: async () => reply(), setPrompts: async () => ({ success: true }) }, reply({ role: 'Invented role line.', tasks: { recap: 'Invented recap text.' } }));
+t.test('the Prompts section shows the role and the six tasks with their badge and count', (t) => {
+    const h = host(t, { getPrompts: async () => reply(), setPrompts: async () => ({ success: true }) }, reply({ role: 'Invented role line.', tasks: { catchUp: 'Invented recap text.' } }));
     const html = h.html();
     for (const words of [
         'The text Pika sends with every request. Edit it to change how it answers; reset to go back to the built-in text.',
@@ -199,11 +195,11 @@ t.test('the Prompts section shows the role and the ten tasks with their badge an
     t.same(h.control('textarea', 'prompt-role').props.value, 'Invented role line.', 'the role textarea shows the text in force');
     t.ok(h.control('textarea', 'prompt-role').props.id === 'prompt-role', 'the textarea has the id its label points at');
     t.ok(h.html().includes('for="prompt-role"'), 'the Role label is a real label');
-    const labels = ['Answer', 'What to answer', 'Recap', 'Follow-up', 'Follow-up questions', 'Assist', 'Clarify', 'Code hint', 'Brainstorm', 'Chat'];
-    t.same(labels.map(label => String(h.control('button', label).props.children)), labels, 'the ten tasks in the agreed order');
+    const labels = ['Answer', 'Catch up', 'Follow-up', 'Assist', 'Ask', 'Chat and Reply'];
+    t.same(labels.map(label => String(h.control('button', label).props.children)), labels, 'the six tasks in the agreed order');
     t.same(labels.map(label => h.control('button', label).props['aria-expanded']), labels.map(() => false), 'none is open at first');
-    t.equal(h.control('button', 'Recap').props['aria-controls'], 'prompt-body-recap');
-    t.equal(h.control('div', 'prompt-body-recap').props.hidden, true, 'a closed task keeps its textarea hidden');
+    t.equal(h.control('button', 'Catch up').props['aria-controls'], 'prompt-body-catchUp');
+    t.equal(h.control('div', 'prompt-body-catchUp').props.hidden, true, 'a closed task keeps its textarea hidden');
     t.match(h.html(), 'Invented recap text.', 'the saved text is in the page');
     t.match(h.html(), 'Edited');
     t.match(h.html(), 'Built-in');
@@ -216,12 +212,12 @@ t.test('only one task is open at a time and each opener keeps its keyboard behav
     h.click('Answer');
     t.equal(h.control('div', 'prompt-body-answer').props.hidden, false, 'Answer opens');
     t.equal(h.control('button', 'Answer').props['aria-expanded'], true);
-    h.click('Recap');
-    t.equal(h.control('div', 'prompt-body-answer').props.hidden, true, 'opening Recap closes Answer');
-    t.equal(h.control('div', 'prompt-body-recap').props.hidden, false);
-    h.click('Recap');
-    t.equal(h.control('div', 'prompt-body-recap').props.hidden, true, 'the opener closes it again');
-    t.equal(h.control('button', 'Recap').props.type, 'button', 'the opener is a button, so Enter and Space work');
+    h.click('Catch up');
+    t.equal(h.control('div', 'prompt-body-answer').props.hidden, true, 'opening Catch up closes Answer');
+    t.equal(h.control('div', 'prompt-body-catchUp').props.hidden, false);
+    h.click('Catch up');
+    t.equal(h.control('div', 'prompt-body-catchUp').props.hidden, true, 'the opener closes it again');
+    t.equal(h.control('button', 'Catch up').props.type, 'button', 'the opener is a button, so Enter and Space work');
     t.end();
 });
 
@@ -251,15 +247,15 @@ t.test('Save sends the edited text of that one prompt', async (t) => {
 
 t.test('Reset sends null and is disabled when the text is not edited', async (t) => {
     const sent: unknown[] = [];
-    const edited = reply({ tasks: { recap: 'Invented recap text.' } });
+    const edited = reply({ tasks: { catchUp: 'Invented recap text.' } });
     const h = host(t, { getPrompts: async () => edited, setPrompts: async (payload: unknown) => { sent.push(payload); return { success: true }; } }, edited);
     h.click('Answer');
     t.equal(h.control('button', 'Reset Answer').props.disabled, true, 'a built-in text has nothing to reset');
-    h.click('Recap');
-    t.equal(h.control('button', 'Reset Recap').props.disabled, false, 'an edited text can be reset');
-    h.click('Reset Recap');
+    h.click('Catch up');
+    t.equal(h.control('button', 'Reset Catch up').props.disabled, false, 'an edited text can be reset');
+    h.click('Reset Catch up');
     await h.settle();
-    t.same(sent, [{ tasks: { recap: null } }]);
+    t.same(sent, [{ tasks: { catchUp: null } }]);
     t.end();
 });
 
@@ -289,7 +285,7 @@ t.test('a text of exactly the limit is saved; one more character is not', async 
     const prompts = await import('../../electron/llm/prompts') as typeof Prompts;
     t.same(await f.invoke('prompts:set', { role: 'a'.repeat(prompts.PROMPT_MAX_LENGTH) }), { success: true }, 'the limit itself is allowed');
     t.equal(((await f.invoke('prompts:get')) as Prompts.PromptsReply).role.text.length, prompts.PROMPT_MAX_LENGTH);
-    const refused = await f.invoke('prompts:set', { tasks: { recap: 'a'.repeat(prompts.PROMPT_MAX_LENGTH + 1) } }) as { success: boolean; error?: string };
+    const refused = await f.invoke('prompts:set', { tasks: { catchUp: 'a'.repeat(prompts.PROMPT_MAX_LENGTH + 1) } }) as { success: boolean; error?: string };
     t.equal(refused.success, false);
     t.match(refused.error, /8000/);
     t.end();

@@ -15,7 +15,7 @@ import { MeetingPersistence } from './core/MeetingPersistence';
 import type { RAGManager } from './rag/RAGManager';
 
 // Re-export types for backward compatibility
-export type { TranscriptSegment, SuggestionTrigger, ContextItem } from './core/SessionTracker';
+export type { TranscriptSegment, ContextItem } from './core/SessionTracker';
 export type { IntelligenceMode, IntelligenceModeEvents } from './core/IntelligenceEngine';
 
 export const GEMINI_FLASH_MODEL = "gemini-3.1-flash-lite-preview";
@@ -25,7 +25,7 @@ export const GEMINI_FLASH_MODEL = "gemini-3.1-flash-lite-preview";
  * 
  * Delegates to:
  * - SessionTracker:     context, transcripts, epoch summaries
- * - IntelligenceEngine: LLM modes (assist, whatToSay, followUp, recap, clarify, manual, followUpQuestions)
+ * - IntelligenceEngine: LLM modes (assist, followUp, catchUp, ask, manual)
  * - MeetingPersistence: meeting stop/save/recovery
  */
 export class IntelligenceManager extends EventEmitter {
@@ -49,10 +49,9 @@ export class IntelligenceManager extends EventEmitter {
      */
     private forwardEngineEvents(): void {
         const events = [
-            'assist_update', 'suggested_answer', 'suggested_answer_token',
+            'assist_update',
             'refined_answer', 'refined_answer_token',
-            'recap', 'recap_token', 'clarify', 'clarify_token',
-            'follow_up_questions_update', 'follow_up_questions_token',
+            'catch_up', 'catch_up_token', 'ask', 'ask_token',
             'manual_answer_started', 'manual_answer_result',
             'mode_changed', 'error'
         ];
@@ -129,10 +128,6 @@ export class IntelligenceManager extends EventEmitter {
         this.engine.handleTranscript(segment);
     }
 
-    async handleSuggestionTrigger(trigger: import('./core/SessionTracker').SuggestionTrigger): Promise<void> {
-        return this.engine.handleSuggestionTrigger(trigger);
-    }
-
     // ============================================
     // Mode Executors (delegates to engine)
     // ============================================
@@ -141,48 +136,20 @@ export class IntelligenceManager extends EventEmitter {
         return this.engine.runAssistMode();
     }
 
-    async runWhatShouldISay(question?: string, confidence?: number, imagePaths?: string[]): Promise<string | null> {
-        return this.engine.runWhatShouldISay(question, confidence, imagePaths);
-    }
-
     async runFollowUp(intent: string, userRequest?: string): Promise<string | null> {
         return this.engine.runFollowUp(intent, userRequest);
     }
 
-    async runRecap(): Promise<string | null> {
-        return this.engine.runRecap();
+    async runCatchUp(): Promise<string | null> {
+        return this.engine.runCatchUp();
     }
 
-    async runClarify(): Promise<string | null> {
-        return this.engine.runClarify();
-    }
-
-    async runFollowUpQuestions(): Promise<string | null> {
-        return this.engine.runFollowUpQuestions();
+    async runAsk(): Promise<string | null> {
+        return this.engine.runAsk();
     }
 
     async runManualAnswer(question: string): Promise<string | null> {
         return this.engine.runManualAnswer(question);
-    }
-
-    async runCodeHint(imagePaths?: string[], problemStatement?: string): Promise<string | null> {
-        return this.engine.runCodeHint(imagePaths, problemStatement);
-    }
-
-    setCodingQuestion(question: string, source: 'screenshot' | 'transcript'): void {
-        this.session.setCodingQuestion(question, source);
-    }
-
-    getDetectedCodingQuestion(): { question: string | null; source: 'screenshot' | 'transcript' | null } {
-        return this.session.getDetectedCodingQuestion();
-    }
-
-    clearCodingQuestion(): void {
-        this.session.clearCodingQuestion();
-    }
-
-    async runBrainstorm(imagePaths?: string[], problemStatement?: string): Promise<string | null> {
-        return this.engine.runBrainstorm(imagePaths, problemStatement);
     }
 
     // ============================================

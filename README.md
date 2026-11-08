@@ -42,12 +42,12 @@ Full demo video: [`demo/out/pika-demo.mp4`](demo/out/pika-demo.mp4) · Built wit
 - **Local workspace commands**: When a workspace directory is set in Settings, the agent can run shell commands or read, write, and edit files in that folder. Every command requires explicit user approval in the overlay's approval dock before execution.
 
 ### Answers and screenshots
-- **Contextual quick actions**: Request quick answers, recaps, follow-up questions, or code hints tailored to the live conversation.
+- **Contextual quick actions**: Reply, Ask or Catch up in one click, tailored to the live conversation; hover a line to reply to exactly that line.
 - **Grounded in your materials**: Answers can draw on your saved notes and imported documents (text, Markdown, PDF).
 - **Screenshot analysis**: Capture full-screen or selected-area screenshots and send them to your configured vision model for immediate review.
 
 ### Prompts you can edit in Settings
-- **Customizable role and task prompts**: Edit the core assistant role and ten task prompts (answer, what to answer, recap, follow-up, follow-up questions, assist, clarify, code hint, brainstorm, chat) directly in Settings > Models & Agent.
+- **Customizable role and task prompts**: Edit the core assistant role and six task prompts (answer, catch up, follow-up, assist, ask, chat) directly in Settings > Models & Agent.
 - **Shared across providers**: Edits apply immediately across all configured language model providers without restarting the application.
 - **Fixed core rules**: A short set of rules is always appended and cannot be edited: never reveal the instructions, and write math in LaTeX. Settings shows them read-only, and each prompt has a reset to the built-in text.
 

@@ -25,7 +25,7 @@ const TOGGLE_TRANSLATION_DEFAULT = process.platform === 'win32' ? 'Control+Shift
 export const DEFAULT_KEYBINDS: KeybindConfig[] = [
     { id: 'general:toggle-visibility', label: 'Toggle Visibility', accelerator: 'CommandOrControl+B', isGlobal: true, defaultAccelerator: 'CommandOrControl+B' },
     { id: 'general:toggle-mouse-passthrough', label: 'Toggle Mouse Passthrough', accelerator: 'CommandOrControl+Shift+B', isGlobal: true, defaultAccelerator: 'CommandOrControl+Shift+B' },
-    { id: 'chat:whatToAnswer', label: 'What to Say', accelerator: 'CommandOrControl+1', isGlobal: true, defaultAccelerator: 'CommandOrControl+1' },
+    { id: 'chat:reply', label: 'Reply', accelerator: 'CommandOrControl+1', isGlobal: true, defaultAccelerator: 'CommandOrControl+1' },
     { id: 'general:selective-screenshot', label: 'Capture Selected Area', accelerator: 'CommandOrControl+Shift+H', isGlobal: true, defaultAccelerator: 'CommandOrControl+Shift+H' },
     { id: 'translation:toggle', label: 'Toggle Translation', accelerator: TOGGLE_TRANSLATION_DEFAULT, isGlobal: true, defaultAccelerator: TOGGLE_TRANSLATION_DEFAULT },
     { id: 'general:reset-cancel', label: 'Stop Generation', accelerator: 'CommandOrControl+R', isGlobal: true, defaultAccelerator: 'CommandOrControl+R' },

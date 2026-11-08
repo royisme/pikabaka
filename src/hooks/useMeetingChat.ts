@@ -4,6 +4,7 @@ import { DefaultChatTransport } from 'ai';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { electronChatFetch } from '../lib/electronChatFetch';
 import { userEchoMessage } from '../lib/userEcho';
+import type { ReplyRequest } from '../lib/transcriptAsk';
 import { useMainEvent } from './useMainEvent';
 import { failureReasonText } from '../lib/transcriptRow';
 import { initialMeetingChatFlags, meetingChatFlagsReducer } from './meetingChatFlagsReducer';
@@ -16,7 +17,8 @@ function agentFailureWords(errorClass: string): string {
 
 /** What the user asked last, so a failed or unwanted answer can be asked again. */
 type LastAction =
-  | { kind: 'what_to_say' | 'clarify' | 'recap' | 'follow_up_questions' | 'brainstorm' | 'code_hint' }
+  | { kind: 'reply'; request?: ReplyRequest }
+  | { kind: 'ask' | 'catch_up' }
   | { kind: 'manual'; text: string };
 
 export type Message = {
@@ -26,7 +28,7 @@ export type Message = {
   isStreaming?: boolean;
   /** A failure message: shown as an error, not as an answer. */
   isError?: boolean;
-  /** What the other party said last, for the "Re:" line of a what-to-say answer. */
+  /** What the other party said, for the "Re:" line of a reply. */
   replyTo?: string;
   hasScreenshot?: boolean;
   screenshotPreview?: string;
@@ -76,7 +78,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     cancelledRef.current = false;
     setIsProcessing(true);
   };
-  // systemMessages holds quick-action responses (WhatToSay, Clarify, Recap, etc.)
+  // systemMessages holds quick-action responses (Reply, Ask, Catch up, etc.)
   const [systemMessages, setSystemMessages] = useState<Message[]>([]);
   const isAgentRunRef = useRef(false);
   const setSystemMessagesIfLive = useCallback<typeof setSystemMessages>((update) => {
@@ -113,16 +115,6 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
   });
 
   const isChatLoading = status === 'submitted' || status === 'streaming';
-
-  const actionButtonModeQuery = useQuery<'recap' | 'brainstorm'>({ queryKey: ['action-button-mode'], queryFn: async () => {
-      const mode = await window.electronAPI?.getActionButtonMode?.();
-      return mode ?? 'recap';
-    } });
-  const actionButtonMode = actionButtonModeQuery.data ?? 'recap';
-
-  useMainEvent(window.electronAPI?.onActionButtonModeChanged, (mode: 'recap' | 'brainstorm') => {
-    queryClient.setQueryData(['action-button-mode'], mode);
-  });
 
   // Build conversationContext from all messages (chat + system) for IPC quick actions
   const allMessagesForContext = useMemo(() => {
@@ -194,35 +186,6 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
       }));
     }
 
-    // ---- Streaming: Gemini Chat (streamGeminiChat / suggested answer) ----
-    if (window.electronAPI.onIntelligenceSuggestedAnswerToken) {
-      cleanups.push(window.electronAPI.onIntelligenceSuggestedAnswerToken((data) => {
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.isStreaming && last.intent === 'what_to_answer') {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: last.text + data.token };
-            return updated;
-          }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: 'what_to_answer', isStreaming: true }];
-        });
-      }));
-    }
-    if (window.electronAPI.onIntelligenceSuggestedAnswer) {
-      cleanups.push(window.electronAPI.onIntelligenceSuggestedAnswer((data) => {
-        setIsProcessing(false);
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.isStreaming && last.intent === 'what_to_answer') {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: data.answer, isStreaming: false };
-            return updated;
-          }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: data.answer, intent: 'what_to_answer' }];
-        });
-      }));
-    }
-
     // ---- Streaming: Refinement ----
     if (window.electronAPI.onIntelligenceRefinedAnswerToken) {
       cleanups.push(window.electronAPI.onIntelligenceRefinedAnswerToken((data) => {
@@ -252,60 +215,60 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
       }));
     }
 
-    // ---- Streaming: Recap ----
-    if (window.electronAPI.onIntelligenceRecapToken) {
-      cleanups.push(window.electronAPI.onIntelligenceRecapToken((data) => {
+    // ---- Streaming: Catch up ----
+    if (window.electronAPI.onIntelligenceCatchUpToken) {
+      cleanups.push(window.electronAPI.onIntelligenceCatchUpToken((data) => {
         setSystemMessagesIfLive((prev) => {
           const last = prev[prev.length - 1];
-          if (last && last.isStreaming && last.intent === 'recap') {
+          if (last && last.isStreaming && last.intent === 'catch_up') {
             const updated = [...prev];
             updated[updated.length - 1] = { ...last, text: last.text + data.token };
             return updated;
           }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: 'recap', isStreaming: true }];
+          return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: 'catch_up', isStreaming: true }];
         });
       }));
     }
-    if (window.electronAPI.onIntelligenceRecap) {
-      cleanups.push(window.electronAPI.onIntelligenceRecap((data) => {
+    if (window.electronAPI.onIntelligenceCatchUp) {
+      cleanups.push(window.electronAPI.onIntelligenceCatchUp((data) => {
         setIsProcessing(false);
         setSystemMessagesIfLive((prev) => {
           const last = prev[prev.length - 1];
-          if (last && last.isStreaming && last.intent === 'recap') {
+          if (last && last.isStreaming && last.intent === 'catch_up') {
             const updated = [...prev];
             updated[updated.length - 1] = { ...last, text: data.summary, isStreaming: false };
             return updated;
           }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: data.summary, intent: 'recap' }];
+          return [...prev, { id: Date.now().toString(), role: 'system', text: data.summary, intent: 'catch_up' }];
         });
       }));
     }
 
-    // ---- Streaming: Follow-Up Questions ----
-    if (window.electronAPI.onIntelligenceFollowUpQuestionsToken) {
-      cleanups.push(window.electronAPI.onIntelligenceFollowUpQuestionsToken((data) => {
+    // ---- Streaming: Ask ----
+    if (window.electronAPI.onIntelligenceAskToken) {
+      cleanups.push(window.electronAPI.onIntelligenceAskToken((data) => {
         setSystemMessagesIfLive((prev) => {
           const last = prev[prev.length - 1];
-          if (last && last.isStreaming && last.intent === 'follow_up_questions') {
+          if (last && last.isStreaming && last.intent === 'ask') {
             const updated = [...prev];
             updated[updated.length - 1] = { ...last, text: last.text + data.token };
             return updated;
           }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: 'follow_up_questions', isStreaming: true }];
+          return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: 'ask', isStreaming: true }];
         });
       }));
     }
-    if (window.electronAPI.onIntelligenceFollowUpQuestionsUpdate) {
-      cleanups.push(window.electronAPI.onIntelligenceFollowUpQuestionsUpdate((data) => {
+    if (window.electronAPI.onIntelligenceAsk) {
+      cleanups.push(window.electronAPI.onIntelligenceAsk((data) => {
         setIsProcessing(false);
         setSystemMessagesIfLive((prev) => {
           const last = prev[prev.length - 1];
-          if (last && last.isStreaming && last.intent === 'follow_up_questions') {
+          if (last && last.isStreaming && last.intent === 'ask') {
             const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: data.questions, isStreaming: false };
+            updated[updated.length - 1] = { ...last, text: data.question, isStreaming: false };
             return updated;
           }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: data.questions, intent: 'follow_up_questions' }];
+          return [...prev, { id: Date.now().toString(), role: 'system', text: data.question, intent: 'ask' }];
         });
       }));
     }
@@ -348,7 +311,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
       }));
     }
 
-    // ---- Streaming: generic gemini-chat-stream (used by submitPrompt / handleWhatToSay) ----
+    // ---- Streaming: generic gemini-chat-stream (used by submitPrompt / handleReply) ----
     console.log('[useMeetingChat] registering gemini-stream listeners. has onGeminiStreamToken:', !!window.electronAPI.onGeminiStreamToken);
     if (window.electronAPI.onGeminiStreamToken) {
       cleanups.push(window.electronAPI.onGeminiStreamToken((token) => {
@@ -525,45 +488,13 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     return () => cleanups.forEach((fn) => fn());
   }, [setSystemMessagesIfLive, setIsProcessing]);
 
-  // Clarify streaming listeners — mounted once (the deps are stable) so they survive
-  // expand/collapse cycles without orphaning an in-flight stream.
-  useEffect(() => {
-    if (!window.electronAPI) return;
-    const cleanupToken = window.electronAPI.onIntelligenceClarifyToken((data: { token: string }) => {
-      setSystemMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last && last.isStreaming && last.intent === 'clarify') {
-          const updated = [...prev];
-          updated[updated.length - 1] = { ...last, text: last.text + data.token };
-          return updated;
-        }
-        return [...prev, { id: Date.now().toString(), role: 'system' as const, text: data.token, intent: 'clarify', isStreaming: true }];
-      });
-    });
-    const cleanupFinal = window.electronAPI.onIntelligenceClarify((data: { clarification: string }) => {
-      setIsProcessing(false);
-      setSystemMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (last && last.isStreaming && last.intent === 'clarify') {
-          const updated = [...prev];
-          updated[updated.length - 1] = { ...last, text: data.clarification, isStreaming: false };
-          return updated;
-        }
-        return [...prev, { id: Date.now().toString(), role: 'system' as const, text: data.clarification, intent: 'clarify' }];
-      });
-    });
-    return () => {
-      cleanupToken();
-      cleanupFinal();
-    };
-  }, [setIsProcessing]); // setIsProcessing is stable, so these listeners still survive isExpanded changes
-
   const submitPrompt = useCallback(async ({
     userText,
     attachments,
     clearAttachments = true,
     echoPrompt = true,
     placeholderIntent,
+    replyTo: replyToLine,
     skipRag = false,
     streamOptions,
   }: {
@@ -573,6 +504,8 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     /** False for a quick action: the prompt text is the app's, not the user's, so it is not shown. */
     echoPrompt?: boolean;
     placeholderIntent?: string;
+    /** The line a reply answers; without it a reply answers the other party's latest words. */
+    replyTo?: string;
     skipRag?: boolean;
     streamOptions?: { skipSystemPrompt?: boolean };
   }) => {
@@ -585,7 +518,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
 
     console.log('[submitPrompt] entry', { promptLength: promptText.length, placeholderIntent, echoPrompt, attachments: currentAttachments.length });
 
-    const replyTo = placeholderIntent === 'what_to_answer' ? options.getReplyContext?.() : undefined;
+    const replyTo = placeholderIntent === 'reply' ? (replyToLine ?? options.getReplyContext?.()) : undefined;
     const echo = userEchoMessage({ id: Date.now().toString(), promptText, echoPrompt, attachments: currentAttachments });
     if (echo) setSystemMessages((prev) => [...prev, echo]);
 
@@ -644,16 +577,21 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     }
   }, [attachedContext, conversationContextRef, setAttachedContext, setIsProcessing, setSystemMessages]);
 
-  const handleWhatToSay = useCallback(async () => {
-    remember({ kind: 'what_to_say' });
+  const reply = useCallback(async (request?: ReplyRequest) => {
+    remember({ kind: 'reply', request });
     await submitPrompt({
-      userText: attachedContext.length > 0
+      userText: request?.userText ?? (attachedContext.length > 0
         ? 'What should I say about this?'
-        : "What should I say in response to the other party's latest message?",
-      placeholderIntent: 'what_to_answer',
+        : "What should I say in response to the other party's latest message?"),
+      placeholderIntent: 'reply',
+      replyTo: request?.replyTo,
       echoPrompt: false,
     });
   }, [submitPrompt, attachedContext.length]);
+  /** Reply to the other party's latest words. */
+  const handleReply = useCallback(() => reply(), [reply]);
+  /** Reply to one chosen transcript line. */
+  const handleReplyToLine = reply;
 
   const handleFollowUp = useCallback(async (intent: string = 'rephrase') => {
     remember(null);
@@ -670,85 +608,28 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     }
   }, [setIsProcessing, setSystemMessages]);
 
-  const handleCodeHint = useCallback(async () => {
-    remember({ kind: 'code_hint' });
-    beginProcessing();
-
-    const currentAttachments = attachedContext;
-    if (currentAttachments.length > 0) {
-      setAttachedContext([]);
-      const echo = userEchoMessage({ id: Date.now().toString(), promptText: '', echoPrompt: false, attachments: currentAttachments });
-      if (echo) setSystemMessages((prev) => [...prev, echo]);
-    }
-
-    try {
-      await window.electronAPI.generateCodeHint(
-        currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined
-      );
-    } catch (err) {
-      setSystemMessages((prev) => [
-        ...prev,
-        { id: Date.now().toString(), role: 'system', text: `Error: ${err}`, isError: true },
-      ]);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [attachedContext, setAttachedContext, setIsProcessing, setSystemMessages]);
-
-  const handleClarify = useCallback(async () => {
-    remember({ kind: 'clarify' });
+  const handleAsk = useCallback(async () => {
+    remember({ kind: 'ask' });
     beginProcessing();
     try {
-      await window.electronAPI.generateClarify();
+      await window.electronAPI.generateAsk();
     } catch (err) {
       pushSystemError(err);
       setIsProcessing(false);
     }
   }, [pushSystemError, setIsProcessing]);
 
-  const handleFollowUpQuestions = useCallback(async () => {
-    remember({ kind: 'follow_up_questions' });
+  const handleCatchUp = useCallback(async () => {
+    remember({ kind: 'catch_up' });
     beginProcessing();
     try {
-      await window.electronAPI.generateFollowUpQuestions();
+      await window.electronAPI.generateCatchUp();
     } catch (err) {
       pushSystemError(err);
     } finally {
       setIsProcessing(false);
     }
   }, [pushSystemError, setIsProcessing]);
-
-  const handleRecap = useCallback(async () => {
-    remember({ kind: 'recap' });
-    beginProcessing();
-    try {
-      await window.electronAPI.generateRecap();
-    } catch (err) {
-      pushSystemError(err);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [pushSystemError, setIsProcessing]);
-
-  const handleBrainstorm = useCallback(async () => {
-    remember({ kind: 'brainstorm' });
-    beginProcessing();
-    const currentAttachments = attachedContext;
-
-    if (currentAttachments.length > 0) {
-      setAttachedContext([]);
-      const echo = userEchoMessage({ id: Date.now().toString(), promptText: '', echoPrompt: false, attachments: currentAttachments });
-      if (echo) setSystemMessages((prev) => [...prev, echo]);
-    }
-
-    try {
-      await window.electronAPI.generateBrainstorm(currentAttachments.length > 0 ? currentAttachments.map((s) => s.path) : undefined);
-    } catch (err) {
-      pushSystemError(err);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [attachedContext, pushSystemError, setIsProcessing]);
 
   const handleAnswerNow = useCallback(async () => {
     remember(null);
@@ -908,12 +789,9 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     if (!action) return;
     setSystemMessages((prev) => (prev.length > 0 && prev[prev.length - 1].isError ? prev.slice(0, -1) : prev));
     switch (action.kind) {
-      case 'what_to_say': return handleWhatToSay();
-      case 'clarify': return handleClarify();
-      case 'recap': return handleRecap();
-      case 'follow_up_questions': return handleFollowUpQuestions();
-      case 'brainstorm': return handleBrainstorm();
-      case 'code_hint': return handleCodeHint();
+      case 'reply': return reply(action.request);
+      case 'ask': return handleAsk();
+      case 'catch_up': return handleCatchUp();
       case 'manual': {
         let isAvailable = false;
         try {
@@ -965,7 +843,7 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
         return submitPrompt({ userText: action.text, placeholderIntent: 'manual', echoPrompt: false });
       }
     }
-  }, [handleWhatToSay, handleClarify, handleRecap, handleFollowUpQuestions, handleBrainstorm, handleCodeHint, submitPrompt, setIsProcessing]);
+  }, [reply, handleAsk, handleCatchUp, submitPrompt, setIsProcessing]);
 
   return {
     stopGeneration,
@@ -973,7 +851,6 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     canRetry,
     attachedContext,
     setAttachedContext,
-    actionButtonMode,
     conversationContext,
     inputValue,
     setInputValue,
@@ -983,13 +860,11 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     setSystemMessages,
     stop,
     submitPrompt,
-    handleWhatToSay,
+    handleReply,
+    handleReplyToLine,
     handleFollowUp,
-    handleCodeHint,
-    handleClarify,
-    handleFollowUpQuestions,
-    handleRecap,
-    handleBrainstorm,
+    handleAsk,
+    handleCatchUp,
     handleAnswerNow,
     handleManualSubmit,
     isAgentAvailable,

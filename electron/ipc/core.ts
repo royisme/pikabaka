@@ -304,7 +304,7 @@ export function registerCoreHandlers(appState: AppState): void {
       // caller, but it is not written into the session of a meeting it was never asked in.
       if (!meetingStillCurrent(meetingId)) return result;
 
-      // Sync with IntelligenceManager so Follow-Up/Recap work
+      // Sync with IntelligenceManager so Follow-Up/Catch up work
       const intelligenceManager = appState.getIntelligenceManager();
 
       // 1. Add user question to context (as 'user')

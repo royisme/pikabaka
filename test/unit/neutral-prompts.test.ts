@@ -2,19 +2,14 @@ import t from 'tap';
 import { buildContextEnhancementPrompt, buildNoMatchPrompt } from '../../electron/knowledge/prompts';
 import {
     ANSWER_TASK,
+    ASK_TASK,
     ASSIST_TASK,
-    BRAINSTORM_TASK,
+    CATCH_UP_TASK,
     CHAT_TASK,
-    CLARIFY_TASK,
-    CODE_HINT_TASK,
     CORE_RULES,
-    FOLLOW_UP_QUESTIONS_TASK,
     FOLLOW_UP_TASK,
-    RECAP_TASK,
     ROLE_PROMPT,
     systemPrompt,
-    WHAT_TO_ANSWER_TASK,
-    buildCodeHintMessage,
     taskPrompt,
     type TaskName,
 } from '../../electron/llm/prompts';
@@ -24,14 +19,10 @@ import { prepareTranscriptForWhatToAnswer } from '../../electron/llm/transcriptC
 
 const TASK_TEXT: Record<TaskName, string> = {
     answer: ANSWER_TASK,
-    whatToAnswer: WHAT_TO_ANSWER_TASK,
-    recap: RECAP_TASK,
+    catchUp: CATCH_UP_TASK,
     followUp: FOLLOW_UP_TASK,
-    followUpQuestions: FOLLOW_UP_QUESTIONS_TASK,
     assist: ASSIST_TASK,
-    clarify: CLARIFY_TASK,
-    codeHint: CODE_HINT_TASK,
-    brainstorm: BRAINSTORM_TASK,
+    ask: ASK_TASK,
     chat: CHAT_TASK,
 };
 
@@ -57,14 +48,10 @@ t.test('no text the app can send still talks about the interview', (t) => {
         CORE_RULES,
         systemPrompt: systemPrompt(),
         ANSWER_TASK,
-        WHAT_TO_ANSWER_TASK,
-        RECAP_TASK,
+        CATCH_UP_TASK,
         FOLLOW_UP_TASK,
-        FOLLOW_UP_QUESTIONS_TASK,
         ASSIST_TASK,
-        CLARIFY_TASK,
-        CODE_HINT_TASK,
-        BRAINSTORM_TASK,
+        ASK_TASK,
         CHAT_TASK,
         notesNoMatch: buildNoMatchPrompt('Invented question'),
         notesMatched: buildContextEnhancementPrompt('Invented question', ['Invented note one', 'Invented note two']),
@@ -73,10 +60,6 @@ t.test('no text the app can send still talks about the interview', (t) => {
         defaultStyleHeader: emptyStyle.header,
         temporalContext: temporal,
         cleanedTranscript: transcript,
-        codeHintWithoutQuestion: buildCodeHintMessage(null, null, null),
-        codeHintFromScreenshot: buildCodeHintMessage('Invented coding question', 'screenshot', null),
-        codeHintFromTranscript: buildCodeHintMessage(null, 'transcript', 'Invented coding discussion'),
-        codeHintWithBoth: buildCodeHintMessage('Invented coding question', 'transcript', 'Invented coding discussion'),
     };
     for (const task of TASKS) texts[`taskPrompt(${task})`] = taskPrompt(task);
 
@@ -99,16 +82,8 @@ t.test('every task prompt is the role, then its task text, then the core rules',
 });
 
 t.test('the accepted output formats survive the neutral wording', (t) => {
-    t.match(taskPrompt('recap'), /3-5/, 'recap keeps 3-5 points');
-    t.match(taskPrompt('recap'), /one dash \(-\)/, 'recap keeps one dash per bullet');
-
-    t.match(taskPrompt('followUpQuestions'), /numbered list/, 'follow-up questions are numbered');
-    t.match(taskPrompt('followUpQuestions'), /exactly 3/, 'follow-up questions are exactly three');
-    t.match(taskPrompt('followUpQuestions'), /1\. \[Question 1\]/, 'follow-up questions keep the list shape');
-
-    t.match(taskPrompt('whatToAnswer'), /Situation, Task, Action, Result/, 'what-to-answer keeps the STAR guidance');
-    t.match(taskPrompt('whatToAnswer'), /SAY THIS FIRST/, 'what-to-answer keeps the speaking structure');
-    t.match(taskPrompt('whatToAnswer'), /AMMUNITION/, 'what-to-answer keeps the ammunition part');
+    t.match(taskPrompt('catchUp'), /3-5/, 'catch up keeps 3-5 points');
+    t.match(taskPrompt('catchUp'), /one dash \(-\)/, 'catch up keeps one dash per bullet');
 
     t.match(taskPrompt('answer'), /SAY THIS FIRST/, 'answer keeps the speaking structure');
     t.match(taskPrompt('answer'), /THE CODE/, 'answer keeps the code part');
@@ -117,18 +92,17 @@ t.test('the accepted output formats survive the neutral wording', (t) => {
 
     t.match(taskPrompt('assist'), /### Dry Run/, 'assist keeps the dry-run heading');
 
-    t.match(taskPrompt('clarify'), /Maximum 1-2 sentences/, 'clarify keeps the one-question limit');
-
-    t.match(taskPrompt('codeHint'), /1-3 sentences total/, 'code hint keeps the short hint rule');
-    t.match(taskPrompt('codeHint'), /Maximum one inline snippet/, 'code hint keeps one snippet at most');
-
-    t.match(taskPrompt('brainstorm'), /Approach 1/, 'brainstorm keeps the numbered approaches');
-    t.match(taskPrompt('brainstorm'), /\*\*Time: O\(\.\.\.\)\*\*/, 'brainstorm keeps the bolded complexities');
+    t.match(taskPrompt('ask'), /the one question/, 'ask is the one question');
+    t.match(taskPrompt('ask'), /at most two alternatives/, 'ask keeps at most two alternatives');
+    t.match(taskPrompt('ask'), /Never ask what it already answers/, 'ask never repeats an answered question');
 
     t.match(taskPrompt('followUp'), /at least 50%/, 'follow-up refinement keeps the shorter rule');
 
     t.match(taskPrompt('chat'), /markdown/, 'chat keeps markdown');
     t.match(taskPrompt('chat'), /LaTeX/, 'chat keeps LaTeX for math');
+    t.match(taskPrompt('chat'), /first person/, 'chat answers in the first person');
+    t.match(taskPrompt('chat'), /Follow the Scenario/, 'chat follows the scenario');
+    t.notMatch(taskPrompt('chat'), /CODING & PROGRAMMING MODE|SAY THIS FIRST/, 'chat no longer carries the coding layout');
     t.end();
 });
 
@@ -139,8 +113,7 @@ t.test('the core rules are the fixed part: no prompt reveal and LaTeX for math',
 });
 
 t.test('the fixed rules do not change the shape of a bullet or numbered output', (t) => {
-    t.notMatch(taskPrompt('recap'), /\*\*bold\*\*/, 'the recap is plain dash bullets');
-    t.notMatch(taskPrompt('followUpQuestions'), /\*\*bold\*\*/, 'the follow-up questions are a plain numbered list');
+    t.notMatch(taskPrompt('catchUp'), /\*\*bold\*\*/, 'the catch up is plain dash bullets');
     t.notMatch(taskPrompt('answer'), /no pronouns[\s\S]*first person|first person[\s\S]*no pronouns/, 'the answer task does not contradict itself');
     t.end();
 });
