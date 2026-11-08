@@ -83,7 +83,7 @@ Regenerate all four (Node and Electron from `node_modules`, no pnpm; the script 
 ./node_modules/.bin/electron demo/shots/render.mjs
 ```
 
-The window is hidden; each page is captured at 2x, scaled to 1200x840 and reduced to a palette PNG (under 350 KB). Look at the four files after a run. The old Remotion demo in `demo/src` is not used for this.
+The window is hidden; each page is captured at 2x, scaled to 1064x1000 and reduced to a palette PNG (under 350 KB). Look at the four files after a run. The old Remotion demo in `demo/src` is not used for this.
 
 ## Finishing a change
 

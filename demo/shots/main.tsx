@@ -23,8 +23,8 @@ const scene = scenes[sceneId];
 
 document.documentElement.setAttribute('data-theme', theme);
 document.documentElement.setAttribute('data-platform', 'darwin');
-// The split between transcript and chat is the user's own setting: here it gives the chat room for the card and an answer.
-localStorage.setItem('pika_splitter_position', '20');
+// The split between transcript and chat is the user's own setting: here it gives the transcript the rows and the chat the card and an answer.
+localStorage.setItem('pika_splitter_position', '38');
 const { emit } = installElectronStub(scene);
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

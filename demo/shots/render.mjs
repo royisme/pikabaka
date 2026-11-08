@@ -16,14 +16,14 @@ const sharp = require('sharp');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const outDir = path.join(root, 'docs/images');
 const WIDTH = 1000;
-const HEIGHT = 700;
-const OUT_WIDTH = 1200;
-const OUT_HEIGHT = 840;
+const HEIGHT = 940;
+const OUT_WIDTH = 1064;
+const OUT_HEIGHT = 1000;
 const MAX_BYTES = 350 * 1024;
 const scenes = ['class', 'client'];
 const themes = ['dark', 'light'];
 
-// The page is captured at 2x, then scaled to 1200x840.
+// The page is captured at 2x, then scaled to 1160x1000.
 app.commandLine.appendSwitch('force-device-scale-factor', '2');
 app.disableHardwareAcceleration();
 
@@ -64,7 +64,7 @@ async function main() {
   await server.listen();
   const base = server.resolvedUrls.local[0].replace(/\/$/, '');
   await app.whenReady();
-  const win = new BrowserWindow({ show: false, width: WIDTH, height: HEIGHT, useContentSize: true, webPreferences: { contextIsolation: true } });
+  const win = new BrowserWindow({ show: false, width: WIDTH, height: HEIGHT, useContentSize: true, webPreferences: { contextIsolation: true, partition: 'product-shots' } });
   win.webContents.on('console-message', (event) => {
     if (event.level === 'error') console.error(`[page] ${event.message}`);
   });

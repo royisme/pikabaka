@@ -100,8 +100,9 @@ export const clientScene: Scene = {
     ...them(
       1,
       'Client',
-      "Bonjour, merci pour votre temps. Nous voulons refondre l'application de réservation de nos salles de sport.",
-      '你好，谢谢你的时间。我们想重新设计健身房的预约应用。'
+      "Bonjour, merci pour votre temps. Nous voulons refondre l'application de nos salles de sport.",
+      '你好，谢谢你的时间。我们想重新设计健身房的应用。',
+      "Bonjour, merci pour votre temps. Nous voulons refonder l'application de nos salles de sport."
     ),
     ...them(2, 'Client', "Trop d'adhérents abandonnent la réservation au moment du paiement.", '太多会员在支付环节放弃了预约。'),
     ...them(3, 'Client', "Pourriez-vous nous présenter une première maquette d'ici le 15 mars ?", '你们能在3月15日前给我们看第一版设计稿吗？'),
