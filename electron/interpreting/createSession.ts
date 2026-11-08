@@ -32,6 +32,7 @@ export function createInterpretingSession(appState: AppState): InterpretingSessi
         finalizeMic: () => finalizeMicSTT(appState),
         translate: (text) => translateForInterpreting(appState, text),
         provider: (id, key) => (id === 'fishaudio' ? fishAudio(key) : elevenLabs(key)),
+        noteSpoken: (text) => appState.spokenEcho.noteOther(text, Date.now()),
         sendAudio: (message) => {
             const win = overlay();
             win?.webContents.send('interpreting-audio', message);

@@ -43,6 +43,8 @@ export interface SessionDeps {
     translate(text: string): Promise<string>;
     provider(id: VoiceProviderId, apiKey: string): VoiceProvider;
     /** To the overlay window only. False when there is no window to play it. */
+    /** The text about to be spoken, for the echo guard on the other party's stream. */
+    noteSpoken(text: string): void;
     sendAudio(message: AudioMessage): boolean;
     sendStop(): void;
     broadcastState(state: InterpretingState): void;
@@ -238,6 +240,7 @@ export class InterpretingSession {
             stage = 'play';
             const id = String(++this.seq);
             const ack = new Promise<PlayedAck>((resolve) => this.acks.set(id, resolve));
+            d.noteSpoken(translated);
             if (!d.sendAudio({ id, bytes, sink: 'virtual' })) throw new Error('The overlay is not open, so nothing can be played.');
             this.setBusy('speaking');
             const result = await Promise.race([

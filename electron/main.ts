@@ -79,7 +79,7 @@ import {
   setVerboseLogging as setVerboseLoggingFn,
 } from "./helpers/stealth"
 import { initializeApp } from "./lib/lifecycle"
-import type { EchoFilter } from "./lib/echo-filter"
+import { EchoFilter } from "./lib/echo-filter"
 import { audioStats } from "./lib/audio-stats"
 import { sendLag } from "./lib/send-lag"
 import { registerGlobalShortcutDispatch } from "./lib/global-shortcuts"
@@ -311,6 +311,8 @@ export class AppState {
   public lastAudioPipelineError: string | null = null;
   // The microphone hears the speakers: lines that repeat the other party's stream are dropped. Created on first use.
   public echoFilter: EchoFilter | null = null;
+  // The text Pika just spoke as the interpreter: a Them line that repeats it is Pika's own voice in the system audio.
+  public spokenEcho = new EchoFilter(20_000, 2, 0.75);
   public interpreting: InterpretingSession = createInterpretingSession(this);
   public transcriptAssemblerProfile: TranscriptAssemblerProfile = 'sentence_bias';
   public transcriptTurnBuffers: Record<TranscriptSpeaker, BufferedTranscriptTurn | null> = {

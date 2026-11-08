@@ -17,7 +17,7 @@ function setup(over: Partial<SessionDeps> = {}, settings: InterpretingSettings =
     let clock = 1000;
     const log: string[] = [];
     const sleeps: number[] = [];
-    const calls = { translate: [] as string[], synth: [] as Array<[string, string, string]>, audio: [] as AudioMessage[], shown: [] as Array<[number, string, string]>, finalize: 0, flush: 0, seal: 0, stop: 0 };
+    const calls = { translate: [] as string[], synth: [] as Array<[string, string, string]>, audio: [] as AudioMessage[], spoken: [] as string[], shown: [] as Array<[number, string, string]>, finalize: 0, flush: 0, seal: 0, stop: 0 };
     const states: string[] = [];
     let session!: InterpretingSession;
     const deps: SessionDeps = {
@@ -39,6 +39,7 @@ function setup(over: Partial<SessionDeps> = {}, settings: InterpretingSettings =
             cloneVoice: async () => { throw new Error('not used'); },
             deleteVoice: async () => { throw new Error('not used'); },
         }),
+        noteSpoken: (text) => { calls.spoken.push(text); },
         sendAudio: (m) => { calls.audio.push(m); session.played({ id: m.id, ok: true }); return true; },
         sendStop: () => { calls.stop++; },
         broadcastState: (s) => { states.push(s.phase); },
@@ -66,6 +67,7 @@ t.test('one window makes one translation and one synthesis, sent once to the ove
     t.same(s.calls.translate, ['Please move the invented review to Thursday afternoon.'], 'one translation of the joined latest texts');
     t.same(s.calls.synth, [[TRANSLATED, 'voice-1', 'fr']], 'one synthesis, in the other party language');
     t.equal(s.calls.audio.length, 1);
+    t.same(s.calls.spoken, [TRANSLATED], 'the spoken text is noted for the echo guard');
     t.equal(s.calls.audio[0].sink, 'virtual');
     t.same(s.calls.shown, [[1, 'to Thursday afternoon.', TRANSLATED]], 'the last Me row gets the spoken translation');
     t.equal(s.session.getState().phase, 'idle');

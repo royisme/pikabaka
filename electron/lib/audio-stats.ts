@@ -27,7 +27,7 @@ export class AudioStats {
     this.streams[speaker].finalWords += words;
   }
 
-  /** A microphone line the echo filter dropped. */
+  /** A line an echo filter dropped (Me heard the speakers, or Them heard Pika's own voice). */
   noteEchoDropped(isFinal: boolean, words: number): void {
     if (isFinal) {
       this.echoDroppedFinalLines += 1;
