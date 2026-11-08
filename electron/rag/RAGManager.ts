@@ -383,7 +383,6 @@ export class RAGManager {
             this.deleteMeetingData(meetingId);
 
             // Fetch meeting details from DB
-            const { DatabaseManager } = require('../db/DatabaseManager');
             const meeting = DatabaseManager.getInstance().getMeetingDetails(meetingId);
 
             if (!meeting) {
@@ -397,7 +396,7 @@ export class RAGManager {
             }
 
             // Convert to RawSegment format
-            const segments = meeting.transcript.map((t: any) => ({
+            const segments = meeting.transcript.map((t) => ({
                 speaker: t.speaker,
                 text: t.text,
                 timestamp: t.timestamp
@@ -409,7 +408,7 @@ export class RAGManager {
                 summary = [
                     ...(meeting.detailedSummary.overview ? [meeting.detailedSummary.overview] : []),
                     ...(meeting.detailedSummary.keyPoints || []),
-                    ...(meeting.detailedSummary.actionItems || []).map((a: any) => `Action: ${a}`)
+                    ...(meeting.detailedSummary.actionItems || []).map((a) => `Action: ${a}`)
                 ].join('. ');
             } else if (meeting.summary) {
                 summary = meeting.summary;

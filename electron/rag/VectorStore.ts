@@ -7,6 +7,29 @@ import { Worker } from 'worker_threads';
 import path from 'path';
 import { Chunk } from './SemanticChunker';
 import { DatabaseManager } from '../db/DatabaseManager';
+// Type-only import: a value import would bundle main-thread code into the worker.
+import type { WorkerRequest, WorkerResponse, ChunkHit, SummaryHit } from './vectorSearchWorker';
+
+type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
+
+interface ChunkDbRow {
+    id: number;
+    meeting_id: string;
+    chunk_index: number;
+    speaker: string;
+    start_timestamp_ms: number;
+    end_timestamp_ms: number;
+    cleaned_text: string;
+    token_count: number;
+    embedding: Buffer | null;
+}
+
+interface SummaryDbRow {
+    id: number;
+    meeting_id: string;
+    summary_text: string;
+    embedding: Buffer | null;
+}
 
 export interface StoredChunk extends Chunk {
     id: number;
@@ -32,7 +55,7 @@ export class VectorStore {
     private useNativeVec: boolean;
     private worker: Worker | null = null;
     private requestId = 0;
-    private pendingRequests = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void; timer: ReturnType<typeof setTimeout> }>();
+    private pendingRequests = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
 
     private static readonly WORKER_TIMEOUT_MS = 30_000; // 30s deadman switch
 
@@ -53,7 +76,7 @@ export class VectorStore {
             const workerPath = path.join(__dirname, 'vectorSearchWorker.js');
             this.worker = new Worker(workerPath);
 
-            this.worker.on('message', (msg: { type: string; requestId: number; data?: any; error?: string }) => {
+            this.worker.on('message', (msg: WorkerResponse) => {
                 const pending = this.pendingRequests.get(msg.requestId);
                 if (!pending) return;
                 clearTimeout(pending.timer);
@@ -97,11 +120,11 @@ export class VectorStore {
      * Send a message to the worker with Transferable buffers.
      * Returns a Promise with a timeout deadman switch.
      */
-    private postToWorker<T>(message: any, transferList: ArrayBuffer[] = []): Promise<T> {
+    private postToWorker<T>(request: DistributiveOmit<WorkerRequest, 'requestId'>, transferList: ArrayBuffer[] = []): Promise<T> {
         // Safe requestId wrap-around
         this.requestId = (this.requestId + 1) % Number.MAX_SAFE_INTEGER;
         const id = this.requestId;
-        message.requestId = id;
+        const message = { ...request, requestId: id } as WorkerRequest;
 
         return new Promise<T>((resolve, reject) => {
             const timer = setTimeout(() => {
@@ -109,7 +132,7 @@ export class VectorStore {
                 reject(new Error(`[VectorStore] Worker request ${id} timed out after ${VectorStore.WORKER_TIMEOUT_MS}ms`));
             }, VectorStore.WORKER_TIMEOUT_MS);
 
-            this.pendingRequests.set(id, { resolve, reject, timer });
+            this.pendingRequests.set(id, { resolve: resolve as (v: unknown) => void, reject, timer });
             this.getWorker().postMessage(message, transferList);
         });
     }
@@ -133,8 +156,8 @@ export class VectorStore {
             this.db.prepare("SELECT count(*) as cnt FROM vec_chunks_768 LIMIT 1").get();
             console.log('[VectorStore] Using native sqlite-vec for vector search');
             return true;
-        } catch (e: any) {
-            console.warn('[VectorStore] sqlite-vec not available, using JS cosine similarity fallback. Reason:', e.message);
+        } catch (e) {
+            console.warn('[VectorStore] sqlite-vec not available, using JS cosine similarity fallback. Reason:', e instanceof Error ? e.message : e);
             return false;
         }
     }
@@ -196,7 +219,7 @@ export class VectorStore {
             SELECT * FROM chunks 
             WHERE meeting_id = ? AND embedding IS NULL
             ORDER BY chunk_index ASC
-        `).all(meetingId) as any[];
+        `).all(meetingId) as ChunkDbRow[];
 
         return rows.map(r => this.rowToChunk(r));
     }
@@ -209,7 +232,7 @@ export class VectorStore {
             SELECT * FROM chunks 
             WHERE meeting_id = ?
             ORDER BY chunk_index ASC
-        `).all(meetingId) as any[];
+        `).all(meetingId) as ChunkDbRow[];
 
         return rows.map(r => this.rowToChunk(r));
     }
@@ -248,7 +271,7 @@ export class VectorStore {
         const queryBlob = this.embeddingToBlob(queryEmbedding);
         const dim = queryEmbedding.length;
         try {
-            return await this.postToWorker<ScoredChunk[]>({
+            return await this.postToWorker<ChunkHit[]>({
                 type: 'nativeVecSearch',
                 dbPath: this.dbPath,
                 extPath: this.extPath,
@@ -282,7 +305,7 @@ export class VectorStore {
             JOIN meetings m ON c.meeting_id = m.id
             WHERE c.embedding IS NOT NULL
         `;
-        const params: any[] = [];
+        const params: (string | number)[] = [];
 
         if (meetingId) {
             query += ' AND c.meeting_id = ?';
@@ -293,7 +316,7 @@ export class VectorStore {
             params.push(providerName);
         }
 
-        const rows = this.db.prepare(query).all(...params) as any[];
+        const rows = this.db.prepare(query).all(...params) as ChunkDbRow[];
         if (rows.length === 0) return [];
 
         const dim = queryEmbedding.length;
@@ -327,7 +350,7 @@ export class VectorStore {
         }));
 
         try {
-            return await this.postToWorker<ScoredChunk[]>({
+            return await this.postToWorker<ChunkHit[]>({
                 type: 'searchChunks',
                 queryEmbedding: new Float32Array(queryEmbedding),
                 rowCount: rowsWithEmbeddingBuffer.length,
@@ -360,7 +383,7 @@ export class VectorStore {
         const row = this.db.prepare(`
             SELECT COUNT(*) as count FROM chunks 
             WHERE meeting_id = ? AND embedding IS NOT NULL
-        `).get(meetingId) as any;
+        `).get(meetingId) as { count: number };
 
         return row.count > 0;
     }
@@ -435,7 +458,7 @@ export class VectorStore {
         const queryBlob = this.embeddingToBlob(queryEmbedding);
         const dim = queryEmbedding.length;
         try {
-            return await this.postToWorker<{ meetingId: string; summaryText: string; similarity: number }[]>({
+            return await this.postToWorker<SummaryHit[]>({
                 type: 'nativeVecSearchSummaries',
                 dbPath: this.dbPath,
                 extPath: this.extPath,
@@ -464,14 +487,14 @@ export class VectorStore {
             JOIN meetings m ON s.meeting_id = m.id
             WHERE s.embedding IS NOT NULL
         `;
-        const params: any[] = [];
+        const params: (string | number)[] = [];
         
         if (providerName) {
             query += ' AND m.embedding_provider = ?';
             params.push(providerName);
         }
 
-        const rows = this.db.prepare(query).all(...params) as any[];
+        const rows = this.db.prepare(query).all(...params) as SummaryDbRow[];
 
         const dim = queryEmbedding.length;
         const expectedByteLength = dim * 4;
@@ -498,7 +521,7 @@ export class VectorStore {
         }));
 
         try {
-            return await this.postToWorker<{ meetingId: string; summaryText: string; similarity: number }[]>({
+            return await this.postToWorker<SummaryHit[]>({
                 type: 'searchSummaries',
                 queryEmbedding: new Float32Array(queryEmbedding),
                 rowCount: rowsWithEmbeddingBuffer.length,
@@ -526,7 +549,7 @@ export class VectorStore {
             WHERE embedding_provider IS NOT NULL 
             AND embedding_provider != ?
             AND is_processed = 1
-        `).get(providerName) as any;
+        `).get(providerName) as { count: number };
 
         return row.count || 0;
     }
@@ -540,7 +563,7 @@ export class VectorStore {
             SELECT id FROM meetings
             WHERE (embedding_provider IS NULL OR embedding_provider != ?)
             AND is_processed = 1
-        `).all(providerName) as any[];
+        `).all(providerName) as { id: string }[];
 
         const meetingIds = rows.map(r => r.id);
         if (meetingIds.length === 0) return [];
@@ -592,7 +615,7 @@ export class VectorStore {
     // Private Helpers
     // ============================================
 
-    private rowToChunk(row: any): StoredChunk {
+    private rowToChunk(row: ChunkDbRow): StoredChunk {
         return {
             id: row.id,
             meetingId: row.meeting_id,

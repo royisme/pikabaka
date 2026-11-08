@@ -14,8 +14,8 @@ export class OllamaEmbeddingProvider implements IEmbeddingProvider {
       // Check if Ollama is running AND the model is pulled
       const res = await fetch(`${this.baseUrl}/api/tags`);
       if (!res.ok) return false;
-      const data = await res.json();
-      return data.models?.some((m: any) => m.name.startsWith(this.model)) ?? false;
+      const data = await res.json() as { models?: { name: string }[] };
+      return data.models?.some((m) => m.name.startsWith(this.model)) ?? false;
     } catch { return false; }
   }
 

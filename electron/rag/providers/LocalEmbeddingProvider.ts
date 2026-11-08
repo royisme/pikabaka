@@ -1,13 +1,14 @@
 // @huggingface/transformers is ESM-only — must use dynamic import()
 import path from 'path';
 import { app } from 'electron';
+import type { FeatureExtractionPipeline } from '@huggingface/transformers';
 import { IEmbeddingProvider } from './IEmbeddingProvider';
 
 export class LocalEmbeddingProvider implements IEmbeddingProvider {
   readonly name = 'local';
   readonly dimensions = 384; // all-MiniLM-L6-v2
 
-  private pipe: any = null;
+  private pipe: FeatureExtractionPipeline | null = null;
   private loadingPromise: Promise<void> | null = null; // prevents concurrent init races
   private modelPath: string;
 
@@ -58,7 +59,7 @@ export class LocalEmbeddingProvider implements IEmbeddingProvider {
       this.pipe = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
         local_files_only: true,
         dtype: 'q8',
-      });
+      }) as FeatureExtractionPipeline;
     })();
 
     try {
@@ -72,7 +73,8 @@ export class LocalEmbeddingProvider implements IEmbeddingProvider {
 
   async embed(text: string): Promise<number[]> {
     await this.ensureLoaded();
-    const output = await this.pipe(text, { pooling: 'mean', normalize: true });
+    const pipe = this.pipe!; // set by ensureLoaded
+    const output = await pipe(text, { pooling: 'mean', normalize: true });
     return Array.from(output.data as Float32Array);
   }
 
@@ -82,13 +84,14 @@ export class LocalEmbeddingProvider implements IEmbeddingProvider {
 
   async embedBatch(texts: string[]): Promise<number[][]> {
     await this.ensureLoaded();
+    const pipe = this.pipe!; // set by ensureLoaded
     // transformers.js handles batching internally
-    const output = await this.pipe(texts, { pooling: 'mean', normalize: true });
+    const output = await pipe(texts, { pooling: 'mean', normalize: true });
     // output.data is flat [n * 384], reshape it
     const batchSize = texts.length;
     const result: number[][] = [];
     for (let i = 0; i < batchSize; i++) {
-      result.push(Array.from(output.data.slice(i * this.dimensions, (i + 1) * this.dimensions)));
+      result.push(Array.from((output.data as Float32Array).slice(i * this.dimensions, (i + 1) * this.dimensions)));
     }
     return result;
   }

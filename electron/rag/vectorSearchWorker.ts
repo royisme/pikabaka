@@ -72,7 +72,44 @@ interface SearchSummariesMessage {
     limit: number;
 }
 
-type WorkerMessage = NativeVecSearchChunksMessage | NativeVecSearchSummariesMessage | SearchChunksMessage | SearchSummariesMessage;
+export type WorkerRequest = NativeVecSearchChunksMessage | NativeVecSearchSummariesMessage | SearchChunksMessage | SearchSummariesMessage;
+
+export interface ChunkHit {
+    id: number;
+    meetingId: string;
+    chunkIndex: number;
+    speaker: string;
+    startMs: number;
+    endMs: number;
+    text: string;
+    tokenCount: number;
+    similarity: number;
+}
+
+export interface SummaryHit {
+    meetingId: string;
+    summaryText: string;
+    similarity: number;
+}
+
+export type WorkerResponse =
+    | { type: 'result'; requestId: number; data: ChunkHit[] | SummaryHit[] }
+    | { type: 'error'; requestId: number; error: string };
+
+// Row shapes read from the database inside the worker.
+interface VecChunkRow { chunk_id: number; distance: number }
+interface VecSummaryRow { summary_id: number; distance: number }
+interface ChunkRow {
+    id: number;
+    meeting_id: string;
+    chunk_index: number;
+    speaker: string;
+    start_timestamp_ms: number;
+    end_timestamp_ms: number;
+    cleaned_text: string;
+    token_count: number;
+}
+interface SummaryRow { id: number; meeting_id: string; summary_text: string }
 
 // ============================================
 // Math helpers — operates directly on Float32Array slices
@@ -124,22 +161,12 @@ function getDb(dbPath: string, extPath: string): Database.Database {
     return db;
 }
 
-parentPort.on('message', (message: WorkerMessage) => {
+parentPort.on('message', (message: WorkerRequest) => {
     try {
         switch (message.type) {
             case 'searchChunks': {
                 const { requestId, queryEmbedding, embeddings, embeddingDim, rowMeta, minSimilarity, limit } = message;
-                const scored: Array<{
-                    id: number;
-                    meetingId: string;
-                    chunkIndex: number;
-                    speaker: string;
-                    startMs: number;
-                    endMs: number;
-                    text: string;
-                    tokenCount: number;
-                    similarity: number;
-                }> = [];
+                const scored: ChunkHit[] = [];
 
                 for (let i = 0; i < rowMeta.length; i++) {
                     const similarity = cosineSimilarityF32(queryEmbedding, embeddings, i * embeddingDim, embeddingDim);
@@ -170,11 +197,7 @@ parentPort.on('message', (message: WorkerMessage) => {
 
             case 'searchSummaries': {
                 const { requestId, queryEmbedding, embeddings, embeddingDim, rowMeta, limit } = message;
-                const scored: Array<{
-                    meetingId: string;
-                    summaryText: string;
-                    similarity: number;
-                }> = [];
+                const scored: SummaryHit[] = [];
 
                 for (let i = 0; i < rowMeta.length; i++) {
                     const similarity = cosineSimilarityF32(queryEmbedding, embeddings, i * embeddingDim, embeddingDim);
@@ -211,22 +234,22 @@ parentPort.on('message', (message: WorkerMessage) => {
                 const vecRows = db.prepare(`
                     SELECT chunk_id, distance FROM ${vecTable}
                     WHERE embedding MATCH ? ORDER BY distance LIMIT ?
-                `).all(queryBlob, fetchLimit) as any[];
+                `).all(queryBlob, fetchLimit) as VecChunkRow[];
 
                 if (vecRows.length === 0) { parentPort!.postMessage({ type: 'result', requestId, data: [] }); break; }
 
-                const chunkIds = vecRows.map((r: any) => r.chunk_id);
+                const chunkIds = vecRows.map((r) => r.chunk_id);
                 const ph = chunkIds.map(() => '?').join(',');
                 let q = `SELECT c.* FROM chunks c JOIN meetings m ON c.meeting_id = m.id WHERE c.id IN (${ph})`;
-                const params: any[] = [...chunkIds];
+                const params: (string | number)[] = [...chunkIds];
                 if (meetingId) { q += ' AND c.meeting_id = ?'; params.push(meetingId); }
                 if (providerName) { q += ' AND m.embedding_provider = ?'; params.push(providerName); }
 
-                const chunkRows = db.prepare(q).all(...params) as any[];
-                const chunkMap = new Map<number, any>();
+                const chunkRows = db.prepare(q).all(...params) as ChunkRow[];
+                const chunkMap = new Map<number, ChunkRow>();
                 for (const row of chunkRows) chunkMap.set(row.id, row);
 
-                const scored: any[] = [];
+                const scored: ChunkHit[] = [];
                 for (const vecRow of vecRows) {
                     const c = chunkMap.get(vecRow.chunk_id);
                     if (!c) continue;
@@ -255,21 +278,21 @@ parentPort.on('message', (message: WorkerMessage) => {
                 const vecRows = db.prepare(`
                     SELECT summary_id, distance FROM ${vecTable}
                     WHERE embedding MATCH ? ORDER BY distance LIMIT ?
-                `).all(queryBlob, fetchLimit) as any[];
+                `).all(queryBlob, fetchLimit) as VecSummaryRow[];
 
                 if (vecRows.length === 0) { parentPort!.postMessage({ type: 'result', requestId, data: [] }); break; }
 
-                const ids = vecRows.map((r: any) => r.summary_id);
+                const ids = vecRows.map((r) => r.summary_id);
                 const ph = ids.map(() => '?').join(',');
                 let sq = `SELECT s.* FROM chunk_summaries s JOIN meetings m ON s.meeting_id = m.id WHERE s.id IN (${ph})`;
-                const params: any[] = [...ids];
+                const params: (string | number)[] = [...ids];
                 if (providerName) { sq += ' AND m.embedding_provider = ?'; params.push(providerName); }
 
-                const summaryRows = db.prepare(sq).all(...params) as any[];
-                const summaryMap = new Map<number, any>();
+                const summaryRows = db.prepare(sq).all(...params) as SummaryRow[];
+                const summaryMap = new Map<number, SummaryRow>();
                 for (const row of summaryRows) summaryMap.set(row.id, row);
 
-                const results: any[] = [];
+                const results: SummaryHit[] = [];
                 for (const vecRow of vecRows) {
                     const s = summaryMap.get(vecRow.summary_id);
                     if (!s) continue;
@@ -283,15 +306,15 @@ parentPort.on('message', (message: WorkerMessage) => {
 
                 parentPort!.postMessage({
                     type: 'error',
-                    requestId: (message as any).requestId,
-                    error: `Unknown message type: ${(message as any).type}`
-                });
+                    requestId: (message as { requestId: number }).requestId,
+                    error: `Unknown message type: ${(message as { type: string }).type}`
+                } satisfies WorkerResponse);
         }
-    } catch (error: any) {
+    } catch (error) {
         parentPort!.postMessage({
             type: 'error',
-            requestId: (message as any).requestId,
-            error: error.message
-        });
+            requestId: message.requestId,
+            error: error instanceof Error ? error.message : String(error)
+        } satisfies WorkerResponse);
     }
 });

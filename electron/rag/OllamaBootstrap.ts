@@ -54,8 +54,8 @@ export class OllamaBootstrap {
   async isModelPulled(model: string): Promise<boolean> {
     try {
       const res = await fetch(`${this.baseUrl}/api/tags`);
-      const data = await res.json();
-      return data.models?.some((m: any) => m.name.startsWith(model)) ?? false;
+      const data = await res.json() as { models?: { name: string }[] };
+      return data.models?.some((m) => m.name.startsWith(model)) ?? false;
     } catch {
       return false;
     }
@@ -163,8 +163,8 @@ export class OllamaBootstrap {
       onProgress('ready', 100);
       db.setAppState('ollama_pull_status', 'complete');
       return 'pulled';
-    } catch (err: any) {
-      console.error('[OllamaBootstrap] Pull failed:', err.message);
+    } catch (err) {
+      console.error('[OllamaBootstrap] Pull failed:', err instanceof Error ? err.message : err);
       db.setAppState('ollama_pull_status', 'failed');
       return 'failed';
     }
