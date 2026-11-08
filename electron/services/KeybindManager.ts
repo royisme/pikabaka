@@ -1,4 +1,5 @@
-import { app, globalShortcut, Menu, BrowserWindow, ipcMain } from 'electron';
+import { app, globalShortcut, Menu, BrowserWindow, ipcMain, type MenuItemConstructorOptions } from 'electron';
+import type { WindowHelper } from '../helpers/WindowHelper';
 import path from 'path';
 import fs from 'fs';
 
@@ -40,7 +41,7 @@ export class KeybindManager {
     private static instance: KeybindManager;
     private keybinds: Map<string, KeybindConfig> = new Map();
     private filePath: string;
-    private windowHelper: any; // Type avoided for circular dep, passed in init
+    private windowHelper: WindowHelper | undefined; // Set by setWindowHelper at init
     private onUpdateCallbacks: (() => void)[] = [];
     private onShortcutTriggeredCallbacks: ((actionId: string) => void)[] = [];
     private activeMode: 'launcher' | 'overlay' = 'launcher';
@@ -96,7 +97,7 @@ export class KeybindManager {
         return KeybindManager.instance;
     }
 
-    public setWindowHelper(windowHelper: any) {
+    public setWindowHelper(windowHelper: WindowHelper) {
         this.windowHelper = windowHelper;
     }
 
@@ -241,7 +242,7 @@ export class KeybindManager {
         // On Windows/Linux, set a minimal menu (for shortcuts like DevTools)
         // but hide the menu bar from the UI
         if (process.platform !== 'darwin') {
-            const template: any[] = [
+            const template: MenuItemConstructorOptions[] = [
                 {
                     label: 'View',
                     submenu: [
@@ -265,7 +266,7 @@ export class KeybindManager {
         const toggleKb = this.keybinds.get('general:toggle-visibility');
         const toggleAccelerator = toggleKb ? toggleKb.accelerator : 'CommandOrControl+B';
 
-        const template: any[] = [
+        const template: MenuItemConstructorOptions[] = [
             {
                 label: app.name,
                 submenu: [

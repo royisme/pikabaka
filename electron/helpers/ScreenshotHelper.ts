@@ -584,7 +584,7 @@ export class ScreenshotHelper {
         console.log('[ScreenshotHelper] Using interactive selection');
         try {
           await exec(this.getScreenshotCommand(screenshotPath, true))
-        } catch (e: any) {
+        } catch (e: unknown) {
           console.warn('[ScreenshotHelper] User cancelled selection or error occurred:', e);
           throw new Error("Selection cancelled")
         }
