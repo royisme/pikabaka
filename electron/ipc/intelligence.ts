@@ -13,7 +13,7 @@ export function registerIntelligenceHandlers(appState: AppState): void {
       const intelligenceManager = appState.getIntelligenceManager();
       const insight = await intelligenceManager.runAssistMode();
       return { insight };
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw error;
     }
   });
@@ -30,7 +30,7 @@ export function registerIntelligenceHandlers(appState: AppState): void {
         win?.webContents.send('intelligence-error', { error: 'Could not generate a question. Try again after some audio context is available.', mode: 'ask' });
       }
       return { question };
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw error;
     }
   });
@@ -41,7 +41,7 @@ export function registerIntelligenceHandlers(appState: AppState): void {
       const intelligenceManager = appState.getIntelligenceManager();
       const refined = await intelligenceManager.runFollowUp(intent, userRequest);
       return { refined, intent };
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw error;
     }
   });
@@ -52,7 +52,7 @@ export function registerIntelligenceHandlers(appState: AppState): void {
       const intelligenceManager = appState.getIntelligenceManager();
       const summary = await intelligenceManager.runCatchUp();
       return { summary };
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw error;
     }
   });
@@ -63,7 +63,7 @@ export function registerIntelligenceHandlers(appState: AppState): void {
       const intelligenceManager = appState.getIntelligenceManager();
       const answer = await intelligenceManager.runManualAnswer(question);
       return { answer, question };
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw error;
     }
   });
@@ -77,7 +77,7 @@ export function registerIntelligenceHandlers(appState: AppState): void {
         lastAssistantMessage: intelligenceManager.getLastAssistantMessage(),
         activeMode: intelligenceManager.getActiveMode()
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw error;
     }
   });
@@ -88,8 +88,8 @@ export function registerIntelligenceHandlers(appState: AppState): void {
       const intelligenceManager = appState.getIntelligenceManager();
       intelligenceManager.reset();
       return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -97,7 +97,7 @@ export function registerIntelligenceHandlers(appState: AppState): void {
   // Service Account Selection
   safeHandle("select-service-account", async () => {
     try {
-      const result: any = await dialog.showOpenDialog({
+      const result = await dialog.showOpenDialog({
         properties: ['openFile'],
         filters: [{ name: 'JSON', extensions: ['json'] }]
       });
@@ -116,9 +116,9 @@ export function registerIntelligenceHandlers(appState: AppState): void {
       CredentialsManager.getInstance().setGoogleServiceAccountPath(filePath);
 
       return { success: true, path: filePath };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error selecting service account:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 }

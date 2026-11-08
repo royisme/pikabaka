@@ -188,7 +188,7 @@ export class SonioxStreamingSTT extends EventEmitter {
             console.log('[SonioxStreaming] Connected, sending config...');
 
             // Send initial configuration as first message
-            const config: any = {
+            const config: Record<string, string | number | boolean | string[]> = {
                 api_key: this.apiKey,
                 model: this.model,
                 audio_format: 'pcm_s16le',

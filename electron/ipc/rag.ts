@@ -52,9 +52,9 @@ export function registerRagHandlers(appState: AppState): void {
       event.sender.send("rag:stream-complete", { meetingId });
       return { success: true };
 
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        const msg = error.message || "";
+    } catch (error: unknown) {
+      if (!(error instanceof Error && error.name === 'AbortError')) {
+        const msg = (error instanceof Error ? error.message : String(error)) || "";
         // If specific RAG failures, return fallback to use transcript window
         if (msg.includes('NO_RELEVANT_CONTEXT') || msg.includes('NO_MEETING_EMBEDDINGS')) {
           console.log(`[RAG] Query failed with '${msg}', falling back to regular chat`);
@@ -64,7 +64,7 @@ export function registerRagHandlers(appState: AppState): void {
         console.error("[RAG] Query failed");
         event.sender.send("rag:stream-error", { meetingId, error: msg });
       }
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     } finally {
       activeRAGQueries.delete(queryKey);
     }
@@ -98,9 +98,9 @@ export function registerRagHandlers(appState: AppState): void {
       event.sender.send("rag:stream-complete", { live: true });
       return { success: true };
 
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        const msg = error.message || "";
+    } catch (error: unknown) {
+      if (!(error instanceof Error && error.name === 'AbortError')) {
+        const msg = (error instanceof Error ? error.message : String(error)) || "";
         // If JIT RAG failed (no embeddings yet, no relevant context), fallback to regular chat
         if (msg.includes('NO_RELEVANT_CONTEXT') || msg.includes('NO_MEETING_EMBEDDINGS')) {
           console.log(`[RAG] JIT query failed with '${msg}', falling back to regular live chat`);
@@ -109,7 +109,7 @@ export function registerRagHandlers(appState: AppState): void {
         console.error("[RAG] Live query failed");
         event.sender.send("rag:stream-error", { live: true, error: msg });
       }
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     } finally {
       activeRAGQueries.delete(queryKey);
     }
@@ -144,11 +144,11 @@ export function registerRagHandlers(appState: AppState): void {
       event.sender.send("rag:stream-complete", { global: true });
       return { success: true };
 
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        event.sender.send("rag:stream-error", { global: true, error: error.message });
+    } catch (error: unknown) {
+      if (!(error instanceof Error && error.name === 'AbortError')) {
+        event.sender.send("rag:stream-error", { global: true, error: (error instanceof Error ? error.message : String(error)) });
       }
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     } finally {
       activeRAGQueries.delete(queryKey);
     }
@@ -175,7 +175,7 @@ export function registerRagHandlers(appState: AppState): void {
       const ragManager = appState.getRAGManager();
       if (!ragManager) throw new Error('RAGManager not initialized');
       return ragManager.isMeetingProcessed(meetingId);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[IPC rag:is-meeting-processed] Error:', error);
       return false;
     }
@@ -216,9 +216,9 @@ export function registerRagHandlers(appState: AppState): void {
       if (!ragManager) throw new Error('RAGManager not initialized');
       await ragManager.reindexIncompatibleMeetings();
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[IPC rag:reindex-incompatible-meetings] Error:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -339,12 +339,12 @@ ${meetingContext || ''}`;
 
       return { success: true };
 
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
+    } catch (error: unknown) {
+      if (!(error instanceof Error && error.name === 'AbortError')) {
         console.error('[chat:stream-meeting] Request failed');
-        sender.send('chat:stream-error', { requestId, error: error.message || 'Unknown error' });
+        sender.send('chat:stream-error', { requestId, error: (error instanceof Error ? error.message : String(error)) || 'Unknown error' });
       }
-      return { success: false, error: error.message };
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     } finally {
       activeChatStreams.delete(requestId);
     }

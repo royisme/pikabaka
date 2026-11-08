@@ -1,16 +1,17 @@
 import { EventEmitter } from 'events';
-import { loadNativeModule } from './nativeModuleLoader';
+import { loadNativeModule, type NativeModule } from './nativeModuleLoader';
 
 // RustAudioCapture is the native Rust class (napi-rs) that captures system audio.
 // May be null if the .node binary isn't available — constructor logs an error in that case.
-const NativeModule: any = loadNativeModule();
-const { SystemAudioCapture: RustAudioCapture } = NativeModule || {};
+const nativeModule = loadNativeModule();
+const { SystemAudioCapture: RustAudioCapture } = nativeModule ?? {};
 
 export class SystemAudioCapture extends EventEmitter {
     private isRecording: boolean = false;
     private deviceId: string | null = null;
     private detectedSampleRate: number = 48000;
-    private monitor: any = null;
+    // get_sample_rate is not on the native class (it exposes getSampleRate); kept as optional so the runtime checks stay as they were.
+    private monitor: (InstanceType<NativeModule['SystemAudioCapture']> & { get_sample_rate?: () => number }) | null = null;
 
     constructor(deviceId?: string | null) {
         super();

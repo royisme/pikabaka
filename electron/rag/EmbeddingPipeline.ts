@@ -4,6 +4,7 @@
 // Exhausted jobs fail without changing the meeting's provider or existing vectors.
 
 import Database from 'better-sqlite3';
+import type { BrowserWindow } from 'electron';
 import { VectorStore } from './VectorStore';
 
 import { EmbeddingProviderResolver, AppAPIConfig } from './EmbeddingProviderResolver';
@@ -108,7 +109,7 @@ export class EmbeddingPipeline {
             }
 
             // Check for previous provider mismatches
-            const stateRow = this.db.prepare("SELECT value FROM app_state WHERE key = 'last_embedding_provider'").get() as any;
+            const stateRow = this.db.prepare("SELECT value FROM app_state WHERE key = 'last_embedding_provider'").get() as { value: string } | undefined;
             const lastProvider = stateRow?.value;
 
             if (lastProvider && lastProvider !== this.provider.name) {
@@ -116,7 +117,7 @@ export class EmbeddingPipeline {
                 if (count > 0) {
                     console.log(`[EmbeddingPipeline] Found ${count} incompatible meetings from ${lastProvider}.`);
                     const { BrowserWindow } = require('electron');
-                    BrowserWindow.getAllWindows().forEach((win: any) => {
+                    BrowserWindow.getAllWindows().forEach((win: BrowserWindow) => {
                         if (!win.isDestroyed()) {
                             win.webContents.send('embedding:incompatible-provider-warning', {
                                 count,
@@ -297,7 +298,7 @@ export class EmbeddingPipeline {
                   AND retry_count < ?
                 ORDER BY created_at ASC
                 LIMIT 1
-            `).get(MAX_RETRIES) as any;
+            `).get(MAX_RETRIES) as { id: number; meeting_id: string; chunk_id: number | null; retry_count: number } | undefined;
 
             if (!pending) {
                 console.log('[EmbeddingPipeline] Queue empty');
@@ -341,12 +342,13 @@ export class EmbeddingPipeline {
                     WHERE id IN (${placeholders})
                 `).run(new Date().toISOString(), ...ids);
 
-            } catch (error: any) {
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
                 const newRetryCount = pending.retry_count + 1;
                 console.error(
                     `[EmbeddingPipeline] Error processing queue item ${pending.id} ` +
                     `(retry ${newRetryCount}/${MAX_RETRIES}, provider: ${activeProvider.name}):`,
-                    error.message
+                    errorMessage
                 );
 
                 const exhausted = newRetryCount >= MAX_RETRIES;
@@ -354,7 +356,7 @@ export class EmbeddingPipeline {
                     UPDATE embedding_queue
                     SET status = ?, retry_count = ?, error_message = ?
                     WHERE id IN (${placeholders})
-                `).run(exhausted ? 'failed' : 'pending', newRetryCount, error.message, ...ids);
+                `).run(exhausted ? 'failed' : 'pending', newRetryCount, errorMessage, ...ids);
 
                 if (!exhausted) {
                     const delay = RETRY_DELAY_BASE_MS * Math.pow(2, pending.retry_count);
@@ -466,7 +468,7 @@ export class EmbeddingPipeline {
         if (!p) throw new Error('No embedding provider');
 
         // Get chunk text
-        const row = this.db.prepare('SELECT cleaned_text, meeting_id FROM chunks WHERE id = ?').get(chunkId) as any;
+        const row = this.db.prepare('SELECT cleaned_text, meeting_id FROM chunks WHERE id = ?').get(chunkId) as { cleaned_text: string; meeting_id: string } | undefined;
         if (!row) {
             console.log(`[EmbeddingPipeline] Chunk ${chunkId} not found, skipping`);
             return false;
@@ -541,7 +543,7 @@ export class EmbeddingPipeline {
     getQueueStatus(): { pending: number; processing: number; completed: number; failed: number } {
         const counts = this.db.prepare(`
             SELECT status, COUNT(*) as count FROM embedding_queue GROUP BY status
-        `).all() as any[];
+        `).all() as { status: string; count: number }[];
 
         const result = { pending: 0, processing: 0, completed: 0, failed: 0 };
 
@@ -556,7 +558,7 @@ export class EmbeddingPipeline {
         const effectivelyStalled = this.db.prepare(`
             SELECT COUNT(*) as count FROM embedding_queue 
             WHERE status = 'pending' AND retry_count >= ?
-        `).get(MAX_RETRIES) as any;
+        `).get(MAX_RETRIES) as { count: number };
 
         // Add stalled count on top of explicit status='failed' count (don't overwrite)
         result.failed += (effectivelyStalled.count || 0);

@@ -1,26 +1,9 @@
 import path from 'path';
 
-export interface AudioDeviceInfo {
-  id: string;
-  name: string;
-}
+export type { AudioDeviceInfo } from '../../native-module/index';
 
-export interface NativeModule {
-  getHardwareId(): string;
-  verifyGumroadKey(licenseKey: string): Promise<string>;
-  getInputDevices(): Array<AudioDeviceInfo>;
-  getOutputDevices(): Array<AudioDeviceInfo>;
-  SystemAudioCapture: new (deviceId?: string | null) => {
-    getSampleRate(): number;
-    start(callback: (...args: any[]) => any, onSpeechEnded?: (...args: any[]) => any): void;
-    stop(): void;
-  };
-  MicrophoneCapture: new (deviceId?: string | null) => {
-    getSampleRate(): number;
-    start(callback: (...args: any[]) => any, onSpeechEnded?: (...args: any[]) => any): void;
-    stop(): void;
-  };
-}
+/** The module shape is the NAPI-RS generated declaration. */
+export type NativeModule = typeof import('../../native-module/index');
 
 const REQUIRED_METHODS = ['getHardwareId', 'verifyGumroadKey', 'getInputDevices', 'getOutputDevices'];
 const REQUIRED_CONSTRUCTORS = ['SystemAudioCapture', 'MicrophoneCapture'];
@@ -29,15 +12,16 @@ const REQUIRED_CONSTRUCTORS = ['SystemAudioCapture', 'MicrophoneCapture'];
  * Validates that a loaded native module conforms to the NativeModule interface.
  * Throws immediately if any required method or constructor is missing.
  */
-function validateNativeModule(mod: any): asserts mod is NativeModule {
+function validateNativeModule(mod: unknown): asserts mod is NativeModule {
+    const m = mod as Record<string, unknown>;
     for (const fn of REQUIRED_METHODS) {
-        if (typeof mod[fn] !== 'function') {
-            throw new Error(`NativeModule: missing or invalid method "${fn}" (expected function, got ${typeof mod[fn]})`);
+        if (typeof m[fn] !== 'function') {
+            throw new Error(`NativeModule: missing or invalid method "${fn}" (expected function, got ${typeof m[fn]})`);
         }
     }
     for (const cls of REQUIRED_CONSTRUCTORS) {
-        if (typeof mod[cls] !== 'function') {
-            throw new Error(`NativeModule: missing or invalid constructor "${cls}" (expected constructor, got ${typeof mod[cls]})`);
+        if (typeof m[cls] !== 'function') {
+            throw new Error(`NativeModule: missing or invalid constructor "${cls}" (expected constructor, got ${typeof m[cls]})`);
         }
     }
 }
@@ -115,7 +99,7 @@ export function loadNativeModule(): NativeModule | null {
 
     for (const filePath of candidates) {
         try {
-            const mod = require(filePath);
+            const mod: unknown = require(filePath);
             validateNativeModule(mod);
             cached = mod;
             console.log(`[nativeModuleLoader] Loaded ${binary} from: ${filePath}`);

@@ -63,8 +63,8 @@ export function registerKnowledgeHandlers(appState: AppState): void {
   safeHandle("knowledge:list-documents", async () => {
     try {
       return { success: true, documents: documents().listDocuments() };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -81,8 +81,8 @@ export function registerKnowledgeHandlers(appState: AppState): void {
       });
       if (result.canceled || result.filePaths.length === 0) return { cancelled: true };
       return { success: true, document: await orchestrator.importDocument(result.filePaths[0]) };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -92,8 +92,8 @@ export function registerKnowledgeHandlers(appState: AppState): void {
       if (docId === null) return { success: false, error: 'That document is not in Pika.' };
       documents().removeDocument(docId);
       return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 
@@ -103,8 +103,8 @@ export function registerKnowledgeHandlers(appState: AppState): void {
       if (docId === null) return { success: false, error: 'That document is not in Pika.' };
       documents().reindexDocument(docId);
       return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: (error instanceof Error ? error.message : String(error)) };
     }
   });
 }

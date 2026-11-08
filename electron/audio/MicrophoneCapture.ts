@@ -1,14 +1,14 @@
 import { EventEmitter } from 'events';
-import { loadNativeModule } from './nativeModuleLoader';
+import { loadNativeModule, type NativeModule } from './nativeModuleLoader';
 
 // RustMicCapture is the native Rust class (napi-rs) that captures microphone input.
 // Uses eager init — the monitor is created in the constructor and kept alive across
 // stop/restart cycles to avoid re-initialization latency.
-const NativeModule: any = loadNativeModule();
-const { MicrophoneCapture: RustMicCapture } = NativeModule || {};
+const nativeModule = loadNativeModule();
+const { MicrophoneCapture: RustMicCapture } = nativeModule ?? {};
 
 export class MicrophoneCapture extends EventEmitter {
-    private monitor: any = null;
+    private monitor: InstanceType<NativeModule['MicrophoneCapture']> | null = null;
     private isRecording: boolean = false;
     private deviceId: string | null = null;
 

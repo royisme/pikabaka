@@ -26,10 +26,16 @@ interface RestSttProviderConfig {
     uploadType: 'multipart' | 'binary';
     extraFormFields?: Record<string, string>;
     /** Extract transcript text from the API response */
-    extractTranscript: (data: any) => string;
+    extractTranscript: (data: unknown) => string;
     /** Extract detected language (ISO 639) from the API response, if available */
-    extractDetectedLanguage?: (data: any) => string | undefined;
+    extractDetectedLanguage?: (data: unknown) => string | undefined;
 }
+
+/** Read one key of an untyped JSON response, or undefined when it is not an object. */
+const field = (data: unknown, key: string): unknown =>
+    typeof data === 'object' && data ? (data as Record<string, unknown>)[key] : undefined;
+const asString = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);
+const asText = (value: unknown): string => asString(value) ?? '';
 
 type ProviderConfigFactory = (apiKey: string, region?: string, languageKey?: string) => RestSttProviderConfig;
 
@@ -50,13 +56,13 @@ const PROVIDER_CONFIGS: Record<RestSttProvider, ProviderConfigFactory> = {
                 response_format: 'verbose_json',
                 ...(lang ? { language: lang } : {})
             },
-            extractTranscript: (data: any) => {
+            extractTranscript: (data: unknown) => {
                 if (typeof data === 'string') return data;
-                return data?.text ?? '';
+                return asText(field(data, 'text'));
             },
-            extractDetectedLanguage: (data: any) => {
+            extractDetectedLanguage: (data: unknown) => {
                 if (typeof data !== 'object' || !data) return undefined;
-                return normalizeLanguageToIso639(data.language);
+                return normalizeLanguageToIso639(asString(field(data, 'language')));
             },
         };
     },
@@ -74,13 +80,13 @@ const PROVIDER_CONFIGS: Record<RestSttProvider, ProviderConfigFactory> = {
                 response_format: 'verbose_json',
                 ...(lang ? { language: lang } : {})
             },
-            extractTranscript: (data: any) => {
+            extractTranscript: (data: unknown) => {
                 if (typeof data === 'string') return data;
-                return data?.text ?? '';
+                return asText(field(data, 'text'));
             },
-            extractDetectedLanguage: (data: any) => {
+            extractDetectedLanguage: (data: unknown) => {
                 if (typeof data !== 'object' || !data) return undefined;
-                return normalizeLanguageToIso639(data.language);
+                return normalizeLanguageToIso639(asString(field(data, 'language')));
             },
         };
     },
@@ -98,13 +104,13 @@ const PROVIDER_CONFIGS: Record<RestSttProvider, ProviderConfigFactory> = {
             extraFormFields: {
                 ...(lang ? { language_code: lang } : {})
             },
-            extractTranscript: (data: any) => {
+            extractTranscript: (data: unknown) => {
                 if (typeof data === 'string') return data;
-                return data?.text ?? '';
+                return asText(field(data, 'text'));
             },
-            extractDetectedLanguage: (data: any) => {
+            extractDetectedLanguage: (data: unknown) => {
                 if (typeof data !== 'object' || !data) return undefined;
-                return normalizeLanguageToIso639(data.language_code ?? data.language);
+                return normalizeLanguageToIso639(asString(field(data, 'language_code')) ?? asString(field(data, 'language')));
             },
         };
     },
@@ -116,8 +122,8 @@ const PROVIDER_CONFIGS: Record<RestSttProvider, ProviderConfigFactory> = {
             model: '',
             authHeader: { 'Ocp-Apim-Subscription-Key': apiKey },
             uploadType: 'binary',
-            extractTranscript: (data: any) => {
-                return data?.DisplayText ?? '';
+            extractTranscript: (data: unknown) => {
+                return asText(field(data, 'DisplayText'));
             },
         };
     },
@@ -129,12 +135,12 @@ const PROVIDER_CONFIGS: Record<RestSttProvider, ProviderConfigFactory> = {
             model: '',
             authHeader: { Authorization: `Basic ${Buffer.from(`apikey:${apiKey}`).toString('base64')}` },
             uploadType: 'binary',
-            extractTranscript: (data: any) => {
-                try {
-                    return data?.results?.[0]?.alternatives?.[0]?.transcript ?? '';
-                } catch {
-                    return '';
-                }
+            extractTranscript: (data: unknown) => {
+                const results = field(data, 'results');
+                const first = Array.isArray(results) ? results[0] : undefined;
+                const alternatives = field(first, 'alternatives');
+                const alt = Array.isArray(alternatives) ? alternatives[0] : undefined;
+                return asText(field(alt, 'transcript'));
             },
         };
     },

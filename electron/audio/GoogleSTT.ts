@@ -1,4 +1,4 @@
-import { SpeechClient } from '@google-cloud/speech';
+import { SpeechClient, protos } from '@google-cloud/speech';
 import { EventEmitter } from 'events';
 import { RECOGNITION_LANGUAGES, EnglishVariant } from '../config/languages';
 import { normalizeLanguageToIso639 } from '../transcript/translationExecutor';
@@ -18,7 +18,7 @@ const AUTO_ALTERNATIVE_LANGUAGES = ['zh-CN', 'ja-JP', 'es-ES'];
  */
 export class GoogleSTT extends EventEmitter {
     private client: SpeechClient;
-    private stream: any = null; // Stream type is complex in google-cloud libs
+    private stream: ReturnType<SpeechClient['streamingRecognize']> | null = null;
     private isStreaming = false;
     private isActive = false;
 
@@ -217,9 +217,7 @@ export class GoogleSTT extends EventEmitter {
                 console.log(`[GoogleSTT] Writing ${audioData.length} bytes to stream`);
             }
 
-            if (this.stream.command && this.stream.command.writable) {
-                this.stream.write(audioData);
-            } else if (this.stream.writable) {
+            if (this.stream.writable) {
                 this.stream.write(audioData);
             } else {
                 console.warn('[GoogleSTT] Stream not writable!');
@@ -283,14 +281,14 @@ export class GoogleSTT extends EventEmitter {
                 this.isStreaming = false;
                 this.stream = null;
             })
-            .on('data', (data: any) => {
+            .on('data', (data: protos.google.cloud.speech.v1.IStreamingRecognizeResponse) => {
                 // ... (existing data handler)
-                if (data.results[0] && data.results[0].alternatives[0]) {
-                    const result = data.results[0];
-                    const alt = result.alternatives[0];
+                const result = data.results?.[0];
+                const alt = result?.alternatives?.[0];
+                if (result && alt) {
                     const transcript = alt.transcript;
                     const isFinal = result.isFinal;
-                    const detectedLanguage = normalizeLanguageToIso639(result.languageCode);
+                    const detectedLanguage = normalizeLanguageToIso639(result.languageCode ?? undefined);
 
                     if (transcript) {
                         this.emit('transcript', {

@@ -5,6 +5,7 @@ import { app } from 'electron';
 import fs from 'fs';
 import * as sqliteVec from 'sqlite-vec';
 import * as meetingRecord from './meetingRecord';
+import { KNOWN_DIMS, runMigrations } from './migrations';
 import { VectorStore } from '../rag/VectorStore';
 
 // Interfaces for our data objects
@@ -33,6 +34,36 @@ export interface Meeting {
         items?: string[];
     }>;
     isProcessed?: boolean;
+}
+
+interface SegmentRow {
+    segmentId: string; revision: number | null; speaker: string; text: string; timestampMs: number;
+}
+
+interface MeetingRow {
+    id: string;
+    title: string;
+    start_time: number;
+    duration_ms: number;
+    summary_json: string | null;
+    created_at: string;
+    is_processed: number;
+}
+
+interface TranscriptRow {
+    speaker: string;
+    content: string;
+    timestamp_ms: number;
+}
+
+interface InteractionRow {
+    id: number;
+    type: 'assist' | 'followup' | 'chat' | 'followup_questions';
+    timestamp: number;
+    // Nullable columns, typed as the Meeting fields they feed (T02 reshapes Meeting).
+    user_query: string;
+    ai_response: string;
+    metadata_json: string | null;
 }
 
 export class DatabaseManager {
@@ -111,272 +142,11 @@ export class DatabaseManager {
                 console.warn('[DatabaseManager] Vector search will fall back to JS cosine similarity');
             }
 
-            this.runMigrations();
+            runMigrations(this.db, (dim) => this.ensureVecTableForDim(dim));
         } catch (error) {
             console.error('[DatabaseManager] Failed to initialize database:', error);
             throw error;
         }
-    }
-
-    // ============================================
-    // PRAGMA user_version Migration System
-    // ============================================
-    // Each version is applied exactly once, in order.
-    // New migrations append a new `if (version < N)` block.
-    // ============================================
-
-    private runMigrations() {
-        if (!this.db) return;
-
-        const version = (this.db.pragma('user_version', { simple: true }) as number) || 0;
-        console.log(`[DatabaseManager] Current schema version: ${version}`);
-
-        // Version 0 → 1: Initial schema (all core tables)
-        if (version < 1) {
-            console.log('[DatabaseManager] Applying migration v0 → v1: Initial schema');
-            this.db.exec(`
-                CREATE TABLE IF NOT EXISTS meetings (
-                    id TEXT PRIMARY KEY,
-                    title TEXT,
-                    start_time INTEGER,
-                    duration_ms INTEGER,
-                    summary_json TEXT,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    is_processed INTEGER DEFAULT 1
-                );
-
-                CREATE TABLE IF NOT EXISTS transcripts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    meeting_id TEXT,
-                    speaker TEXT,
-                    content TEXT,
-                    timestamp_ms INTEGER,
-                    FOREIGN KEY(meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
-                );
-
-                CREATE TABLE IF NOT EXISTS ai_interactions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    meeting_id TEXT,
-                    type TEXT,
-                    timestamp INTEGER,
-                    user_query TEXT,
-                    ai_response TEXT,
-                    metadata_json TEXT,
-                    FOREIGN KEY(meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
-                );
-
-                CREATE TABLE IF NOT EXISTS chunks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    meeting_id TEXT NOT NULL,
-                    chunk_index INTEGER NOT NULL,
-                    speaker TEXT,
-                    start_timestamp_ms INTEGER,
-                    end_timestamp_ms INTEGER,
-                    cleaned_text TEXT NOT NULL,
-                    token_count INTEGER NOT NULL,
-                    embedding BLOB,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY(meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
-                );
-
-                CREATE TABLE IF NOT EXISTS chunk_summaries (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    meeting_id TEXT NOT NULL UNIQUE,
-                    summary_text TEXT NOT NULL,
-                    embedding BLOB,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY(meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
-                );
-
-                CREATE TABLE IF NOT EXISTS embedding_queue (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    meeting_id TEXT NOT NULL,
-                    chunk_id INTEGER,
-                    status TEXT DEFAULT 'pending',
-                    retry_count INTEGER DEFAULT 0,
-                    error_message TEXT,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    processed_at TEXT
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_chunks_meeting ON chunks(meeting_id);
-            `);
-            this.db.pragma('user_version = 1');
-        }
-
-        // Version 1 → 2: Add columns for existing installs (safe for fresh installs too)
-        if (version < 2) {
-            console.log('[DatabaseManager] Applying migration v1 → v2: Add meetings columns');
-            // For fresh installs these columns already exist from v1, so we guard with try/catch.
-            // Unlike the old code, these are versioned and run exactly once.
-            const columnsToAdd = [
-                "ALTER TABLE meetings ADD COLUMN is_processed INTEGER DEFAULT 1"
-            ];
-            for (const sql of columnsToAdd) {
-                try { this.db.exec(sql); } catch (e) { /* Column already exists from v1 CREATE */ }
-            }
-            this.db.pragma('user_version = 2');
-        }
-
-        // Versions 3 and 4 used to create single-table vec0 tables with no vector dimension, which
-        // sqlite-vec rejects. v8 drops them and provisions the per-dimension tables, so they only
-        // advance the version.
-        if (version < 3) this.db.pragma('user_version = 3');
-        if (version < 4) this.db.pragma('user_version = 4');
-
-        // Version 4 → 5: Add embedding provider and dimensions columns
-        if (version < 5) {
-            console.log('[DatabaseManager] Applying migration v4 → v5: Add embedding provider/dimensions columns');
-            const columnsToAdd = [
-                "ALTER TABLE meetings ADD COLUMN embedding_provider TEXT",
-                "ALTER TABLE meetings ADD COLUMN embedding_dimensions INTEGER"
-            ];
-            for (const sql of columnsToAdd) {
-                try { this.db.exec(sql); } catch (e) { /* Column already exists */ }
-            }
-            this.db.pragma('user_version = 5');
-        }
-
-        // Version 5 → 6: Add app_state table for KV storage (Ollama pull state, etc)
-        if (version < 6) {
-            console.log('[DatabaseManager] Applying migration v5 → v6: Add app_state table');
-            this.db.exec(`
-                CREATE TABLE IF NOT EXISTS app_state (
-                    key TEXT PRIMARY KEY,
-                    value TEXT
-                );
-            `);
-            this.db.pragma('user_version = 6');
-        }
-
-        // Version 6 → 7: Add indexes on transcripts and ai_interactions meeting_id
-        // (Previously missing — causes O(N) full-table scans when fetching meeting details)
-        if (version < 7) {
-            console.log('[DatabaseManager] Applying migration v6 → v7: Add meeting_id indexes');
-            try {
-                this.db.exec('CREATE INDEX IF NOT EXISTS idx_transcripts_meeting ON transcripts(meeting_id);');
-                this.db.exec('CREATE INDEX IF NOT EXISTS idx_ai_interactions_meeting ON ai_interactions(meeting_id, timestamp);');
-                console.log('[DatabaseManager] Meeting ID indexes created successfully');
-            } catch (e) {
-                console.error('[DatabaseManager] Failed to create indexes (non-fatal):', e);
-            }
-            this.db.pragma('user_version = 7');
-        }
-
-        // Version 7 → 8: Provision per-dimension vec0 tables (NOTE: this v8 ran in two broken
-        // iterations for some users — first with float[1536] single table, then with correct per-dim
-        // tables. The v9 migration below corrects any v8 that used the old broken schema.)
-        if (version < 8) {
-            console.log('[DatabaseManager] Applying migration v7 → v8: Provision per-dimension vec0 tables');
-            // Drop the legacy single-dim tables from v3/v4 if they exist and are unusable
-            try { this.db.exec('DROP TABLE IF EXISTS vec_chunks;'); } catch (_) {}
-            try { this.db.exec('DROP TABLE IF EXISTS vec_summaries;'); } catch (_) {}
-
-            for (const dim of DatabaseManager.KNOWN_DIMS) {
-                this.ensureVecTableForDim(dim);
-            }
-            console.log('[DatabaseManager] v8 migration: per-dimension vec0 tables provisioned');
-            this.db.pragma('user_version = 8');
-        }
-
-        // Version 8 → 9: Ensure per-dimension tables exist.
-        // Required for DBs already at v8 but with the old broken float[1536] single-table schema,
-        // or with the first incorrect v8 migration that didn't provision KNOWN_DIMS tables.
-        if (version < 9) {
-            console.log('[DatabaseManager] Applying migration v8 → v9: Ensure per-dimension vec0 tables exist');
-            // Drop old single-dim orphan tables if they exist (float[1536] schema)
-            try { this.db.exec('DROP TABLE IF EXISTS vec_chunks;'); } catch (_) {}
-            try { this.db.exec('DROP TABLE IF EXISTS vec_summaries;'); } catch (_) {}
-
-            let allOk = true;
-            for (const dim of DatabaseManager.KNOWN_DIMS) {
-                this.ensureVecTableForDim(dim);
-                // Verify the table actually exists after provisioning
-                try {
-                    this.db.prepare(`SELECT count(*) FROM vec_chunks_${dim} LIMIT 1`).get();
-                } catch (e) {
-                    console.error(`[DatabaseManager] v9: vec_chunks_${dim} still missing after provisioning:`, e);
-                    allOk = false;
-                }
-            }
-            if (allOk) {
-                console.log('[DatabaseManager] v9 migration: all per-dimension vec0 tables verified ✓');
-            } else {
-                console.warn('[DatabaseManager] v9 migration: some tables missing — sqlite-vec extension may not be loaded');
-            }
-            this.db.pragma('user_version = 9');
-        }
-
-        // Version 9 → 10: Add UNIQUE constraint on embedding_queue(meeting_id, chunk_id).
-        // This enables INSERT OR IGNORE in EmbeddingPipeline.queueMeeting() to silently
-        // skip duplicate rows when queueMeeting() is called more than once for the same meeting.
-        // SQLite doesn't support ADD CONSTRAINT on existing tables, so we recreate the table
-        // using the standard rename-create-copy-drop pattern.
-        if (version < 10) {
-            console.log('[DatabaseManager] Applying migration v9 → v10: Add UNIQUE constraint to embedding_queue');
-            try {
-                // Wrap all steps in an explicit better-sqlite3 transaction for atomicity.
-                // If any step throws, the entire migration is rolled back cleanly —
-                // preventing the dangerous half-renamed table state that a bare exec() chain would leave.
-                const migrate = this.db.transaction(() => {
-                    // Step 1: Rename the existing table to a temp name
-                    this.db!.exec('ALTER TABLE embedding_queue RENAME TO embedding_queue_old;');
-
-                    // Step 2: Recreate with the UNIQUE(meeting_id, chunk_id) constraint
-                    this.db!.exec(`
-                        CREATE TABLE embedding_queue (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            meeting_id TEXT NOT NULL,
-                            chunk_id INTEGER,
-                            status TEXT DEFAULT 'pending',
-                            retry_count INTEGER DEFAULT 0,
-                            error_message TEXT,
-                            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                            processed_at TEXT,
-                            UNIQUE(meeting_id, chunk_id)
-                        );
-                    `);
-
-                    // Step 3: Copy rows; INSERT OR IGNORE silently drops any pre-existing duplicates
-                    this.db!.exec(`
-                        INSERT OR IGNORE INTO embedding_queue
-                            (id, meeting_id, chunk_id, status, retry_count, error_message, created_at, processed_at)
-                        SELECT id, meeting_id, chunk_id, status, retry_count, error_message, created_at, processed_at
-                        FROM embedding_queue_old;
-                    `);
-
-                    // Step 4: Drop the backup
-                    this.db!.exec('DROP TABLE embedding_queue_old;');
-                });
-                migrate();
-                console.log('[DatabaseManager] v10 migration: embedding_queue UNIQUE constraint added ✓');
-            } catch (e) {
-                console.error('[DatabaseManager] v10 migration failed — table structure unchanged:', e);
-                // user_version still advances. We do NOT retry — a failed rename leaves
-                // embedding_queue_old behind; retrying would cause "table already exists".
-                // In the failure case, INSERT OR IGNORE in queueMeeting() will still work
-                // for natural uniqueness (same meeting queued twice picks up existing rows),
-                // just without DB-enforced deduplication.
-            }
-            this.db.pragma('user_version = 10');
-        }
-
-        // Version 10 → 11: Persist transcript segments by identity and revision.
-        if (version < 11) {
-            console.log('[DatabaseManager] Applying migration v10 → v11: Add transcript segment identity');
-            meetingRecord.migrateRecordColumns(this.db);
-            this.db.pragma('user_version = 11');
-        }
-
-        // Version 11 → 12: no schema change; the other party's speaker value is `them`.
-        if (version < 12) {
-            this.db.pragma('user_version = 12');
-        }
-
-        // Tables the removed interview feature wrote.
-        this.db.exec('DROP TABLE IF EXISTS user_profile; DROP TABLE IF EXISTS resume_nodes;');
-
-        console.log('[DatabaseManager] Migrations completed.');
     }
 
     // ============================================
@@ -386,8 +156,8 @@ export class DatabaseManager {
     public getAppState(key: string): string | null {
         if (!this.db) return null;
         try {
-            const stmt = this.db.prepare('SELECT value FROM app_state WHERE key = ?');
-            const row = stmt.get(key) as { value: string } | undefined;
+            const stmt = this.db.prepare<[string], { value: string }>('SELECT value FROM app_state WHERE key = ?');
+            const row = stmt.get(key);
             return row ? row.value : null;
         } catch (error) {
             console.error(`[DatabaseManager] Failed to get app_state for key: ${key}`, error);
@@ -410,7 +180,7 @@ export class DatabaseManager {
      * Used by the v8 migration, delete operations, and table provisioning.
      * When a new provider dimension is encountered at runtime, ensureVecTableForDim() handles it.
      */
-    public static readonly KNOWN_DIMS: readonly number[] = [768, 1536, 3072];
+    public static readonly KNOWN_DIMS: readonly number[] = KNOWN_DIMS;
 
     /** Cache: dimensions for which vec0 tables have already been verified/created this session. */
     private ensuredDims = new Set<number>();
@@ -490,32 +260,30 @@ export class DatabaseManager {
 
     public getSegmentRevision(meetingId: string, segmentId: string): number | undefined {
         if (!this.db) return undefined;
-        const row = this.db.prepare('SELECT revision FROM transcripts WHERE meeting_id = ? AND segment_id = ?')
-            .get(meetingId, segmentId) as { revision: number | null } | undefined;
+        const row = this.db.prepare<[string, string], { revision: number | null }>('SELECT revision FROM transcripts WHERE meeting_id = ? AND segment_id = ?')
+            .get(meetingId, segmentId);
         return row?.revision ?? undefined;
     }
 
-    public getRecentSegments(meetingId: string, sinceMs: number): Array<{
-        segmentId: string; revision: number | null; speaker: string; text: string; timestampMs: number;
-    }> {
+    public getRecentSegments(meetingId: string, sinceMs: number): SegmentRow[] {
         if (!this.db) throw new Error('Database not initialized');
-        return this.db.prepare(`
+        return this.db.prepare<[string, number], SegmentRow>(`
             SELECT COALESCE(segment_id, CAST(id AS TEXT)) AS segmentId, revision,
                    speaker, content AS text, timestamp_ms AS timestampMs
             FROM transcripts WHERE meeting_id = ? AND timestamp_ms >= ?
             ORDER BY timestamp_ms ASC, id ASC
-        `).all(meetingId, sinceMs) as ReturnType<DatabaseManager['getRecentSegments']>;
+        `).all(meetingId, sinceMs);
     }
 
-    public searchSegments(meetingId: string, query: string, limit: number): ReturnType<DatabaseManager['getRecentSegments']> {
+    public searchSegments(meetingId: string, query: string, limit: number): SegmentRow[] {
         if (!this.db) throw new Error('Database not initialized');
         if (!query.trim()) return [];
-        return this.db.prepare(`
+        return this.db.prepare<[string, string, number], SegmentRow>(`
             SELECT COALESCE(segment_id, CAST(id AS TEXT)) AS segmentId, revision,
                    speaker, content AS text, timestamp_ms AS timestampMs
             FROM transcripts WHERE meeting_id = ? AND instr(lower(content), lower(?)) > 0
             ORDER BY timestamp_ms DESC, id DESC LIMIT ?
-        `).all(meetingId, query, Math.max(1, Math.min(8, Math.trunc(limit)))) as ReturnType<DatabaseManager['getRecentSegments']>;
+        `).all(meetingId, query, Math.max(1, Math.min(8, Math.trunc(limit))));
     }
 
     public addInteraction(meetingId: string, usage: NonNullable<Meeting['usage']>[number]): void {
@@ -618,7 +386,7 @@ export class DatabaseManager {
 
         try {
             // 1. Get current summary_json
-            const row = this.db.prepare('SELECT summary_json FROM meetings WHERE id = ?').get(id) as any;
+            const row = this.db.prepare<[string], Pick<MeetingRow, 'summary_json'>>('SELECT summary_json FROM meetings WHERE id = ?').get(id);
             if (!row) return false;
 
             const existingData = JSON.parse(row.summary_json || '{}');
@@ -658,13 +426,13 @@ export class DatabaseManager {
     public getRecentMeetings(limit: number = 50): Meeting[] {
         if (!this.db) return [];
 
-        const stmt = this.db.prepare(`
+        const stmt = this.db.prepare<[number], MeetingRow>(`
             SELECT * FROM meetings 
             ORDER BY created_at DESC 
             LIMIT ?
         `);
 
-        const rows = stmt.all(limit) as any[];
+        const rows = stmt.all(limit);
 
         return rows.map(row => {
             const summaryData = JSON.parse(row.summary_json || '{}');
@@ -683,8 +451,8 @@ export class DatabaseManager {
                 summary: summaryData.legacySummary || '',
                 detailedSummary: summaryData.detailedSummary,
                 // We don't load full transcript/usage for list view to keep it light
-                transcript: [] as any[],
-                usage: [] as any[]
+                transcript: [],
+                usage: []
             };
         });
     }
@@ -692,18 +460,18 @@ export class DatabaseManager {
     public getMeetingDetails(id: string): Meeting | null {
         if (!this.db) return null;
 
-        const meetingStmt = this.db.prepare('SELECT * FROM meetings WHERE id = ?');
-        const meetingRow = meetingStmt.get(id) as any;
+        const meetingStmt = this.db.prepare<[string], MeetingRow>('SELECT * FROM meetings WHERE id = ?');
+        const meetingRow = meetingStmt.get(id);
 
         if (!meetingRow) return null;
 
         // Get Transcript
-        const transcriptStmt = this.db.prepare('SELECT * FROM transcripts WHERE meeting_id = ? ORDER BY timestamp_ms ASC');
-        const transcriptRows = transcriptStmt.all(id) as any[];
+        const transcriptStmt = this.db.prepare<[string], TranscriptRow>('SELECT * FROM transcripts WHERE meeting_id = ? ORDER BY timestamp_ms ASC');
+        const transcriptRows = transcriptStmt.all(id);
 
         // Get Usage
-        const usageStmt = this.db.prepare('SELECT * FROM ai_interactions WHERE meeting_id = ? ORDER BY timestamp ASC');
-        const usageRows = usageStmt.all(id) as any[];
+        const usageStmt = this.db.prepare<[string], InteractionRow>('SELECT * FROM ai_interactions WHERE meeting_id = ? ORDER BY timestamp ASC');
+        const usageRows = usageStmt.all(id);
 
         // Reconstruct
         const summaryData = JSON.parse(meetingRow.summary_json || '{}');
@@ -772,13 +540,13 @@ export class DatabaseManager {
         if (!this.db) return [];
 
         // is_processed = 0 means false
-        const stmt = this.db.prepare(`
+        const stmt = this.db.prepare<[], MeetingRow>(`
             SELECT * FROM meetings 
             WHERE is_processed = 0 
             ORDER BY created_at DESC
         `);
 
-        const rows = stmt.all() as any[];
+        const rows = stmt.all();
 
         return rows.map(row => {
             // Reconstruct minimal meeting object for processing
@@ -796,8 +564,8 @@ export class DatabaseManager {
                 summary: summaryData.legacySummary || '',
                 detailedSummary: summaryData.detailedSummary,
                 isProcessed: false,
-                transcript: [] as any[], // Fetched separately via getMeetingDetails or manually if needed
-                usage: [] as any[]
+                transcript: [], // Fetched separately via getMeetingDetails or manually if needed
+                usage: []
             };
         });
     }
@@ -825,7 +593,7 @@ export class DatabaseManager {
 
                 // Dormant interview data goes with Clear all data: a stored resume or job description
                 // and its passages and vectors. Notes and imported materials are kept. Guarded by table existence so an older database still flushes.
-                const tables = new Set((this.db!.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map(row => row.name));
+                const tables = new Set((this.db!.prepare<[], { name: string }>("SELECT name FROM sqlite_master WHERE type = 'table'").all()).map(row => row.name));
                 if (tables.has('knowledge_chunks')) {
                     for (const name of tables) {
                         if (/^vec_knowledge_\d+$/.test(name)) {
