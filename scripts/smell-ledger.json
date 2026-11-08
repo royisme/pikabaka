@@ -1,35 +1,31 @@
 {
-  "any": 470,
+  "any": 332,
   "tsSuppress": 7,
-  "filesOver800Lines": 7,
+  "filesOver800Lines": 6,
   "largeFiles": [
     {
       "file": "electron/main.ts",
-      "lines": 1424
-    },
-    {
-      "file": "electron/preload.ts",
-      "lines": 1146
+      "lines": 1320
     },
     {
       "file": "electron/db/DatabaseManager.ts",
-      "lines": 1101
+      "lines": 1076
     },
     {
-      "file": "src/hooks/useMeetingChat.ts",
-      "lines": 992
+      "file": "electron/preload.ts",
+      "lines": 1006
     },
     {
       "file": "electron/lib/transcript-assembler.ts",
-      "lines": 873
+      "lines": 953
     },
     {
-      "file": "electron/core/IntelligenceEngine.ts",
-      "lines": 855
+      "file": "src/hooks/useMeetingChat.ts",
+      "lines": 872
     },
     {
       "file": "electron/services/CredentialsManager.ts",
-      "lines": 817
+      "lines": 844
     }
   ]
 }

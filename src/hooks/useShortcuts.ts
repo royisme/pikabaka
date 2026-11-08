@@ -39,8 +39,6 @@ function buildDefaultShortcuts(): ShortcutConfig {
     };
 }
 
-export const DEFAULT_SHORTCUTS = buildDefaultShortcuts();
-
 export const useShortcuts = () => {
     const queryClient = useQueryClient();
     const { data: keybinds = [] } = useQuery<BackendKeybind[]>({ queryKey: ['keybinds'], queryFn: () => window.electronAPI.getKeybinds() });

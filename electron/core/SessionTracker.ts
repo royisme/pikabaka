@@ -60,17 +60,6 @@ export class SessionTracker {
     // Track the interim other-party segment
     private lastInterimThem: TranscriptSegment | null = null;
 
-    // Detected coding question from transcript or screenshot extraction
-    private detectedCodingQuestion: string | null = null;
-    private codingQuestionSource: 'screenshot' | 'transcript' | null = null;
-    private codingQuestionSetAt: number | null = null;
-
-    // Rolling buffer for multi-segment other-party question detection
-    private recentThemBuffer: { text: string; timestamp: number }[] = [];
-    private static readonly THEM_BUFFER_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
-    // Screenshot-detected question stays sticky for 3 min before transcript can override
-    private static readonly SCREENSHOT_STALE_MS = 3 * 60 * 1000;
-
     // Reference to RecapLLM for epoch summarization (injected later)
     private recapLLM: RecapLLM | null = null;
 
@@ -92,90 +81,6 @@ export class SessionTracker {
 
     public getMeetingMetadata() {
         return this.currentMeetingMetadata;
-    }
-
-    public clearMeetingMetadata(): void {
-        this.currentMeetingMetadata = null;
-    }
-
-    // ============================================
-    // Coding Question Tracking
-    // ============================================
-
-    /**
-     * Set the current coding question.
-     * Priority rules (avoids stale Q1 blocking Q2 detection in multi-question interviews):
-     *  - Screenshot → always stored immediately (explicit user action via Solve)
-     *  - Transcript → stored if nothing is known yet, OR if existing question is also from
-     *    transcript (newer detection = newer question), OR if screenshot question is stale
-     *    (> 3 min old — user likely moved to the next question)
-     */
-    setCodingQuestion(question: string, source: 'screenshot' | 'transcript'): void {
-        const now = Date.now();
-        const trimmed = question.trim();
-        if (!trimmed) return;
-
-        if (this.detectedCodingQuestion === null) {
-            // Nothing stored — accept any source
-            this.detectedCodingQuestion = trimmed;
-            this.codingQuestionSource = source;
-            this.codingQuestionSetAt = now;
-            console.log(`[SessionTracker] Coding question stored (source: ${source})`);
-            return;
-        }
-
-        if (source === 'screenshot') {
-            // Screenshot always updates immediately (explicit user Solve action)
-            this.detectedCodingQuestion = trimmed;
-            this.codingQuestionSource = source;
-            this.codingQuestionSetAt = now;
-            console.log('[SessionTracker] Coding question updated via screenshot');
-            return;
-        }
-
-        // source === 'transcript'
-        const isStale = this.codingQuestionSetAt !== null
-            && (now - this.codingQuestionSetAt) > SessionTracker.SCREENSHOT_STALE_MS;
-        const canOverride = this.codingQuestionSource === 'transcript' || isStale;
-
-        if (canOverride) {
-            this.detectedCodingQuestion = trimmed;
-            this.codingQuestionSource = source;
-            this.codingQuestionSetAt = now;
-            console.log(`[SessionTracker] Coding question updated via transcript (stale=${isStale})`);
-        } else {
-            console.log(`[SessionTracker] Transcript question ignored — screenshot question is recent (< ${SessionTracker.SCREENSHOT_STALE_MS / 1000}s)`);
-        }
-    }
-
-    getDetectedCodingQuestion(): { question: string | null; source: 'screenshot' | 'transcript' | null } {
-        return { question: this.detectedCodingQuestion, source: this.codingQuestionSource };
-    }
-
-    clearCodingQuestion(): void {
-        this.detectedCodingQuestion = null;
-        this.codingQuestionSource = null;
-        this.codingQuestionSetAt = null;
-        this.recentThemBuffer = [];
-    }
-
-    /**
-     * Heuristic to decide if an other-party statement looks like a coding question.
-     * Requires ≥2 of the signal patterns and minimum length to avoid false positives
-     * on casual conversation ("can you implement X?" → yes, "sounds good!" → no).
-     */
-    private looksLikeCodingQuestion(text: string): boolean {
-        if (text.length < 50) return false;
-        const patterns = [
-            /\b(implement|write|code|solve|design|build|create)\b/i,
-            /\b(given\s+(an?|the)\s+(array|string|list|tree|graph|matrix|number|integer|node|linked list|stack|queue|heap))\b/i,
-            /\b(return|find\s+(all|the|a|any)|count|check\s+if|determine|calculate|maximize|minimize|sort)\b/i,
-            /\b(function|method|algorithm|data structure|class)\b/i,
-            /\b(O\(n\)|time complexity|space complexity|optimal|efficient|brute force)\b/i,
-            /\b(two sum|three sum|binary search|dynamic programming|BFS|DFS|palindrome|anagram|substring|subarray|rotation)\b/i,
-        ];
-        const matchCount = patterns.filter(p => p.test(text)).length;
-        return matchCount >= 2;
     }
 
     // ============================================
@@ -308,22 +213,6 @@ export class SessionTracker {
                 this.lastInterimThem = segment;
             } else {
                 this.lastInterimThem = null;
-
-                // Add segment to rolling buffer and evict old entries
-                this.recentThemBuffer.push({ text: segment.text, timestamp: segment.timestamp });
-                const bufferCutoff = Date.now() - SessionTracker.THEM_BUFFER_WINDOW_MS;
-                this.recentThemBuffer = this.recentThemBuffer.filter(e => e.timestamp >= bufferCutoff);
-
-                // Test single segment first; if no match, test accumulated recent turns
-                // (the other party may state a problem across multiple speech segments)
-                if (this.looksLikeCodingQuestion(segment.text)) {
-                    this.setCodingQuestion(segment.text, 'transcript');
-                } else if (this.recentThemBuffer.length > 1) {
-                    const combinedText = this.recentThemBuffer.map(e => e.text).join(' ');
-                    if (this.looksLikeCodingQuestion(combinedText)) {
-                        this.setCodingQuestion(combinedText, 'transcript');
-                    }
-                }
             }
         }
 
@@ -505,10 +394,6 @@ export class SessionTracker {
         this.lastAssistantMessage = null;
         this.assistantResponseHistory = [];
         this.lastInterimThem = null;
-        this.detectedCodingQuestion = null;
-        this.codingQuestionSource = null;
-        this.codingQuestionSetAt = null;
-        this.recentThemBuffer = [];
     }
 
     // ============================================

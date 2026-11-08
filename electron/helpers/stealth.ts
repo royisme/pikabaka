@@ -2,14 +2,6 @@ import { SettingsManager } from "../services/SettingsManager"
 import { setVerboseLoggingFlag } from "../lib/verboseLog"
 import type { AppState } from "../main"
 
-export function setHasDebugged(appState: AppState, value: boolean): void {
-  appState.hasDebugged = value
-}
-
-export function getHasDebugged(appState: AppState): boolean {
-  return appState.hasDebugged
-}
-
 export function setUndetectable(appState: AppState, state: boolean): void {
   // Guard: skip if state hasn't actually changed to prevent
   // duplicate dock hide/show cycles from renderer feedback loops

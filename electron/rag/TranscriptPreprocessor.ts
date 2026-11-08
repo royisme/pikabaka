@@ -1,5 +1,5 @@
 // electron/rag/TranscriptPreprocessor.ts
-// Enhanced transcript cleaning for RAG - extends existing transcriptCleaner.ts patterns
+// Transcript cleaning for RAG
 // Adds semantic detection (questions, decisions, action items)
 
 export interface RawSegment {
@@ -18,7 +18,7 @@ export interface CleanedSegment {
     isActionItem: boolean;
 }
 
-// Filler words to remove (extended from transcriptCleaner.ts)
+// Filler words to remove
 const FILLERS = new Set([
     'uh', 'um', 'ah', 'hmm', 'hm', 'er', 'erm',
     'like', 'you know', 'i mean', 'basically', 'actually',

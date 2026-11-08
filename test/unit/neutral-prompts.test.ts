@@ -14,8 +14,6 @@ import {
     type TaskName,
 } from '../../electron/llm/prompts';
 import { speakingStyleInstruction } from '../../electron/llm/speakingStyle';
-import { buildTemporalContext, formatTemporalContextForPrompt } from '../../electron/llm/TemporalContextBuilder';
-import { prepareTranscriptForWhatToAnswer } from '../../electron/llm/transcriptCleaner';
 
 const TASK_TEXT: Record<TaskName, string> = {
     answer: ANSWER_TASK,
@@ -31,18 +29,6 @@ const TASKS = Object.keys(TASK_TEXT) as TaskName[];
 t.test('no text the app can send still talks about the interview', (t) => {
     const style = speakingStyleInstruction('direct and plain');
     const emptyStyle = speakingStyleInstruction('');
-    const temporal = formatTemporalContextForPrompt(buildTemporalContext(
-        [
-            { role: 'them', text: 'Invented question about a queue', timestamp: Date.now() },
-            { role: 'user', text: 'Invented reply about a stack', timestamp: Date.now() },
-        ],
-        [{ text: 'Invented earlier answer', timestamp: Date.now(), questionContext: 'Invented earlier question' }]
-    ));
-    const transcript = prepareTranscriptForWhatToAnswer([
-        { role: 'them', text: 'Invented question about an array', timestamp: 1 },
-        { role: 'user', text: 'Invented reply about a hash map', timestamp: 2 },
-    ]);
-
     const texts: Record<string, string> = {
         ROLE_PROMPT,
         CORE_RULES,
@@ -58,8 +44,6 @@ t.test('no text the app can send still talks about the interview', (t) => {
         styleHeader: style.header,
         styleFooter: style.footer,
         defaultStyleHeader: emptyStyle.header,
-        temporalContext: temporal,
-        cleanedTranscript: transcript,
     };
     for (const task of TASKS) texts[`taskPrompt(${task})`] = taskPrompt(task);
 

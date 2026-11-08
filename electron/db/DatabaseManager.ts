@@ -448,16 +448,6 @@ export class DatabaseManager {
         }
     }
 
-    public deleteAppState(key: string): void {
-        if (!this.db) return;
-        try {
-            const stmt = this.db.prepare('DELETE FROM app_state WHERE key = ?');
-            stmt.run(key);
-        } catch (error) {
-            console.error(`[DatabaseManager] Failed to delete app_state for key: ${key}`, error);
-        }
-    }
-
     /**
      * Known embedding dimension tiers.
      * Used by the v8 migration, delete operations, and table provisioning.
@@ -498,20 +488,6 @@ export class DatabaseManager {
             console.log(`[DatabaseManager] Ensured vec0 tables for dim=${dim}`);
         } catch (e) {
             console.error(`[DatabaseManager] Failed to create vec0 tables for dim=${dim}:`, e);
-        }
-    }
-
-    /**
-     * Check if sqlite-vec is available (any per-dimension vec0 table must exist)
-     */
-    public hasVecExtension(): boolean {
-        if (!this.db) return false;
-        try {
-            // Check the most common dimension (Ollama 768); any may suffice
-            this.db.prepare("SELECT count(*) FROM vec_chunks_768 LIMIT 1").get();
-            return true;
-        } catch (e) {
-            return false;
         }
     }
 

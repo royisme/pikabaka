@@ -5,12 +5,6 @@ import { X } from "lucide-react"
 
 const ToastProvider = ToastPrimitive.Provider
 
-export type ToastMessage = {
-  title: string
-  description: string
-  variant: ToastVariant
-}
-
 const ToastViewport = React.forwardRef<
   React.ElementRef<typeof ToastPrimitive.Viewport>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitive.Viewport>

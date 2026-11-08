@@ -84,10 +84,6 @@ export class IntelligenceEngine extends EventEmitter {
         return this.llmHelper;
     }
 
-    getRecapLLM(): RecapLLM | null {
-        return this.recapLLM;
-    }
-
     // ============================================
     // LLM Initialization
     // ============================================

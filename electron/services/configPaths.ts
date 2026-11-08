@@ -22,11 +22,6 @@ function ensureConfigDir(): void {
     }
 }
 
-export function getConfigDir(): string {
-    ensureConfigDir();
-    return CONFIG_DIR;
-}
-
 export function getCredentialsJsonPath(): string {
     ensureConfigDir();
     return path.join(CONFIG_DIR, 'credentials.json');

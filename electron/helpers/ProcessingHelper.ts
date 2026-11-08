@@ -11,15 +11,9 @@ if (!app.isPackaged) {
   require("dotenv").config()
 }
 
-const isDev = process.env.NODE_ENV === "development"
-const isDevTest = process.env.IS_DEV_TEST === "true"
-const MOCK_API_WAIT_TIME = Number(process.env.MOCK_API_WAIT_TIME) || 500
-
 export class ProcessingHelper {
   private appState: AppState
   private llmHelper: LLMHelper
-  private currentProcessingAbortController: AbortController | null = null
-  private currentExtraProcessingAbortController: AbortController | null = null
 
   constructor(appState: AppState) {
     this.appState = appState
@@ -69,125 +63,6 @@ export class ProcessingHelper {
       this.llmHelper.setAiResponseLanguage(aiResponseLanguage);
     }
   }
-
-  public async processScreenshots(): Promise<void> {
-    const mainWindow = this.appState.getMainWindow()
-    if (!mainWindow) return
-
-    const view = this.appState.getView()
-
-    if (view === "queue") {
-      const screenshotQueue = this.appState.getScreenshotHelper().getScreenshotQueue()
-      if (screenshotQueue.length === 0) {
-        mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.NO_SCREENSHOTS)
-        return
-      }
-
-
-
-      const allPaths = this.appState.getScreenshotHelper().getScreenshotQueue();
-
-      mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.INITIAL_START)
-      this.appState.setView("solutions")
-      this.currentProcessingAbortController = new AbortController()
-      try {
-        // Generate the structured 4-phase rolling interview script
-        const rollingScript = await this.llmHelper.generateRollingScript(allPaths);
-
-        const problemInfo = {
-          problem_statement: rollingScript.problem_identifier_script,
-          input_format: { description: "Generated from screenshot", parameters: [] as any[] },
-          output_format: { description: "Generated from screenshot", type: "string", subtype: "structured" },
-          complexity: { time: rollingScript.time_complexity, space: rollingScript.space_complexity },
-          test_cases: [] as any[],
-          validation_type: "structured",
-          difficulty: "custom"
-        };
-        mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.PROBLEM_EXTRACTED, problemInfo);
-        this.appState.setProblemInfo(problemInfo);
-
-        // Send the full structured solution so Solutions.tsx renders the 4 phases
-        mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.SOLUTION_SUCCESS, {
-          solution: {
-            problem_identifier_script: rollingScript.problem_identifier_script,
-            brainstorm_script: rollingScript.brainstorm_script,
-            code: rollingScript.code,
-            dry_run_script: rollingScript.dry_run_script,
-            time_complexity: rollingScript.time_complexity,
-            space_complexity: rollingScript.space_complexity,
-          }
-        });
-      } catch (error: any) {
-        console.error("[ProcessingHelper] Rolling script generation failed:", error);
-        mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR, error.message)
-      } finally {
-        this.currentProcessingAbortController = null
-      }
-      return;
-
-    } else {
-      // Debug mode
-      const extraScreenshotQueue = this.appState.getScreenshotHelper().getExtraScreenshotQueue()
-      if (extraScreenshotQueue.length === 0) {
-        // console.log("No extra screenshots to process")
-        mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.NO_SCREENSHOTS)
-        return
-      }
-
-      mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.DEBUG_START)
-      this.currentExtraProcessingAbortController = new AbortController()
-
-      try {
-        // Get problem info and current solution
-        const problemInfo = this.appState.getProblemInfo()
-        if (!problemInfo) {
-          throw new Error("No problem info available")
-        }
-
-        // Get current solution from state
-        const currentSolution = await this.llmHelper.generateSolution(problemInfo)
-        const currentCode = currentSolution.solution.code
-
-        // Debug the solution using vision model
-        const debugResult = await this.llmHelper.debugSolutionWithImages(
-          problemInfo,
-          currentCode,
-          extraScreenshotQueue
-        )
-
-        this.appState.setHasDebugged(true)
-        mainWindow.webContents.send(
-          this.appState.PROCESSING_EVENTS.DEBUG_SUCCESS,
-          debugResult
-        )
-
-      } catch (error: any) {
-        // console.error("Debug processing error:", error)
-        mainWindow.webContents.send(
-          this.appState.PROCESSING_EVENTS.DEBUG_ERROR,
-          error.message
-        )
-      } finally {
-        this.currentExtraProcessingAbortController = null
-      }
-    }
-  }
-
-  public cancelOngoingRequests(): void {
-    if (this.currentProcessingAbortController) {
-      this.currentProcessingAbortController.abort()
-      this.currentProcessingAbortController = null
-    }
-
-    if (this.currentExtraProcessingAbortController) {
-      this.currentExtraProcessingAbortController.abort()
-      this.currentExtraProcessingAbortController = null
-    }
-
-    this.appState.setHasDebugged(false)
-  }
-
-
 
   public getLLMHelper() {
     return this.llmHelper;

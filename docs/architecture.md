@@ -27,8 +27,8 @@ Alignment uses sample-count clocks anchored to DSP arrival times, a fixed 40ms r
 A channel exists in four places and they move together:
 
 - handler: `electron/ipc/*.ts` (`index.ts` registers them; `safeHandle.ts` wraps handlers)
-- preload: `electron/preload.ts` and `electron/preload/*.ts` (`contextBridge`)
-- types: `electron/preload/types.ts` and `src/types/electron.d.ts`
+- preload: `electron/preload.ts` (`contextBridge`; one file, the only preload the windows load)
+- types: `src/types/electron.d.ts`
 - renderer caller or listener (`src/hooks/*`, components)
 
 Channel groups: window control, LLM switching and keys, audio and STT control, screenshots and intelligence, translation (`electron/ipc/translation.ts`).
