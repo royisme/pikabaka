@@ -1,19 +1,11 @@
 {
-  "any": 32,
+  "any": 11,
   "tsSuppress": 0,
-  "filesOver800Lines": 3,
+  "filesOver800Lines": 1,
   "largeFiles": [
     {
       "file": "electron/main.ts",
-      "lines": 1172
-    },
-    {
-      "file": "electron/lib/transcript-assembler.ts",
-      "lines": 953
-    },
-    {
-      "file": "electron/services/CredentialsManager.ts",
-      "lines": 844
+      "lines": 1027
     }
   ]
 }
