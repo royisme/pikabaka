@@ -5,7 +5,7 @@ import { VoiceCloner, type CloneDeps } from '../../electron/interpreting/voiceCl
 import { VoiceProviderError, type VoiceProvider } from '../../electron/interpreting/voiceProviders';
 import type { AudioMessage } from '../../electron/interpreting/InterpretingSession';
 import type { InterpretingSettings } from '../../electron/services/interpretingSettings';
-import VoiceCloneDialog, { CONSENT_TEXT } from '../../src/components/settings/VoiceCloneDialog';
+import VoiceCloneDialog, { CONSENT_TEXT, ReviewActions } from '../../src/components/settings/VoiceCloneDialog';
 import { inputDeviceId, isVirtualInput, preferredInputName } from '../../src/lib/micRecorder';
 
 // A fake provider and an in-memory settings object: no real service, no real key, no audio.
@@ -83,7 +83,7 @@ t.test('clone checks its input and logs neither the sample nor the voice id', as
     await t.rejects(cloner.clone('nope', SAMPLE), /Unknown voice service/);
     await t.rejects(cloner.clone('fishaudio', 'text'), /voice sample/);
     await t.rejects(cloner.clone('fishaudio', new Uint8Array(10)), /voice sample/);
-    t.equal((await cloner.clone('elevenlabs', SAMPLE)).needsVerification, true);
+    t.same(await cloner.clone('elevenlabs', SAMPLE), { voiceId: '', needsVerification: true });
     t.notOk(calls.filter((c) => c.startsWith('log:')).some((c) => c.includes('v-new')));
 });
 
@@ -103,4 +103,23 @@ t.test('the virtual device is refused as input', async (t) => {
     t.equal(preferredInputName([], null), null);
     t.same(inputDeviceId([{ deviceId: 'x1', label: 'Studio Microphone' }], 'studio microphone'), { ok: true, deviceId: 'x1' });
     t.equal(inputDeviceId([{ deviceId: 'x1', label: 'Other' }], 'Studio Microphone').ok, false);
+});
+
+t.test('a voice that needs verification is never handed back or saved, and Discard deletes it', async (t) => {
+    const { cloner, calls } = setup({ verify: true });
+    t.same(await cloner.clone('elevenlabs', SAMPLE), { voiceId: '', needsVerification: true });
+    await cloner.delete('elevenlabs');
+    t.ok(calls.some((c) => c.startsWith('delete')));
+    t.notOk(calls.some((c) => c.startsWith('save')));
+});
+
+t.test('review offers Keep only for a usable voice; a voice to verify offers Discard only', async (t) => {
+    const render = (needsVerification: boolean) => renderToStaticMarkup(React.createElement(ReviewActions, { needsVerification, busy: false, retry: false, onListen: () => undefined, onDiscard: () => undefined, onKeep: () => undefined }));
+    const usable = render(false);
+    t.match(usable, />Keep</);
+    t.match(usable, />Listen</);
+    const verify = render(true);
+    t.match(verify, />Discard</);
+    t.notMatch(verify, />Keep</);
+    t.notMatch(verify, />Listen</);
 });

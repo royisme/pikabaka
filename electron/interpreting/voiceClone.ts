@@ -61,7 +61,8 @@ export class VoiceCloner {
             const result = await service.cloneVoice(sample, CLONE_NAME);
             this.pending.set(id, result.voiceId);
             this.deps.log(`[Interpreting] cloned provider=${id} bytes=${sample.length} status=200`);
-            return result;
+            // A voice that needs verification stays pending so Discard can delete it, but its id is never handed back to be saved.
+            return result.needsVerification ? { voiceId: '', needsVerification: true } : result;
         } catch (e: unknown) {
             this.deps.log(`[Interpreting] clone failed provider=${id} status=${e instanceof VoiceProviderError ? (e.status ?? 'none') : 'none'}`);
             throw e;

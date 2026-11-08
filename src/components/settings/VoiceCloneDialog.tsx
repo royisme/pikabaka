@@ -4,7 +4,7 @@ import { MAX_SECONDS, MIN_SECONDS, preferredInputName, startRecording, type MicR
 import { primaryButton, secondaryButton } from './buttonStyles';
 
 export const CONSENT_TEXT = 'This is my own voice. Use it only to translate for me when I speak.';
-export const VERIFY_TEXT = 'ElevenLabs asks you to verify this voice on its site before it can be used.';
+export const VERIFY_TEXT = 'ElevenLabs asks you to verify this voice on its site before it can be used, so Pika cannot keep it. Discard it, verify your voice on the ElevenLabs site, then clone again.';
 
 const PASSAGES = {
     english: 'The harbor was quiet before the first ferry. A cold wind came across the water, and the gulls waited on the rail. Two people carried boxes along the pier, counting each one aloud. Later the sun rose over the roofs, and the market began to fill with the smell of bread, oranges and warm coffee.',
@@ -24,6 +24,24 @@ interface Props {
     onKeep: (choice: VoiceChoice) => void;
     onClose: () => void;
 }
+
+interface ReviewActionsProps {
+    needsVerification: boolean;
+    busy: boolean;
+    retry: boolean;
+    onListen: () => void;
+    onDiscard: () => void;
+    onKeep: () => void;
+}
+
+/** A voice that needs verification can only be discarded: it cannot be heard or kept. */
+export const ReviewActions = ({ needsVerification, busy, retry, onListen, onDiscard, onKeep }: ReviewActionsProps) => (
+    <>
+        {!needsVerification ? <button type="button" disabled={busy} onClick={onListen} className={secondaryButton}>Listen</button> : null}
+        <button type="button" disabled={busy} onClick={onDiscard} className={secondaryButton}>{retry ? 'Retry discard' : 'Discard'}</button>
+        {!needsVerification ? <button type="button" disabled={busy} onClick={onKeep} className={primaryButton}>Keep</button> : null}
+    </>
+);
 
 /** Clone the user's own voice: consent, a 15 to 30 s recording, a listen, then Keep or Discard. */
 const VoiceCloneDialog = ({ provider, providerName, outputLabel, onKeep, onClose }: Props) => {
@@ -90,7 +108,7 @@ const VoiceCloneDialog = ({ provider, providerName, outputLabel, onKeep, onClose
         setError(null);
         try { await run(); then(); } catch (e) { fail(e); } finally { setBusy(false); }
     };
-    const keep = () => { if (clone) onKeep({ voiceId: clone.voiceId, cloned: true, consentAt: consentAt.current }); };
+    const keep = () => { if (clone && !clone.needsVerification) onKeep({ voiceId: clone.voiceId, cloned: true, consentAt: consentAt.current }); };
     const discard = () => void act(() => window.electronAPI.interpretingDeleteVoice(provider), onClose);
     const listen = () => void act(() => window.electronAPI.interpretingPreviewVoice(provider), () => undefined);
 
@@ -126,11 +144,7 @@ const VoiceCloneDialog = ({ provider, providerName, outputLabel, onKeep, onClose
                     {phase === 'idle' ? <button type="button" disabled={!consent} onClick={() => void start()} className={primaryButton}>Start recording</button> : null}
                     {phase === 'recording' ? <button type="button" disabled={seconds < MIN_SECONDS} onClick={() => void finish()} className={primaryButton}>Done</button> : null}
                     {phase === 'review' ? (
-                        <>
-                            {!clone?.needsVerification ? <button type="button" disabled={busy} onClick={listen} className={secondaryButton}>Listen</button> : null}
-                            <button type="button" disabled={busy} onClick={discard} className={secondaryButton}>{error ? 'Retry discard' : 'Discard'}</button>
-                            <button type="button" disabled={busy} onClick={keep} className={primaryButton}>Keep</button>
-                        </>
+                        <ReviewActions needsVerification={!!clone?.needsVerification} busy={busy} retry={!!error} onListen={listen} onDiscard={discard} onKeep={keep} />
                     ) : null}
                 </div>
             </div>
