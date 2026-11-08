@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { Languages, MessageSquarePlus, Reply, TriangleAlert } from 'lucide-react';
 import type { TranscriptDisplayMode, TranscriptSegment } from '../../lib/transcriptSegments';
 import { failureReasonText, rowSlot, transcriptRowParts, type RowSlot } from '../../lib/transcriptRow';
-import { countNewRows, isNearBottom, nextTranscriptScroll } from '../../lib/answerScroll';
+import { countNewRows, isNearBottom, newestPreview, nextTranscriptScroll } from '../../lib/answerScroll';
 import { nextAnnouncement } from '../../lib/transcriptAnnounce';
 
 interface TranscriptNotesProps {
@@ -54,6 +54,29 @@ function SlotLine({ slot, onRetry }: { slot: RowSlot; onRetry?: () => void }) {
                 </>
             )}
         </div>
+    );
+}
+
+/** The jump-to-latest pill. Its width is fixed so a longer preview or a bigger count never makes it jump. */
+export function NewRowsPill({ count, preview, onClick }: { count: number; preview: string; onClick: () => void }) {
+    return (
+        <button
+            type="button"
+            aria-label={count > 0 ? `Jump to latest, ${count} new ${count === 1 ? 'line' : 'lines'}` : 'Jump to latest'}
+            onClick={onClick}
+            className="absolute bottom-2 right-3 flex w-44 max-w-[calc(100%-1.5rem)] items-center gap-1 rounded-full border border-border-subtle px-2.5 py-1 text-[11px] font-medium overlay-text-primary overlay-subtle-surface min-[480px]:w-56"
+        >
+            <span aria-hidden="true" className="shrink-0">↓</span>
+            <span aria-hidden="true" className="shrink-0">
+                {count > 0 ? count : 'Latest'}
+                {count > 0 && <span className="hidden min-[480px]:inline"> new</span>}
+            </span>
+            {preview && (
+                <span aria-hidden="true" data-pill-preview="true" className="min-w-0 flex-1 truncate text-left font-normal overlay-text-secondary">
+                    {preview}
+                </span>
+            )}
+        </button>
     );
 }
 
@@ -295,18 +318,7 @@ const TranscriptNotes: React.FC<TranscriptNotesProps> = ({
             </div>
 
             {rowsWhenFollowStopped !== null && (
-                <button
-                    type="button"
-                    aria-label={newRows > 0 ? `Jump to latest, ${newRows} new ${newRows === 1 ? 'line' : 'lines'}` : 'Jump to latest'}
-                    onClick={jumpToLatest}
-                    className="absolute bottom-2 right-3 flex items-center gap-1 rounded-full border border-border-subtle px-2.5 py-1 text-[11px] font-medium overlay-text-primary overlay-subtle-surface"
-                >
-                    <span aria-hidden="true">↓</span>
-                    <span aria-hidden="true">
-                        {newRows > 0 ? newRows : 'Latest'}
-                        {newRows > 0 && <span className="hidden min-[480px]:inline"> new</span>}
-                    </span>
-                </button>
+                <NewRowsPill count={newRows} preview={newestPreview(segments)} onClick={jumpToLatest} />
             )}
         </div>
     );
