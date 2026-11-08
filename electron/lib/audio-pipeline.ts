@@ -149,6 +149,11 @@ export function createSTTProvider(appState: AppState, speaker: 'them' | 'user'):
     // The speakers can be heard by the microphone: a line of "Me" that repeats what the other party's stream
     // just produced is that audio again, not the user speaking.
     if (trimmed) {
+      // The system-audio tap can hear Pika's own synthetic voice: a Them line that repeats the text just spoken is dropped.
+      if (speaker === 'them' && state.spokenEcho.isEcho(trimmed, timestamp)) {
+        audioStats.noteEchoDropped(segment.isFinal, wordsOf(trimmed).length);
+        return;
+      }
       state.echoFilter ??= new EchoFilter();
       const echoFilter = state.echoFilter;
       if (speaker === 'them') {
