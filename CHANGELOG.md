@@ -1,5 +1,27 @@
 # Changelog
 
+## [3.2.0](https://github.com/royisme/pikabaka/compare/v3.1.0...v3.2.0) (2026-11-07)
+
+
+### Features
+
+* **agent:** add a Not right link on the proactive card that fills the input with the card and its line ([d2cbbc1](https://github.com/royisme/pikabaka/commit/d2cbbc1f052b1e47b4f2547185f45a326d195405))
+* **scenario:** let the proactive gate classifier see the scenario brief ([c9d88ec](https://github.com/royisme/pikabaka/commit/c9d88ecbe6d71451b6bd4d96b6ca65e493df71c4))
+* **scenario:** set a brief and an answer language that cards and answers follow ([b92d4c3](https://github.com/royisme/pikabaka/commit/b92d4c3ccbc2de60cf190e8b311069ca1109cf3c))
+* **scenario:** set a brief and an answer language that cards and answers follow ([8948bb3](https://github.com/royisme/pikabaka/commit/8948bb37757148e8369a65da089dcf58a6edcc97))
+* **transcript:** add a hover button on other-party rows that fills the chat input with the line ([c706720](https://github.com/royisme/pikabaka/commit/c70672004d1b0c8306f1328a4c153be2d2dd6b85))
+* **transcript:** ask the agent about a transcript line or a card ([bb344f8](https://github.com/royisme/pikabaka/commit/bb344f840d9a1869387045b106be95cc94c38ffa))
+* **transcript:** fix misheard words with a model after a line is final ([4761373](https://github.com/royisme/pikabaka/commit/476137355b593243169a8f97f8e33df5b6dfb222))
+* **transcript:** fix misheard words with a model after a line is final ([fdd6554](https://github.com/royisme/pikabaka/commit/fdd65549433c300735be725354e86f9f665485a9))
+
+
+### Bug Fixes
+
+* **scenario:** show Scenario as its own open section above the other two answer settings ([8c91f4c](https://github.com/royisme/pikabaka/commit/8c91f4ccf07c5eee91ca4209b6f8246f94150fb4))
+* **transcript:** do not send temperature to Anthropic connections for correction ([b73f5a7](https://github.com/royisme/pikabaka/commit/b73f5a7d57a58df7e916987ee7aa30cf050f8b2a))
+* **transcript:** let the correction prompt fix words the context supports ([ae5fcf0](https://github.com/royisme/pikabaka/commit/ae5fcf0eb1a99ddb1d75e11fd848b3ef1916029e))
+* **transcript:** make the correction prompt conservative and allow 10 seconds ([d700cc6](https://github.com/royisme/pikabaka/commit/d700cc6a5c88c89f3cec664f3623fa0c8515e352))
+
 ## [3.1.0](https://github.com/royisme/pikabaka/compare/v3.0.0...v3.1.0) (2026-10-31)
 
 
