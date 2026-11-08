@@ -48,6 +48,7 @@ function pipeline(service: string | undefined, credential?: string) {
         electron: {},
         [file('services/CredentialsManager')]: { CredentialsManager: { getInstance: () => credentials } },
         [file('lib/transcript-assembler')]: {},
+        [file('lib/transcript-translation')]: {},
     }) as typeof import('../../electron/lib/audio-pipeline');
     const captures = Object.fromEntries(['SystemAudioCapture', 'MicrophoneCapture'].map(name => [file(`audio/${name}`), mocks[file(`audio/${name}`)]]));
     return { audio, captures, constructed, argumentsByProvider, started };
@@ -104,7 +105,7 @@ function meeting(t: Test, f: ReturnType<typeof pipeline>) {
         'helpers/CropperWindowHelper', 'helpers/ScreenshotHelper', 'services/KeybindManager', 'helpers/ProcessingHelper',
         'IntelligenceManager', 'audio/SystemAudioCapture', 'audio/MicrophoneCapture', 'helpers/ThemeManager',
         'rag/RAGManager', 'rag/embeddingConfig', 'db/DatabaseManager', 'agent/MeetingAgent', 'llm/index',
-        'lib/auto-updater', 'lib/transcript-assembler', 'lib/tray-menu', 'helpers/stealth',
+        'lib/auto-updater', 'lib/transcript-assembler', 'lib/transcript-translation', 'lib/tray-menu', 'helpers/stealth',
         'knowledge/KnowledgeOrchestrator', 'knowledge/KnowledgeDatabaseManager', 'services/CredentialsManager',
         'services/SettingsManager', 'lib/verboseLog', 'services/OllamaManager',
     ];

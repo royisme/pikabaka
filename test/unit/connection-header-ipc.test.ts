@@ -122,9 +122,9 @@ t.test('credential status is allowlisted and exposes only header names and set m
 
 t.test('translation projection carries headers and its Test redacts echoed secrets', async t => {
     const cm = credentials();
-    const { testTranslation } = mockRequire(path.resolve('electron/lib/transcript-assembler.ts'), {
+    const { testTranslation } = mockRequire(path.resolve('electron/lib/transcript-translation.ts'), {
         [path.resolve('electron/services/CredentialsManager.ts')]: { CredentialsManager: { getInstance: () => cm } },
-    }) as typeof import('../../electron/lib/transcript-assembler');
+    }) as typeof import('../../electron/lib/transcript-translation');
     let seen: unknown;
     let fail = false;
     const state = { processingHelper: { getLLMHelper: () => ({ translateTranscriptText: async (request: unknown) => {
