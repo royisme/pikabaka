@@ -7,6 +7,7 @@ import { userEchoMessage } from '../lib/userEcho';
 import type { ReplyRequest } from '../lib/transcriptAsk';
 import { useMainEvent } from './useMainEvent';
 import { failureReasonText } from '../lib/transcriptRow';
+import { appendStreaming, endStreaming, finalizeStreaming, pushStreamError, pushSystem } from './meetingChatMessages';
 import { initialMeetingChatFlags, meetingChatFlagsReducer } from './meetingChatFlagsReducer';
 
 /** " (check the API key)" and the like for a failed agent run; empty when the reason is unknown. */
@@ -169,320 +170,162 @@ export function useMeetingChat(options: { getReplyContext?: () => string | undef
     if (!window.electronAPI) return;
     const cleanups: Array<() => void> = [];
 
-    // ---- Assist (generic insight from streaming) ----
-    if (window.electronAPI.onIntelligenceAssistUpdate) {
-      cleanups.push(window.electronAPI.onIntelligenceAssistUpdate((data) => {
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          const text = (data as { insight?: string; token?: string }).insight ?? (data as { token?: string }).token ?? '';
-          if (last && last.isStreaming && last.intent === 'assist') {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: last.text + text };
-            return updated;
-          }
-          return [...prev, { id: Date.now().toString(), role: 'system', text, intent: 'assist', isStreaming: true }];
-        });
-      }));
-    }
+    cleanups.push(window.electronAPI.onIntelligenceAssistUpdate((data) => {
+      const text = (data as { insight?: string; token?: string }).insight ?? (data as { token?: string }).token ?? '';
+      setSystemMessagesIfLive((prev) => appendStreaming(prev, text, 'assist'));
+    }));
 
-    // ---- Streaming: Refinement ----
-    if (window.electronAPI.onIntelligenceRefinedAnswerToken) {
-      cleanups.push(window.electronAPI.onIntelligenceRefinedAnswerToken((data) => {
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.isStreaming && last.intent === data.intent) {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: last.text + data.token };
-            return updated;
-          }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: data.intent, isStreaming: true }];
-        });
-      }));
-    }
-    if (window.electronAPI.onIntelligenceRefinedAnswer) {
-      cleanups.push(window.electronAPI.onIntelligenceRefinedAnswer((data) => {
-        setIsProcessing(false);
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.isStreaming && last.intent === data.intent) {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: data.answer, isStreaming: false };
-            return updated;
-          }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: data.answer, intent: data.intent }];
-        });
-      }));
-    }
+    cleanups.push(window.electronAPI.onIntelligenceRefinedAnswerToken((data) => {
+      setSystemMessagesIfLive((prev) => appendStreaming(prev, data.token, data.intent));
+    }));
+    cleanups.push(window.electronAPI.onIntelligenceRefinedAnswer((data) => {
+      setIsProcessing(false);
+      setSystemMessagesIfLive((prev) => finalizeStreaming(prev, data.answer, data.intent));
+    }));
 
-    // ---- Streaming: Catch up ----
-    if (window.electronAPI.onIntelligenceCatchUpToken) {
-      cleanups.push(window.electronAPI.onIntelligenceCatchUpToken((data) => {
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.isStreaming && last.intent === 'catch_up') {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: last.text + data.token };
-            return updated;
-          }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: 'catch_up', isStreaming: true }];
-        });
-      }));
-    }
-    if (window.electronAPI.onIntelligenceCatchUp) {
-      cleanups.push(window.electronAPI.onIntelligenceCatchUp((data) => {
-        setIsProcessing(false);
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.isStreaming && last.intent === 'catch_up') {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: data.summary, isStreaming: false };
-            return updated;
-          }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: data.summary, intent: 'catch_up' }];
-        });
-      }));
-    }
+    cleanups.push(window.electronAPI.onIntelligenceCatchUpToken((data) => {
+      setSystemMessagesIfLive((prev) => appendStreaming(prev, data.token, 'catch_up'));
+    }));
+    cleanups.push(window.electronAPI.onIntelligenceCatchUp((data) => {
+      setIsProcessing(false);
+      setSystemMessagesIfLive((prev) => finalizeStreaming(prev, data.summary, 'catch_up'));
+    }));
 
-    // ---- Streaming: Ask ----
-    if (window.electronAPI.onIntelligenceAskToken) {
-      cleanups.push(window.electronAPI.onIntelligenceAskToken((data) => {
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.isStreaming && last.intent === 'ask') {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: last.text + data.token };
-            return updated;
-          }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: data.token, intent: 'ask', isStreaming: true }];
-        });
-      }));
-    }
-    if (window.electronAPI.onIntelligenceAsk) {
-      cleanups.push(window.electronAPI.onIntelligenceAsk((data) => {
-        setIsProcessing(false);
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.isStreaming && last.intent === 'ask') {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: data.question, isStreaming: false };
-            return updated;
-          }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: data.question, intent: 'ask' }];
-        });
-      }));
-    }
+    cleanups.push(window.electronAPI.onIntelligenceAskToken((data) => {
+      setSystemMessagesIfLive((prev) => appendStreaming(prev, data.token, 'ask'));
+    }));
+    cleanups.push(window.electronAPI.onIntelligenceAsk((data) => {
+      setIsProcessing(false);
+      setSystemMessagesIfLive((prev) => finalizeStreaming(prev, data.question, 'ask'));
+    }));
 
-    // ---- Manual result / generic error ----
-    if (window.electronAPI.onIntelligenceManualResult) {
-      cleanups.push(window.electronAPI.onIntelligenceManualResult((data) => {
-        setIsProcessing(false);
-        setSystemMessagesIfLive((prev) => [
-          ...prev,
-          { id: Date.now().toString(), role: 'system', text: `\uD83C\uDFAF **Answer:**\n\n${data.answer}` },
-        ]);
-      }));
-    }
-    if (window.electronAPI.onIntelligenceError) {
-      cleanups.push(window.electronAPI.onIntelligenceError((data) => {
-        setIsProcessing(false);
-        setSystemMessagesIfLive((prev) => [
-          ...prev,
-          { id: Date.now().toString(), role: 'system', text: `Error (${data.mode}): ${data.error}`, isError: true },
-        ]);
-      }));
-    }
-    if (window.electronAPI.onSuggestionGenerated) {
-      cleanups.push(window.electronAPI.onSuggestionGenerated((data) => {
-        setIsProcessing(false);
-        setSystemMessagesIfLive((prev) => [
-          ...prev,
-          { id: Date.now().toString(), role: 'system', text: data.suggestion },
-        ]);
-      }));
-    }
-    if (window.electronAPI.onSuggestionError) {
-      cleanups.push(window.electronAPI.onSuggestionError((data) => {
-        setIsProcessing(false);
-        setSystemMessagesIfLive((prev) => [
-          ...prev,
-          { id: Date.now().toString(), role: 'system', text: `Error: ${data.error}`, isError: true },
-        ]);
-      }));
-    }
+    cleanups.push(window.electronAPI.onIntelligenceManualResult((data) => {
+      setIsProcessing(false);
+      setSystemMessagesIfLive((prev) => pushSystem(prev, `\uD83C\uDFAF **Answer:**\n\n${data.answer}`));
+    }));
+    cleanups.push(window.electronAPI.onIntelligenceError((data) => {
+      setIsProcessing(false);
+      setSystemMessagesIfLive((prev) => pushSystem(prev, `Error (${data.mode}): ${data.error}`, true));
+    }));
+    cleanups.push(window.electronAPI.onSuggestionGenerated((data) => {
+      setIsProcessing(false);
+      setSystemMessagesIfLive((prev) => pushSystem(prev, data.suggestion));
+    }));
+    cleanups.push(window.electronAPI.onSuggestionError((data) => {
+      setIsProcessing(false);
+      setSystemMessagesIfLive((prev) => pushSystem(prev, `Error: ${data.error}`, true));
+    }));
 
-    // ---- Streaming: generic gemini-chat-stream (used by submitPrompt / handleReply) ----
-    console.log('[useMeetingChat] registering gemini-stream listeners. has onGeminiStreamToken:', !!window.electronAPI.onGeminiStreamToken);
-    if (window.electronAPI.onGeminiStreamToken) {
-      cleanups.push(window.electronAPI.onGeminiStreamToken((token) => {
-        console.log('[gemini-stream-token]', String(token).length);
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.isStreaming) {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: last.text + token };
-            return updated;
-          }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: token, isStreaming: true }];
-        });
-      }));
-    }
-    if (window.electronAPI.onGeminiStreamDone) {
-      cleanups.push(window.electronAPI.onGeminiStreamDone(() => {
-        console.log('[gemini-stream-done]');
-        setIsProcessing(false);
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.isStreaming) {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, isStreaming: false };
-            return updated;
-          }
-          return prev;
-        });
-      }));
-    }
-    if (window.electronAPI.onGeminiStreamError) {
-      cleanups.push(window.electronAPI.onGeminiStreamError((error) => {
-        console.log('[gemini-stream-error]', error);
-        setIsProcessing(false);
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          const errMsg = { id: Date.now().toString(), role: 'system' as const, text: `Error: ${error}`, isError: true };
-          if (last && last.isStreaming && last.text === '') return prev.slice(0, -1).concat(errMsg);
-          return [...prev, errMsg];
-        });
-      }));
-    }
+    // Generic gemini-chat-stream (used by submitPrompt / handleReply).
+    cleanups.push(window.electronAPI.onGeminiStreamToken((token) => {
+      setSystemMessagesIfLive((prev) => appendStreaming(prev, token));
+    }));
+    cleanups.push(window.electronAPI.onGeminiStreamDone(() => {
+      setIsProcessing(false);
+      setSystemMessagesIfLive(endStreaming);
+    }));
+    cleanups.push(window.electronAPI.onGeminiStreamError((error) => {
+      setIsProcessing(false);
+      setSystemMessagesIfLive((prev) => pushStreamError(prev, `Error: ${error}`));
+    }));
 
-    // ---- Streaming: RAG live query (rag:query-live) ----
-    if (window.electronAPI.onRAGStreamChunk) {
-      cleanups.push(window.electronAPI.onRAGStreamChunk((data) => {
-        console.log('[rag-stream-chunk]', String(data.chunk).length);
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.isStreaming) {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, text: last.text + data.chunk };
-            return updated;
-          }
-          return [...prev, { id: Date.now().toString(), role: 'system', text: data.chunk, isStreaming: true }];
-        });
-      }));
-    }
-    if (window.electronAPI.onRAGStreamComplete) {
-      cleanups.push(window.electronAPI.onRAGStreamComplete((data) => {
-        console.log('[rag-stream-complete]', data);
-        setIsProcessing(false);
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.isStreaming) {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...last, isStreaming: false };
-            return updated;
-          }
-          return prev;
-        });
-      }));
-    }
-    if (window.electronAPI.onRAGStreamError) {
-      cleanups.push(window.electronAPI.onRAGStreamError((data) => {
-        console.log('[rag-stream-error]', data);
-        setIsProcessing(false);
-        setSystemMessagesIfLive((prev) => {
-          const last = prev[prev.length - 1];
-          const errMsg = { id: Date.now().toString(), role: 'system' as const, text: `Error: ${data.error}`, isError: true };
-          if (last && last.isStreaming && last.text === '') return prev.slice(0, -1).concat(errMsg);
-          return [...prev, errMsg];
-        });
-      }));
-    }
+    // RAG live query (rag:query-live).
+    cleanups.push(window.electronAPI.onRAGStreamChunk((data) => {
+      setSystemMessagesIfLive((prev) => appendStreaming(prev, data.chunk));
+    }));
+    cleanups.push(window.electronAPI.onRAGStreamComplete(() => {
+      setIsProcessing(false);
+      setSystemMessagesIfLive(endStreaming);
+    }));
+    cleanups.push(window.electronAPI.onRAGStreamError((data) => {
+      setIsProcessing(false);
+      setSystemMessagesIfLive((prev) => pushStreamError(prev, `Error: ${data.error}`));
+    }));
 
     // ---- Agent Events (MeetingAgent) ----
-    if (window.electronAPI.onAgentEvent) {
-      cleanups.push(window.electronAPI.onAgentEvent((event) => {
-        switch (event.type) {
-          case 'run_started':
-            setIsProcessing(true);
-            break;
-          case 'text_delta':
-            setSystemMessagesIfLive((prev) => {
-              const last = prev[prev.length - 1];
-              if (last && last.isStreaming) {
-                const updated = [...prev];
-                const baseText = last.isWorkingState ? '' : last.text;
-                updated[updated.length - 1] = {
-                  ...last,
-                  text: baseText + event.text,
-                  isWorkingState: false,
-                };
-                return updated;
-              }
-              // A later step of the same run (after a tool call) starts a new message.
-              if (!isAgentRunRef.current) return prev;
-              return [...prev, { id: `${Date.now()}-${prev.length}`, role: 'system', text: event.text, isStreaming: true, intent: 'manual' }];
-            });
-            break;
-          case 'text_final':
-            setSystemMessagesIfLive((prev) => {
-              const last = prev[prev.length - 1];
-              if (last && last.isStreaming) {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  ...last,
-                  text: event.text,
-                  isStreaming: false,
-                  isWorkingState: false,
-                };
-                return updated;
-              }
-              if (!isAgentRunRef.current || !event.text.trim() || last?.text === event.text) return prev;
-              return [...prev, { id: `${Date.now()}-${prev.length}`, role: 'system', text: event.text, intent: 'manual' }];
-            });
-            break;
-          case 'tool_started':
-            setSystemMessagesIfLive((prev) => {
-              const last = prev[prev.length - 1];
-              if (last && last.isStreaming && (!last.text || last.isWorkingState)) {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  ...last,
-                  text: toolWorkingMessage(event.toolName),
-                  isWorkingState: true,
-                };
-                return updated;
-              }
-              // The step before the tool call already ended its message: show the working state as a new one.
-              if (!isAgentRunRef.current || (last && last.isStreaming)) return prev;
-              return [...prev, { id: `${Date.now()}-${prev.length}`, role: 'system', text: toolWorkingMessage(event.toolName), isStreaming: true, isWorkingState: true, intent: 'manual' }];
-            });
-            break;
-          case 'run_settled':
-            setIsProcessing(false);
-            isAgentRunRef.current = false;
-            setSystemMessagesIfLive((prev) =>
-              prev.map((m) => (m.isStreaming ? { ...m, isStreaming: false, isWorkingState: false } : m))
-            );
-            break;
-          case 'run_failed':
-            setIsProcessing(false);
-            isAgentRunRef.current = false;
-            setSystemMessagesIfLive((prev) => {
-              const nonStreaming = prev.filter((m) => !(m.isStreaming && (!m.text || m.isWorkingState)));
-              const finalized = nonStreaming.map((m) => (m.isStreaming ? { ...m, isStreaming: false, isWorkingState: false } : m));
-              return [
-                ...finalized,
-                {
-                  id: Date.now().toString(),
-                  role: 'system',
-                  text: `The agent could not answer${agentFailureWords(event.errorClass)}. Try again, or test the agent model in Settings, Models & Agent.`,
-                  isError: true,
-                },
-              ];
-            });
-            break;
-        }
-      }));
-    }
+    cleanups.push(window.electronAPI.onAgentEvent((event) => {
+      switch (event.type) {
+        case 'run_started':
+          setIsProcessing(true);
+          break;
+        case 'text_delta':
+          setSystemMessagesIfLive((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.isStreaming) {
+              const updated = [...prev];
+              const baseText = last.isWorkingState ? '' : last.text;
+              updated[updated.length - 1] = {
+                ...last,
+                text: baseText + event.text,
+                isWorkingState: false,
+              };
+              return updated;
+            }
+            // A later step of the same run (after a tool call) starts a new message.
+            if (!isAgentRunRef.current) return prev;
+            return [...prev, { id: `${Date.now()}-${prev.length}`, role: 'system', text: event.text, isStreaming: true, intent: 'manual' }];
+          });
+          break;
+        case 'text_final':
+          setSystemMessagesIfLive((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.isStreaming) {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...last,
+                text: event.text,
+                isStreaming: false,
+                isWorkingState: false,
+              };
+              return updated;
+            }
+            if (!isAgentRunRef.current || !event.text.trim() || last?.text === event.text) return prev;
+            return [...prev, { id: `${Date.now()}-${prev.length}`, role: 'system', text: event.text, intent: 'manual' }];
+          });
+          break;
+        case 'tool_started':
+          setSystemMessagesIfLive((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.isStreaming && (!last.text || last.isWorkingState)) {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...last,
+                text: toolWorkingMessage(event.toolName),
+                isWorkingState: true,
+              };
+              return updated;
+            }
+            // The step before the tool call already ended its message: show the working state as a new one.
+            if (!isAgentRunRef.current || (last && last.isStreaming)) return prev;
+            return [...prev, { id: `${Date.now()}-${prev.length}`, role: 'system', text: toolWorkingMessage(event.toolName), isStreaming: true, isWorkingState: true, intent: 'manual' }];
+          });
+          break;
+        case 'run_settled':
+          setIsProcessing(false);
+          isAgentRunRef.current = false;
+          setSystemMessagesIfLive((prev) =>
+            prev.map((m) => (m.isStreaming ? { ...m, isStreaming: false, isWorkingState: false } : m))
+          );
+          break;
+        case 'run_failed':
+          setIsProcessing(false);
+          isAgentRunRef.current = false;
+          setSystemMessagesIfLive((prev) => {
+            const nonStreaming = prev.filter((m) => !(m.isStreaming && (!m.text || m.isWorkingState)));
+            const finalized = nonStreaming.map((m) => (m.isStreaming ? { ...m, isStreaming: false, isWorkingState: false } : m));
+            return [
+              ...finalized,
+              {
+                id: Date.now().toString(),
+                role: 'system',
+                text: `The agent could not answer${agentFailureWords(event.errorClass)}. Try again, or test the agent model in Settings, Models & Agent.`,
+                isError: true,
+              },
+            ];
+          });
+          break;
+      }
+    }));
 
     return () => cleanups.forEach((fn) => fn());
   }, [setSystemMessagesIfLive, setIsProcessing]);
