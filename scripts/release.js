@@ -13,8 +13,8 @@
 //   • Current branch is main, working tree clean, in sync with origin
 //   • package.json version has a matching `vX.Y.Z` GitHub Release
 // Pipeline:
-//   • node scripts/build-app.js   (verify → vite → tsc → rust → pack →
-//                                  sign → notarize → staple → dmg/zip)
+//   • pnpm run app:build          (verify → clean → vite → tsc → rust →
+//                                  pack → sign → notarize → staple → dmg/zip)
 //   • xcrun stapler validate     (assert .app is stapled)
 //   • spctl -a -vvv              (assert Gatekeeper accepts)
 //   • gh release upload --clobber  (idempotent — re-runs replace assets)
@@ -80,8 +80,10 @@ try {
     fail(`Tag ${tag} missing locally. Run: git fetch origin --tags`);
 }
 
-step('Build: sign + notarize + staple (this is the slow step)');
-const buildResult = spawnSync('node', ['scripts/build-app.js'], { stdio: 'inherit', env: process.env });
+step('Build: compile from source, then sign + notarize + staple (this is the slow step)');
+// app:build cleans dist/ and dist-electron/ and compiles them again; build-app.js alone packs whatever
+// is already there, which shipped v3.4.0 with a renderer and main process from an older commit.
+const buildResult = spawnSync('pnpm', ['run', 'app:build'], { stdio: 'inherit', env: process.env });
 if (buildResult.status !== 0) {
     fail(
         'Build failed. If notarize specifically timed out, the signed .app is preserved at\n' +
