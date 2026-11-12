@@ -133,6 +133,8 @@ Two renderer-only shortcuts fill the chat input without sending it (`src/lib/tra
 - `bash` runs with a minimal environment (the login shell `PATH`, `HOME`, `LANG`); no Pika keys or provider variables reach it.
 - Errors at the agent boundary are logged as a class and status code only; command output, file contents and paths are never logged.
 
+The proactive card (`assist.ts`, drafted by `draftCard` in `instance.ts` for a `shown` gate decision) is one chat-model call with no tools: the exact words the user says next, in the conversation's language and the user's answer style, or `SKIP`. It may use an example detail (a number, a preference, a place; a bracketed placeholder for the user's name) when the transcript does not give one: the owner-approved exception to "never invent data", for suggested words only. After each card attempt `draftCard` appends one `card: true` line to the meeting's `<id>.gate.jsonl` with ids, `outcome` (`drafted`, `skip`, `timeout`, `error:<class>`) and `cardLatencyMs`, never text; `readGateDecisions` skips those lines.
+
 ## Embedding store integrity
 
 `VectorStore.clearNativeVectors` finds every `vec_chunks_<n>` and `vec_summaries_<n>` table in `sqlite_master` and is the one place that clears a meeting's native vectors (re-index, summary refresh, meeting deletion), so no dimension is missed. A job that exhausts its retries stays `failed` with its real error; the meeting is never silently switched to another embedding provider, because retrieval filters by the meeting's recorded provider.

@@ -11,8 +11,9 @@ import { Gate, type GateClassify, type GateDecision } from './gate';
 import { runAssist, type AssistCard } from './assist';
 import { randomUUID } from 'node:crypto';
 import { ApprovalBroker } from './approval';
-import { appendGateDecision } from './gateLog';
+import { appendCardOutcome, appendGateDecision, type CardOutcome } from './gateLog';
 import { reportAgentError } from './MeetingAgent';
+import { classifyTranslationError } from '../transcript/translationError';
 import { takeScreenshot } from '../lib/screenshot-capture';
 
 let instance: MeetingAgent | undefined;
@@ -108,15 +109,24 @@ export async function draftCard(decision: GateDecision): Promise<AssistCard | un
   const state = AppState.getInstance();
   const cm = CredentialsManager.getInstance();
   if (!decision.kind || state.getCurrentMeetingId() !== decision.meetingId) return undefined;
+  const started = Date.now();
+  const signal = AbortSignal.timeout(15_000);
+  const record = (outcome: CardOutcome['outcome']) => {
+    try {
+      appendCardOutcome(app.getPath('userData'), { card: true, time: Date.now(), meetingId: decision.meetingId, segmentId: decision.segmentId, outcome, cardLatencyMs: Date.now() - started });
+    } catch { /* a full disk must not stop the card */ }
+  };
   try {
     const resolved = await resolveAgentModel(cm);
-    if (!resolved.ok) return undefined;
+    if (!resolved.ok) { record('error:no_model'); return undefined; }
     const lines = DatabaseManager.getInstance().getRecentSegments(decision.meetingId, Date.now() - 3 * 60_000).slice(-6)
       .map(segment => ({ speaker: segment.speaker === 'user' ? 'You' as const : 'Them' as const, text: segment.text }));
-    const text = await runAssist(resolved.model, { kind: decision.kind, lines, language: cm.getAiResponseLanguage(), spokenLanguageKey: cm.getSttLanguageUser(), style: cm.getAnswerStyle(), scenario: getScenario() }, AbortSignal.timeout(15_000));
-    if (!text || state.getCurrentMeetingId() !== decision.meetingId) return undefined;
+    const text = await runAssist(resolved.model, { kind: decision.kind, lines, language: cm.getAiResponseLanguage(), spokenLanguageKey: cm.getSttLanguageUser(), style: cm.getAnswerStyle(), scenario: getScenario() }, signal);
+    if (!text || state.getCurrentMeetingId() !== decision.meetingId) { record(signal.aborted ? 'timeout' : 'skip'); return undefined; }
+    record('drafted');
     return { id: randomUUID(), meetingId: decision.meetingId, segmentId: decision.segmentId, kind: decision.kind, text, time: Date.now() };
   } catch (error) {
+    record(signal.aborted ? 'timeout' : `error:${classifyTranslationError(error)}`);
     reportAgentError(error, decision.meetingId);
     return undefined;
   }
