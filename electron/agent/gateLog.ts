@@ -4,12 +4,27 @@ import path from 'node:path';
 import type { GateDecision } from './gate';
 
 // One JSON line per decision, beside the meeting's agent store. A line carries ids, numbers and the
-// outcome, never speech text. Deleting the meeting deletes the file with its store.
+// outcome, never speech text. Deleting the meeting deletes the file with its store. A shown decision is
+// followed by one `card: true` line that says what became of its card; readers of decisions skip it.
 const ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/;
 
 export function gateLogFile(userDataDir: string, meetingId: string): string {
   if (!ID.test(meetingId)) throw new Error('Invalid meeting id');
   return path.join(userDataDir, 'agent', `${meetingId}.gate.jsonl`);
+}
+
+/** What became of the card for a shown decision. Ids, numbers and the outcome only. */
+export interface CardOutcome {
+  card: true;
+  time: number;
+  meetingId: string;
+  segmentId: string;
+  outcome: 'drafted' | 'skip' | 'timeout' | `error:${string}`;
+  cardLatencyMs: number;
+}
+
+export function appendCardOutcome(userDataDir: string, outcome: CardOutcome): void {
+  appendFileSync(gateLogFile(userDataDir, outcome.meetingId), JSON.stringify(outcome) + '\n');
 }
 
 export function appendGateDecision(userDataDir: string, decision: GateDecision): void {
@@ -18,10 +33,13 @@ export function appendGateDecision(userDataDir: string, decision: GateDecision):
 
 export async function readGateDecisions(userDataDir: string, meetingId: string, limit: number): Promise<GateDecision[]> {
   const text = await readFile(gateLogFile(userDataDir, meetingId), 'utf8').catch(() => '');
-  const lines = text.split('\n').filter(Boolean).slice(-limit);
-  return lines.flatMap(line => {
-    try { return [JSON.parse(line) as GateDecision]; } catch { return []; }
-  }).reverse();
+  const decisions = text.split('\n').filter(Boolean).flatMap(line => {
+    try {
+      const entry = JSON.parse(line) as GateDecision | CardOutcome;
+      return 'card' in entry ? [] : [entry];
+    } catch { return []; }
+  });
+  return decisions.slice(-limit).reverse();
 }
 
 /** The meeting whose gate log was written last, for when no meeting runs. */
