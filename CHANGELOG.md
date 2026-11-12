@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.5.0](https://github.com/royisme/pikabaka/compare/v3.4.0...v3.5.0) (2026-11-12)
+
+
+### Features
+
+* **cards:** proactive cards now give the exact words to say next, not a label for the question ([#147](https://github.com/royisme/pikabaka/issues/147)) ([5d4eb15](https://github.com/royisme/pikabaka/commit/5d4eb151319515a564a1499ab4e63611d7915bea))
+
+
+### Bug Fixes
+
+* **release:** build installers from the current source, so Scenario and Interpreting reach users ([#145](https://github.com/royisme/pikabaka/issues/145)) ([efa7618](https://github.com/royisme/pikabaka/commit/efa76188a82b73d401ce94c2b5cb586939f1edfd))
+
 ## [3.4.0](https://github.com/royisme/pikabaka/compare/v3.3.0...v3.4.0) (2026-11-08)
 
 
